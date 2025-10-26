@@ -1,5 +1,5 @@
 # Windows Launcher for Android
-
+[![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-yellow.svg)](https://buymeacoffee.com/jovanovski)
 This is a Windows inspired launcher for Android 11+, which tries to faithfully recreate the retro Windows on modern phones. Feel free to grab a pre-comliped APK from the Releases tab or download and build the project yourself.
 
 ![Windows Launcher Preview](https://i.imgur.com/QkqXMBu.jpeg)
