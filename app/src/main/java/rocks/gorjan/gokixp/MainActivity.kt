@@ -362,7 +362,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
         private const val KEY_SCREENSAVER_ENABLED = "screensaver_enabled"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
-        private const val KEY_CHANGELOG_DATA = "changelog_data"
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 
@@ -6087,43 +6086,58 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val welcomeMessage = "Windows has updated to version $versionName, tap 'Change Log' to see what's new!.\n\nIf you like what I'm building, buy me a coffee here: https://buymeacoffee.com/jovanovski.\n\nThis is a passion project from Gorjan Jovanovski, a developer who grew up with these aesthetics and prefers them over new design any day.\n\nIf you're a 80s or 90s kid, you remember these days fondly, and this is a change to relive them on a modern daily driver, in your pocket!\n\nA few tips:\n1) Tap on things that look tappable, chances are they are.\n2) Swipe back to close the active open window.\n3) Swipe up, down and right on the desktop for different actions.\n4) Long press on the desktop to change wallpapers and themes.\n5) There are multiple Windows apps in the start menu, all with their own purpose.\n\nAll the copyrighted information belongs to their respective authors, the aim here is to just recreate nostalgia for fun.\n\nThe music you're listening to from the legendary Stan LePard, rest in peace!\n\nFor any feature requests, drop me an email at hey@gorjan.rocks\n\nThanks for using Windows!"
 
         // Function to format changelog text
-        fun getChangeLogText(): String {
-            val changelogData = prefs.getString(KEY_CHANGELOG_DATA, null) ?: return "No changelog available"
+        fun fetchChangeLogFromGitHub(callback: (String) -> Unit) {
+            Thread {
+                try {
+                    val url = URL("https://api.github.com/repos/jovanovski/windowslauncher/releases")
+                    val connection = url.openConnection() as HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
 
-            try {
-                val gson = Gson()
-                val config = gson.fromJson(changelogData, com.google.gson.JsonObject::class.java)
-                val changeLogArray = config.getAsJsonArray("changeLog")
+                    val responseCode = connection.responseCode
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        val response = connection.inputStream.bufferedReader().use { it.readText() }
+                        val gson = Gson()
+                        val releases = gson.fromJson(response, com.google.gson.JsonArray::class.java)
 
-                if (changeLogArray == null || changeLogArray.size() == 0) {
-                    return "No changelog available"
-                }
-
-                val builder = StringBuilder()
-                builder.append("Change Log\n\n")
-
-                for (i in 0 until changeLogArray.size()) {
-                    val versionEntry = changeLogArray[i].asJsonObject
-                    val changes = versionEntry.getAsJsonArray("changeLog")
-
-                    builder.append("Version $versionName:\n")
-
-                    if (changes != null) {
-                        for (j in 0 until changes.size()) {
-                            builder.append("  - ${changes[j].asString}\n")
+                        if (releases == null || releases.size() == 0) {
+                            callback("No changelog available")
+                            return@Thread
                         }
+
+                        val builder = StringBuilder()
+                        builder.append("Change Log\n\n")
+
+                        // Releases are already sorted from most recent to oldest by GitHub API
+                        for (i in 0 until releases.size()) {
+                            val release = releases[i].asJsonObject
+                            val name = release.get("name")?.asString ?: release.get("tag_name")?.asString ?: "Unknown Version"
+                            val body = release.get("body")?.asString ?: ""
+
+                            builder.append("$name\n")
+                            if (body.isNotEmpty()) {
+                                builder.append("$body\n")
+                            }
+
+                            if (i < releases.size() - 1) {
+                                builder.append("\n")
+                            }
+                        }
+
+                        callback(builder.toString())
+                    } else {
+                        Log.e("MainActivity", "Failed to fetch changelog: HTTP $responseCode")
+                        callback("Failed to load changelog from GitHub")
                     }
 
-                    if (i < changeLogArray.size() - 1) {
-                        builder.append("\n")
-                    }
+                    connection.disconnect()
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error fetching changelog from GitHub", e)
+                    callback("Error loading changelog: ${e.message}")
                 }
-
-                return builder.toString()
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error parsing changelog", e)
-                return "Error loading changelog"
-            }
+            }.start()
         }
 
         // Make the text clickable with blue underlined links
@@ -6208,10 +6222,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Switch to changelog image
             backgroundImageView.setImageResource(changeLogDrawable)
 
-            // Display changelog text
-            val changeLogText = getChangeLogText()
-            welcomeTextView.text = changeLogText
+            // Show loading message
+            welcomeTextView.text = "Loading changelog..."
             welcomeTextView.movementMethod = null
+
+            // Fetch and display changelog from GitHub
+            fetchChangeLogFromGitHub { changeLogText ->
+                runOnUiThread {
+                    welcomeTextView.text = changeLogText
+                }
+            }
         }
 
         // Set up close button click handler
