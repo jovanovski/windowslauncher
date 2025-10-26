@@ -67,6 +67,8 @@ import android.text.style.ClickableSpan
 import java.io.InputStream
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
+import androidx.appcompat.content.res.AppCompatResources
 import rocks.gorjan.gokixp.agent.Agent
 import rocks.gorjan.gokixp.agent.AgentView
 import rocks.gorjan.gokixp.agent.TTSService
@@ -83,11 +85,16 @@ import com.google.android.gms.common.api.ApiException
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import rocks.gorjan.gokixp.theme.*
+import java.net.HttpURLConnection
+import java.net.URL
+import androidx.core.graphics.toColorInt
+import androidx.core.view.isVisible
+import androidx.core.view.isEmpty
 
 class MainActivity : AppCompatActivity(), AppChangeListener {
 
     val themeManager by lazy { ThemeManager(this) }
-    val fontManager by lazy { FontManager(this) }
+    private val fontManager by lazy { FontManager(this) }
     val drawableManager by lazy { DrawableManager(this) }
     private val themeAwareComponents = mutableListOf<ThemeAware>()
 
@@ -166,7 +173,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val systemAppActions = mutableMapOf<String, () -> Unit>() // packageName -> action function
 
     // Permission request codes
-    private val CALENDAR_PERMISSION_REQUEST_CODE = 1001
+    private val CALENDAR_PERMISSION_REQUEST_CODE = 1003
     private val AUDIO_PERMISSION_REQUEST_CODE = 200
 
     // Image picker launcher for wallpaper selection
@@ -181,7 +188,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var pendingImportCallback: (() -> Unit)? = null
     private lateinit var googleDriveHelper: GoogleDriveHelper
 
-    private val exportPrefsLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument()) { uri: Uri? ->
+    private val exportPrefsLauncher = registerForActivityResult(CreateDocument("todo/todo")) { uri: Uri? ->
         uri?.let { selectedUri ->
             try {
                 val jsonString = pendingExportJson
@@ -208,29 +215,31 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 if (jsonString != null) {
-                    val gson = com.google.gson.Gson()
-                    val importedPrefs = gson.fromJson(jsonString, Map::class.java) as Map<String, Any>
+                    val gson = Gson()
+                    val importedPrefs = gson.fromJson(jsonString, Map::class.java) as Map<String, *>
 
                     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    val editor = prefs.edit()
+                    prefs.edit {
+                        // Clear all existing preferences
+                        clear()
 
-                    // Clear all existing preferences
-                    editor.clear()
-
-                    // Import all preferences
-                    importedPrefs.forEach { (key, value) ->
-                        when (value) {
-                            is String -> editor.putString(key, value)
-                            is Boolean -> editor.putBoolean(key, value)
-                            is Int -> editor.putInt(key, value.toInt())
-                            is Long -> editor.putLong(key, value.toLong())
-                            is Float -> editor.putFloat(key, value.toFloat())
-                            is Double -> editor.putFloat(key, value.toFloat())
-                            else -> Log.w("MainActivity", "Unknown preference type for key $key: ${value?.javaClass?.name}")
+                        // Import all preferences
+                        importedPrefs.forEach { (key, value) ->
+                            when (value) {
+                                is String -> putString(key, value)
+                                is Boolean -> putBoolean(key, value)
+                                is Int -> putInt(key, value.toInt())
+                                is Long -> putLong(key, value.toLong())
+                                is Float -> putFloat(key, value.toFloat())
+                                is Double -> putFloat(key, value.toFloat())
+                                else -> Log.w(
+                                    "MainActivity",
+                                    "Unknown preference type for key $key: ${value?.javaClass?.name}"
+                                )
+                            }
                         }
-                    }
 
-                    editor.apply()
+                    }
                     recreate()
                 }
             } catch (e: Exception) {
@@ -285,9 +294,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     // Easter egg sounds (sorted by filename)
     private val eggSounds = listOf(
-        "developers1",
-        "developers2", 
-        "ilovethiscompany"
+        R.raw.developers1,
+        R.raw.developers2,
+        R.raw.ilovethiscompany
     )
     private var currentEggSoundIndex = 0
     private var profilePictureView: ImageView? = null
@@ -386,6 +395,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "start_banner_2000",
             "start_banner_95"
         )
+
+        // Map banner names to resource IDs
+        private val BANNER_RESOURCE_MAP = mapOf(
+            "start_banner_98" to R.drawable.start_banner_98,
+            "start_banner_me" to R.drawable.start_banner_me,
+            "start_banner_2000" to R.drawable.start_banner_2000,
+            "start_banner_95" to R.drawable.start_banner_95
+        )
+    }
+
+    /**
+     * Gets the drawable resource ID for a banner name.
+     * @return Resource ID or 0 if not found
+     */
+    private fun getBannerResourceId(bannerName: String): Int {
+        return BANNER_RESOURCE_MAP[bannerName] ?: 0
     }
 
 
@@ -476,21 +501,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Returns true if flavour spinner should be visible (Classic theme only).
      */
     private fun shouldShowFlavourSpinner(): Boolean {
-        return themeManager.getSelectedTheme() is AppTheme.WindowsClassic
-    }
-
-    /**
-     * Returns true if shutdown sound should play (XP and Vista only).
-     */
-    private fun shouldPlayShutdownSound(): Boolean {
-        val theme = themeManager.getSelectedTheme()
-        return theme is AppTheme.WindowsXP || theme is AppTheme.WindowsVista
-    }
-
-    /**
-     * Returns true if font scale should be applied (Classic theme only).
-     */
-    private fun shouldApplyFontScale(): Boolean {
         return themeManager.getSelectedTheme() is AppTheme.WindowsClassic
     }
 
@@ -648,7 +658,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             updateDownloadLink?.let { link ->
                 try {
                     val intent = Intent(Intent.ACTION_VIEW)
-                    intent.data = Uri.parse(link)
+                    intent.data = link.toUri()
                     startActivity(intent)
                     playClickSound()
                 } catch (e: Exception) {
@@ -720,7 +730,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun setupSystemTrayToggle() {
         val systemTrayToggle = findViewById<ImageView>(R.id.system_tray_toggle)
         val systemTrayToggleArea = findViewById<LinearLayout>(R.id.system_tray_toggle_area)
-        val taskbarEmptySpace = findViewById<View>(R.id.taskbar_empty_space)
 
         if (systemTrayToggle == null) {
             Log.e("MainActivity", "System tray toggle button not found!")
@@ -782,7 +791,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun updateSystemTrayToggleIcon(toggleButton: ImageView?, isVisible: Boolean) {
         // Update icon based on visibility state and theme
         val currentTheme = themeManager.getSelectedTheme()
-        Log.d("GOKIII", currentTheme.toString())
         val iconRes = when {
             currentTheme is AppTheme.WindowsVista && isVisible -> R.drawable.system_tray_collapse_vista
             currentTheme is AppTheme.WindowsVista && !isVisible -> R.drawable.system_tray_expand_vista
@@ -857,8 +865,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Add load completion listener to prevent blocking UI
         soundPool.setOnLoadCompleteListener { _, _, status ->
-            if (status == 0) {
-            } else {
+            if (status != 0) {
                 Log.w("MainActivity", "Sound failed to load with status: $status")
             }
         }
@@ -899,11 +906,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.num_other] = soundPool.load(audioContext, R.raw.num_other, 1)
 
         // Preload egg sounds
-        for (soundName in eggSounds) {
-            val resourceId = resources.getIdentifier(soundName, "raw", packageName)
-            if (resourceId != 0) {
-                soundIds[resourceId] = soundPool.load(audioContext, resourceId, 1)
-            }
+        for (resourceId in eggSounds) {
+            soundIds[resourceId] = soundPool.load(audioContext, resourceId, 1)
         }
         
         Log.d("MainActivity", "SoundPool initialized with ${soundIds.size} sounds")
@@ -971,11 +975,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun vibrateShort() {
-        val vibratorContext =
-            createAttributionContext("system")
-        val vibratorManager = vibratorContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-        val vibrator = vibratorManager.defaultVibrator
-        vibrator.vibrate(VibrationEffect.createOneShot(25, 70))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorContext =
+                createAttributionContext("system")
+            val vibratorManager =
+                vibratorContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            val vibrator = vibratorManager.defaultVibrator
+            vibrator.vibrate(VibrationEffect.createOneShot(25, 70))
+        }
     }
 
     private fun setupChargingDetection() {
@@ -1055,7 +1062,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val systemApps = mutableListOf<AppInfo>()
 
         // Internet Explorer - scale icon to match app icon size
-        val ieDrawable = getDrawable(themeManager.getIEIcon())
+        val ieDrawable = AppCompatResources.getDrawable(this, themeManager.getIEIcon())
         if (ieDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Internet Explorer",
@@ -1065,7 +1072,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Registry Editor - scale icon to match app icon size
-        val regeditDrawable = getDrawable(themeManager.getRegeditIcon())
+        val regeditDrawable = AppCompatResources.getDrawable(this,themeManager.getRegeditIcon())
         if (regeditDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Registry Editor",
@@ -1075,7 +1082,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Dialer - scale icon to match app icon size
-        val dialerDrawable = getDrawable(R.drawable.dialer_icon)
+        val dialerDrawable = AppCompatResources.getDrawable(this,R.drawable.dialer_icon)
         if (dialerDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Phone Dialer",
@@ -1085,7 +1092,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Notepad - scale icon to match app icon size
-        val notepadDrawable = getDrawable(themeManager.getNotepadIcon())
+        val notepadDrawable = AppCompatResources.getDrawable(this,themeManager.getNotepadIcon())
         if (notepadDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Notepad",
@@ -1095,7 +1102,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Winamp - scale icon to match app icon size
-        val winampDrawable = getDrawable(themeManager.getWinampIcon())
+        val winampDrawable = AppCompatResources.getDrawable(this,themeManager.getWinampIcon())
         if (winampDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Winamp",
@@ -1105,7 +1112,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Minesweeper - scale icon to match app icon size
-        val minesweeperDrawable = getDrawable(themeManager.getMinesweeperIcon())
+        val minesweeperDrawable = AppCompatResources.getDrawable(this,themeManager.getMinesweeperIcon())
         if (minesweeperDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Minesweeper",
@@ -1115,7 +1122,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Solitare - scale icon to match app icon size
-        val solitareDrawable = getDrawable(themeManager.getSolitareIcon())
+        val solitareDrawable = AppCompatResources.getDrawable(this,themeManager.getSolitareIcon())
         if (solitareDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Solitaire",
@@ -1327,7 +1334,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 // Switch to apps when user starts typing (not just on focus)
-                searchBoxView.addTextChangedListener(object : android.text.TextWatcher {
+                searchBoxView.addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
                         // Detect backspace on empty field: count > 0 means deleting, s is empty
                         if (count > 0 && after == 0 && s.isNullOrEmpty() && isVistaShowingApps) {
@@ -1340,7 +1347,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             switchToApps()
                         }
                     }
-                    override fun afterTextChanged(s: android.text.Editable?) {}
+                    override fun afterTextChanged(s: Editable?) {}
                 })
             }
 
@@ -1386,23 +1393,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Handle special virtual items that don't have real packages
         if (packageName == "recycle.bin") {
             // Return the recycle bin icon from resources instead of looking in package manager
-            return getDrawable(R.drawable.recycle)
+            return AppCompatResources.getDrawable(this, R.drawable.recycle)
         }
 
         if(packageName.startsWith("folder_")){
             // Return appropriate folder icon based on theme
-            return getDrawable(themeManager.getFolderIconRes(themeManager.getSelectedTheme()))
+            return AppCompatResources.getDrawable(this, themeManager.getFolderIconRes(themeManager.getSelectedTheme()))
         }
 
         // Handle system apps
         if (isSystemApp(packageName)) {
             return when (packageName) {
-                "system.internet_explorer" -> getDrawable(themeManager.getIEIcon())
-                "system.notepad" -> getDrawable(themeManager.getNotepadIcon())
-                "system.solitare" -> getDrawable(themeManager.getSolitareIcon())
-                "system.minesweeper" -> getDrawable(themeManager.getMinesweeperIcon())
-                "system.registry_editor" -> getDrawable(themeManager.getRegeditIcon())
-                "system.winamp" -> getDrawable(themeManager.getWinampIcon())
+                "system.internet_explorer" ->AppCompatResources.getDrawable(this, themeManager.getIEIcon())
+                "system.notepad" ->AppCompatResources.getDrawable(this, themeManager.getNotepadIcon())
+                "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
+                "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
+                "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
+                "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 else -> null
             }
         }
@@ -1517,7 +1524,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         commandsAdapter?.onThemeChanged(themeManager.getSelectedTheme())
     }
 
-    fun refreshCommandsList() {
+    private fun refreshCommandsList() {
         Log.d("MainActivity", "Commands list refresh requested")
         isCommandsListLoading = false // Reset loading flag
 
@@ -1562,13 +1569,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         Log.d("MainActivity", "Cursor visibility changed to: ${if (newVisibility) "VISIBLE" else "HIDDEN"}")
     }
-
-    fun isIconTextBackgroundVisible(): Boolean {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        return prefs.getBoolean(KEY_ICON_TEXT_BACKGROUND_VISIBLE, true) // Default to visible
-    }
-
-
 
     private fun getCurrentThemeWallpaperKeys(): Pair<String, String> {
         return getCurrentThemeWallpaperKeysTypeSafe()
@@ -1660,10 +1660,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.setTitle("Select Agent")
 
-        // Get current theme for button styling
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-
         // Create content view
         val contentView = LinearLayout(this)
         contentView.orientation = LinearLayout.VERTICAL
@@ -1678,7 +1674,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             radioButton.id = View.generateViewId() // Generate unique ID for proper grouping
             radioButton.text = agent.name
             radioButton.isChecked = (index == currentIndex)
-            radioButton.setTextColor(android.graphics.Color.BLACK)
+            radioButton.setTextColor(Color.BLACK)
             radioButton.textSize = 14f
             radioButton.setPadding(4.dpToPx(), 8.dpToPx(), 4.dpToPx(), 8.dpToPx())
             radioGroup.addView(radioButton)
@@ -1703,9 +1699,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val buttonBackground = getButtonBackgroundForCurrentTheme()
 
         // Create OK button
-        val okButton = android.widget.TextView(this).apply {
+        val okButton = TextView(this).apply {
             text = "OK"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
@@ -1722,9 +1718,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Create Cancel button
-        val cancelButton = android.widget.TextView(this).apply {
+        val cancelButton = TextView(this).apply {
             text = "Cancel"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
@@ -1745,7 +1741,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setContentView(contentView)
 
         // Apply theme fonts to the entire dialog content
-        applyThemeFontsToDialog(contentView, selectedTheme)
+        applyThemeFontsToDialog(contentView)
 
         // Create the dialog container
         // OK button click handler
@@ -2226,7 +2222,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         appsAdapter?.onThemeChanged(themeManager.getSelectedTheme())
     }
 
-    fun refreshAppListManually() {
+    private fun refreshAppListManually() {
         Log.d("MainActivity", "Manual app list refresh requested")
         cachedAppList = null // Clear cache
         isAppListLoading = false // Reset loading flag
@@ -2296,28 +2292,25 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun playNextEggSound() {
         if (eggSounds.isNotEmpty()) {
-            val soundName = eggSounds[currentEggSoundIndex]
-            val resourceId = resources.getIdentifier(soundName, "raw", packageName)
-            
-            if (resourceId != 0) {
-                // Switch profile picture and name to Balmer while sound plays
-                profilePictureView?.setImageResource(R.drawable.balmer)
-                profileNameView?.text = "Balmer"
-                
-                // Play the sound using MediaPlayer for longer sounds
-                playLongSound(resourceId)
-                Log.d("MainActivity", "Playing egg sound: $soundName (index $currentEggSoundIndex)")
-                
-                // Get the actual duration for this sound and schedule revert
-                val duration = getMediaDuration(resourceId)
-                Handler(Looper.getMainLooper()).postDelayed({
-                    // Revert profile picture and name back to original
-                    updateProfilePicture() // Use saved user icon
-                    updateProfileName() // Use saved user name instead of hardcoded "Gorjan"
-                    Log.d("MainActivity", "Reverted profile picture and name back to original after $duration ms")
-                }, duration)
-            }
-            
+            val resourceId = eggSounds[currentEggSoundIndex]
+
+            // Switch profile picture and name to Balmer while sound plays
+            profilePictureView?.setImageResource(R.drawable.balmer)
+            profileNameView?.text = "Balmer"
+
+            // Play the sound using MediaPlayer for longer sounds
+            playLongSound(resourceId)
+            Log.d("MainActivity", "Playing egg sound (index $currentEggSoundIndex)")
+
+            // Get the actual duration for this sound and schedule revert
+            val duration = getMediaDuration(resourceId)
+            Handler(Looper.getMainLooper()).postDelayed({
+                // Revert profile picture and name back to original
+                updateProfilePicture() // Use saved user icon
+                updateProfileName() // Use saved user name instead of hardcoded "Gorjan"
+                Log.d("MainActivity", "Reverted profile picture and name back to original after $duration ms")
+            }, duration)
+
             // Move to next sound, wrap around to 0 when reaching the end
             currentEggSoundIndex = (currentEggSoundIndex + 1) % eggSounds.size
         }
@@ -2346,7 +2339,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
             appList98?.visibility = View.INVISIBLE
             isProgramsMenuExpanded = false
-            (commandsAdapter as? CommandsAdapter)?.setProgramsExpanded(false)
+            commandsAdapter?.setProgramsExpanded(false)
 
             // For Windows Vista theme, reset to show command list instead of app list
             if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
@@ -2396,7 +2389,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
             appList98?.visibility = View.INVISIBLE
             isProgramsMenuExpanded = false
-            (commandsAdapter as? CommandsAdapter)?.setProgramsExpanded(false)
+            commandsAdapter?.setProgramsExpanded(false)
 
             // Close keyboard and clear search box
             if (::searchBox.isInitialized) {
@@ -2434,7 +2427,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
                 appList98?.visibility = View.VISIBLE
                 isProgramsMenuExpanded = true
-                (commandsAdapter as? CommandsAdapter)?.setProgramsExpanded(true)
+                commandsAdapter?.setProgramsExpanded(true)
             } else {
                 // For Vista, ensure we're showing command list
                 val appsRecyclerView = findViewById<RecyclerView>(R.id.apps_recycler_view)
@@ -2477,7 +2470,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             appList98.visibility = if (isProgramsMenuExpanded) View.VISIBLE else View.INVISIBLE
 
             // Update the adapter with the new expanded state
-            (commandsAdapter as? CommandsAdapter)?.setProgramsExpanded(isProgramsMenuExpanded)
+            commandsAdapter?.setProgramsExpanded(isProgramsMenuExpanded)
             playClickSound()
         }
     }
@@ -3365,7 +3358,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Get the content view from the dialog
         val contentArea = parentDialog.getContentArea()
-        if (contentArea.childCount == 0) {
+        if (contentArea.isEmpty()) {
             Log.e("MainActivity", "Content area has no children")
             return
         }
@@ -3521,12 +3514,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
 
         // Create and set the content with theme-appropriate layout
-        val contentLayoutResId = if (selectedTheme == "Windows Classic") {
-            R.layout.icon_selection_content
-        } else if (selectedTheme == "Windows Vista") {
-            R.layout.icon_selection_content_vista
-        }else {
-            R.layout.icon_selection_content_xp
+        val contentLayoutResId = when (selectedTheme) {
+            "Windows Classic" -> {
+                R.layout.icon_selection_content
+            }
+            "Windows Vista" -> {
+                R.layout.icon_selection_content_vista
+            }
+            else -> {
+                R.layout.icon_selection_content_xp
+            }
         }
         val contentView = layoutInflater.inflate(contentLayoutResId, null)
         windowsDialog.setContentView(contentView)
@@ -3793,12 +3790,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create adapter that handles icon selection
         val adapter = CustomIconAdapter(userIcons) { chosenIcon ->
             val iconPath = chosenIcon.filePath ?: "default"
-
-            // Save selected user icon to shared preferences
-            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            prefs.edit()
-                .putString("user_icon_path", iconPath)
-                .apply()
+            prefs.edit {
+                putString("user_icon_path", iconPath)
+            }
 
             // Update profile picture display
             updateProfilePicture()
@@ -3949,12 +3943,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setTitle(folderNameDisplay)
 
         // Use folder icon as taskbar icon
-        val taskbarIcon = if (selectedTheme == "Windows Classic") {
-            R.drawable.folder_98
-        } else if (selectedTheme == "Windows Vista") {
-            R.drawable.folder_vista
-        } else {
-            R.drawable.folder_xp
+        val taskbarIcon = when (selectedTheme) {
+            "Windows Classic" -> {
+                R.drawable.folder_98
+            }
+            "Windows Vista" -> {
+                R.drawable.folder_vista
+            }
+            else -> {
+                R.drawable.folder_xp
+            }
         }
         windowsDialog.setTaskbarIcon(taskbarIcon)
 
@@ -4382,7 +4380,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             R.drawable.folder_xp
         }
 
-        val folderIcon = getDrawable(folderIconResource)!!
+        val folderIcon =AppCompatResources.getDrawable(this, folderIconResource)!!
 
         // Find the nearest available grid position to where the context menu was opened
         val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
@@ -4519,7 +4517,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setContentView(contentView)
 
         // Inflate the theme-appropriate RecyclerView into the container
-        val recyclerView = contentView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.wallpapers_recycler_view)
+        val recyclerView = contentView.findViewById<RecyclerView>(R.id.wallpapers_recycler_view)
 
         // Get references to tab buttons
         val wallpaperSelectButton = contentView.findViewById<View>(R.id.wallpaper_select_screen_button)
@@ -4567,7 +4565,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val themeSpinner = contentView.findViewById<android.widget.Spinner>(R.id.theme_spinner)
         val flavourLabel = contentView.findViewById<TextView>(R.id.flavour_label)
         val flavourSpinner = contentView.findViewById<android.widget.Spinner>(R.id.flavour_spinner)
-        val viewOptionsContainer = contentView.findViewById<android.widget.LinearLayout>(R.id.view_options_container)
         val gestureBarCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_under_taskbar_checkbox)
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
         val showQuickGlanceCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_quick_glance_checkbox)
@@ -4642,7 +4639,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         gestureBarCheckbox.setOnCheckedChangeListener { _, isChecked ->
             // Save new state to SharedPreferences
-            prefs.edit().putBoolean(KEY_GESTURE_BAR_VISIBLE, isChecked).apply()
+            prefs.edit { putBoolean(KEY_GESTURE_BAR_VISIBLE, isChecked) }
 
             // Apply the change immediately
             val gestureBarBackground = findViewById<View>(R.id.gesture_bar_background)
@@ -4692,7 +4689,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Set up Taskbar Height Input
-        val taskbarHeightInput = contentView.findViewById<android.widget.EditText>(R.id.taskbar_height_input)
+        val taskbarHeightInput = contentView.findViewById<EditText>(R.id.taskbar_height_input)
 
         // Load current offset from SharedPreferences
         val currentOffset = prefs.getInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
@@ -4701,10 +4698,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Track pending offset value (don't apply immediately)
         var pendingTaskbarOffset: Int? = null
 
-        taskbarHeightInput.addTextChangedListener(object : android.text.TextWatcher {
+        taskbarHeightInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
+            override fun afterTextChanged(s: Editable?) {
                 val value = s.toString().toIntOrNull()
                 if (value != null && value in -30..30) {
                     pendingTaskbarOffset = value
@@ -4718,7 +4715,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val screensaverEnabled = prefs.getBoolean(KEY_SCREENSAVER_ENABLED, true)
         enableScreensaverCheckbox.isChecked = screensaverEnabled
         enableScreensaverCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(KEY_SCREENSAVER_ENABLED, isChecked).apply()
+            prefs.edit {putBoolean(KEY_SCREENSAVER_ENABLED, isChecked) }
             if (::screensaverManager.isInitialized) {
                 screensaverManager.setEnabled(isChecked)
             }
@@ -4736,7 +4733,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Apply fonts based on selected theme
-        applyThemeFontsToDialog(contentView, currentTheme.toString())
+        applyThemeFontsToDialog(contentView)
 
         // Create the dialog container without interfering with system UI
         // Handle theme selection - just track it and update UI, don't apply
@@ -4746,8 +4743,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 pendingTheme = selectedTheme
 
                 // Update flavour spinner visibility based on selected theme
-                val isClassicTheme = selectedTheme == "Windows Classic"
-                val flavourVisibility = if (isClassicTheme) View.VISIBLE else View.GONE
                 flavourLabel.visibility = flavourVisibility
                 flavourSpinner.visibility = flavourVisibility
             }
@@ -4766,7 +4761,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Set up list layout for wallpapers
-        recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        recyclerView.layoutManager = LinearLayoutManager(this)
 
         // Load wallpapers
         val wallpapers = loadWallpapers()
@@ -4786,9 +4781,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (customWallpaperUri != null) {
             // Load custom wallpaper from URI
             try {
-                val uri = Uri.parse(customWallpaperUri)
+                val uri = customWallpaperUri.toUri()
                 val inputStream = contentResolver.openInputStream(uri)
-                val customDrawable = android.graphics.drawable.Drawable.createFromStream(inputStream, customWallpaperUri)
+                val customDrawable = Drawable.createFromStream(inputStream, customWallpaperUri)
                 inputStream?.close()
                 if (customDrawable != null) {
                     wallpaperPreview.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -4808,7 +4803,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             try {
                 val inputStream = assets.open(currentWallpaperPath)
-                val currentDrawable = android.graphics.drawable.Drawable.createFromStream(inputStream, currentWallpaperPath)
+                val currentDrawable = Drawable.createFromStream(inputStream, currentWallpaperPath)
                 inputStream.close()
                 if (currentDrawable != null) {
                     wallpaperPreview.setImageDrawable(currentDrawable)
@@ -4860,7 +4855,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // Apply pending taskbar height offset
             if (pendingTaskbarOffset != null) {
-                prefs.edit().putInt(KEY_TASKBAR_HEIGHT_OFFSET, pendingTaskbarOffset!!).apply()
+                prefs.edit {putInt(KEY_TASKBAR_HEIGHT_OFFSET, pendingTaskbarOffset!!) }
                 applyTaskbarHeightOffset(pendingTaskbarOffset!!)
             }
 
@@ -4906,7 +4901,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // Apply pending taskbar height offset
             if (pendingTaskbarOffset != null) {
-                prefs.edit().putInt(KEY_TASKBAR_HEIGHT_OFFSET, pendingTaskbarOffset!!).apply()
+                prefs.edit {putInt(KEY_TASKBAR_HEIGHT_OFFSET, pendingTaskbarOffset!!) }
                 applyTaskbarHeightOffset(pendingTaskbarOffset!!)
                 pendingTaskbarOffset = null // Clear after applying
             }
@@ -4920,7 +4915,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Show as floating window
-        android.util.Log.d("MainActivity", "Showing wallpaper dialog as floating window")
+        Log.d("MainActivity", "Showing wallpaper dialog as floating window")
         floatingWindowManager.showWindow(windowsDialog)
 
         // Set cursor back to normal after window is shown and loaded
@@ -4932,7 +4927,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showWallpaperTargetDialog(
         wallpaperItem: WallpaperItem? = null,
         uri: Uri? = null,
-        drawable: android.graphics.drawable.Drawable? = null
+        drawable: Drawable? = null
     ) {
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
@@ -4950,7 +4945,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val launcherCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.launcher_checkbox)
         val homeScreenCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.home_screen_checkbox)
         val lockScreenCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.lock_screen_checkbox)
-        val applyButton = contentView.findViewById<android.widget.TextView>(R.id.apply_button)
+        val applyButton = contentView.findViewById<TextView>(R.id.apply_button)
 
         // Set button background based on theme
         val buttonBackground = if (selectedTheme == "Windows Classic") {
@@ -4961,7 +4956,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         applyButton.setBackgroundResource(buttonBackground)
 
         // Apply theme fonts to the entire dialog content
-        applyThemeFontsToDialog(contentView, selectedTheme)
+        applyThemeFontsToDialog(contentView)
 
         // Apply button click handler
         applyButton.setOnClickListener {
@@ -5057,64 +5052,59 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun showAddKeyDialog(prefs: android.content.SharedPreferences, refreshCallback: () -> Unit) {
-        val dialogView = layoutInflater.inflate(android.R.layout.simple_list_item_1, null).apply {
-            layoutParams = android.view.ViewGroup.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
 
-        val container = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(16, 16, 16, 16)
         }
 
-        val keyInput = android.widget.EditText(this).apply {
+        val keyInput = EditText(this).apply {
             hint = "Key name"
-            setTextColor(android.graphics.Color.BLACK)
-            setHintTextColor(android.graphics.Color.GRAY)
+            setTextColor(Color.BLACK)
+            setHintTextColor(Color.GRAY)
             inputType = android.text.InputType.TYPE_CLASS_TEXT
         }
 
-        val valueInput = android.widget.EditText(this).apply {
+        val valueInput = EditText(this).apply {
             hint = "Value"
-            setTextColor(android.graphics.Color.BLACK)
-            setHintTextColor(android.graphics.Color.GRAY)
+            setTextColor(Color.BLACK)
+            setHintTextColor(Color.GRAY)
             inputType = android.text.InputType.TYPE_CLASS_TEXT
         }
 
         val typeSpinner = android.widget.Spinner(this)
         val typeOptions = arrayOf("String", "Boolean", "Integer", "Float", "Long")
         val spinnerAdapter = object : android.widget.ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, typeOptions) {
-            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
-                (view as? android.widget.TextView)?.setTextColor(android.graphics.Color.BLACK)
+                (view as? TextView)?.setTextColor(Color.BLACK)
                 return view
             }
-            override fun getDropDownView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getDropDownView(position, convertView, parent)
-                (view as? android.widget.TextView)?.setTextColor(android.graphics.Color.BLACK)
+                (view as? TextView)?.setTextColor(Color.BLACK)
                 return view
             }
         }
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         typeSpinner.adapter = spinnerAdapter
 
-        container.addView(android.widget.TextView(this).apply {
+        container.addView(TextView(this).apply {
             text = "Key:"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             setPadding(0, 8, 0, 4)
         })
         container.addView(keyInput)
-        container.addView(android.widget.TextView(this).apply {
+        container.addView(TextView(this).apply {
             text = "Value:"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             setPadding(0, 16, 0, 4)
         })
         container.addView(valueInput)
-        container.addView(android.widget.TextView(this).apply {
+        container.addView(TextView(this).apply {
             text = "Type:"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             setPadding(0, 16, 0, 4)
         })
         container.addView(typeSpinner)
@@ -5178,7 +5168,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setWindowSize(404, 422)
 
         // Load SharedPreferences
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
         // Create Registry Editor app instance
         val regeditApp = RegistryEditorApp(
@@ -5191,13 +5181,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onImportFromLocalFile = { importFromLocalFile() },
             onImportFromGoogleDrive = { importFromGoogleDrive() },
             onAutoSyncChanged = { enabled -> handleAutoSyncChanged(enabled) },
-            getLastSyncTime = { prefs.getLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L) }
+            getLastSyncTime = { preferences.getLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L) }
         )
 
         // Store instance for auto-sync updates
         registryEditorAppInstance = regeditApp
 
-        regeditApp.setupApp(contentView, prefs)
+        regeditApp.setupApp(contentView, preferences)
 
         // Auto-sync is already started in onCreate if enabled - no need to start it again here
 
@@ -5287,7 +5277,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             lifecycleScope.launch {
                 try {
                     val result = googleDriveHelper.exportToGoogleDrive(jsonString)
-                    result.onSuccess { message ->
+                    result.onSuccess {
                         // Record last sync time
                         val currentTime = System.currentTimeMillis()
                         prefs.edit { putLong(KEY_LAST_GOOGLE_DRIVE_SYNC, currentTime) }
@@ -5335,29 +5325,32 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 result.onSuccess { jsonString ->
                     try {
                         Log.d("MainActivity", "Import successful, parsing JSON (${jsonString.length} bytes)")
-                        val gson = com.google.gson.Gson()
+                        val gson = Gson()
                         val importedPrefs = gson.fromJson(jsonString, Map::class.java) as Map<String, Any>
 
                         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                        val editor = prefs.edit()
+                        prefs.edit {
 
-                        // Clear all existing preferences
-                        editor.clear()
+                            // Clear all existing preferences
+                            clear()
 
-                        // Import all preferences
-                        importedPrefs.forEach { (key, value) ->
-                            when (value) {
-                                is String -> editor.putString(key, value)
-                                is Boolean -> editor.putBoolean(key, value)
-                                is Int -> editor.putInt(key, value.toInt())
-                                is Long -> editor.putLong(key, value.toLong())
-                                is Float -> editor.putFloat(key, value.toFloat())
-                                is Double -> editor.putFloat(key, value.toFloat())
-                                else -> Log.w("MainActivity", "Unknown preference type for key $key: ${value?.javaClass?.name}")
+                            // Import all preferences
+                            importedPrefs.forEach { (key, value) ->
+                                when (value) {
+                                    is String -> putString(key, value)
+                                    is Boolean -> putBoolean(key, value)
+                                    is Int -> putInt(key, value.toInt())
+                                    is Long -> putLong(key, value.toLong())
+                                    is Float -> putFloat(key, value.toFloat())
+                                    is Double -> putFloat(key, value.toFloat())
+                                    else -> Log.w(
+                                        "MainActivity",
+                                        "Unknown preference type for key $key"
+                                    )
+                                }
                             }
-                        }
 
-                        editor.apply()
+                        }
                         Log.d("MainActivity", "Preferences imported successfully")
                         showNotification("Registry Editor", "Settings imported successfully from Google Drive")
                         recreate()
@@ -5440,8 +5433,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun createAndShowDialerDialog() {
         // Request permissions when opening dialer
-        if (checkSelfPermission(android.Manifest.permission.CALL_PHONE) != android.content.pm.PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        if (checkSelfPermission(android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(
                 arrayOf(
                     android.Manifest.permission.CALL_PHONE,
@@ -5612,9 +5605,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val editText = EditText(this).apply {
             setText(initialText)
             selectAll()
-            setTextColor(android.graphics.Color.BLACK)
-            setHintTextColor(android.graphics.Color.GRAY)
-            highlightColor = android.graphics.Color.parseColor("#7a94f4")
+            setTextColor(Color.BLACK)
+            setHintTextColor(Color.GRAY)
+            highlightColor = "#7a94f4".toColorInt()
             textSize = 12f
             setBackgroundResource(R.drawable.win98_edit_text_border)
             setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 6.dpToPx())
@@ -5641,7 +5634,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create OK button
         val okButton = TextView(this).apply {
             text = "OK"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
@@ -5660,7 +5653,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create Cancel button
         val cancelButton = TextView(this).apply {
             text = "Cancel"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
@@ -5735,7 +5728,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create message TextView
         val messageText = TextView(this).apply {
             text = message
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -5756,7 +5749,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create OK button
         val okButton = TextView(this).apply {
             text = "OK"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
@@ -5775,7 +5768,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create Cancel button
         val cancelButton = TextView(this).apply {
             text = "Cancel"
-            setTextColor(android.graphics.Color.BLACK)
+            setTextColor(Color.BLACK)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
@@ -5914,7 +5907,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             context = this,
             onRequestPermissions = {
                 // Request storage permissions
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     // For Android 13+, request READ_MEDIA_AUDIO
                     requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_AUDIO), AUDIO_PERMISSION_REQUEST_CODE)
                 } else {
@@ -5923,10 +5916,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
             },
             hasAudioPermission = {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                    checkSelfPermission(android.Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    checkSelfPermission(android.Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
                 } else {
-                    checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
                 }
             },
             onShowRenameDialog = { title, initialText, hint, onConfirm ->
@@ -6002,7 +5995,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showWelcomeToWindows()
 
             // Save that we've shown it for this version
-            prefs.edit().putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion).apply()
+            prefs.edit { putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion) }
         }
     }
 
@@ -6091,14 +6084,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Set welcome message based on theme
-        val welcomeMessage = "Windows has updated to version $versionName, tap 'Change Log' to see what's new!.\n\nIf you like what I'm building, buy me a coffee here: https://buymeacoffee.com/jovanovski.\n\nThis is a passion project from Gorjan Jovanovski, a developer who grew up with these aesthetics and prefers them over new design any day.\n\nIf you're a 80s or 90s kid, you remember these days fondly, and this is a change to relive them on a modern daily driver, in your pocket!\n\nA few tips:\n1) Tap on things that look tappable, chances are they are.\n2) Swipe back to close the active open window.\n3) Swipe up, down and right on the desktop for different actions.\n4) Long press on the desktop to change wallpapers and themes.\n5) There are multiple Windows apps in the start menu, all with their own purpouse.\n\nAll the copyrighted information belongs to their respective authors, the aim here is to just recreate nostalgia for fun.\n\nThe music you're listening to from the legendary Stan LePard, rest in peace!\n\nFor any feature requests, drop me an email at hey@gorjan.rocks\n\nThanks for using Windows!"
+        val welcomeMessage = "Windows has updated to version $versionName, tap 'Change Log' to see what's new!.\n\nIf you like what I'm building, buy me a coffee here: https://buymeacoffee.com/jovanovski.\n\nThis is a passion project from Gorjan Jovanovski, a developer who grew up with these aesthetics and prefers them over new design any day.\n\nIf you're a 80s or 90s kid, you remember these days fondly, and this is a change to relive them on a modern daily driver, in your pocket!\n\nA few tips:\n1) Tap on things that look tappable, chances are they are.\n2) Swipe back to close the active open window.\n3) Swipe up, down and right on the desktop for different actions.\n4) Long press on the desktop to change wallpapers and themes.\n5) There are multiple Windows apps in the start menu, all with their own purpose.\n\nAll the copyrighted information belongs to their respective authors, the aim here is to just recreate nostalgia for fun.\n\nThe music you're listening to from the legendary Stan LePard, rest in peace!\n\nFor any feature requests, drop me an email at hey@gorjan.rocks\n\nThanks for using Windows!"
 
         // Function to format changelog text
         fun getChangeLogText(): String {
             val changelogData = prefs.getString(KEY_CHANGELOG_DATA, null) ?: return "No changelog available"
 
             try {
-                val gson = com.google.gson.Gson()
+                val gson = Gson()
                 val config = gson.fromJson(changelogData, com.google.gson.JsonObject::class.java)
                 val changeLogArray = config.getAsJsonArray("changeLog")
 
@@ -6111,7 +6104,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
                 for (i in 0 until changeLogArray.size()) {
                     val versionEntry = changeLogArray[i].asJsonObject
-                    val versionName = versionEntry.get("versionName")?.asString ?: "Unknown"
                     val changes = versionEntry.getAsJsonArray("changeLog")
 
                     builder.append("Version $versionName:\n")
@@ -6143,7 +6135,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val clickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/jovanovski"))
+                val intent = Intent(Intent.ACTION_VIEW,
+                    "https://buymeacoffee.com/jovanovski".toUri())
                 startActivity(intent)
             }
 
@@ -6161,7 +6154,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val emailClickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
                 val intent = Intent(Intent.ACTION_SENDTO).apply {
-                    data = Uri.parse("mailto:hey@gorjan.rocks?subject=Windows%20Launcher")
+                    data = "mailto:hey@gorjan.rocks?subject=Windows%20Launcher".toUri()
                 }
                 startActivity(intent)
             }
@@ -6179,7 +6172,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val gorjanClickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://gorjan.rocks"))
+                val intent = Intent(Intent.ACTION_VIEW, "https://gorjan.rocks".toUri())
                 startActivity(intent)
             }
 
@@ -6202,7 +6195,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
 
         // Set up button click listeners to switch between welcome and changelog
-        welcomeButton.setOnClickListener {
+        welcomeButton?.setOnClickListener {
             // Switch to welcome image
             backgroundImageView.setImageResource(welcomeDrawable)
 
@@ -6211,7 +6204,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
         }
 
-        changeLogButton.setOnClickListener {
+        changeLogButton?.setOnClickListener {
             // Switch to changelog image
             backgroundImageView.setImageResource(changeLogDrawable)
 
@@ -6226,14 +6219,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             welcomeMediaPlayer.stop()
             welcomeMediaPlayer.release()
             floatingWindowManager.removeWindow(windowsDialog)
-        }
-
-        // Set up window control handlers
-        windowsDialog.setOnMinimizeListener {
-        }
-
-        windowsDialog.setOnMaximizeListener {
-            // Do nothing for now
         }
 
         windowsDialog.setOnCloseListener {
@@ -6315,7 +6300,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun applyWallpaperDrawable(drawable: android.graphics.drawable.Drawable, uri: Uri? = null) {
+    private fun applyWallpaperDrawable(drawable: Drawable, uri: Uri? = null) {
         val mainBackground = findViewById<RelativeLayout>(R.id.main_background)
 
         // Create or find existing wallpaper ImageView
@@ -6351,7 +6336,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val oldUri = prefs.getString(uriKey, null)
             if (oldUri != null) {
                 try {
-                    val oldUriParsed = Uri.parse(oldUri)
+                    val oldUriParsed = oldUri.toUri()
                     contentResolver.releasePersistableUriPermission(
                         oldUriParsed,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -6400,7 +6385,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Check if we have a custom wallpaper URI
             val uriString = prefs.getString(uriKey, null)
             if (uriString != null) {
-                val uri = Uri.parse(uriString)
+                val uri = uriString.toUri()
 
                 // Reload with downsampling
                 val options = BitmapFactory.Options().apply {
@@ -6526,38 +6511,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun setDeviceWallpaper(drawable: android.graphics.drawable.Drawable) {
-        try {
-            val wallpaperManager = android.app.WallpaperManager.getInstance(this)
-
-            // Convert drawable to bitmap
-            val bitmap = when (drawable) {
-                is android.graphics.drawable.BitmapDrawable -> {
-                    drawable.bitmap
-                }
-                else -> {
-                    // Create bitmap from drawable
-                    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1080
-                    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1920
-                    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bitmap)
-                    drawable.setBounds(0, 0, canvas.width, canvas.height)
-                    drawable.draw(canvas)
-                    bitmap
-                }
-            }
-
-            // Set the device wallpaper
-            wallpaperManager.setBitmap(bitmap)
-            Log.d("MainActivity", "Successfully set device wallpaper")
-
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Failed to set device wallpaper", e)
-            // Don't show error toast to user - this is a secondary feature
-        }
-    }
-
-    private fun applyThemeFontsToDialog(contentView: View, selectedTheme: String) {
+    private fun applyThemeFontsToDialog(contentView: View) {
         val fontResId = fontManager.getFontFamilyRes(themeManager.getSelectedTheme())
 
         val typeface = try {
@@ -6573,7 +6527,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun applyFontToAllTextViews(parent: View, typeface: android.graphics.Typeface?) {
         if (parent is TextView) {
             parent.typeface = typeface
-        } else if (parent is android.view.ViewGroup) {
+        } else if (parent is ViewGroup) {
             for (i in 0 until parent.childCount) {
                 applyFontToAllTextViews(parent.getChildAt(i), typeface)
             }
@@ -6586,7 +6540,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return if (theme.resolveAttribute(R.attr.primaryFontFamily, typedValue, true)) {
             androidx.core.content.res.ResourcesCompat.getFont(this, typedValue.resourceId)
         } else {
-            Log.d("GOKII", "ERROR!")
             null
         }
     }
@@ -6605,19 +6558,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         textView.typeface = font
     }
 
-    // Phase 2: Legacy string version for backward compatibility
-    private fun getCurrentTheme(): String {
-        return themeManager.getSelectedTheme().toString()
-    }
-
     private fun swapTaskbarLayout(layoutResId: Int) {
-        val mainContainer = findViewById<RelativeLayout>(R.id.main_background)
         val oldTaskbar = findViewById<View>(R.id.taskbar_container)
 
         if (oldTaskbar != null) {
             // Store the layout parameters from the old taskbar
             val layoutParams = oldTaskbar.layoutParams
-            val oldParent = oldTaskbar.parent as android.view.ViewGroup
+            val oldParent = oldTaskbar.parent as ViewGroup
             val indexInParent = oldParent.indexOfChild(oldTaskbar)
 
             // Remove the old taskbar
@@ -6668,7 +6615,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             updateDownloadLink?.let { link ->
                 try {
                     val intent = Intent(Intent.ACTION_VIEW)
-                    intent.data = Uri.parse(link)
+                    intent.data = link.toUri()
                     startActivity(intent)
                     playClickSound()
                 } catch (e: Exception) {
@@ -6861,7 +6808,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val customWallpaperUri = prefs.getString(uriKey, null)
         if (customWallpaperUri != null) {
             try {
-                val uri = Uri.parse(customWallpaperUri)
+                val uri = customWallpaperUri.toUri()
                 applyCustomWallpaperFromUri(uri)
                 return
             } catch (e: Exception) {
@@ -6968,9 +6915,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         } else {
             DesktopIconView(this).apply {
                 setDesktopIcon(desktopIcon)
-                // Apply current theme font
-                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                 setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
             }
         }
@@ -7076,13 +7020,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     val icon = when (iconType) {
                         IconType.RECYCLE_BIN -> {
                             // Special case for recycle bin - use recycle drawable
-                            getDrawable(R.drawable.recycle)!!
+                            AppCompatResources.getDrawable(this, R.drawable.recycle)!!
                         }
                         IconType.FOLDER -> {
                             // Use custom icon if available, otherwise use theme-appropriate folder icon
                             getAppIcon(packageName) ?: run {
                                 val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-                                getDrawable(if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
+                                AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
                             }
                         }
                         IconType.APP -> {
@@ -7091,7 +7035,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // Use custom icon if available, otherwise load from system app list
                                 getAppIcon(packageName) ?: run {
                                     getSystemAppsList().find { it.packageName == packageName }?.icon
-                                        ?: getDrawable(themeManager.getIEIcon())!! // Fallback to IE icon
+                                        ?: AppCompatResources.getDrawable(this, themeManager.getIEIcon())!! // Fallback to IE icon
                                 }
                             } else {
                                 val appInfo = packageManager.getApplicationInfo(packageName, 0)
@@ -7115,7 +7059,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             RecycleBinView(this).apply {
                                 setDesktopIcon(desktopIcon)
                                 // Apply current theme for recycle bin
-                                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                                 val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                                 Log.d("MainActivity", "LoadDesktopIcons: selectedTheme = $selectedTheme")
                                 setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
@@ -7126,8 +7069,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             FolderView(this).apply {
                                 setDesktopIcon(desktopIcon)
                                 // Apply current theme for folder
-                                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                                val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                                 Log.d("MainActivity", "LoadDesktopIcons: loading folder = $name")
                                 setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
                                 // Only set theme icon if there's no custom icon mapping
@@ -7149,7 +7090,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     desktopContainer.addView(iconView, layoutParams)
                     desktopIconViews.add(iconView)
                     // Apply current theme font
-                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                     iconView.setThemeFont(selectedTheme == "Windows Classic")
                     // Set position after adding to container
@@ -7189,7 +7129,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             } else {
                 R.drawable.recycle
             }
-            val recycleDrawable = getDrawable(iconResource)!!
+            val recycleDrawable = AppCompatResources.getDrawable(this, iconResource)!!
             val recycleBinAppInfo = AppInfo(
                 name = "Recycle Bin",
                 packageName = "recycle.bin",
@@ -7317,7 +7257,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun isOverFolder(x: Float, y: Float): FolderView? {
         // Check all desktop icon views to see if any folders are under the coordinates
         desktopIconViews.forEach { iconView ->
-            if (iconView is FolderView && iconView.parent != null && iconView.visibility == View.VISIBLE) {
+            if (iconView is FolderView && iconView.parent != null && iconView.isVisible) {
                 val folderX = iconView.x
                 val folderY = iconView.y
                 val folderWidth = iconView.width
@@ -7498,7 +7438,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Get all current occupied positions (excluding the icon being snapped)
         desktopIcons.forEachIndexed { index, _ ->
             val view = desktopIconViews.getOrNull(index)
-            if (view != null && view != iconView && view.parent != null && view.visibility == View.VISIBLE) {
+            if (view != null && view != iconView && view.parent != null && view.isVisible) {
                 val containerWidth = desktopContainer.width.toFloat()
                 val containerHeight = desktopContainer.height.toFloat()
                 val taskbarHeightPx = 70 * resources.displayMetrics.density
@@ -7541,7 +7481,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Then snap all desktop icons
         desktopIcons.forEachIndexed { index, icon ->
             val iconView = desktopIconViews.getOrNull(index)
-            if (iconView != null && iconView.parent != null && iconView.visibility == View.VISIBLE) {
+            if (iconView != null && iconView.parent != null && iconView.isVisible) {
                 // Find the nearest available grid position to the icon's current location
                 val nearestPosition = findNearestAvailableGridPosition(icon.x, icon.y, occupiedPositions)
                 
@@ -7594,7 +7534,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             for (dRow in -radius..radius) {
                 for (dCol in -radius..radius) {
                     // Only check positions at the current radius (edge of the circle)
-                    if (maxOf(kotlin.math.abs(dRow), kotlin.math.abs(dCol)) == radius) {
+                    if (maxOf(abs(dRow), abs(dCol)) == radius) {
                         val testRow = currentRow + dRow
                         val testCol = currentCol + dCol
                         
@@ -7806,7 +7746,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    fun launchGoogleSearch() {
+    private fun launchGoogleSearch() {
         Log.d("MainActivity", "🔍 launchGoogleSearch() called")
         try {
             // Method 1: Try to launch Google Search with focused search box
@@ -7872,6 +7812,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         showNotification("Error", "Google Search app not available")
     }
 
+    @Deprecated("Deprecated in Java")
     @Suppress("MissingSuperCall", "GestureBackNavigation")
     override fun onBackPressed() {
         // Custom back button behavior for home screen launcher
@@ -8024,6 +7965,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * Called when the system is running low on memory
      */
+    @Deprecated("Deprecated in Java")
     override fun onLowMemory() {
         super.onLowMemory()
         Log.w("MainActivity", "onLowMemory called - clearing caches aggressively")
@@ -8367,7 +8309,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     Log.d("MainActivity", "Weather fetch attempt ${attempt + 1}/$maxRetries")
                     
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,weather_code&timezone=auto"
-                    val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    val connection = URL(url).openConnection() as HttpURLConnection
                     connection.requestMethod = "GET"
                     connection.connectTimeout = 10000 + (attempt * 2000) // Increase timeout with retries
                     connection.readTimeout = 10000 + (attempt * 2000)
@@ -8508,7 +8450,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setWeatherUnit(unit: String) {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        prefs.edit().putString(KEY_WEATHER_UNIT, unit).apply()
+        prefs.edit { putString(KEY_WEATHER_UNIT, unit) }
         Log.d("MainActivity", "Weather unit changed to: $unit")
     }
 
@@ -8920,27 +8862,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "New apps: $newApps")
             Log.d("MainActivity", "Removed apps: $removedApps")
 
-            // Handle new apps
-            newApps.forEach { packageName ->
-                try {
-                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                    val appName = packageManager.getApplicationLabel(appInfo).toString()
-                    val appIcon = getAppIcon(packageName) ?: packageManager.getApplicationIcon(appInfo)
-
-                    val newAppInfo = AppInfo(
-                        name = appName,
-                        packageName = packageName,
-                        icon = appIcon
-                    )
-
-//                    createDesktopShortcut(newAppInfo)
-                    Log.d("MainActivity", "Auto-created desktop shortcut for new app: $appName")
-
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error handling new app: $packageName", e)
-                }
-            }
-
             // Handle removed apps
             removedApps.forEach { packageName ->
                 val iconsToRemove = mutableListOf<DesktopIconView>()
@@ -9286,7 +9207,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         } catch (e: Exception) {
             Log.w("MainActivity", "Failed to load start banner $currentBanner: ${e.message}")
             // Fallback to default drawable resource
-            bannerFrame.setBackgroundResource(resources.getIdentifier(currentBanner, "drawable", packageName))
+            val resourceId = getBannerResourceId(currentBanner)
+            if (resourceId != 0) {
+                bannerFrame.setBackgroundResource(resourceId)
+            }
         }
     }
 
@@ -9305,7 +9229,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val nextBanner = START_BANNER_CYCLE[nextIndex]
 
         // Save new banner to SharedPreferences
-        prefs.edit().putString(KEY_START_BANNER_98, nextBanner).apply()
+        prefs.edit { putString(KEY_START_BANNER_98, nextBanner) }
 
         // Apply new banner
         loadCurrentStartBanner(bannerFrame)
@@ -9426,10 +9350,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             animator.addUpdateListener { animation ->
                 val saturation = animation.animatedValue as Float
                 val cm = android.graphics.ColorMatrix().apply { setSaturation(saturation) }
-                val effect = android.graphics.RenderEffect.createColorFilterEffect(
-                    android.graphics.ColorMatrixColorFilter(cm)
-                )
-                mainBackgroundView.setRenderEffect(effect)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val effect = android.graphics.RenderEffect.createColorFilterEffect(
+                        android.graphics.ColorMatrixColorFilter(cm)
+                    )
+                    mainBackgroundView.setRenderEffect(effect)
+                }
             }
             animator.addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
@@ -9441,7 +9367,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             })
             animator.start()
         } else {
-            mainBackgroundView.setRenderEffect(null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                mainBackgroundView.setRenderEffect(null)
+            }
         }
     }
 
@@ -9606,7 +9534,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val bottom = top + child.height
 
             // Check if touch is within bounds
-            if (x >= left && x <= right && y >= top && y <= bottom) {
+            if (x in left..right && y >= top && y <= bottom) {
                 // If it's a ViewGroup, recursively search its children
                 if (child is ViewGroup) {
                     val foundInChild = findViewAtPosition(child, x, y)
@@ -9635,13 +9563,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 cursorEffect.visibility = View.GONE
             }
             cursorHandler.postDelayed(cursorRunnable!!, 2000)
-        }
-    }
-
-    // Public method for dialogs to trigger cursor display
-    fun showCursorAtPosition(x: Float, y: Float) {
-        if (::cursorEffect.isInitialized && isCursorVisible()) {
-            showCursorAt(x, y, isMoving = false)
         }
     }
 
@@ -9711,8 +9632,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun checkForUpdates(showCheckingNotification: Boolean = false) {
         Thread {
             try {
-                val url = java.net.URL("https://gorjan.rocks/projects/windowsxp/config.json")
-                val connection = url.openConnection() as java.net.HttpURLConnection
+                val apiUrl = URL("https://api.github.com/repos/jovanovski/windowslauncher/releases/latest")
+                val connection = apiUrl.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000
                 connection.readTimeout = 10000
@@ -9721,76 +9642,95 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
                     connection.disconnect()
 
-                    // Parse JSON
-                    val gson = com.google.gson.Gson()
-                    val config = gson.fromJson(response, com.google.gson.JsonObject::class.java)
+                    val gson = Gson()
+                    val release = gson.fromJson(response, com.google.gson.JsonObject::class.java)
 
-                    // Save the changelog data locally
-                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    prefs.edit().putString(KEY_CHANGELOG_DATA, response).apply()
+                    val latestTag = release.get("tag_name")?.asString ?: ""
+                    val isPrerelease = release.get("prerelease")?.asBoolean ?: false
 
-                    val latestVersionCode = config.get("latestVersionCode")?.asInt ?: 0
-                    val isDebuggable = (applicationContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                    val latestVersionLink = if (isDebuggable) {
-                        config.get("latestVersionLink_debug")?.asString ?: ""
-                    } else {
-                        config.get("latestVersionLink_release")?.asString ?: ""
+                    // Skip prereleases if you only want stable versions
+                    if (isPrerelease) {
+                        Log.d("MainActivity", "Skipping prerelease: $latestTag")
+                        return@Thread
                     }
 
-                    // Get current version code
-                    val currentVersionCode = try {
-                        packageManager.getPackageInfo(packageName, 0).versionCode
+                    val assets = release.getAsJsonArray("assets")
+                    val downloadUrl = if (assets != null && assets.size() > 0)
+                        assets[0].asJsonObject.get("browser_download_url").asString
+                    else
+                        release.get("html_url")?.asString ?: ""
+
+                    // Current app versionName (like "1.6" or "v1.6")
+                    val currentVersionName = try {
+                        val pInfo = packageManager.getPackageInfo(packageName, 0)
+                        pInfo.versionName ?: ""
                     } catch (e: Exception) {
-                        0
+                        ""
                     }
 
-                    // Check if update available
-                    if (latestVersionCode > currentVersionCode) {
-                        val updateType = if (isDebuggable) "Debug" else "Release"
-                        Log.d("MainActivity", "Update $updateType available! Latest: $latestVersionCode, Current: $currentVersionCode")
+                    Log.d("MainActivity", "Current version: $currentVersionName | Latest: $latestTag")
+
+                    val latestNumeric = latestTag.trim().removePrefix("v").removePrefix("V")
+                    val currentNumeric = currentVersionName.trim().removePrefix("v").removePrefix("V")
+
+                    val updateAvailable = try {
+                        compareVersions(latestNumeric, currentNumeric) > 0
+                    } catch (e: Exception) {
+                        latestNumeric != currentNumeric // fallback simple check
+                    }
+
+                    if (updateAvailable) {
                         runOnUiThread {
-                            // Store download link and show update icon in system tray
-                            updateDownloadLink = latestVersionLink
-                            Log.d("MainActivity UPDATE", "Setting update icon visibility to VISIBLE")
+                            updateDownloadLink = downloadUrl
                             updateIcon.visibility = View.VISIBLE
-                            Log.d("MainActivity UPDATE", "Update icon visibility is now: ${updateIcon.visibility}")
 
                             showNotification(
-                                "$updateType update Available",
-                                "There is a update available for Windows, tap here to download."
+                                "Windows Update",
+                                "A new version ($latestTag) is available. Tap to download."
                             ) {
-                                // Open browser when notification is tapped
-                                if (latestVersionLink.isNotEmpty()) {
+                                if (downloadUrl.isNotEmpty()) {
                                     try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
-                                        intent.data = Uri.parse(latestVersionLink)
+                                        val intent = Intent(Intent.ACTION_VIEW, downloadUrl.toUri())
                                         startActivity(intent)
                                     } catch (e: Exception) {
-                                        Log.e("MainActivity", "Error opening download link", e)
+                                        Log.e("MainActivity", "Error opening link", e)
                                     }
                                 }
                             }
                         }
                     } else {
-                        Log.d("MainActivity", "No update available. Latest: $latestVersionCode, Current: $currentVersionCode")
-                        if(showCheckingNotification) {
+                        Log.d("MainActivity", "No update available")
+                        if (showCheckingNotification) {
                             runOnUiThread {
-                                showNotification(
-                                    "Windows is up to date",
-                                    "No new updates available"
-                                )
+                                showNotification("Up to date", "No new updates available")
                             }
                         }
                     }
                 } else {
                     connection.disconnect()
-                    Log.w("MainActivity", "Update check failed with response code: ${connection.responseCode}")
+                    Log.w("MainActivity", "GitHub API failed: ${connection.responseCode}")
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error checking for updates", e)
             }
         }.start()
     }
+
+    /**
+     * Simple semantic version comparator (e.g., 1.7.0 > 1.6)
+     */
+    private fun compareVersions(v1: String, v2: String): Int {
+        val parts1 = v1.split(".", "-")
+        val parts2 = v2.split(".", "-")
+        val len = maxOf(parts1.size, parts2.size)
+        for (i in 0 until len) {
+            val a = parts1.getOrNull(i)?.toIntOrNull() ?: 0
+            val b = parts2.getOrNull(i)?.toIntOrNull() ?: 0
+            if (a != b) return a.compareTo(b)
+        }
+        return 0
+    }
+
 
     /**
      * Starts the periodic update checker
@@ -9829,7 +9769,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val drawable = if (wallpaperItem.filePath != null) {
                 // Load from assets
                 val inputStream = assets.open(wallpaperItem.filePath)
-                val loadedDrawable = android.graphics.drawable.Drawable.createFromStream(inputStream, wallpaperItem.filePath)
+                val loadedDrawable = Drawable.createFromStream(inputStream, wallpaperItem.filePath)
                 inputStream.close()
                 loadedDrawable
             } else {
@@ -9845,8 +9785,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     else -> {
                         val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1080
                         val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1920
-                        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                        val canvas = android.graphics.Canvas(bitmap)
+                        val bitmap = createBitmap(width, height)
+                        val canvas = Canvas(bitmap)
                         drawable.setBounds(0, 0, canvas.width, canvas.height)
                         drawable.draw(canvas)
                         bitmap
@@ -9854,18 +9794,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 // Set wallpaper based on selected options
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                    // Android 7.0+ supports separate home and lock screen wallpapers
-                    if (setHomeScreen && setLockScreen) {
-                        wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK)
-                    } else if (setHomeScreen) {
-                        wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM)
-                    } else if (setLockScreen) {
-                        wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_LOCK)
-                    }
-                } else {
-                    // Pre-Android 7.0 - set both home and lock screen
-                    wallpaperManager.setBitmap(bitmap)
+                // Android 7.0+ supports separate home and lock screen wallpapers
+                if (setHomeScreen && setLockScreen) {
+                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK)
+                } else if (setHomeScreen) {
+                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM)
+                } else if (setLockScreen) {
+                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_LOCK)
                 }
 
                 Log.d("MainActivity", "Successfully set device wallpaper: home=$setHomeScreen, lock=$setLockScreen")
@@ -9875,7 +9810,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun applyWallpaperToDeviceFromDrawable(drawable: android.graphics.drawable.Drawable, setHomeScreen: Boolean, setLockScreen: Boolean) {
+    private fun applyWallpaperToDeviceFromDrawable(drawable: Drawable, setHomeScreen: Boolean, setLockScreen: Boolean) {
         try {
             val wallpaperManager = android.app.WallpaperManager.getInstance(this)
 
@@ -9887,8 +9822,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 else -> {
                     val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1080
                     val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1920
-                    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bitmap)
+                    val bitmap = createBitmap(width, height)
+                    val canvas = Canvas(bitmap)
                     drawable.setBounds(0, 0, canvas.width, canvas.height)
                     drawable.draw(canvas)
                     bitmap
@@ -9896,18 +9831,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             // Set wallpaper based on selected options
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                // Android 7.0+ supports separate home and lock screen wallpapers
-                if (setHomeScreen && setLockScreen) {
-                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK)
-                } else if (setHomeScreen) {
-                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM)
-                } else if (setLockScreen) {
-                    wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_LOCK)
-                }
-            } else {
-                // Pre-Android 7.0 - set both home and lock screen
-                wallpaperManager.setBitmap(bitmap)
+            // Android 7.0+ supports separate home and lock screen wallpapers
+            if (setHomeScreen && setLockScreen) {
+                wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK)
+            } else if (setHomeScreen) {
+                wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_SYSTEM)
+            } else if (setLockScreen) {
+                wallpaperManager.setBitmap(bitmap, null, true, android.app.WallpaperManager.FLAG_LOCK)
             }
 
             Log.d("MainActivity", "Successfully set device wallpaper from drawable: home=$setHomeScreen, lock=$setLockScreen")
