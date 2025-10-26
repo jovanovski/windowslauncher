@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Blur effect layers for drop shadow -->
+    <item android:top="2dp" android:left="2dp">
+        <shape>
+            <solid android:color="#11000000" />
+            <corners 
+                android:topLeftRadius="12dp"
+                android:bottomLeftRadius="12dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="10dp" />
+        </shape>
+    </item>
+    <item android:top="1dp" android:left="1dp">
+        <shape>
+            <solid android:color="#22000000" />
+            <corners 
+                android:topLeftRadius="11dp"
+                android:bottomLeftRadius="11dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="10dp" />
+        </shape>
+    </item>
+    <item android:top="0dp">
+        <shape>
+            <solid android:color="#33000000" />
+            <corners 
+                android:topLeftRadius="5dp"
+                android:bottomLeftRadius="5dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="10dp" />
+        </shape>
+    </item>
+    <!-- Main system tray -->
+    <item android:left="2dp">
+        <shape>
+            <solid android:color="#118be6" />
+            <corners 
+                android:topLeftRadius="5dp"
+                android:bottomLeftRadius="5dp"
+                android:topRightRadius="10dp"
+                android:bottomRightRadius="10dp" />
+        </shape>
+    </item>
+</layer-list>

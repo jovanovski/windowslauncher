@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="360dp"
+    android:layout_height="360dp"
+
+    android:background="?windowBackgroundColor">
+
+    <!-- Menu Bar-->
+    <LinearLayout
+        android:layout_width="360dp"
+        android:layout_height="20dp"
+        android:src="?menuBarBackground"
+        android:orientation="horizontal"
+        android:paddingTop="3dp"
+        android:paddingStart="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="File"/>
+
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="Edit"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="Tools"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="Help"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="336dp"
+        android:orientation="horizontal"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="2dp">
+
+        <LinearLayout
+            android:id="@+id/notes_list_container"
+            android:layout_width="100dp"
+            android:layout_height="336dp"
+            android:orientation="vertical">
+
+            <ScrollView
+                android:id="@+id/notes_list_scroll"
+                android:layout_width="100dp"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <TableLayout
+                    android:id="@+id/notes_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stretchColumns="0"
+                    android:shrinkColumns="0">
+                </TableLayout>
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/add_note_button"
+                style="?winButtonStyle"
+                android:layout_width="94dp"
+                android:layout_height="25dp"
+                android:layout_marginLeft="3dp"
+                android:layout_marginBottom="3dp"
+                android:text="Add"
+                android:textColor="@color/black"
+                android:textSize="10sp"
+                android:fontFamily="?primaryFontFamily"
+                android:gravity="center"
+                android:backgroundTint="@null"
+                android:clickable="true"
+                android:focusable="true"/>
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/expand_button"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:text=">"
+            android:textColor="@color/black"
+            android:textSize="9sp"
+            android:fontFamily="@font/micross_block"
+            android:gravity="center"
+            android:background="@drawable/win98_start_menu_border"
+            android:backgroundTint="@null"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginTop="-3dp"
+            android:visibility="gone"/>
+
+        <EditText
+            android:id="@+id/notes"
+            android:layout_width="255dp"
+            android:layout_height="336dp"
+            android:layout_marginEnd="2dp"
+            android:gravity="top|start"
+            android:background="@android:color/white"
+            android:textColor="@android:color/black"
+            android:fontFamily="?attr/primaryFontFamily"
+            android:textSize="13sp"
+            android:text="Test test"
+            android:padding="4dp"
+            android:paddingEnd="20dp"
+            android:scrollbars="vertical"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarSize="16dp"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:fadeScrollbars="false"
+            android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+            android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:lineSpacingMultiplier="1.0"
+            android:lineSpacingExtra="0dp">
+        </EditText>
+
+
+    </LinearLayout>
+
+</RelativeLayout>

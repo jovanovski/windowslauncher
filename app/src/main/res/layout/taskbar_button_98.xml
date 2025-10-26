@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/taskbar_button"
+    android:layout_width="36dp"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@drawable/win98_start_menu_border"
+    android:gravity="center"
+    android:paddingLeft="9dp"
+    android:paddingRight="9dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:layout_marginRight="2dp">
+
+    <ImageView
+        android:id="@+id/taskbar_button_icon"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:contentDescription="Dialog icon" />
+
+    <TextView
+        android:id="@+id/taskbar_button_text"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+</LinearLayout>

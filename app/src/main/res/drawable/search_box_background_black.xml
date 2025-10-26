@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#ffffff" />
+        </shape>
+    </item>
+
+    <!-- Top border outer (#7a7a7a) -->
+    <item android:gravity="top">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="#7a7a7a" />
+        </shape>
+    </item>
+
+    <!-- Left border outer (#7a7a7a) -->
+    <item android:gravity="left">
+        <shape android:shape="rectangle">
+            <size android:width="1dp" />
+            <solid android:color="#7a7a7a" />
+        </shape>
+    </item>
+
+    <!-- Top border inner (#0a0a0a) -->
+    <item android:gravity="top" android:top="1dp">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="#0a0a0a" />
+        </shape>
+    </item>
+
+    <!-- Left border inner (#0a0a0a) -->
+    <item android:gravity="left" android:left="1dp">
+        <shape android:shape="rectangle">
+            <size android:width="1dp" />
+            <solid android:color="#0a0a0a" />
+        </shape>
+    </item>
+
+    <!-- Bottom border outer (#fdfdfd) -->
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="#fdfdfd" />
+        </shape>
+    </item>
+
+    <!-- Right border outer (#fdfdfd) -->
+    <item android:gravity="right">
+        <shape android:shape="rectangle">
+            <size android:width="1dp" />
+            <solid android:color="#fdfdfd" />
+        </shape>
+    </item>
+
+    <!-- Bottom border inner (#e3e3e3) -->
+    <item android:gravity="bottom" android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="#e3e3e3" />
+        </shape>
+    </item>
+
+    <!-- Right border inner (#e3e3e3) -->
+    <item android:gravity="right" android:right="1dp">
+        <shape android:shape="rectangle">
+            <size android:width="1dp" />
+            <solid android:color="#e3e3e3" />
+        </shape>
+    </item>
+
+    <!-- Main input area background -->
+    <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#ffffff" />
+        </shape>
+    </item>
+</layer-list>

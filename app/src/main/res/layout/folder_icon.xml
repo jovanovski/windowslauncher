@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="50dp"
+    android:layout_height="60dp"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@android:color/transparent">
+
+    <!-- Container for icon and notification dot -->
+    <FrameLayout
+        android:layout_width="36dp"
+        android:layout_height="30dp">
+
+        <ImageView
+            android:id="@+id/icon_image"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:scaleType="centerInside" />
+
+        <ImageView
+            android:id="@+id/shortcut_icon"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:src="@drawable/overlay_shortcut"
+            android:scaleType="centerInside" />
+
+        <!-- Notification dot -->
+        <View
+            android:id="@+id/notification_dot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="1dp"
+            android:background="@drawable/notification_dot"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/icon_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:text="App Name App Name"
+        android:textColor="@color/white"
+        android:textSize="8.5sp"
+        android:gravity="center_horizontal"
+        android:lines="2"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:lineSpacingMultiplier="1.0"
+        android:shadowColor="@color/black"
+        android:shadowDx="0.7"
+        android:shadowDy="0.7"
+        android:shadowRadius="1.4"
+        android:fontFamily="?attr/primaryFontFamily"/>
+
+</LinearLayout>

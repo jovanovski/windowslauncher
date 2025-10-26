@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Rounded corner shape with white background to clip the image -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#c1cfe6"/>
+            <corners
+                android:topLeftRadius="5dp"
+                android:topRightRadius="5dp"
+                android:bottomLeftRadius="0dp"
+                android:bottomRightRadius="0dp"/>
+        </shape>
+    </item>
+
+    <!-- The title bar background image on top -->
+<!--    <item>-->
+<!--        -->
+<!--        <bitmap-->
+<!--            android:src="@drawable/windows_vista_title_bar_transparent"-->
+<!--            android:gravity="fill"-->
+<!--            android:tileMode="disabled"/>-->
+<!--    </item>-->
+</layer-list>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="320dp"
+    android:layout_height="400dp"
+    android:background="?windowBackgroundColor"
+    android:paddingEnd="8dp"
+    android:paddingStart="8dp"
+    android:paddingBottom="8dp"
+    android:paddingTop="3dp"
+    >
+
+    <!-- Menu Bar-->
+    <LinearLayout
+        android:layout_width="360dp"
+        android:layout_height="20dp"
+        android:src="?menuBarBackground"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="Game"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="Help"/>
+
+    </LinearLayout>
+
+    <!-- Top bar with counter, smiley, and timer -->
+    <LinearLayout
+        android:id="@+id/minesweeper_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/win98_start_menu_border_inverted"
+        android:padding="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="19dp"
+        android:gravity="center_vertical">
+
+        <!-- Bomb Counter (left) -->
+        <LinearLayout
+            android:id="@+id/bomb_counter"
+            android:layout_width="60dp"
+            android:layout_height="35dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:background="@drawable/win98_minesweeper_timer_background"
+            android:padding="4dp">
+
+            <ImageView
+                android:id="@+id/bomb_digit_1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_0" />
+
+            <ImageView
+                android:id="@+id/bomb_digit_2"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_1" />
+
+            <ImageView
+                android:id="@+id/bomb_digit_3"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_0" />
+        </LinearLayout>
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Smiley Button (center) -->
+        <ImageView
+            android:id="@+id/smiley_button"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:src="@drawable/minesweeper_smiley"
+            android:scaleType="fitCenter"
+            android:background="@drawable/win98_start_menu_border"
+            android:padding="2dp" />
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Timer (right) -->
+        <LinearLayout
+            android:id="@+id/timer"
+            android:layout_width="60dp"
+            android:layout_height="35dp"
+            android:background="@drawable/win98_minesweeper_timer_background"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="4dp">
+
+            <ImageView
+                android:id="@+id/timer_digit_1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_0" />
+
+            <ImageView
+                android:id="@+id/timer_digit_2"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_0" />
+
+            <ImageView
+                android:id="@+id/timer_digit_3"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:scaleType="fitCenter"
+                android:src="@drawable/minesweeper_timer_0" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 9x9 Grid -->
+    <GridLayout
+        android:id="@+id/mine_grid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/minesweeper_top_bar"
+        android:columnCount="9"
+        android:rowCount="9"
+        android:background="@drawable/win98_start_menu_border_inverted"
+        android:padding="4dp"
+        android:layout_centerHorizontal="true" />
+
+</RelativeLayout>

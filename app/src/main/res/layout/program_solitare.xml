@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="380dp">
+
+
+    <LinearLayout
+        android:id="@+id/solitare_menu"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="?windowBackgroundColor"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+        <TextView
+            android:id="@+id/solitare_new_game"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New Game"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:id="@+id/solitare_change_deck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Change Deck"
+            style="@style/MenuBarItem"/>
+        <TextView
+            android:id="@+id/solitare_change_card_size"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Card Style"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:id="@+id/solitare_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hint"
+            style="@style/MenuBarItem"/>
+
+    </LinearLayout>
+    <!-- Game area -->
+    <FrameLayout
+        android:id="@+id/solitare_game_area"
+        android:layout_width="400dp"
+        android:layout_height="380dp"
+        android:background="?solitareGreen"
+        android:layout_marginTop="22dp">
+
+        <!-- Top row: Stock, Waste, and 4 Foundation slots -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp">
+
+            <!-- Stock pile -->
+            <ImageView
+                android:id="@+id/stock_slot"
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <!-- Waste pile -->
+            <ImageView
+                android:id="@+id/waste_slot"
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <!-- Spacer -->
+            <View
+                android:layout_width="9dp"
+                android:layout_height="1dp" />
+
+            <!-- Foundation 1 -->
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <!-- Foundation 2 -->
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <!-- Foundation 3 -->
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <!-- Foundation 4 -->
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+        </LinearLayout>
+
+        <!-- Tableau (7 columns) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="80dp"
+            android:layout_marginStart="8dp">
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:layout_width="45dp"
+                android:layout_height="60dp"
+                android:layout_marginStart="9dp"
+                android:src="@drawable/solitare_card_slot"
+                android:scaleType="fitXY" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/no_moves_left"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="340dp"
+        android:textColor="#FFF"
+        android:gravity="center"
+        android:textSize="18dp"
+        android:fontFamily="?primaryFontFamily"
+        android:text="Game over, no valid moves left"/>
+
+</RelativeLayout>

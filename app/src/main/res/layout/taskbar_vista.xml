@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="45dp">
+
+    <!-- Background element spanning full width with margins -->
+    <View
+        android:id="@+id/taskbar_background"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_alignParentBottom="true"
+        android:alpha="0.8"
+        android:background="@drawable/taskbar_vista"
+        android:clipToOutline="true" />
+
+    <!-- Content container for all interactive elements -->
+    <RelativeLayout
+        android:id="@+id/taskbar_content"
+        android:layout_width="match_parent"
+        android:layout_height="45dp">
+
+        <!-- Start Button -->
+        <ImageView
+            android:id="@+id/start_button"
+            android:layout_width="57dp"
+            android:layout_height="45dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:contentDescription="Start button"
+            android:src="@drawable/start_vista"
+            android:clipToOutline="true"
+            android:scaleType="fitXY"
+            android:layout_marginLeft="15dp"
+            tools:ignore="HardcodedText" />
+
+        <!-- Empty taskbar space (clickable area between start button and system tray) -->
+        <LinearLayout
+            android:id="@+id/taskbar_empty_space"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_alignParentBottom="true"
+            android:layout_toRightOf="@id/start_button"
+            android:layout_toLeftOf="@id/system_tray_wrapper"
+            android:background="@android:color/transparent"
+            android:orientation="horizontal"
+            android:gravity="start|center_vertical"
+            android:layout_marginTop="2dp"
+            android:layout_marginLeft="10dp"
+            android:paddingLeft="4dp" />
+
+
+        <LinearLayout
+            android:id="@+id/system_tray_wrapper"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentRight="true"
+            android:orientation="horizontal"
+            >
+            <!-- System Tray -->
+            <LinearLayout
+                android:id="@+id/system_tray"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:gravity="center_vertical">
+                <LinearLayout
+                    android:id="@+id/system_tray_toggle_area"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal">
+                    <!-- Weather Temperature -->
+                    <TextView
+                        android:id="@+id/weather_temp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:text="?"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="4dp"
+                        android:minWidth="24dp"
+                        android:fontFamily="@font/tahoma"
+
+                        />
+
+                    <!-- Date Display with superscript ordinal -->
+                    <LinearLayout
+                        android:id="@+id/date_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:minWidth="24dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        >
+
+                        <TextView
+                            android:id="@+id/date_day"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text="26"
+                            android:textColor="@color/white"
+                            android:textSize="13sp"
+                            android:fontFamily="@font/tahoma"
+ />
+
+                        <TextView
+                            android:id="@+id/date_ordinal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="th"
+                            android:textColor="@color/white"
+                            android:textSize="9sp"
+                            android:layout_marginBottom="4dp"
+                            android:layout_marginLeft="1dp"
+                            android:fontFamily="@font/tahoma"
+ />
+
+                    </LinearLayout>
+
+                    <!-- Volume Icon -->
+                    <LinearLayout
+                        android:id="@+id/volume_icon_wrapper"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:gravity="center"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent">
+                    <ImageView
+                        android:id="@+id/volume_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/sound"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/update_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:visibility="gone"
+                    android:paddingLeft="6dp"
+                    android:paddingRight="6dp">
+                    <ImageView
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:src="@drawable/update_available" />
+                </LinearLayout>
+                <!-- Clock (time only) -->
+                <TextView
+                    android:id="@+id/clock_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="01:23"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:minWidth="44dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="12dp"
+                    android:fontFamily="@font/tahoma"
+ />
+            </LinearLayout>
+
+        </LinearLayout>
+
+
+        <ImageView
+            android:id="@+id/system_tray_toggle"
+            android:layout_width="20dp"
+            android:layout_height="40dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:layout_alignParentBottom="true"
+            android:scaleType="fitXY"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_toLeftOf="@id/system_tray_wrapper"
+            android:layout_marginRight="-13dp"
+            android:src="@drawable/system_tray_collapse_vista"/>
+
+    </RelativeLayout>
+
+</RelativeLayout>

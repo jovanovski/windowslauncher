@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Win95.CheckBox" parent="Widget.AppCompat.CompoundButton.CheckBox">
+        <item name="buttonTint">@null</item>
+        <item name="android:button">@drawable/checkbox_windows</item>
+    </style>
+
+    <style name="Windows98ScrollBar">
+        <item name="android:scrollbarTrackVertical">@drawable/scrollbar_track_98</item>
+        <item name="android:scrollbarThumbVertical">@drawable/scrollbar_thumb_98</item>
+        <item name="android:scrollbarSize">16dp</item>
+        <item name="android:scrollbarFadeDuration">0</item>
+        <item name="android:scrollbarDefaultDelayBeforeFade">0</item>
+        <item name="android:fadeScrollbars">false</item>
+    </style>
+
+    <style name="WindowsXP.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/button_xp_background</item>
+        <item name="android:textColor">#000000</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">32dp</item>
+        <item name="android:elevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+
+    <style name="Windows98.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/win98_start_menu_border</item>
+        <item name="android:textColor">#000000</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">32dp</item>
+        <item name="android:elevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+</resources>

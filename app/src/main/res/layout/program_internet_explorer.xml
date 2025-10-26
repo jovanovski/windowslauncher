@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="358dp"
+    android:layout_height="610dp"
+    android:clickable="true"
+    >
+
+    <ImageView
+        android:layout_width="358dp"
+        android:layout_height="610dp"
+        android:src="@drawable/ie6_layout"/>
+
+    <EditText
+        android:id="@+id/url_bar"
+        android:layout_width="match_parent"
+        android:layout_height="15dp"
+        android:background="@color/white"
+        android:layout_marginLeft="73dp"
+        android:layout_marginRight="70dp"
+        android:layout_marginTop="71.5dp"
+        android:textSize="11dp"
+        android:text="www.google.com"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:imeOptions="actionGo"
+        android:inputType="textUri"
+        />
+
+    <View
+        android:id="@+id/ie_go_button"
+        android:layout_width="50dp"
+        android:layout_height="23dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="67dp"
+        android:layout_marginEnd="2dp"/>
+
+    <View
+        android:id="@+id/ie_refresh_button"
+        android:layout_width="50dp"
+        android:layout_height="39dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="26dp"
+        android:layout_marginEnd="124dp" />
+
+    <View
+        android:id="@+id/ie_tools_button"
+        android:layout_width="40dp"
+        android:layout_height="25dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="144dp" />
+
+    <View
+        android:id="@+id/ie_back_button"
+        android:layout_width="60dp"
+        android:layout_height="39dp"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="26dp"
+        android:layout_marginStart="12dp" />
+
+    <View
+        android:id="@+id/ie_forward_button"
+        android:layout_width="60dp"
+        android:layout_height="39dp"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="26dp"
+        android:layout_marginStart="75dp" />
+
+    <View
+        android:id="@+id/ie_home_button"
+        android:layout_width="50dp"
+        android:layout_height="39dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="26dp"
+        android:layout_marginEnd="74dp" />
+
+
+    <View
+        android:id="@+id/ie_search_button"
+        android:layout_width="50dp"
+        android:layout_height="39dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="26dp"
+        android:layout_marginEnd="18dp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        >
+        <ImageView
+            android:id="@+id/status_icon"
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:layout_marginStart="3dp"
+            android:layout_marginTop="1dp"
+            android:src="@drawable/ie_status_done"
+            />
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Done"
+            android:fontFamily="@font/micross_block"
+            android:textColor="@color/black"
+            android:textSize="12sp"
+            android:layout_alignBottom="@id/status_icon"
+            android:layout_toEndOf="@id/status_icon"
+            android:layout_marginStart="3dp"/>
+    </LinearLayout>
+
+    <pl.droidsonroids.gif.GifImageView
+        android:id="@+id/ie_loading_gif"
+        android:layout_width="37.5dp"
+        android:layout_height="23.5dp"
+        android:layout_marginEnd="2.3dp"
+        android:layout_marginTop="2.3dp"
+        android:src="@drawable/ie_loading"
+        android:layout_alignParentEnd="true"
+        android:adjustViewBounds="true" />
+
+
+    <WebView
+        android:id="@+id/ie_web_view"
+        android:layout_width="358dp"
+        android:layout_height="492dp"
+        android:layout_marginTop="96dp"
+        android:layout_marginBottom="22dp"
+        android:layout_marginLeft="1.5dp"
+        android:layout_marginRight="1.5dp"
+        android:background="@color/context_menu_background">
+
+
+
+    </WebView>
+
+
+    <View
+        android:visibility="gone"
+        android:id="@+id/ie_enter_button"
+        android:layout_width="50dp"
+        android:layout_height="39dp"
+        android:layout_alignParentEnd="true"
+        android:background="@color/xp_start_green"
+        android:layout_marginTop="426dp"
+        android:layout_marginEnd="124dp" />
+
+</RelativeLayout>

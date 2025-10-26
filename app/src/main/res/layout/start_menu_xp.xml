@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows XP Start Menu Content Layout (just the middle section) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/start_menu_content"
+    android:layout_width="match_parent"
+    android:layout_height="600dp"
+    android:clickable="true"
+    android:orientation="vertical">
+
+    <!-- Start Menu Header -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="70dp">
+
+        <!-- Background image spanning full size -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/start_header"
+            android:background="@drawable/start_menu_header_rounded"
+            android:clipToOutline="true"
+            android:scaleType="fitXY" />
+
+        <!-- Content on top -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:paddingLeft="10dp"
+            android:paddingRight="16dp"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/profile_picture"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/user"
+                android:layout_marginRight="12dp"
+                android:padding="1.5dp"
+                android:background="@drawable/profile_picture_border" />
+
+            <TextView
+                android:id="@+id/profile_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:fontFamily="?attr/primaryFontFamily" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <!-- Commands List (40%) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:layout_weight="0.4"
+
+            android:background="#d3e5fb">
+
+
+            <LinearLayout
+                android:id="@+id/welcome_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center|start"
+                android:orientation="horizontal"
+                android:paddingLeft="8dp"
+                android:paddingRight="12dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/start_menu_item_background"
+                >
+
+                <ImageView
+                    android:layout_width="25dp"
+                    android:layout_height="25dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/xp_logo" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/tahoma"
+                    android:maxLines="1"
+                    android:text="Welcome"
+                    android:textColor="@color/context_menu_text_selector"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:id="@+id/windows_update_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center|start"
+                android:orientation="horizontal"
+                android:paddingLeft="8dp"
+                android:paddingRight="12dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/start_menu_item_background"
+                >
+
+                <ImageView
+                    android:layout_width="25dp"
+                    android:layout_height="25dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/update_available" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/tahoma"
+                    android:maxLines="1"
+                    android:text="Windows Update"
+                    android:textColor="@color/context_menu_text_selector"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/commands_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#d3e5fb" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:src="@drawable/start_menu_divider_xp"
+                    android:scaleType="fitXY"
+                    android:background="#d3e5fb"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    />
+
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#d3e5fb"
+                    android:gravity="center|end"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="18dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingBottom="6dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="?attr/primaryFontFamily"
+                        android:maxLines="1"
+                        android:textFontWeight="1000"
+                        android:text="All Programs"
+                        android:textColor="@color/context_menu_text_selector"
+                        android:textSize="13sp" />
+
+                    <ImageView
+                        android:layout_width="25dp"
+                        android:layout_height="25dp"
+                        android:layout_marginStart="5dp"
+                        android:src="@drawable/programs" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <!-- Right Panel (60%) - Apps List with Search Box -->
+        <RelativeLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.6"
+            android:background="@color/white">
+
+            <!-- Apps List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/apps_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_marginBottom="50dp"
+
+                android:layout_weight="1" />
+
+            <!-- Search Box -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+
+                android:paddingBottom="4dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:paddingTop="4dp">
+
+                <EditText
+                    android:id="@+id/search_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@drawable/search_box_background"
+                    android:hint="Run ..."
+                    android:textColor="#000000"
+                    android:textColorHint="#444444"
+                    android:textSize="14sp"
+                    android:textStyle="normal"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:inputType="text"
+                    android:imeOptions="actionSearch"
+                    android:drawableLeft="@drawable/ic_run_scaled"
+                    android:drawableStart="@drawable/ic_run_scaled"
+                    android:drawablePadding="4dp"
+                    android:fontFamily="?attr/primaryFontFamily"
+                    style="@android:style/Widget.EditText" />
+            </LinearLayout>
+
+        </RelativeLayout>
+    </LinearLayout>
+    <!-- Start Menu Footer -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="37dp"
+        android:background="@drawable/start_footer_background">
+
+        <ImageView
+            android:id="@+id/shutdown_button"
+            android:layout_width="290dp"
+            android:layout_height="match_parent"
+            android:src="@drawable/start_footer"
+            android:layout_alignParentEnd="true"
+            android:scaleType="fitXY" />
+
+    </RelativeLayout>
+</LinearLayout>
+

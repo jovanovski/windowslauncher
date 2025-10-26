@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="358dp"
+    android:layout_height="240dp">
+
+    <ImageView
+        android:layout_width="358dp"
+        android:layout_height="240dp"
+        android:src="@drawable/explorer_vista"/>
+
+    <TextView
+        android:id="@+id/folder_name_small"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Folder Name"
+        android:lines="1"
+        android:fontFamily="@font/segoeui_regular"
+        android:layout_marginTop="5dp"
+        android:textColor="@color/black"
+        android:textSize="8.5sp"
+        android:layout_marginStart="68dp"
+        />
+
+    <ImageView
+        android:id="@+id/folder_icon_small"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginStart="52dp"
+        />
+
+
+    <GridView
+        android:id="@+id/folder_icons_grid"
+        android:layout_width="240dp"
+        android:layout_height="175dp"
+        android:layout_marginStart="110dp"
+        android:layout_marginTop="66dp"
+        android:numColumns="5"
+        android:verticalSpacing="0dp"
+        android:horizontalSpacing="0dp"
+        android:stretchMode="columnWidth"
+        android:columnWidth="62dp"
+
+        android:scrollbars="vertical" />
+
+
+
+
+</RelativeLayout>

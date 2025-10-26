@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:clickable="true"
+    android:background="?windowBackgroundColor"
+    android:padding="12dp">
+
+    <CheckBox
+        android:id="@+id/launcher_checkbox"
+        style="@style/Win95.CheckBox"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:text="Windows Launcher"
+        android:textColor="#000000"
+        android:textSize="11sp"
+        android:fontFamily="?attr/primaryFontFamily"
+        android:checked="true"
+        android:paddingLeft="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <CheckBox
+        android:id="@+id/home_screen_checkbox"
+        style="@style/Win95.CheckBox"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:text="Phone's Home Screen"
+        android:textColor="#000000"
+        android:textSize="11sp"
+        android:fontFamily="?attr/primaryFontFamily"
+        android:checked="false"
+        android:paddingLeft="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <CheckBox
+        android:id="@+id/lock_screen_checkbox"
+        style="@style/Win95.CheckBox"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:text="Phone's Lock Screen"
+        android:textColor="#000000"
+        android:textSize="11sp"
+        android:fontFamily="?attr/primaryFontFamily"
+        android:checked="false"
+        android:paddingLeft="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Spacer -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="8dp" />
+
+    <TextView
+        android:id="@+id/apply_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:text="Apply"
+        android:gravity="center"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:clickable="true"
+        android:focusable="true"
+        style="?winButtonStyle"
+        android:layout_marginTop="8dp" />
+
+</LinearLayout>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Constrain entire track to 16dp width -->
+    <item android:width="16dp">
+        <layer-list>
+            <!-- Main track background -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#f0f0f0" />
+                </shape>
+            </item>
+
+            <!-- Top arrow button -->
+            <item android:top="0dp" android:height="16dp">
+                <layer-list>
+                    <!-- Button background -->
+                    <item>
+                        <shape android:shape="rectangle">
+                            <solid android:color="#f0f0f0" />
+                        </shape>
+                    </item>
+                    <!-- Up arrow image -->
+                    <item android:gravity="center">
+                        <bitmap
+                            android:src="@drawable/vista_scroll_up"
+                            android:gravity="center" />
+                    </item>
+                </layer-list>
+            </item>
+
+            <!-- Bottom arrow button -->
+            <item android:bottom="0dp" android:height="16dp" android:gravity="bottom">
+                <layer-list>
+                    <!-- Button background -->
+                    <item>
+                        <shape android:shape="rectangle">
+                            <solid android:color="#f0f0f0" />
+                        </shape>
+                    </item>
+                    <!-- Down arrow image -->
+                    <item android:gravity="center">
+                        <bitmap
+                            android:src="@drawable/vista_scroll_down"
+                            android:gravity="center" />
+                    </item>
+                </layer-list>
+            </item>
+        </layer-list>
+    </item>
+
+</layer-list>

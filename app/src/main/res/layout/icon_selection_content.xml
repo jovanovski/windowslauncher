@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- Icon type selection buttons -->
+    <LinearLayout
+        android:id="@+id/icon_type_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/btn_windows_98"
+            style="@android:style/Widget.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Classic"
+            android:textSize="12sp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:fontFamily="@font/micross_block"
+            android:background="@drawable/win98_start_menu_border"
+            android:backgroundTint="@null" />
+
+        <TextView
+            android:id="@+id/btn_windows_xp"
+            style="@android:style/Widget.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:text="XP"
+            android:textSize="12sp"
+            android:fontFamily="@font/micross_block"
+            android:background="@drawable/win98_start_menu_border"
+            android:backgroundTint="@null" />
+
+        <TextView
+            android:id="@+id/btn_windows_vista"
+            style="@android:style/Widget.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:layout_marginStart="4dp"
+            android:text="Vista"
+            android:textSize="12sp"
+            android:fontFamily="@font/micross_block"
+            android:background="@drawable/win98_start_menu_border"
+            android:backgroundTint="@null" />
+
+
+        <TextView
+            android:id="@+id/btn_programs"
+            style="@android:style/Widget.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:layout_marginStart="4dp"
+            android:text="Programs"
+            android:textSize="12sp"
+            android:fontFamily="@font/micross_block"
+            android:background="@drawable/win98_start_menu_border"
+            android:backgroundTint="@null" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/icons_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="330dp"
+        android:paddingEnd="30dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
+        android:scrollbarThumbVertical="@drawable/win98_start_menu_border"
+        android:scrollbarSize="16dp"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:fadeScrollbars="false"
+        />
+
+</LinearLayout>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Main track background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#dedede" />
+        </shape>
+    </item>
+
+    <!-- Top arrow button -->
+    <item android:top="0dp" android:height="16dp" android:width="16dp">
+        <layer-list>
+            <!-- Button background with win98 border -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- White bottom and right borders -->
+            <item android:bottom="2dp" android:right="2dp">
+                <shape android:shape="rectangle">
+                    <stroke android:width="2dp" android:color="#FFFFFF" />
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Black top and left borders -->
+            <item android:top="2dp" android:left="2dp">
+                <shape android:shape="rectangle">
+                    <stroke android:width="2dp" android:color="#080808" />
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Inner button area -->
+            <item android:top="2dp" android:left="2dp" android:bottom="2dp" android:right="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Up arrow icon -->
+            <item android:gravity="center" android:width="6dp" android:height="4dp">
+                <vector android:width="6dp" android:height="4dp" android:viewportWidth="6" android:viewportHeight="4">
+                    <path android:fillColor="#000000" android:pathData="M3,0 L0,4 L6,4 Z" />
+                </vector>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Bottom arrow button -->
+    <item android:bottom="0dp" android:height="16dp" android:gravity="bottom">
+        <layer-list>
+            <!-- Button background with win98 border -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- White bottom and right borders -->
+            <item android:bottom="2dp" android:right="2dp">
+                <shape android:shape="rectangle">
+                    <stroke android:width="2dp" android:color="#FFFFFF" />
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Black top and left borders -->
+            <item android:top="2dp" android:left="2dp">
+                <shape android:shape="rectangle">
+                    <stroke android:width="2dp" android:color="#080808" />
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Inner button area -->
+            <item android:top="2dp" android:left="2dp" android:bottom="2dp" android:right="2dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#d3cec7" />
+                </shape>
+            </item>
+            <!-- Down arrow icon -->
+            <item android:gravity="center" android:width="6dp" android:height="4dp">
+                <vector android:width="6dp" android:height="4dp" android:viewportWidth="6" android:viewportHeight="4">
+                    <path android:fillColor="#000000" android:pathData="M0,0 L6,0 L3,4 Z" />
+                </vector>
+            </item>
+        </layer-list>
+    </item>
+</layer-list>

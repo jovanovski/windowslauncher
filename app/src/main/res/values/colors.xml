@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Windows XP Taskbar Colors -->
+    <color name="xp_taskbar_start">#FF2D6AA0</color>
+    <color name="xp_taskbar_end">#FF54A7E6</color>
+    <color name="xp_start_green">#FF598fe4</color>
+    <color name="xp_start_green_dark">#FF3367cb</color>
+    <color name="xp_button_text">#FFFFFFFF</color>
+    <color name="xp_clock_text">#FF000000</color>
+    <color name="xp_border_light">#FFE3E3E3</color>
+    <color name="xp_border_dark">#FF7A7A7A</color>
+    <color name="xp_system_tray">#FFCED4E7</color>
+    
+    <!-- Context Menu Colors -->
+    <color name="context_menu_background">#FFFFFFFF</color>
+    <color name="context_menu_border">#FF969696</color>
+    <color name="context_menu_divider">#FFBFBFBF</color>
+    <color name="context_menu_text_enabled">#FF000000</color>
+    <color name="context_menu_text_disabled">#FF808080</color>
+    <color name="context_menu_item_selected">#FF0A246A</color>
+    
+    <!-- Start Menu Colors -->
+    <color name="pinned_app_background">#FFD6E4F8</color>
+
+    <!-- Windows 98/Classic Colors -->
+    <color name="window_98_background">#FFd3cec7</color>
+    <color name="border_white">#FFFFFFFF</color>
+    <color name="border_black">#FF000000</color>
+    <color name="border_gray_light">#FFdfdfdf</color>
+    <color name="border_gray_dark">#FF808080</color>
+    <color name="window_98_title_active">#FF000080</color>
+    <color name="window_98_title_inactive">#FF808080</color>
+    <color name="window_98_title_text">#FFFFFFFF</color>
+    <color name="solitare_green">#FF008000</color>
+
+
+    <!-- Windows Vista Colors -->
+    <color name="vista_window_background">#FFF0F0F0</color>
+    <color name="vista_taskbar_start">#FF1F1F1F</color>
+    <color name="vista_taskbar_end">#FF3F3F3F</color>
+    <color name="vista_aero_glow">#FF0078D7</color>
+    <color name="vista_start_orb_start">#FF3DAEF5</color>
+    <color name="vista_start_orb_end">#FF1D5D8C</color>
+    <color name="vista_title_bar_active">#FF1D5D8C</color>
+    <color name="vista_title_bar_inactive">#FF808080</color>
+    <color name="vista_border_color">#FF0078D7</color>
+</resources>

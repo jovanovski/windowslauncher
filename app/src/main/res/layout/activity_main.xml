@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/solitare_content"
+    >
+
+<RelativeLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/main_background"
+    android:background="@drawable/wallpaper1"
+    android:fitsSystemWindows="false"
+    tools:context=".MainActivity">
+
+    <View
+        android:id="@+id/gesture_bar_background"
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:background="#000000"
+        android:layout_alignParentBottom="true"
+        android:visibility="visible"
+        />
+
+    <!-- Desktop Icons Container -->
+    <RelativeLayout
+        android:id="@+id/desktop_icons_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="20dp"
+        android:clipChildren="false"
+        android:clipToPadding="false" />
+
+    <!-- Floating Windows Container -->
+    <FrameLayout
+        android:id="@+id/floating_windows_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:layout_marginBottom="24dp"
+        android:elevation="50dp" />
+
+    <!-- Taskbar at bottom -->
+    <include
+        android:id="@+id/taskbar_container"
+        layout="@layout/taskbar_xp"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginBottom="30dp"
+        android:layout_alignParentBottom="true"
+        android:elevation="15dp" />
+
+</RelativeLayout>
+
+    <!-- Start Menu Container (content will be dynamically loaded based on theme) -->
+    <RelativeLayout
+        android:id="@+id/start_menu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginLeft="5dp"
+        android:layout_marginRight="12dp"
+        android:layout_marginBottom="70dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:gravity="bottom"
+        android:elevation="150dp">
+
+
+    </RelativeLayout>
+
+    <!-- Context Menu -->
+    <rocks.gorjan.gokixp.ContextMenuView
+        android:id="@+id/context_menu"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:elevation="160dp" />
+
+    <ImageView
+        android:id="@+id/please_wait"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:src="@drawable/please_wait"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone"
+        android:layout_centerInParent="true"
+        android:elevation="180dp"/>
+
+    <RelativeLayout
+        android:id="@+id/notification_bubble"
+        android:layout_width="250dp"
+        android:layout_height="75dp"
+        android:background="?notificationBubble"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="60dp"
+        android:layout_marginEnd="55dp"
+        android:visibility="gone"
+        android:orientation="vertical">
+
+        <View
+            android:id="@+id/close_notification_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_alignParentEnd="true"
+            />
+        <TextView
+            android:id="@+id/notification_title"
+            android:layout_width="match_parent"
+            android:layout_height="17dp"
+            android:lines="1"
+            android:maxLines="1"
+            android:text="Notification title"
+            android:fontFamily="?primaryFontFamily"
+            android:textSize="14sp"
+            android:layout_marginTop="5dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="25dp"
+            android:textColor="?notificationBubbleTitleColor"
+            android:ellipsize="end"/>
+
+        <TextView
+            android:id="@+id/notification_text"
+            android:text="Notification text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_marginTop="23dp"
+            android:fontFamily="?primaryFontFamily"
+            android:textSize="11sp"
+            android:lines="2"
+            android:maxLines="2"
+            android:lineHeight="14dp"
+            android:textColor="@color/black"
+            android:ellipsize="end"/>
+
+    </RelativeLayout>
+    <!-- Cursor effect -->
+    <ImageView
+        android:id="@+id/cursor_effect"
+        android:layout_width="12.64dp"
+        android:layout_height="20dp"
+        android:src="@drawable/cursor"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone"
+        android:elevation="200dp"
+        android:scaleType="fitXY"/>
+</RelativeLayout>

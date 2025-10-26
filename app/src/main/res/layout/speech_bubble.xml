@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/speech_bubble_background"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:elevation="8dp">
+
+    <!-- Text display mode (when showing speech) -->
+    <TextView
+        android:id="@+id/speechText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/black"
+        android:textSize="14sp"
+        android:maxWidth="200dp"
+        android:text="Hi, I'm Rover, welcome to Windows XP!"
+        android:fontFamily="?attr/primaryFontFamily"
+
+        android:visibility="gone" />
+
+    <!-- Input mode (when allowing user to type) -->
+    <LinearLayout
+        android:id="@+id/inputContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="visible">
+        
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            
+            <EditText
+                android:id="@+id/speechInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minWidth="180dp"
+                android:maxWidth="200dp"
+                android:textColor="@android:color/black"
+                android:textSize="14sp"
+                android:background="@android:color/transparent"
+                android:hint="What should I say?"
+                android:textColorHint="@android:color/darker_gray"
+                android:fontFamily="?attr/primaryFontFamily"
+
+                android:inputType="textMultiLine"
+                android:maxLines="3"
+                android:padding="4dp" />
+            
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="voice by tetyys.com"
+                android:textSize="10sp"
+                android:textColor="@android:color/darker_gray"
+                android:fontFamily="?attr/primaryFontFamily"
+
+                android:layout_marginTop="2dp"
+                android:gravity="start" />
+        
+        </LinearLayout>
+        
+        <ImageButton
+            android:id="@+id/sendButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_play"
+            android:contentDescription="Send message"
+            android:scaleType="centerInside"
+            android:tint="@android:color/black" />
+    
+    </LinearLayout>
+
+</LinearLayout>

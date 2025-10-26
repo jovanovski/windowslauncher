@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="30dp"
+    android:orientation="horizontal"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/menu_item_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✓"
+        android:textSize="12sp"
+        android:layout_marginRight="4dp"
+        android:visibility="gone"
+        android:fontFamily="?attr/primaryFontFamily"
+ />
+
+    <TextView
+        android:id="@+id/menu_item_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="12sp"
+        android:fontFamily="?attr/primaryFontFamily"
+ />
+
+    <TextView
+        android:id="@+id/menu_item_arrow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="▶"
+        android:textSize="10sp"
+        android:visibility="gone"
+        android:fontFamily="?attr/primaryFontFamily"
+ />
+
+</LinearLayout>

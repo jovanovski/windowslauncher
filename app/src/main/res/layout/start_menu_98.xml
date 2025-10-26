@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?><!-- Windows 98 Start Menu Layout -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/start_menu_content"
+    android:layout_width="match_parent"
+    android:layout_height="600dp"
+    android:layout_alignParentBottom="true"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        android:gravity="bottom"
+        android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_weight="0.45"
+                android:layout_height="wrap_content"
+                android:background="@drawable/win98_start_menu_border"
+                android:orientation="horizontal"
+                android:padding="2dp">
+
+                <FrameLayout
+                    android:id="@+id/start_banner_frame"
+                    android:layout_width="30dp"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/start_banner_98"/>
+
+                <!-- Commands area with vertical layout -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#d3cec7"
+                    android:clickable="true"
+                    android:orientation="vertical">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/welcome_item"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/start_menu_item_background"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="4dp"
+                            android:paddingTop="5dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="6dp">
+
+                            <ImageView
+                                android:layout_width="35dp"
+                                android:layout_height="35dp"
+                                android:layout_marginEnd="2dp"
+                                android:padding="3dp"
+                                android:src="@drawable/windows_logo" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="?attr/primaryFontFamily"
+                                android:maxLines="1"
+                                android:text="Welcome"
+                                android:textColor="@color/context_menu_text_selector"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+
+
+                        <LinearLayout
+                            android:id="@+id/windows_update_item"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/start_menu_item_background"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="4dp"
+                            android:paddingTop="5dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="6dp">
+
+                            <ImageView
+                                android:layout_width="35dp"
+                                android:layout_height="35dp"
+                                android:layout_marginEnd="2dp"
+                                android:padding="3dp"
+                                android:src="@drawable/update_available_98" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="?attr/primaryFontFamily"
+                                android:maxLines="1"
+                                android:text="Windows Update"
+                                android:textColor="@color/context_menu_text_selector"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="2dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/win98_separator_horizontal" />
+
+                    </LinearLayout>
+                    <!-- Commands List -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/commands_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:background="#d3cec7" />
+
+                    <!-- Bottom items -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="vertical">
+
+
+                        <LinearLayout
+                            android:id="@+id/settings_item"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/start_menu_item_background"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="4dp"
+                            android:paddingTop="5dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="6dp">
+
+                            <ImageView
+                                android:layout_width="35dp"
+                                android:layout_height="35dp"
+                                android:layout_marginEnd="2dp"
+                                android:src="@drawable/settings_98" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="?attr/primaryFontFamily"
+                                android:maxLines="1"
+                                android:text="Settings..."
+                                android:textColor="@color/context_menu_text_selector"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="2dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/win98_separator_horizontal" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:id="@+id/logoff_item"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/start_menu_item_background"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingStart="4dp"
+                                android:paddingTop="5dp"
+                                android:paddingEnd="12dp"
+
+                                android:paddingBottom="2dp">
+
+                                <ImageView
+                                    android:layout_width="35dp"
+                                    android:layout_height="35dp"
+                                    android:layout_marginEnd="2dp"
+                                    android:src="@drawable/logoff_98" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:fontFamily="?attr/primaryFontFamily"
+                                    android:maxLines="1"
+                                    android:text="Log Off..."
+                                    android:textColor="@color/context_menu_text_selector"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/shutdown_item"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/start_menu_item_background"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingStart="4dp"
+                                android:paddingTop="5dp"
+                                android:paddingRight="12dp"
+
+                                android:paddingBottom="5dp">
+
+                                <ImageView
+                                    android:layout_width="35dp"
+                                    android:layout_height="35dp"
+                                    android:layout_marginEnd="2dp"
+                                    android:src="@drawable/shut_down_98" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:fontFamily="?attr/primaryFontFamily"
+                                    android:maxLines="1"
+                                    android:text="Shut Down..."
+                                    android:textColor="@color/context_menu_text_selector"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        <!-- Right Panel (60% of remaining space) - Apps List with Search Box -->
+        <RelativeLayout
+            android:id="@+id/start_menu_app_list_98"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="-4dp"
+            android:layout_weight="0.55"
+            android:background="@drawable/win98_start_menu_border"
+            android:visibility="invisible"
+            android:padding="2dp">
+
+            <!-- Apps List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/apps_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_marginBottom="48dp"
+                android:background="#d3cec7" />
+
+            <!-- Search Box -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:background="#d3cec7"
+                android:paddingLeft="4dp"
+                android:paddingTop="4dp"
+                android:paddingRight="4dp"
+                android:paddingBottom="4dp">
+
+                <EditText
+                    android:id="@+id/search_box"
+                    style="@android:style/Widget.EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:background="@drawable/search_box_background_black"
+                    android:drawableStart="@drawable/ic_run_98"
+                    android:drawablePadding="6dp"
+                    android:fontFamily="?attr/primaryFontFamily"
+                    android:hint="Run ..."
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:textColor="#000000"
+                    android:textColorHint="#444444"
+                    android:textSize="14sp"
+                    android:textStyle="normal" />
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

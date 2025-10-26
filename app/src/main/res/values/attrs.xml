@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Font family attributes for theming -->
+    <attr name="primaryFontFamily" format="reference" />
+    <attr name="secondaryFontFamily" format="reference" />
+
+    <!-- Scrollbar attributes for theming -->
+    <attr name="scrollbarTrackDrawable" format="reference" />
+    <attr name="scrollbarThumbDrawable" format="reference" />
+
+    <!-- Widget style attributes for theming -->
+    <attr name="winButtonStyle" format="reference" />
+
+    <attr name="windowBackgroundColor" format="color" />
+    <attr name="solitareGreen" format="reference"/>
+    <attr name="menuBarBackground" format="reference" />
+    <attr name="notificationBubble" format="reference"/>
+    <attr name="notificationBubbleTitleColor" format="color" />
+
+</resources>

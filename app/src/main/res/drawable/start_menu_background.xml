@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Blur effect layers for drop shadow -->
+    <item android:top="4dp" android:left="4dp">
+        <shape>
+            <solid android:color="#11000000" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+    <item android:top="2dp" android:left="2dp">
+        <shape>
+            <solid android:color="#22000000" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:top="0dp" android:left="0dp">
+        <shape>
+            <solid android:color="#33000000" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <!-- Main start menu background -->
+    <item android:bottom="4dp" android:right="4dp">
+        <shape>
+            <solid android:color="@color/white" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/xp_border_dark" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+</layer-list>

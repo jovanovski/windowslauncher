@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="36dp">
+
+    <!-- Content container for all interactive elements with Windows 98 styling -->
+    <RelativeLayout
+        android:id="@+id/taskbar_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/taskbar_98_background"
+        android:paddingLeft="10dp"
+        android:paddingTop="4dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="4dp">
+
+        <!-- Start Button - Windows 98 style -->
+        <LinearLayout
+            android:id="@+id/start_and_divider"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/start_button"
+                android:layout_width="76dp"
+                android:layout_height="match_parent"
+                android:background="#d3cec7"
+                android:clipToOutline="false"
+                android:contentDescription="Start button"
+                android:scaleType="fitXY"
+                android:src="@drawable/start_98"
+                tools:ignore="HardcodedText" />
+
+            <ImageView
+                android:layout_width="10dp"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:layout_marginStart="2dp"
+                android:src="@drawable/start_button_separator_98"/>
+        </LinearLayout>
+
+
+        <!-- Empty taskbar space (clickable area between start button and system tray) -->
+        <LinearLayout
+            android:id="@+id/taskbar_empty_space"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_toLeftOf="@id/system_tray"
+            android:layout_toRightOf="@id/start_and_divider"
+            android:background="@android:color/transparent"
+            android:orientation="horizontal"
+            android:gravity="start|center_vertical"
+            android:paddingLeft="4dp" />
+
+        <!-- System Tray - Windows 98 style with custom borders -->
+        <LinearLayout
+            android:id="@+id/system_tray"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_alignParentRight="true"
+            android:background="@drawable/system_tray_98_background"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Weather Temperature -->
+            <TextView
+                android:id="@+id/weather_temp"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:fontFamily="@font/micross_block"
+                android:gravity="center"
+                android:minWidth="24dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="4dp"
+                android:text="?"
+                android:textColor="@color/black"
+                android:textSize="13sp" />
+
+            <!-- Date Display with superscript ordinal -->
+            <LinearLayout
+                android:id="@+id/date_container"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minWidth="24dp"
+                android:orientation="horizontal"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp">
+
+                <TextView
+                    android:id="@+id/date_day"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/micross_block"
+                    android:gravity="center"
+                    android:text="26"
+                    android:textColor="@color/black"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/date_ordinal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="1dp"
+                    android:layout_marginBottom="4dp"
+                    android:fontFamily="@font/micross_block"
+                    android:text="th"
+                    android:textColor="@color/black"
+                    android:textSize="9sp" />
+
+            </LinearLayout>
+
+            <!-- Volume Icon - Windows 98 style -->
+            <LinearLayout
+                android:id="@+id/volume_icon_wrapper"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp">
+             <ImageView
+                android:id="@+id/volume_icon"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:src="@drawable/sound_98" />
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:id="@+id/update_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:visibility="gone"
+                android:paddingLeft="0dp"
+                android:paddingRight="8dp">
+                <ImageView
+                    android:layout_width="19dp"
+                    android:layout_height="19dp"
+                    android:src="@drawable/update_available_98" />
+            </LinearLayout>
+            <!-- Clock (time only) -->
+            <TextView
+                android:id="@+id/clock_time"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:fontFamily="@font/micross_block"
+                android:gravity="center"
+                android:minWidth="44dp"
+                android:text="01:23"
+                android:textColor="@color/black"
+                android:paddingRight="12dp"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+</RelativeLayout>

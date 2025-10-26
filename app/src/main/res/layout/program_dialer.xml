@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="360dp"
+    android:layout_height="360dp"
+    android:clickable="true"
+    >
+
+    <ImageView
+        android:layout_width="360dp"
+        android:layout_height="360dp"
+        android:src="@drawable/dialer"/>
+
+    <View
+        android:id="@+id/button_1"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="148dp"
+        android:layout_marginStart="29dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+    <View
+        android:id="@+id/button_2"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="148dp"
+        android:layout_marginStart="77dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_3"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="148dp"
+        android:layout_marginStart="125dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_4"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="196dp"
+        android:layout_marginStart="29dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+    <View
+        android:id="@+id/button_5"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="196dp"
+        android:layout_marginStart="77dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_6"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="196dp"
+        android:layout_marginStart="125dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_7"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="244dp"
+        android:layout_marginStart="29dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+    <View
+        android:id="@+id/button_8"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="244dp"
+        android:layout_marginStart="77dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_9"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="244dp"
+        android:layout_marginStart="125dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_delete"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="292dp"
+        android:layout_marginStart="29dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+    <View
+        android:id="@+id/button_0"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="292dp"
+        android:layout_marginStart="77dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_hash"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="292dp"
+        android:layout_marginStart="125dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"/>
+
+
+    <View
+        android:id="@+id/button_dial"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="99dp"
+        android:layout_marginStart="16dp"
+        android:layout_width="165dp"
+        android:layout_height="30dp"/>
+
+
+    <TextView
+        android:id="@+id/number_edit"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="69dp"
+        android:layout_marginStart="18dp"
+        android:layout_width="142dp"
+        android:background="@color/white"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:paddingStart="3dp"
+        android:letterSpacing="0.05"
+        android:paddingEnd="3dp"
+        android:layout_height="20dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_1"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="72dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_2"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="106dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_3"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="139dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_4"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="172dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="15sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_5"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="207dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_6"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="241dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_7"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="275dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+
+    <TextView
+        android:id="@+id/speed_dial_8"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="309dp"
+        android:layout_marginEnd="35dp"
+        android:layout_width="102dp"
+        android:textColor="@color/black"
+        android:fontFamily="@font/micross_block"
+        android:lines="1"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="13sp"
+        android:paddingStart="3dp"
+        android:paddingEnd="3dp"
+        android:layout_height="17dp"/>
+
+</RelativeLayout>

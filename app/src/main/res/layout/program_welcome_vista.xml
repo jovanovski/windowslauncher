@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="300dp">
+
+    <ImageView
+        android:id="@+id/background"
+        android:layout_width="400dp"
+        android:layout_height="300dp"
+        android:src="@drawable/welcome_vista_welcome"/>
+
+
+    <TextView
+        android:id="@+id/version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Version: 1.1"
+        android:fontFamily="@font/segoeui_font_family"
+        android:textSize="10sp"
+        android:textColor="@color/white"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="4dp"
+        android:layout_alignParentEnd="true"
+        />
+
+    <ScrollView
+        android:layout_width="270dp"
+        android:layout_height="220dp"
+        android:layout_marginTop="70dp"
+        android:layout_marginStart="120dp"
+        android:paddingEnd="20dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+        android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+        android:scrollbarSize="16dp"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:fadeScrollbars="false">
+    <TextView
+        android:id="@+id/welcome_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/tahoma"
+        android:textColor="@color/black"
+        android:textSize="10sp"
+        android:text="Test test"
+        />
+    </ScrollView>
+
+
+    <TextView
+        android:id="@+id/welcome_button"
+        android:layout_marginTop="70dp"
+        android:layout_marginLeft="10dp"
+        android:layout_width="90dp"
+        android:text="Welcome"
+        style="?winButtonStyle"
+        android:textSize="10sp"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/change_log_button"
+        android:layout_marginTop="96dp"
+        android:layout_marginLeft="10dp"
+        android:layout_width="90dp"
+        android:text="Change Log"
+        style="?winButtonStyle"
+        android:textSize="10sp"
+        android:layout_height="wrap_content"/>
+
+</RelativeLayout>

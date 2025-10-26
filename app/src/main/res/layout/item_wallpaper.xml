@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="4dp"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/wallpaper_icon"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:src="@drawable/paint_file"
+        android:scaleType="fitCenter"
+        android:layout_marginEnd="6dp" />
+
+    <TextView
+        android:id="@+id/wallpaper_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@android:color/black"
+        android:textSize="11sp"
+        android:fontFamily="@font/micross_block"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+</LinearLayout>

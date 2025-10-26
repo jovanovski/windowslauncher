@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="359dp"
+    android:layout_height="380dp"
+    android:background="#d3cec7"
+    android:clickable="true">
+
+<!-- Background -->
+    <RelativeLayout
+        android:id="@+id/wallpaper_select_screen"
+        android:layout_width="359dp"
+        android:layout_height="380dp">
+        <ImageView
+            android:layout_width="359dp"
+            android:layout_height="380dp"
+            android:src="@drawable/wallpaper_select"/>
+
+        <ImageView
+            android:id="@+id/wallpaper_preview"
+            android:layout_width="138dp"
+            android:layout_height="102dp"
+            android:layout_marginTop="52dp"
+            android:layout_marginStart="109dp"
+            android:scaleType="centerCrop"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"/>
+        <View
+            android:id="@+id/custom_wallpaper_button"
+            android:layout_width="70dp"
+            android:layout_height="22dp"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="233dp"
+            android:layout_marginEnd="17dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/wallpapers_recycler_view"
+            android:layout_width="238dp"
+            android:layout_marginStart="22dp"
+            android:layout_alignParentBottom="true"
+            android:layout_height="98dp"
+            android:layout_marginBottom="48dp"
+            android:paddingEnd="20dp"
+            android:clipToPadding="false"
+            android:scrollbars="vertical"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+            android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+            android:scrollbarSize="16dp"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:fadeScrollbars="false"/>
+
+    </RelativeLayout>
+<!-- Screen Saver-->
+    <RelativeLayout
+
+        android:visibility="gone"
+        android:id="@+id/wallpaper_screensaver_screen"
+        android:layout_width="359dp"
+        android:layout_height="380dp">
+        <ImageView
+            android:layout_width="359dp"
+            android:layout_height="380dp"
+            android:src="@drawable/wallpaper_screensaver"/>
+
+        <TextView
+            android:id="@+id/preview_screensaver_button"
+            android:layout_width="70dp"
+            android:layout_height="20dp"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="206dp"
+            android:layout_marginEnd="30dp"/>
+
+
+        <CheckBox
+            android:id="@+id/enable_screensaver_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:layout_weight="1"
+            android:text="Enable Screensaver"
+            android:textColor="#000000"
+            android:checked="true"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:layout_marginTop="233dp"
+            android:layout_marginStart="27dp"
+            android:paddingLeft="4dp" />
+
+    </RelativeLayout>
+<!-- Appearance -->
+    <RelativeLayout
+
+        android:visibility="gone"
+        android:id="@+id/wallpaper_appearance_screen"
+        android:layout_width="359dp"
+        android:layout_height="380dp">
+        <ImageView
+            android:layout_width="359dp"
+            android:layout_height="380dp"
+            android:src="@drawable/wallpaper_appearance"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginTop="35dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Theme"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:layout_marginBottom="4dp"
+                android:fontFamily="?attr/primaryFontFamily"
+                />
+
+            <Spinner
+                android:id="@+id/theme_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
+
+            <TextView
+                android:id="@+id/flavour_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Flavour"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="4dp"
+                android:fontFamily="?attr/primaryFontFamily"
+                android:visibility="gone" />
+
+            <Spinner
+                android:id="@+id/flavour_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </RelativeLayout>
+<!-- Settings -->
+    <RelativeLayout
+        android:id="@+id/wallpaper_settings_screen"
+        android:visibility="gone"
+        android:layout_width="359dp"
+        android:layout_height="380dp"
+        >
+        <ImageView
+            android:layout_width="359dp"
+            android:layout_height="380dp"
+            android:src="@drawable/wallpaper_settings"/>
+        <LinearLayout
+            android:id="@+id/view_options_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginTop="35dp"
+            android:orientation="vertical">
+
+            <CheckBox
+                android:id="@+id/show_under_taskbar_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Black Under Taskbar"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_agent_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Desktop Agent"
+                android:textColor="#000000"
+
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_quick_glance_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Quick Glance"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_recycle_bin_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Recycle Bin"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_cursor_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Cursor"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+            <CheckBox
+                android:id="@+id/show_shortcut_arrow"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Icon Shortcut Arrow"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Taskbar Height:"
+                    android:textSize="12sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginEnd="8dp" />
+
+                <EditText
+                    android:id="@+id/taskbar_height_input"
+                    android:layout_width="60dp"
+                    android:layout_height="20dp"
+                    android:inputType="numberSigned"
+                    android:textSize="11sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:background="@drawable/win98_edit_text_inverted"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:gravity="center"
+                    android:text="0" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="(-30 to +30)"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginStart="8dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </RelativeLayout>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/wallpaper_select_screen_button"
+            android:layout_width="67dp"
+            android:layout_height="20dp"/>
+
+        <View
+            android:id="@+id/wallpaper_screensaver_screen_button"
+            android:layout_width="66dp"
+            android:layout_height="20dp"/>
+
+        <View
+            android:id="@+id/wallpaper_appearance_screen_button"
+            android:layout_width="64dp"
+            android:layout_height="20dp"/>
+
+
+        <View
+            android:id="@+id/wallpaper_settings_screen_button"
+            android:layout_width="50dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="76dp"
+            />
+
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="353dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_alignParentEnd="true"
+        android:gravity="end"
+
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/wallpaper_ok_button"
+            android:layout_marginEnd="8dp"
+            android:layout_width="67dp"
+            android:layout_height="20dp"/>
+
+        <View
+            android:id="@+id/wallpaper_cancel_button"
+            android:layout_marginEnd="6dp"
+            android:layout_width="66dp"
+            android:layout_height="20dp"/>
+
+        <View
+            android:id="@+id/wallpaper_apply_button"
+            android:layout_width="67dp"
+            android:layout_height="20dp"/>
+
+    </LinearLayout>
+</RelativeLayout>

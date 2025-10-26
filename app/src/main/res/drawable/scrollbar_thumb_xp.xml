@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Constrain entire thumb to 16dp width -->
+    <item android:width="16dp">
+        <layer-list>
+            <!-- Background gradient -->
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:startColor="#c9d4fa"
+                        android:endColor="#bbc8f4"
+                        android:angle="0" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+
+            <!-- Middle image overlay -->
+            <item android:gravity="center">
+                <bitmap
+                    android:src="@drawable/xp_scroll_middle"
+                    android:gravity="center" />
+            </item>
+        </layer-list>
+    </item>
+
+</layer-list>

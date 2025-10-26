@@ -1,0 +1,5 @@
+<resources>
+    <dimen name="fab_margin">16dp</dimen>
+    <dimen name="dialog_padding">8dp</dimen>
+    <dimen name="wallpaper_item_margin">4dp</dimen>
+</resources>

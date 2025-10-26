@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Main button shape with border -->
+    <item>
+        <shape android:shape="rectangle">
+            <stroke
+                android:width="2dp"
+                android:color="#828282" />
+            <corners android:radius="5dp" />
+        </shape>
+    </item>
+
+    <!-- Gradient background inside the border -->
+    <item
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#f1f1f1"
+                android:endColor="#d8d8d8"
+                android:angle="270" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+</layer-list>

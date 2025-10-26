@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dialog_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clickable="true"
+    android:clipToPadding="false">
+
+    <!-- Movable window -->
+    <LinearLayout
+        android:id="@+id/window_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="20dp">
+
+        <!-- Windows XP Title Bar -->
+        <LinearLayout
+            android:id="@+id/dialog_title_bar"
+            android:layout_width="match_parent"
+            android:layout_height="22dp"
+            android:background="@drawable/windows_dialog_title_bar"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clipToOutline="true"
+            android:paddingLeft="8dp"
+            android:paddingRight="4dp">
+
+            <ImageView
+                android:id="@+id/dialog_window_icon"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_dialog_window"
+                android:layout_marginRight="6dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/dialog_title_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Dialog Title"
+                android:letterSpacing="0.03"
+                android:textColor="#ffffff"
+                android:textSize="10sp"
+                android:textFontWeight="500"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:fontFamily="?attr/primaryFontFamily" />
+
+
+            <ImageView
+                android:id="@+id/dialog_minimize_button"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:background="@drawable/xp_title_bar_minimize"
+                android:padding="3dp"
+                android:scaleType="centerInside" />
+
+            <ImageView
+                android:id="@+id/dialog_close_button"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:background="@drawable/xp_title_bar_close"
+                android:padding="3dp"
+                android:layout_marginLeft="2dp"
+                android:scaleType="centerInside" />
+        </LinearLayout>
+
+        <!-- Content Area with Border (excluding top) -->
+        <FrameLayout
+            android:id="@+id/window_border"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:paddingBottom="2dp"
+            android:background="@drawable/windows_xp_dialog_border">
+
+                <LinearLayout
+                    android:id="@+id/dialog_content_area"
+
+                    android:clickable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#f0f0f0" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>
