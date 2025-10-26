@@ -1332,14 +1332,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     }
                 }
 
+                // Detect backspace on empty search box
+                searchBoxView.setOnKeyListener { _, keyCode, event ->
+                    if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                        keyCode == android.view.KeyEvent.KEYCODE_DEL &&
+                        searchBoxView.text.isEmpty() &&
+                        isVistaShowingApps) {
+                        switchToCommands()
+                        true
+                    } else {
+                        false
+                    }
+                }
+
                 // Switch to apps when user starts typing (not just on focus)
                 searchBoxView.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-                        // Detect backspace on empty field: count > 0 means deleting, s is empty
-                        if (count > 0 && after == 0 && s.isNullOrEmpty() && isVistaShowingApps) {
-                            switchToCommands()
-                        }
-                    }
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                         // Only switch if user is actually typing (text is not empty)
                         if (!s.isNullOrEmpty()) {
