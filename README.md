@@ -24,6 +24,7 @@ This is a Windows inspired launcher for Android 11+, which tries to faithfully r
     -   Notepad - for storing notes but included tabs as well
     -   Phone Dialer - working phone with basic features and speed dial
     -   Registry Editor - to check locally stored settings, modify, export/sync to your Google Drive to later restore easily
+    -   MSN Messenger - a simple SMS send/recieve app with the `/nudge` capability
     -   2 games: Minesweeper & Solitare
 -   Calendar & Weather Integration
 -   Windows Update (checks for a new APK version and lets you download it)
