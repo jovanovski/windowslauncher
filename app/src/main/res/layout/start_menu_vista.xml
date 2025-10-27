@@ -1,211 +1,231 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Windows Vista Start Menu Content Layout (just the middle section) -->
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:clickable="true">
+    <!-- Windows XP Start Menu Content Layout (just the middle section) -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:id="@+id/start_menu_content"
+android:layout_width="wrap_content"
+android:layout_height="560dp"
+android:clickable="true"
+android:orientation="vertical">
 
-    <!-- Container with max width constraint, scales down proportionally on smaller screens -->
-    <RelativeLayout
-        android:id="@+id/start_menu_content"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:clickable="true"
-        android:orientation="vertical"
-        app:layout_constraintDimensionRatio="400:560"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_default="wrap"
-        app:layout_constraintWidth_max="400dp">
 
-        <!-- Background Image -->
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/start_menu_vista" />
+<!--    <ImageView-->
+<!--        android:layout_width="400dp"-->
+<!--        android:layout_height="560dp"-->
+<!--        android:src="@drawable/start_menu_vista"-->
+<!--    />-->
 
-        <!-- Vista Arrow -->
-        <ImageView
-            android:id="@+id/start_menu_vista_arrow"
-            android:layout_width="10dp"
-            android:layout_height="14dp"
-            android:layout_marginLeft="18dp"
-            android:layout_marginTop="493dp"
-            android:src="@drawable/start_menu_vista_arrow_right" />
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
 
-        <!-- Profile Picture -->
-        <ImageView
-            android:id="@+id/profile_picture"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginLeft="291dp"
-            android:layout_marginTop="3dp"
-            android:src="@drawable/user" />
-
-        <!-- Profile Name -->
-        <TextView
-            android:id="@+id/profile_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="252dp"
-            android:layout_marginTop="85dp"
-            android:fontFamily="@font/segoeui_bold"
-            android:text="User"
-            android:textColor="#DDD"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Shutdown Button -->
-        <ImageView
-            android:id="@+id/shutdown_button"
-            android:layout_width="160dp"
-            android:layout_height="40dp"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentBottom="true" />
-
-        <!-- Settings Item -->
         <LinearLayout
-            android:id="@+id/settings_item"
-            android:layout_width="158dp"
-            android:layout_height="40dp"
-            android:layout_marginLeft="240dp"
-            android:layout_marginTop="362dp"
-            android:orientation="horizontal" />
+            android:layout_width="180dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/start_menu_vista_left"
+            android:orientation="vertical">
 
-        <!-- Search Box -->
-        <EditText
-            android:id="@+id/search_box"
-            style="@android:style/Widget.EditText"
-            android:layout_width="200dp"
-            android:layout_height="18dp"
-            android:layout_marginLeft="10dp"
-            android:layout_marginTop="531dp"
-            android:background="@android:color/transparent"
-            android:fontFamily="@font/segoeui_font_family"
-            android:gravity="center_vertical"
-            android:hint="Start Search"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp"
-            android:textColor="#000000"
-            android:textColorHint="#444444"
-            android:textSize="12sp"
-            android:textStyle="normal" />
-
-        <!-- Main Content Area -->
-        <RelativeLayout
-            android:layout_width="220dp"
-            android:layout_height="440dp"
-            android:layout_marginLeft="12dp"
-            android:layout_marginTop="40dp">
-
-            <!-- Commands List Wrapper -->
-            <LinearLayout
-                android:id="@+id/command_list_wrapper"
+            <RelativeLayout
+                android:layout_marginTop="40dp"
+                android:layout_marginLeft="12dp"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
+                android:layout_height="440dp">
 
+                <!-- Commands List (40%) -->
                 <LinearLayout
-                    android:id="@+id/welcome_item"
+                    android:id="@+id/command_list_wrapper"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/start_menu_item_background"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center|start"
-                    android:orientation="horizontal"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="10dp"
-                    android:paddingRight="12dp"
-                    android:paddingBottom="10dp">
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
 
-                    <ImageView
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        android:layout_marginEnd="8dp"
-                        android:src="@drawable/logo_vista" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:id="@+id/welcome_item"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/segoeui_regular"
-                        android:maxLines="1"
-                        android:text="Welcome"
-                        android:textColor="@color/context_menu_text_selector"
-                        android:textSize="13sp" />
+                        android:gravity="center|start"
+                        android:orientation="horizontal"
+                        android:paddingLeft="8dp"
+                        android:paddingRight="12dp"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="@drawable/start_menu_item_background"
+                        >
+
+                        <ImageView
+                            android:layout_width="25dp"
+                            android:layout_height="25dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/logo_vista" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:fontFamily="@font/segoeui_regular"
+                            android:maxLines="1"
+                            android:text="Welcome"
+                            android:textColor="@color/context_menu_text_selector"
+                            android:textSize="13sp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/windows_update_item"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center|start"
+                        android:orientation="horizontal"
+                        android:paddingLeft="8dp"
+                        android:paddingRight="12dp"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="@drawable/start_menu_item_background"
+                        >
+
+                        <ImageView
+                            android:layout_width="25dp"
+                            android:layout_height="25dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/update_available_vista" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:fontFamily="@font/segoeui_regular"
+                            android:maxLines="1"
+                            android:text="Windows Update"
+                            android:textColor="@color/context_menu_text_selector"
+                            android:textSize="13sp" />
+
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/commands_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        />
 
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/windows_update_item"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/start_menu_item_background"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center|start"
-                    android:orientation="horizontal"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="10dp"
-                    android:paddingRight="12dp"
-                    android:paddingBottom="10dp">
-
-                    <ImageView
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        android:layout_marginEnd="8dp"
-                        android:src="@drawable/update_available_vista" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/segoeui_regular"
-                        android:maxLines="1"
-                        android:text="Windows Update"
-                        android:textColor="@color/context_menu_text_selector"
-                        android:textSize="13sp" />
-
-                </LinearLayout>
-
+                <!-- Apps List -->
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/commands_recycler_view"
+                    android:visibility="gone"
+                    android:id="@+id/apps_recycler_view"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentBottom="true" />
 
-            </LinearLayout>
 
-            <!-- Apps List -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/apps_recycler_view"
-                android:layout_width="match_parent"
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
-                android:visibility="gone" />
+                android:orientation="horizontal">
+                <ImageView
+                    android:id="@+id/start_menu_vista_arrow"
+                    android:layout_width="10dp"
+                    android:layout_height="14dp"
+                    android:layout_marginLeft="18dp"
+                    android:layout_marginTop="13dp"
+                    android:src="@drawable/start_menu_vista_arrow_right"
+                    />
 
-        </RelativeLayout>
+                <TextView
+                    android:id="@+id/all_programs"
+                    android:layout_width="225dp"
+                    android:layout_height="30dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/segoeui_font_family"
+                    android:maxLines="1"
+                    android:paddingLeft="25dp"
+                    android:text="All Programs"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginLeft="10dp"
+                    android:gravity="center_vertical"
+                    android:textColor="@color/context_menu_text_selector"
+                    android:textSize="13sp" />
 
-        <!-- All Programs Button -->
-        <TextView
-            android:id="@+id/all_programs"
-            android:layout_width="225dp"
-            android:layout_height="30dp"
-            android:layout_marginLeft="10dp"
-            android:layout_marginTop="484dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/segoeui_font_family"
-            android:gravity="center_vertical"
-            android:maxLines="1"
-            android:paddingLeft="25dp"
-            android:text="All Programs"
-            android:textColor="@color/context_menu_text_selector"
-            android:textSize="13sp" />
+            </RelativeLayout>
 
-    </RelativeLayout>
+            <EditText
+                android:id="@+id/search_box"
+                android:layout_width="190dp"
+                android:layout_height="18dp"
+                android:background="@android:color/transparent"
+                android:hint="Start Search"
+                android:textColor="#000000"
+                android:textColorHint="#444444"
+                android:textSize="12sp"
+                android:textStyle="normal"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:inputType="text"
+                android:gravity="center_vertical"
+                android:imeOptions="actionSearch"
+                android:fontFamily="@font/segoeui_font_family"
+                android:layout_marginLeft="10dp"
+                android:layout_marginTop="15dp"
+                style="@android:style/Widget.EditText" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="185dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:background="@drawable/start_menu_vista_right"
+            >
+            <ImageView
+                android:id="@+id/profile_picture"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@drawable/user"
+                android:layout_marginTop="2dp"
+                android:layout_marginLeft="77dp" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <TextView
+                android:id="@+id/profile_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User"
+                android:layout_marginLeft="40dp"
+                android:textColor="#DDD"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/segoeui_bold"
+                android:layout_marginTop="25dp"
+                />
+
+
+            <LinearLayout
+                android:id="@+id/settings_item"
+                android:layout_width="158dp"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:layout_marginTop="252dp"
+                android:layout_marginLeft="25dp"
+                />
+
+            <ImageView
+                android:id="@+id/shutdown_button"
+                android:layout_width="160dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="118dp"
+                android:layout_marginLeft="24dp"/>
+
+
+        </LinearLayout>
+    </LinearLayout>
+
+
+
+
+
+
+
+</RelativeLayout>
