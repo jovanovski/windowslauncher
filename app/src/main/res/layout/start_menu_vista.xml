@@ -55,9 +55,9 @@ android:orientation="vertical">
                         >
 
                         <ImageView
-                            android:layout_width="25dp"
-                            android:layout_height="25dp"
-                            android:layout_marginEnd="8dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginEnd="12dp"
                             android:src="@drawable/logo_vista" />
 
                         <TextView
@@ -88,9 +88,9 @@ android:orientation="vertical">
                         >
 
                         <ImageView
-                            android:layout_width="25dp"
-                            android:layout_height="25dp"
-                            android:layout_marginEnd="8dp"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginEnd="12dp"
                             android:src="@drawable/update_available_vista" />
 
                         <TextView
