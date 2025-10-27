@@ -75,6 +75,7 @@ import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.apps.dialer.DialerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
+import rocks.gorjan.gokixp.apps.msn.MsnApp
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
 import rocks.gorjan.gokixp.apps.regedit.RegistryEditorApp
 import rocks.gorjan.gokixp.apps.regedit.GoogleDriveHelper
@@ -330,6 +331,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_SOUND_MUTED = "sound_muted"
+        private const val KEY_PLAY_EMAIL_SOUND = "play_email_sound"
         private const val KEY_KNOWN_APPS = "known_apps"
         private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
         private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
@@ -903,6 +905,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.num_8] = soundPool.load(audioContext, R.raw.num_8, 1)
         soundIds[R.raw.num_9] = soundPool.load(audioContext, R.raw.num_9, 1)
         soundIds[R.raw.num_other] = soundPool.load(audioContext, R.raw.num_other, 1)
+        soundIds[R.raw.youve_got_mail] = soundPool.load(audioContext, R.raw.youve_got_mail, 1)
 
         // Preload egg sounds
         for (resourceId in eggSounds) {
@@ -1039,6 +1042,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showNotepadDialog()
         }
 
+        // Register MSN Messenger
+        systemAppActions["system.msn"] = {
+            showMsnDialog()
+        }
+
         // Register Winamp
         systemAppActions["system.winamp"] = {
             showWinampDialog()
@@ -1097,6 +1105,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 name = "Notepad",
                 packageName = "system.notepad",
                 icon = createSquareDrawable(notepadDrawable)
+            ))
+        }
+
+        // MSN Messenger - scale icon to match app icon size
+        val msnDrawable = AppCompatResources.getDrawable(this,themeManager.getMsnIcon())
+        if (msnDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "MSN Messenger",
+                packageName = "system.msn",
+                icon = createSquareDrawable(msnDrawable)
             ))
         }
 
@@ -4578,6 +4596,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showRecycleBinCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_recycle_bin_checkbox)
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
+        val playEmailSoundCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.play_email_sound_checkbox)
         val enableScreensaverCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.enable_screensaver_checkbox)
         val previewScreensaverButton = contentView.findViewById<TextView>(R.id.preview_screensaver_button)
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
@@ -4693,6 +4712,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (isChecked != isCursorVisible()) {
                 toggleCursorVisibility()
             }
+        }
+
+        // Set up Play Email Sound checkbox
+        val playEmailSoundEnabled = prefs.getBoolean(KEY_PLAY_EMAIL_SOUND, true)
+        playEmailSoundCheckbox.isChecked = playEmailSoundEnabled
+        playEmailSoundCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_PLAY_EMAIL_SOUND, isChecked) }
+            Log.d("MainActivity", "Play email sound changed to: $isChecked")
         }
 
         // Set up Taskbar Height Input
@@ -5563,6 +5590,94 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Cleanup on close
         windowsDialog.setOnCloseListener {
             notepadApp.cleanup()
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Set cursor back to normal after window is shown and loaded
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+        }, 100) // Small delay to ensure window is fully rendered
+    }
+
+    private fun showMsnDialog() {
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowMsnDialog()
+        }
+    }
+
+    private fun createAndShowMsnDialog() {
+        // Check if permissions are granted
+        val hasReadSms = checkSelfPermission(android.Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        val hasSendSms = checkSelfPermission(android.Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        val hasReceiveSms = checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        val hasReadContacts = checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasReadSms || !hasSendSms || !hasReceiveSms || !hasReadContacts) {
+            // Request permissions
+            requestPermissions(
+                arrayOf(
+                    android.Manifest.permission.READ_SMS,
+                    android.Manifest.permission.SEND_SMS,
+                    android.Manifest.permission.RECEIVE_SMS,
+                    android.Manifest.permission.READ_CONTACTS
+                ),
+                101
+            )
+            setCursorNormal()
+            return
+        }
+
+        // Create Windows-style dialog with correct theme from start
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.msn"  // Set identifier for tracking
+        windowsDialog.setTitle("MSN Messenger")
+        windowsDialog.setTaskbarIcon(themeManager.getMsnIcon())
+
+        // Inflate the MSN content
+        val contentView = layoutInflater.inflate(R.layout.program_msn, null)
+
+        // Create MSN app instance
+        val msnApp = MsnApp(
+            context = this,
+            onSoundPlay = {
+                playClickSound()
+            },
+            onCloseWindow = {
+                windowsDialog.closeWindow()
+            },
+            onMoveWindow = { offsetY ->
+                windowsDialog.moveWindowVertical(offsetY)
+            },
+            onShakeWindow = {
+                windowsDialog.shakeWindow()
+            }
+        )
+
+        // Setup the app
+        msnApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSize(400, 533)
+
+        // Set up window control handlers
+        windowsDialog.setOnMinimizeListener {
+            msnApp.onMinimize()
+        }
+
+        windowsDialog.setOnMaximizeListener {
+            // Do nothing for now
+        }
+
+        // Cleanup on close
+        windowsDialog.setOnCloseListener {
+            msnApp.cleanup()
         }
 
         // Set context menu reference and show as floating window
@@ -6897,7 +7012,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun playClickSound() {
         playSound(R.raw.click)
     }
-    
+
+    fun playEmailSound() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val playEmailSound = prefs.getBoolean(KEY_PLAY_EMAIL_SOUND, true)
+        if (playEmailSound) {
+            playSound(R.raw.youve_got_mail)
+        }
+    }
+
     private fun playDingSound() {
         // Bypass mute check since this is specifically for unmute confirmation
         if(themeManager.getSelectedTheme() == AppTheme.WindowsVista){
@@ -8617,6 +8740,42 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             } else {
                 Log.d("MainActivity", "Notification permission denied")
                 // Don't show a toast for notification denial as it's optional
+            }
+
+            101 -> {
+                // MSN Messenger SMS permissions
+                val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+
+                if (allGranted) {
+                    // Permissions granted, open MSN Messenger
+                    Log.d("MainActivity", "MSN permissions granted, opening app")
+                    Handler(Looper.getMainLooper()).post {
+                        showMsnDialog()
+                    }
+                } else {
+                    // Check if any permission was permanently denied
+                    val hasReadSms = checkSelfPermission(android.Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+                    val hasSendSms = checkSelfPermission(android.Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+                    val hasReadContacts = checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+
+                    val canRequestReadSms = shouldShowRequestPermissionRationale(android.Manifest.permission.READ_SMS)
+                    val canRequestSendSms = shouldShowRequestPermissionRationale(android.Manifest.permission.SEND_SMS)
+                    val canRequestContacts = shouldShowRequestPermissionRationale(android.Manifest.permission.READ_CONTACTS)
+
+                    // If any permission is denied and we can't request it again (permanently denied)
+                    if ((!hasReadSms && !canRequestReadSms) ||
+                        (!hasSendSms && !canRequestSendSms) ||
+                        (!hasReadContacts && !canRequestContacts)) {
+
+                        // Show notification to open settings
+                        showNotification(
+                            "Permissions Needed",
+                            "Tap here to open settings and grant Contact and SMS permissions"
+                        ) {
+                            openAppSettings()
+                        }
+                    }
+                }
             }
         }
     }

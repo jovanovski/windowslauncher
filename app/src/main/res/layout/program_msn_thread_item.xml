@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="4dp"
+    android:gravity="center_vertical">
+
+    <ImageView
+        android:id="@+id/thread_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/msn_icon"
+        android:layout_marginEnd="6dp"/>
+
+    <TextView
+        android:id="@+id/thread_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="11sp"
+        android:fontFamily="?primaryFontFamily"
+        android:textColor="#333"
+        android:singleLine="true"
+        android:ellipsize="end"/>
+    <View
+        android:id="@+id/notification_dot"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginEnd="2dp"
+        android:background="@drawable/notification_dot"/>
+
+</LinearLayout>

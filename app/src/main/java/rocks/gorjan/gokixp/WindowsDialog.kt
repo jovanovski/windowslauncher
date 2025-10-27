@@ -68,6 +68,10 @@ class WindowsDialog @JvmOverloads constructor(
     private var initialTouchY = 0f
     private var isDragging = false
 
+    // Current window position (for shake animation)
+    private var currentWindowX = 0f
+    private var currentWindowY = 0f
+
     // Window manager reference for closing
     private var windowManager: FloatingWindowManager? = null
 
@@ -178,6 +182,8 @@ class WindowsDialog @JvmOverloads constructor(
 
                         windowFrame.x = newX
                         windowFrame.y = newY
+                        currentWindowX = newX
+                        currentWindowY = newY
                     }
                     true
                 }
@@ -358,6 +364,8 @@ class WindowsDialog @JvmOverloads constructor(
 
         windowFrame.x = x
         windowFrame.y = y
+        currentWindowX = x
+        currentWindowY = y
     }
 
     // ——— Public API ———
@@ -428,6 +436,95 @@ class WindowsDialog @JvmOverloads constructor(
         hideContextMenu()
         windowManager?.removeWindow(this)
         onCloseListener?.invoke()
+    }
+
+    /**
+     * Move window by vertical offset (for keyboard adjustments)
+     * @param offsetY Vertical offset in pixels (negative to move up, 0 to reset to original position)
+     */
+    fun moveWindowVertical(offsetY: Int) {
+        if (!::windowFrame.isInitialized) return
+
+        // Store original position if not yet stored
+        if (offsetY != 0 && initialY == 0f) {
+            initialY = windowFrame.y
+        }
+
+        // Calculate new Y position
+        val newY = if (offsetY == 0) {
+            // Reset to original position
+            initialY
+        } else {
+            // Move by offset from original position
+            initialY + offsetY
+        }
+
+        // Ensure window stays within bounds
+        val overlayH = overlayRoot.height
+        val maxY = overlayH - windowFrame.height
+        val finalY = newY.coerceIn(0f, maxY.toFloat())
+        windowFrame.y = finalY
+        currentWindowY = finalY
+    }
+
+    /**
+     * Shake the window (for nudge animation)
+     */
+    fun shakeWindow() {
+        if (!::windowFrame.isInitialized) return
+
+        // Use the tracked position instead of reading from windowFrame
+        val startX = currentWindowX
+        val startY = currentWindowY
+
+        // Debug: Log the starting position
+        android.util.Log.d("WindowsDialog", "Shake starting at x=$startX, y=$startY")
+
+        val shakeDistance = 10f // pixels to shake
+        val shakeDuration = 50L // duration of each shake step in ms
+        val shakeCount = 10 // number of shakes in 1 second (1000ms / 100ms per cycle)
+
+        val handler = Handler(Looper.getMainLooper())
+        var currentShake = 0
+
+        val shakeRunnable = object : Runnable {
+            override fun run() {
+                if (currentShake >= shakeCount * 2) {
+                    // Return to the position where shake started
+                    windowFrame.x = startX
+                    windowFrame.y = startY
+                    currentWindowX = startX
+                    currentWindowY = startY
+                    android.util.Log.d("WindowsDialog", "Shake ended, returned to x=$startX, y=$startY")
+                    return
+                }
+
+                // Alternate between offsets to create shake effect, relative to start position
+                when (currentShake % 4) {
+                    0 -> {
+                        windowFrame.x = startX + shakeDistance
+                        windowFrame.y = startY
+                    }
+                    1 -> {
+                        windowFrame.x = startX - shakeDistance
+                        windowFrame.y = startY
+                    }
+                    2 -> {
+                        windowFrame.x = startX
+                        windowFrame.y = startY + shakeDistance
+                    }
+                    3 -> {
+                        windowFrame.x = startX
+                        windowFrame.y = startY - shakeDistance
+                    }
+                }
+
+                currentShake++
+                handler.postDelayed(this, shakeDuration)
+            }
+        }
+
+        handler.post(shakeRunnable)
     }
 
     /**
@@ -539,6 +636,8 @@ class WindowsDialog @JvmOverloads constructor(
 
                         windowFrame.x = newX
                         windowFrame.y = newY
+                        currentWindowX = newX
+                        currentWindowY = newY
                     }
                     true
                 }

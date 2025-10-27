@@ -201,6 +201,12 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.notepad_icon_vista
     }
 
+    fun getMsnIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.msn_icon
+        AppTheme.WindowsXP -> R.drawable.msn_icon
+        AppTheme.WindowsVista -> R.drawable.msn_icon_vista
+    }
+
     /**
      * Gets the taskbar button layout resource ID for the given theme.
      */

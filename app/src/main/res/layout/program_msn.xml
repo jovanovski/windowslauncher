@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="504dp"
+    android:clickable="true"
+    >
+
+    <ImageView
+        android:id="@+id/msn_background"
+        android:layout_width="400dp"
+        android:layout_height="504dp"
+        android:src="@drawable/msn_screen"/>
+
+    <TextView
+        android:id="@+id/msn_recipient"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:ellipsize="end"
+        android:text=""
+        android:layout_marginTop="58dp"
+        android:layout_marginLeft="32dp"
+        android:textSize="10sp"
+        android:background="@android:color/transparent"
+        android:fontFamily="?primaryFontFamily"
+        android:textColor="#333"
+        />
+
+    <ScrollView
+        android:id="@+id/msn_message_thread_wrapper"
+        android:layout_width="231dp"
+        android:layout_height="307dp"
+        android:layout_marginTop="78dp"
+        android:layout_marginLeft="11dp"
+        android:background="@android:color/transparent"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarSize="16dp"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+        android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+        android:fadeScrollbars="false"
+        android:paddingEnd="20dp">
+
+        <TableLayout
+            android:id="@+id/msn_message_thread"
+            android:layout_width="213dp"
+            android:layout_height="wrap_content"
+            android:paddingTop="6dp"
+            android:paddingStart="2dp"
+            android:paddingBottom="6dp"
+            />
+
+    </ScrollView>
+
+    <EditText
+        android:id="@+id/msn_compose_message"
+        android:layout_width="188dp"
+        android:layout_height="53dp"
+        android:background="@android:color/transparent"
+        android:layout_marginTop="420dp"
+        android:layout_marginLeft="12dp"
+        android:fontFamily="?primaryFontFamily"
+        android:textSize="12sp"
+        android:textColor="@color/black"
+        android:hint="Compose a message..."
+        android:textColorHint="#666"
+        android:paddingStart="2dp"
+        android:gravity="start"
+        android:imeOptions="actionSend"
+        android:inputType="text"
+        />
+
+    <View
+        android:id="@+id/msn_send_button"
+        android:layout_width="45dp"
+        android:layout_height="53dp"
+        android:layout_marginTop="420dp"
+        android:layout_marginLeft="200dp"
+        />
+
+
+    <ScrollView
+        android:id="@+id/msn_recent_message_threads_wrapper"
+        android:layout_width="140dp"
+        android:layout_height="440dp"
+        android:layout_marginTop="50dp"
+        android:layout_marginLeft="251dp"
+        android:background="@color/white">
+
+        <TableLayout
+            android:id="@+id/msn_recent_message_threads"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            />
+
+    </ScrollView>
+
+
+    <TextView
+        android:id="@+id/msn_toggle_threads"
+        android:layout_width="30dp"
+        android:layout_height="24dp"
+        android:text="&gt;"
+        android:layout_marginLeft="361dp"
+        android:layout_marginTop="18dp"
+        android:textSize="12sp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        style="?winButtonStyle"
+        />
+
+    <View
+        android:id="@+id/msn_nudge_button"
+        android:layout_width="45dp"
+        android:layout_height="23dp"
+        android:layout_marginTop="395dp"
+        android:layout_marginLeft="200dp"
+        />
+
+
+</RelativeLayout>

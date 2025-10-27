@@ -236,12 +236,26 @@
                 android:checked="true"
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
+
             <CheckBox
                 android:id="@+id/show_shortcut_arrow"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:text="Show Icon Shortcut Arrow"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/play_email_sound_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Play 'You've got mail' when receiving email"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
