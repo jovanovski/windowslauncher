@@ -1,6 +1,5 @@
 package rocks.gorjan.gokixp
 
-import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -62,57 +61,99 @@ class NotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
 
-        if (!shouldShowNotification(sbn)) {
+        val packageName = sbn.packageName
+        val isOngoing = sbn.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
+        Log.d(TAG, "Notification posted from: $packageName (ongoing=$isOngoing)")
+
+        // Handle email notifications specially - always play sound and show dot
+        // even if they would normally be filtered out
+        if (isEmailApp(packageName)) {
+            Log.d(TAG, "Email notification detected from: $packageName")
+            val mainActivity = MainActivity.getInstance()
+            if (mainActivity != null) {
+                Log.d(TAG, "MainActivity instance found, playing email sound")
+                mainActivity.playEmailSound()
+            } else {
+                Log.w(TAG, "MainActivity instance is null, cannot play email sound")
+            }
+            // Only add non-ongoing email notifications
+            if (!isOngoing) {
+                activeNotificationPackages.add(packageName)
+                notifyMainActivity()
+            } else {
+                Log.d(TAG, "Skipping ongoing email notification from $packageName")
+            }
             return
         }
 
-        val packageName = sbn.packageName
+        if (!shouldShowNotification(sbn)) {
+            Log.d(TAG, "Notification from $packageName filtered out (ongoing=$isOngoing)")
+            return
+        }
+
         Log.d(TAG, "Active notification posted for: $packageName")
 
         activeNotificationPackages.add(packageName)
-
-        // Play "You've Got Mail" sound for email notifications
-        if (isEmailApp(packageName)) {
-            Log.d(TAG, "Email notification detected from: $packageName")
-            MainActivity.getInstance()?.playEmailSound()
-        }
 
         notifyMainActivity()
     }
     
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         super.onNotificationRemoved(sbn)
-        
+
         val packageName = sbn.packageName
         Log.d(TAG, "Notification removed for: $packageName")
-        
+
         // Check if there are still active notifications for this package
+        // Only count non-ongoing notifications
         val stillHasNotifications = try {
-            getActiveNotifications().any { it.packageName == packageName && shouldShowNotification(it) }
+            val notifications = getActiveNotifications().filter {
+                it.packageName == packageName
+            }
+
+            // Log what we found for debugging
+            Log.d(TAG, "Found ${notifications.size} notifications for $packageName")
+            notifications.forEach { notif ->
+                val isOngoing = notif.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
+                Log.d(TAG, "  - Notification ongoing=$isOngoing")
+            }
+
+            // Only count notifications that pass our filter (non-ongoing, non-system)
+            notifications.any { shouldShowNotification(it) }
         } catch (e: Exception) {
+            Log.e(TAG, "Error checking notifications for $packageName", e)
             false
         }
-        
+
         if (!stillHasNotifications) {
+            Log.d(TAG, "Removing $packageName from active notifications")
             activeNotificationPackages.remove(packageName)
             notifyMainActivity()
+        } else {
+            Log.d(TAG, "Keeping $packageName in active notifications")
         }
     }
     
     private fun refreshActiveNotifications() {
         try {
             activeNotificationPackages.clear()
-            
+
             val notifications = getActiveNotifications()
+            Log.d(TAG, "Refreshing notifications, found ${notifications.size} total notifications")
+
             for (notification in notifications) {
-                if (shouldShowNotification(notification)) {
+                val isOngoing = notification.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
+                val shouldShow = shouldShowNotification(notification)
+                Log.d(TAG, "  ${notification.packageName}: ongoing=$isOngoing, shouldShow=$shouldShow")
+
+                if (shouldShow) {
                     activeNotificationPackages.add(notification.packageName)
                 }
             }
-            
-            Log.d(TAG, "Refreshed active notifications: ${activeNotificationPackages.size} packages")
+
+            Log.d(TAG, "Refreshed active notifications: ${activeNotificationPackages.size} packages: $activeNotificationPackages")
             notifyMainActivity()
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Error refreshing active notifications", e)
         }
@@ -120,38 +161,17 @@ class NotificationListenerService : NotificationListenerService() {
     
     private fun shouldShowNotification(sbn: StatusBarNotification): Boolean {
         val notification = sbn.notification
-        
-        // Skip ongoing notifications (like music players)
-        if (notification.flags and Notification.FLAG_ONGOING_EVENT != 0) {
+
+        // Skip ongoing notifications (like music players, timers, etc.)
+        if (notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0) {
             return false
         }
-        
-        // Skip system notifications  
+
+        // Skip system notifications
         if (sbn.packageName == "android" || sbn.packageName == "com.android.systemui") {
             return false
         }
-        
-        // Skip low priority notifications (using importance for newer APIs)
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                // Use importance for API 24+
-                val channel = notification.channelId?.let { channelId ->
-                    // We can't easily check channel importance here without NotificationManager
-                    // So we'll just allow all notifications for now
-                    true
-                } ?: true
-                if (!channel) return false
-            } else {
-                // Use deprecated priority for older APIs
-                @Suppress("DEPRECATION")
-                if (notification.priority < Notification.PRIORITY_DEFAULT) {
-                    return false
-                }
-            }
-        } catch (e: Exception) {
-            // If we can't determine priority/importance, show the notification
-        }
-        
+
         return true
     }
     

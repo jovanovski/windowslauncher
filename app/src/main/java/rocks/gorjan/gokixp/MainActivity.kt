@@ -310,6 +310,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val AUTO_SYNC_INTERVAL = 3600000L // 1 hour in milliseconds
     private var registryEditorAppInstance: RegistryEditorApp? = null
 
+    // Permission error update functions for wallpaper dialog
+    private var updateEmailPermissionError: (() -> Unit)? = null
+    private var updateNotificationDotsPermissionError: (() -> Unit)? = null
+
     private fun getMediaDuration(resourceId: Int): Long {
         return try {
             val audioContext = createAttributionContext("system")
@@ -332,6 +336,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_SOUND_MUTED = "sound_muted"
         private const val KEY_PLAY_EMAIL_SOUND = "play_email_sound"
+        private const val KEY_SHOW_NOTIFICATION_DOTS = "show_notification_dots"
         private const val KEY_KNOWN_APPS = "known_apps"
         private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
         private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
@@ -918,18 +923,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun playSound(soundResourceId: Int, bypassMute: Boolean = false) {
         // Check mute state unless bypassing (for unmute confirmation)
         if (!bypassMute && isSoundMuted()) {
+            Log.d("MainActivity", "Sound resource $soundResourceId not played - sound is muted")
             return
         }
 
         try {
             val soundId = soundIds[soundResourceId]
             if (soundId != null) {
+                Log.d("MainActivity", "Playing sound resource $soundResourceId with soundId $soundId")
                 // Play sound asynchronously to avoid blocking UI
                 Thread {
                     try {
                         val streamId = soundPool.play(soundId, 1f, 1f, 1, 0, 1.0f)
                         if (streamId == 0) {
                             Log.w("MainActivity", "Failed to play sound resource $soundResourceId (may not be loaded yet)")
+                        } else {
+                            Log.d("MainActivity", "Sound playing with streamId $streamId")
                         }
                     } catch (e: Exception) {
                         Log.e("MainActivity", "Error in sound playback thread for resource $soundResourceId", e)
@@ -1299,6 +1308,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             val settingsItem = findViewById<LinearLayout>(R.id.settings_item)
             settingsItem?.setOnClickListener {
+                hideStartMenu()
                 openPhoneSettings()
             }
 
@@ -1403,14 +1413,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun openPhoneSettings() {
-        try {
-            val intent = Intent(Settings.ACTION_SETTINGS)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(intent)
-            Log.d("MainActivity", "Opened phone settings")
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error opening phone settings", e)
-        }
+        createAndShowWallpaperDialog("settings")
     }
     
     
@@ -2914,7 +2917,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 onRefresh = {
                     refreshEverything()
                 },
-                onChangeWallpaper = { showWallpaperSelectionDialog() },
+                onChangeWallpaper = { createAndShowWallpaperDialog() },
                 onToggleSnapToGrid = { toggleSnapToGrid() },
                 isSnapToGridEnabled = isSnapToGridEnabled(),
                 onOpenInternetExplorer = { showInternetExplorerDialog() },
@@ -4506,20 +4509,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showNotification("Error", "Cannot uninstall ${appInfo.name}")
         }
     }
-    
-    
-    
-    private fun showWallpaperSelectionDialog() {
-        // Set cursor to busy while loading
-        setCursorBusy()
 
-        // Defer the actual loading to allow cursor to render
-        Handler(Looper.getMainLooper()).post {
-            createAndShowWallpaperDialog()
-        }
-    }
-
-    private fun createAndShowWallpaperDialog() {
+    private fun createAndShowWallpaperDialog(initScreen: String? = null) {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
         // Get current theme
@@ -4586,6 +4577,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playClickSound()
         }
 
+
         // Get references to UI elements
         val themeSpinner = contentView.findViewById<android.widget.Spinner>(R.id.theme_spinner)
         val flavourLabel = contentView.findViewById<TextView>(R.id.flavour_label)
@@ -4597,6 +4589,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
         val playEmailSoundCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.play_email_sound_checkbox)
+        val showNotificationDotsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_notification_dots_checkbox)
         val enableScreensaverCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.enable_screensaver_checkbox)
         val previewScreensaverButton = contentView.findViewById<TextView>(R.id.preview_screensaver_button)
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
@@ -4717,9 +4710,63 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up Play Email Sound checkbox
         val playEmailSoundEnabled = prefs.getBoolean(KEY_PLAY_EMAIL_SOUND, true)
         playEmailSoundCheckbox.isChecked = playEmailSoundEnabled
+
+        // Set up email permission error text
+        val emailPermissionError = contentView.findViewById<TextView>(R.id.email_permission_error)
+        emailPermissionError.paintFlags = emailPermissionError.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+        emailPermissionError.setOnClickListener {
+            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            startActivity(intent)
+        }
+
+        // Update email error visibility
+        val updateEmailPermissionErrorFunc = {
+            emailPermissionError.visibility = if (playEmailSoundCheckbox.isChecked && !isNotificationListenerEnabled()) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+        }
+        // Store reference for use in onResume
+        updateEmailPermissionError = updateEmailPermissionErrorFunc
+        updateEmailPermissionErrorFunc()
+
         playEmailSoundCheckbox.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_PLAY_EMAIL_SOUND, isChecked) }
             Log.d("MainActivity", "Play email sound changed to: $isChecked")
+            updateEmailPermissionErrorFunc()
+        }
+
+        // Set up Show Notification Dots checkbox
+        val showNotificationDotsEnabled = prefs.getBoolean(KEY_SHOW_NOTIFICATION_DOTS, true)
+        showNotificationDotsCheckbox.isChecked = showNotificationDotsEnabled
+
+        // Set up notification dots permission error text
+        val notificationDotsPermissionError = contentView.findViewById<TextView>(R.id.notification_dots_permission_error)
+        notificationDotsPermissionError.paintFlags = notificationDotsPermissionError.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+        notificationDotsPermissionError.setOnClickListener {
+            val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            startActivity(intent)
+        }
+
+        // Update notification dots error visibility
+        val updateNotificationDotsPermissionErrorFunc = {
+            notificationDotsPermissionError.visibility = if (showNotificationDotsCheckbox.isChecked && !isNotificationListenerEnabled()) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+        }
+        // Store reference for use in onResume
+        updateNotificationDotsPermissionError = updateNotificationDotsPermissionErrorFunc
+        updateNotificationDotsPermissionErrorFunc()
+
+        showNotificationDotsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_SHOW_NOTIFICATION_DOTS, isChecked) }
+            Log.d("MainActivity", "Show notification dots changed to: $isChecked")
+            updateNotificationDotsPermissionErrorFunc()
+            // Update notification dots immediately
+            updateNotificationDots()
         }
 
         // Set up Taskbar Height Input
@@ -4955,6 +5002,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set cursor back to normal after window is shown and loaded
         Handler(Looper.getMainLooper()).postDelayed({
             setCursorNormal()
+            when(initScreen){
+                "screensaver" -> showScreen(screensaverScreen)
+                "appearance" -> showScreen(appearanceScreen)
+                "settings" -> showScreen(settingsScreen)
+            }
         }, 100) // Small delay to ensure window is fully rendered
     }
 
@@ -7999,10 +8051,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onResume() {
         super.onResume()
         refreshWeatherIfNeeded()
-        
+
         // Check for new apps when resuming and start periodic checking
         checkForNewApps()
         startPeriodicAppChecking()
+
+        // Update permission error visibility when returning from settings
+        updateEmailPermissionError?.invoke()
+        updateNotificationDotsPermissionError?.invoke()
     }
 
     override fun onStop() {
@@ -8784,10 +8840,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun updateNotificationDots() {
         handler.post {
             try {
+                // Check if notification dots are enabled in settings
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                val showNotificationDots = prefs.getBoolean(KEY_SHOW_NOTIFICATION_DOTS, true)
+
                 desktopIconViews.forEach { iconView ->
                     val packageName = iconView.getDesktopIcon()?.packageName
                     if (packageName != null && packageName != "recycle.bin") {
-                        val hasNotification = NotificationListenerService.hasNotification(packageName)
+                        // Only show dot if setting is enabled AND app has a notification
+                        val hasNotification = showNotificationDots && NotificationListenerService.hasNotification(packageName)
                         iconView.updateNotificationDot(hasNotification)
                     }
                 }

@@ -261,7 +261,50 @@
                 android:textSize="11dp"
                 android:checked="true"
                 android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:id="@+id/email_permission_error"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap to grant permission"
+                android:textColor="#0000FF"
+                android:textSize="10sp"
+                android:fontFamily="@font/micross_block"
+                android:paddingLeft="24dp"
+                android:layout_marginBottom="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/show_notification_dots_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show notification dots on app icons"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:id="@+id/notification_dots_permission_error"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap to grant permission"
+                android:textColor="#0000FF"
+                android:textSize="10sp"
+                android:fontFamily="@font/micross_block"
+                android:paddingLeft="24dp"
+                android:layout_marginBottom="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"

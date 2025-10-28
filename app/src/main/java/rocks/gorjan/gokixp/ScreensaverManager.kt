@@ -67,7 +67,7 @@ class ScreensaverManager(
             screensaverView.findViewById<View>(R.id.screensaver_container)?.visibility = View.VISIBLE
 
             val videoView = screensaverView.findViewById<VideoView>(R.id.screensaver_video)
-            val videoUri = Uri.parse("android.resource://${context.packageName}/${R.raw.screensaver}")
+            val videoUri = Uri.parse("android.resource://${context.packageName}/${R.raw.screensaver_pipes}")
             videoView.setVideoURI(videoUri)
 
             videoView.setOnPreparedListener { mediaPlayer ->
