@@ -337,6 +337,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SOUND_MUTED = "sound_muted"
         private const val KEY_PLAY_EMAIL_SOUND = "play_email_sound"
         private const val KEY_SHOW_NOTIFICATION_DOTS = "show_notification_dots"
+        private const val KEY_CLOCK_24_HOUR = "clock_24_hour"
         private const val KEY_KNOWN_APPS = "known_apps"
         private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
         private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
@@ -825,13 +826,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val currentDate = Date()
                 val calendar = Calendar.getInstance()
                 calendar.time = currentDate
-                
+
                 val day = calendar.get(Calendar.DAY_OF_MONTH)
-                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+                // Get clock format preference (default to 24-hour)
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                val is24Hour = prefs.getBoolean(KEY_CLOCK_24_HOUR, true)
+                val timeFormatPattern = if (is24Hour) "HH:mm" else "hh:mm a"
+                val timeFormat = SimpleDateFormat(timeFormatPattern, Locale.getDefault())
                 val time = timeFormat.format(currentDate)
-                
+
                 val ordinalSuffix = getOrdinalSuffix(day)
-                
+
                 // Update separate date and time displays
                 dateDay.text = day.toString()
                 dateOrdinal.text = ordinalSuffix
@@ -6856,6 +6862,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         dateContainer.setOnClickListener { openCalendarApp() }
 
         clockTime.setOnClickListener { openClockApp() }
+
+        // Long press to toggle clock format (24-hour <-> 12-hour)
+        clockTime.setOnLongClickListener {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val is24Hour = prefs.getBoolean(KEY_CLOCK_24_HOUR, true)
+            val newFormat = !is24Hour
+
+            // Save new format preference
+            prefs.edit { putBoolean(KEY_CLOCK_24_HOUR, newFormat) }
+
+            // Show feedback to user
+            val formatName = if (newFormat) "24-hour" else "12-hour"
+            playClickSound()
+
+            true // Consume the long press event
+        }
 
         // Set up volume icon click
         val volumeIcon = findViewById<ImageView>(R.id.volume_icon)
