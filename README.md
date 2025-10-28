@@ -3,7 +3,7 @@
 
 This is a Windows inspired launcher for Android 11+, which tries to faithfully recreate the retro Windows on modern phones. Feel free to grab a pre-comliped APK from the Releases tab or download and build the project yourself.
 
-![Windows Launcher Preview](https://i.imgur.com/QkqXMBu.jpeg)
+![Windows Launcher Preview](https://i.imgur.com/oRB4PVU.gif)
 
 ## Features
 - Themes to faithfully recreate:
