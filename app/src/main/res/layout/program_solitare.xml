@@ -3,7 +3,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-
     <LinearLayout
         android:id="@+id/solitare_menu"
         android:layout_width="match_parent"
@@ -79,8 +78,8 @@
             <!-- Spacer -->
             <View
                 android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="1dp" />
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
 
             <!-- Foundation 1 -->
             <ImageView
@@ -117,6 +116,7 @@
 
         <!-- Tableau (7 columns) -->
         <LinearLayout
+            android:id="@+id/solitare_tableau_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"

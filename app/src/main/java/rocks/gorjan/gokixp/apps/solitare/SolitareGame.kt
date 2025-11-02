@@ -124,25 +124,84 @@ class SolitareGame(
     private var wasteCardUsedThisCycle = false // Whether any waste card was used this cycle
     private var isGameOver = false             // True when game is definitively over (stays until new game)
 
+    // Store captured slot positions
+    private var tableauSlotPositions = mutableListOf<Pair<Float, Float>>()
+    private var contentViewRef: View? = null
+    private var gameAreaRef: FrameLayout? = null
+
     /**
      * Initialize the game
      */
     fun setupGame(contentView: View): View {
+        contentViewRef = contentView
         val gameArea = contentView.findViewById<FrameLayout>(R.id.solitare_game_area)
+        gameAreaRef = gameArea
 
         // Load saved preferences
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         cardBackIndex = prefs.getInt(PREF_CARD_BACK, 1)
         useLargeCards = prefs.getBoolean(PREF_LARGE_CARDS, false)
 
-        gameView = SolitareView(context)
-        val layoutParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        )
+        // Add layout change listener to recalculate positions on resize
+        gameArea.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val oldWidth = oldRight - oldLeft
+            val oldHeight = oldBottom - oldTop
+            val newWidth = right - left
+            val newHeight = bottom - top
 
-        gameArea.removeAllViews() // Remove placeholder slots
-        gameArea.addView(gameView, layoutParams)
+            // Only recalculate if size actually changed
+            if (oldWidth != newWidth || oldHeight != newHeight) {
+                if (oldWidth > 0 && oldHeight > 0) { // Ignore initial layout
+                    recalculatePositions()
+                }
+            }
+        }
+
+        // Capture tableau slot positions before removing them
+        val tableauContainer = contentView.findViewById<android.widget.LinearLayout>(R.id.solitare_tableau_container)
+        if (tableauContainer != null) {
+            tableauContainer.post {
+                // Wait for layout to complete
+                tableauSlotPositions.clear()
+                for (i in 0 until tableauContainer.childCount) {
+                    val child = tableauContainer.getChildAt(i)
+                    if (child is android.widget.ImageView) {
+                        val location = IntArray(2)
+                        child.getLocationInWindow(location)
+
+                        // Get game area location to calculate relative position
+                        val gameAreaLocation = IntArray(2)
+                        gameArea.getLocationInWindow(gameAreaLocation)
+
+                        val relativeX = (location[0] - gameAreaLocation[0]).toFloat()
+                        val relativeY = (location[1] - gameAreaLocation[1]).toFloat()
+                        tableauSlotPositions.add(Pair(relativeX, relativeY))
+                    }
+                }
+
+                // Now that we have positions, setup the game view
+                gameView = SolitareView(context)
+                val layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+
+                gameArea.removeAllViews() // Remove placeholder slots
+                gameArea.addView(gameView, layoutParams)
+
+                resetGame()
+            }
+        } else {
+            // No tableau container found, setup normally
+            gameView = SolitareView(context)
+            val layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+
+            gameArea.removeAllViews() // Remove placeholder slots
+            gameArea.addView(gameView, layoutParams)
+        }
 
         // Setup menu buttons
         val newGameButton = contentView.findViewById<android.widget.TextView>(R.id.solitare_new_game)
@@ -167,7 +226,12 @@ class SolitareGame(
 
         noMovesLeftTextView = contentView.findViewById(R.id.no_moves_left)
 
-        resetGame()
+        // resetGame() is now called inside the post block after capturing positions
+        // or needs to be called manually if tableau container wasn't found
+        if (tableauContainer == null) {
+            resetGame()
+        }
+
         return contentView
     }
 
@@ -801,22 +865,8 @@ class SolitareGame(
         wasteCardUsedThisCycle = false
         isGameOver = false
 
-        // Position piles
-        stockPile.x = LEFT_MARGIN
-        stockPile.y = TOP_MARGIN
-
-        wastePile.x = LEFT_MARGIN + CARD_SPACING_X
-        wastePile.y = TOP_MARGIN
-
-        foundations.forEachIndexed { index, foundation ->
-            foundation.x = LEFT_MARGIN + (index + 3) * CARD_SPACING_X
-            foundation.y = TOP_MARGIN
-        }
-
-        tableaus.forEachIndexed { index, tableau ->
-            tableau.x = LEFT_MARGIN + index * CARD_SPACING_X
-            tableau.y = TOP_MARGIN + CARD_HEIGHT + 30f
-        }
+        // Position piles - call recalculate to ensure responsive positioning
+        recalculatePositions()
 
         // Hide "no moves left" message on new game
         noMovesLeftTextView?.visibility = android.view.View.GONE
@@ -861,6 +911,52 @@ class SolitareGame(
         }
 
         deck.clear()
+    }
+
+    /**
+     * Recalculate positions when window is resized
+     */
+    private fun recalculatePositions() {
+        val gameArea = gameAreaRef ?: return
+
+        val gameAreaWidth = gameArea.width.toFloat()
+
+        // Recalculate stock and waste positions
+        stockPile.x = LEFT_MARGIN
+        stockPile.y = TOP_MARGIN
+
+        wastePile.x = LEFT_MARGIN + CARD_SPACING_X
+        wastePile.y = TOP_MARGIN
+
+        // Recalculate foundation positions - they should be right-aligned
+        // Foundation slots are after the spacer, so calculate from right edge
+        val rightMargin = 10f * density // Match the paddingEnd from XML
+        foundations.forEachIndexed { index, foundation ->
+            // Place foundations from right to left
+            val fromRight = (3 - index) // 3, 2, 1, 0
+            val spacing = 9f * density // marginStart between cards
+            foundation.x = gameAreaWidth - rightMargin - CARD_WIDTH - (fromRight * (CARD_WIDTH + spacing))
+            foundation.y = TOP_MARGIN
+        }
+
+        // For tableaus, use the same proportional spacing as the layout
+        // The XML layout uses paddingStart=10dp, paddingEnd=10dp with evenly spaced items
+        val padding = 10f * density
+        val availableWidth = gameAreaWidth - (padding * 2)
+        val cardsTotalWidth = CARD_WIDTH * 7
+        val spaceBetween = (availableWidth - cardsTotalWidth) / 6
+
+        tableauSlotPositions.clear()
+        tableaus.forEachIndexed { index, tableau ->
+            val x = padding + (index * (CARD_WIDTH + spaceBetween))
+            val y = TOP_MARGIN + CARD_HEIGHT + 30f
+
+            tableau.x = x
+            tableau.y = y
+            tableauSlotPositions.add(Pair(x, y))
+        }
+
+        gameView?.invalidate()
     }
 
     /**
