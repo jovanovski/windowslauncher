@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="360dp"
-    android:layout_height="360dp"
-
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="?windowBackgroundColor">
 
     <!-- Menu Bar-->
     <LinearLayout
-        android:layout_width="360dp"
+        android:layout_width="match_parent"
         android:layout_height="20dp"
         android:src="?menuBarBackground"
         android:orientation="horizontal"
@@ -41,22 +41,19 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="336dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="22dp"
-        android:layout_marginBottom="2dp">
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
 
         <LinearLayout
             android:id="@+id/notes_list_container"
             android:layout_width="100dp"
-            android:layout_height="336dp"
+            android:layout_height="match_parent"
             android:orientation="vertical">
 
             <ScrollView
                 android:id="@+id/notes_list_scroll"
                 android:layout_width="100dp"
-                android:layout_height="0dp"
-                android:layout_weight="1">
+                android:layout_height="match_parent">
 
                 <TableLayout
                     android:id="@+id/notes_list"
@@ -103,8 +100,8 @@
 
         <EditText
             android:id="@+id/notes"
-            android:layout_width="255dp"
-            android:layout_height="336dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:layout_marginEnd="2dp"
             android:gravity="top|start"
             android:background="@android:color/white"
@@ -131,4 +128,4 @@
 
     </LinearLayout>
 
-</RelativeLayout>
+</LinearLayout>

@@ -35,6 +35,7 @@ class WindowsDialog @JvmOverloads constructor(
     private lateinit var titleText: TextView
     private lateinit var closeButton: ImageView
     private lateinit var minimizeButton: ImageView
+    private var maximizeButton: ImageView? = null
     private lateinit var contentArea: LinearLayout
     private var windowIcon: ImageView? = null
     private var windowBorder: FrameLayout? = null
@@ -58,6 +59,14 @@ class WindowsDialog @JvmOverloads constructor(
     // Borderless state
     private var isBorderless = false
 
+    // Maximize state
+    private var canMaximize = false
+    private var isMaximized = false
+    private var savedWidth = 0
+    private var savedHeight = 0
+    private var savedX = 0f
+    private var savedY = 0f
+
     // Window identifier (for tracking unique instances like app package or folder path)
     var windowIdentifier: String? = null
 
@@ -77,6 +86,9 @@ class WindowsDialog @JvmOverloads constructor(
 
     // Context menu reference (from MainActivity)
     private var contextMenuView: ContextMenuView? = null
+
+    // Gesture detector for double-tap to maximize
+    private lateinit var gestureDetector: GestureDetector
 
     init {
         orientation = VERTICAL
@@ -120,6 +132,7 @@ class WindowsDialog @JvmOverloads constructor(
         titleText = findViewById(R.id.dialog_title_text)
         closeButton = findViewById(R.id.dialog_close_button)
         minimizeButton = findViewById(R.id.dialog_minimize_button)
+        maximizeButton = findViewById(R.id.dialog_maximize_button)
         contentArea = findViewById(R.id.dialog_content_area)
         windowIcon = findViewById(R.id.dialog_window_icon)
 
@@ -144,6 +157,20 @@ class WindowsDialog @JvmOverloads constructor(
             minimizeWindow()
         }
 
+        maximizeButton?.setOnClickListener {
+            // Only allow maximize/restore if enabled
+            if (!canMaximize) return@setOnClickListener
+
+            if (isMaximized) {
+                restoreWindow()
+            } else {
+                maximizeWindow()
+            }
+        }
+
+        // Hide maximize button by default (shown when setMaximizable(true) is called)
+        maximizeButton?.visibility = View.GONE
+
         // DON'T set overlay as clickable - we'll handle this through onInterceptTouchEvent
         overlayRoot.isClickable = false
         overlayRoot.isFocusable = false
@@ -151,8 +178,28 @@ class WindowsDialog @JvmOverloads constructor(
         // Hide window initially until it's centered
         windowFrame.visibility = View.INVISIBLE
 
+        // Setup gesture detector for double-tap to maximize
+        gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (canMaximize && !isMaximized) {
+                    maximizeWindow()
+                } else if (canMaximize && isMaximized) {
+                    restoreWindow()
+                }
+                return true
+            }
+        })
+
         // Drag the window by its title bar within the overlayRoot
         titleBar.setOnTouchListener { v, event ->
+            // Pass event to gesture detector for double-tap detection
+            gestureDetector.onTouchEvent(event)
+
+            // Don't allow dragging when maximized
+            if (isMaximized) {
+                return@setOnTouchListener true
+            }
+
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     isDragging = false
@@ -226,104 +273,6 @@ class WindowsDialog @JvmOverloads constructor(
         autoRegisterWithTaskbar()
     }
 
-    fun setupDialogWindow(dialog: AlertDialog) {
-        dialog.window?.let { w ->
-            // Make dialog window full-screen and a free canvas
-            WindowCompat.setDecorFitsSystemWindows(w, false)
-            w.setBackgroundDrawable(null) // fully transparent
-            w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
-            w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
-
-            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-
-            val lp = w.attributes
-            lp.gravity = Gravity.TOP or Gravity.START
-            lp.flags = (lp.flags or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                    WindowManager.LayoutParams.FLAG_SPLIT_TOUCH) and
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
-            w.attributes = lp
-
-            // Ensure the decorView and content chain don't clip
-            (w.decorView as? ViewGroup)?.apply {
-                clipChildren = false
-                clipToPadding = false
-                setPadding(0, 0, 0, 0)
-                setBackgroundColor(Color.TRANSPARENT)
-                // DecorView doesn't have layoutParams as it's the root window view
-            }
-            w.findViewById<ViewGroup>(android.R.id.content)?.apply {
-                clipChildren = false
-                clipToPadding = false
-                setPadding(0, 0, 0, 0)
-                updateLayoutParams<ViewGroup.LayoutParams> {
-                    width = ViewGroup.LayoutParams.MATCH_PARENT
-                    height = ViewGroup.LayoutParams.MATCH_PARENT
-                }
-            }
-        }
-
-        // Make sure our own root chain does not clip either
-        post {
-            clipChildren = false
-            clipToPadding = false
-            setPadding(0, 0, 0, 0)
-
-            // Force window to be fullscreen
-            dialog.window?.setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT
-            )
-
-            // Traverse up parent chain to fix all WRAP_CONTENT parents and remove backgrounds
-            var currentParent = parent as? ViewGroup
-            while (currentParent != null) {
-                currentParent.clipChildren = false
-                currentParent.clipToPadding = false
-                currentParent.setPadding(0, 0, 0, 0)
-                // The DecorView has an InsetDrawable gray background that needs to be removed
-                currentParent.setBackgroundColor(Color.TRANSPARENT)
-
-                // Force all parent containers to MATCH_PARENT
-                currentParent.layoutParams?.let { lp ->
-                    lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-                    lp.height = ViewGroup.LayoutParams.MATCH_PARENT
-                    currentParent.layoutParams = lp
-                }
-
-                currentParent = currentParent.parent as? ViewGroup
-            }
-
-            // Request re-layout to apply the changes
-            requestLayout()
-
-            // Wait for layout to complete before centering
-            windowFrame.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    windowFrame.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                    centerWindowFrame()
-                    // Show window after centering
-                    windowFrame.visibility = View.VISIBLE
-
-                    // Set touchable region to only the window frame
-                    updateTouchableRegion()
-                }
-            })
-
-            // Also update touchable region when window moves
-            windowFrame.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                updateTouchableRegion()
-            }
-        }
-
-        autoRegisterWithTaskbar(dialog)
-        dialog.setOnDismissListener { unregisterFromTaskbar() }
-    }
-
     private fun updateTouchableRegion() {
         // Get window frame position on screen
         val location = IntArray(2)
@@ -386,7 +335,10 @@ class WindowsDialog @JvmOverloads constructor(
 
     fun setContentView(view: View) {
         contentArea.removeAllViews()
-        contentArea.addView(view)
+        contentArea.addView(view, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.MATCH_PARENT
+        ))
     }
 
     fun setWindowSize(widthDp: Int? = null, heightDp: Int? = null) {
@@ -399,6 +351,38 @@ class WindowsDialog @JvmOverloads constructor(
                 height = (heightDp * density).toInt()
             }
         }
+
+        // When setting explicit height, make content area expand to fill available space
+        if (heightDp != null) {
+            windowBorder?.updateLayoutParams<LayoutParams> {
+                height = LayoutParams.MATCH_PARENT
+            }
+            contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = FrameLayout.LayoutParams.MATCH_PARENT
+            }
+        }
+    }
+
+    fun setWindowSizePercentage(widthPercent: Float? = null, heightPercent: Float? = null) {
+        val display = resources.displayMetrics
+        windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+            if (widthPercent != null) {
+                width = (display.widthPixels * (widthPercent / 100f)).toInt()
+            }
+            if (heightPercent != null) {
+                height = (display.heightPixels * (heightPercent / 100f)).toInt()
+            }
+        }
+
+        // When setting explicit height, make content area expand to fill available space
+        if (heightPercent != null) {
+            windowBorder?.updateLayoutParams<LayoutParams> {
+                height = LayoutParams.MATCH_PARENT
+            }
+            contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = FrameLayout.LayoutParams.MATCH_PARENT
+            }
+        }
     }
 
     fun setContentView(layoutResId: Int) {
@@ -409,6 +393,16 @@ class WindowsDialog @JvmOverloads constructor(
     fun setOnCloseListener(listener: () -> Unit) { onCloseListener = listener }
     fun setOnMinimizeListener(listener: () -> Unit) { onMinimizeListener = listener }
     fun setOnMaximizeListener(listener: () -> Unit) { onMaximizeListener = listener }
+
+    /**
+     * Enable or disable maximize functionality via double-tap on title bar and maximize button
+     * @param enabled True to enable maximize, false to disable (default: false)
+     */
+    fun setMaximizable(enabled: Boolean) {
+        canMaximize = enabled
+        // Show or hide maximize button based on enabled state
+        maximizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
+    }
 
     /**
      * Triggers the close listener (used when closing via back button)
@@ -901,6 +895,94 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = false
             windowFrame.visibility = View.VISIBLE
             windowManager?.bringToFront(this)
+        }
+    }
+
+    // ——— Maximize/Restore ———
+
+    /**
+     * Maximizes the window to fill the entire floating windows container
+     */
+    private fun maximizeWindow() {
+        if (!canMaximize || isMaximized) return
+
+        // Save current dimensions and position
+        savedWidth = windowFrame.width
+        savedHeight = windowFrame.height
+        savedX = windowFrame.x
+        savedY = windowFrame.y
+
+        // Fill the overlay container completely
+        windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+            width = FrameLayout.LayoutParams.MATCH_PARENT
+            height = FrameLayout.LayoutParams.MATCH_PARENT
+        }
+
+        // Make content area expand to fill
+        windowBorder?.updateLayoutParams<LayoutParams> {
+            height = LayoutParams.MATCH_PARENT
+        }
+        contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+            height = FrameLayout.LayoutParams.MATCH_PARENT
+        }
+
+        // Position at top-left corner of container
+        windowFrame.x = 0f
+        windowFrame.y = 0f
+        currentWindowX = 0f
+        currentWindowY = 0f
+
+        isMaximized = true
+
+        // Update maximize button icon to show restore icon (if it exists)
+        updateMaximizeButtonIcon()
+
+        onMaximizeListener?.invoke()
+    }
+
+    /**
+     * Restores the window to its original size and position before maximizing
+     */
+    private fun restoreWindow() {
+        if (!isMaximized) return
+
+        // Restore original dimensions
+        windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+            width = savedWidth
+            height = savedHeight
+        }
+
+        // Restore original position
+        windowFrame.x = savedX
+        windowFrame.y = savedY
+        currentWindowX = savedX
+        currentWindowY = savedY
+
+        isMaximized = false
+
+        // Update maximize button icon to show maximize icon
+        updateMaximizeButtonIcon()
+
+        // Center the window after a brief delay to allow layout to update
+        post {
+            centerWindowFrame()
+        }
+    }
+
+    /**
+     * Updates the maximize button icon based on current state
+     */
+    private fun updateMaximizeButtonIcon() {
+        maximizeButton?.let { button ->
+            // Check if restore icon exists, otherwise keep using maximize icon
+            val iconRes = if (isMaximized) {
+                // Try to use restore icon if available, fallback to maximize icon
+                val restoreIconId = resources.getIdentifier("xp_title_bar_restore", "drawable", context.packageName)
+                if (restoreIconId != 0) restoreIconId else R.drawable.xp_title_bar_maximize
+            } else {
+                R.drawable.xp_title_bar_maximize
+            }
+            button.setBackgroundResource(iconRes)
         }
     }
 

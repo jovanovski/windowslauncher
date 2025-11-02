@@ -5634,7 +5634,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         notepadApp.setupApp(contentView)
 
         windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(360, 382)
+        windowsDialog.setMaximizable(true)
+
+//        windowsDialog.setWindowSize(360, 382)
+        windowsDialog.setWindowSizePercentage(90f, 50f)
 
         // Set up window control handlers
         windowsDialog.setOnMinimizeListener {
@@ -6047,7 +6050,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         solitareGame.setupGame(contentView)
 
         windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(400, 424)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setWindowSizePercentage(90f, 60f)
 
         // Cleanup on close
         windowsDialog.setOnCloseListener {
@@ -9536,7 +9540,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Calculate new dimensions
         val baseGestureBarHeight = 30 // Base height in dp
         val baseTaskbarMarginBottom = 30 // Base margin in dp
-        val baseFloatingWindowsMarginBottom = 24 // Base margin in dp
+        val baseFloatingWindowsMarginBottom = 70 // Base margin in dp
         val baseDesktopIconsMarginBottom = 20 // Base margin in dp
         val baseStartMenuMarginBottom = 70 // Base margin in dp
         val baseNotificationBubbleMarginBottom = 60 // Base margin in dp
@@ -9738,6 +9742,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             when (event.action) {
                 MotionEvent.ACTION_DOWN,
                 MotionEvent.ACTION_MOVE -> {
+                    Log.d("MainActivity", "Touch event: initialized=${::cursorEffect.isInitialized}, visible=${isCursorVisible()}, editText=$isTouchingEditableEditText, gameWindow=$isTouchingGameWindow")
                     if (::cursorEffect.isInitialized && isCursorVisible() && !isTouchingEditableEditText && !isTouchingGameWindow) {
                         showCursorAt(event.rawX, event.rawY, isMoving = true)
                     }
@@ -9763,7 +9768,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         var currentView: View? = touchedView
         while (currentView != null) {
             val id = currentView.id
-            if (id == R.id.solitare_content || id == R.id.mine_grid) {
+            if (id == R.id.solitare_game_area || id == R.id.mine_grid) {
                 return true
             }
             currentView = currentView.parent as? View
@@ -9820,12 +9825,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Cancel any pending cursor hide
         cursorRunnable?.let { cursorHandler.removeCallbacks(it) }
 
+        // Debug log
+        Log.d("MainActivity", "showCursorAt: x=$x, y=$y, isMoving=$isMoving")
+
         // Position the cursor at the touch point (top-left corner)
         cursorEffect.x = x
         cursorEffect.y = y
 
         // Show the cursor
         cursorEffect.visibility = View.VISIBLE
+        cursorEffect.bringToFront()
+
+        Log.d("MainActivity", "Cursor visibility set to VISIBLE at position ($x, $y)")
 
         // Only start hide timer when not moving (i.e., on touch up)
         if (!isMoving) {

@@ -66,6 +66,15 @@
                 android:scaleType="center" />
 
             <ImageView
+                android:id="@+id/dialog_maximize_button"
+                android:layout_width="16dp"
+                android:layout_height="14dp"
+                android:layout_marginLeft="2dp"
+                android:src="@drawable/window_maximize_98"
+                android:background="@drawable/window_control_98_background"
+                android:scaleType="center" />
+
+            <ImageView
                 android:id="@+id/dialog_close_button"
                 android:layout_width="16dp"
                 android:layout_height="14dp"
@@ -82,10 +91,9 @@
             android:layout_height="wrap_content">
             <LinearLayout
                 android:id="@+id/dialog_content_area"
-
                 android:clickable="true"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:background="#d3cec7"/>
         </ScrollView>

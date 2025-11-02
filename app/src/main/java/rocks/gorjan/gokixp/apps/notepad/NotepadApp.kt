@@ -241,17 +241,17 @@ class NotepadApp(
                     textSize = 12f
                 }
                 else {
-                    textSize = 10f
+                    textSize = 11f
                 }
 
                 // Highlight current note with bold font and larger size
                 if (note.id == currentNote?.id) {
-                    setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 4.dpToPx())
                     setBackgroundColor(0xFFFFFFFF.toInt()) // White background
                 } else {
-                    setPadding(8.dpToPx(), 4.dpToPx(), 8.dpToPx(), 4.dpToPx())
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 }
+                setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 6.dpToPx())
+
 
                 // Click to select note
                 setOnClickListener {
