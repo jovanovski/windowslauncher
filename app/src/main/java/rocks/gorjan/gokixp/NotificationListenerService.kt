@@ -47,7 +47,6 @@ class NotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
-        Log.d(TAG, "NotificationListenerService connected")
         refreshActiveNotifications()
     }
     
@@ -55,7 +54,6 @@ class NotificationListenerService : NotificationListenerService() {
         super.onListenerDisconnected()
         instance = null
         activeNotificationPackages.clear()
-        Log.d(TAG, "NotificationListenerService disconnected")
     }
     
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -63,8 +61,6 @@ class NotificationListenerService : NotificationListenerService() {
 
         val packageName = sbn.packageName
         val isOngoing = sbn.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
-        Log.d(TAG, "Notification posted from: $packageName (ongoing=$isOngoing)")
-
         // Handle email notifications specially - always play sound and show dot
         // even if they would normally be filtered out
         if (isEmailApp(packageName)) {
@@ -80,14 +76,11 @@ class NotificationListenerService : NotificationListenerService() {
             if (!isOngoing) {
                 activeNotificationPackages.add(packageName)
                 notifyMainActivity()
-            } else {
-                Log.d(TAG, "Skipping ongoing email notification from $packageName")
             }
             return
         }
 
         if (!shouldShowNotification(sbn)) {
-            Log.d(TAG, "Notification from $packageName filtered out (ongoing=$isOngoing)")
             return
         }
 
@@ -139,12 +132,10 @@ class NotificationListenerService : NotificationListenerService() {
             activeNotificationPackages.clear()
 
             val notifications = getActiveNotifications()
-            Log.d(TAG, "Refreshing notifications, found ${notifications.size} total notifications")
 
             for (notification in notifications) {
                 val isOngoing = notification.notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0
                 val shouldShow = shouldShowNotification(notification)
-                Log.d(TAG, "  ${notification.packageName}: ongoing=$isOngoing, shouldShow=$shouldShow")
 
                 if (shouldShow) {
                     activeNotificationPackages.add(notification.packageName)

@@ -254,7 +254,6 @@ class ContextMenuView @JvmOverloads constructor(
         val screenWidth = resources.displayMetrics.widthPixels
         val screenHeight = resources.displayMetrics.heightPixels
 
-        Log.d("MENUWIDTH", menuWidth.toString())
 
         // Get taskbar position to avoid showing menu below it
         val taskbarTop = getTaskbarTopPosition()

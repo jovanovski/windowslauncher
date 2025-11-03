@@ -23,10 +23,17 @@ class ScreensaverManager(
     private var screensaverDialog: Dialog? = null
     private val handler = Handler(Looper.getMainLooper())
     private val inactivityTimeout = 30000L // 30 seconds
-    private var isEnabled = true
+    private var selectedScreensaver = 1 // Default to 3D Pipes
+
+    // Screensaver types
+    companion object {
+        const val SCREENSAVER_NONE = 0
+        const val SCREENSAVER_3D_PIPES = 1
+        const val SCREENSAVER_UNDERWATER = 2
+    }
 
     private val screensaverRunnable = Runnable {
-        if (isEnabled) {
+        if (selectedScreensaver != SCREENSAVER_NONE) {
             showScreensaver()
         }
     }
@@ -67,11 +74,37 @@ class ScreensaverManager(
             screensaverView.findViewById<View>(R.id.screensaver_container)?.visibility = View.VISIBLE
 
             val videoView = screensaverView.findViewById<VideoView>(R.id.screensaver_video)
-            val videoUri = Uri.parse("android.resource://${context.packageName}/${R.raw.screensaver_pipes}")
+            val videoResource = when (selectedScreensaver) {
+                SCREENSAVER_3D_PIPES -> R.raw.screensaver_pipes
+                SCREENSAVER_UNDERWATER -> R.raw.screensaver_underwater
+                else -> R.raw.screensaver_pipes // Default fallback
+            }
+            val videoUri = Uri.parse("android.resource://${context.packageName}/${videoResource}")
             videoView.setVideoURI(videoUri)
 
             videoView.setOnPreparedListener { mediaPlayer ->
                 mediaPlayer.isLooping = true
+
+                // Scale video to fill screen (center crop)
+                val videoWidth = mediaPlayer.videoWidth
+                val videoHeight = mediaPlayer.videoHeight
+                val screenWidth = videoView.width
+                val screenHeight = videoView.height
+
+                // Calculate scale to fill screen (using max instead of min for crop behavior)
+                val scaleX = screenWidth.toFloat() / videoWidth
+                val scaleY = screenHeight.toFloat() / videoHeight
+                val scale = maxOf(scaleX, scaleY)
+
+                val scaledWidth = (videoWidth * scale).toInt()
+                val scaledHeight = (videoHeight * scale).toInt()
+
+                // Update layout params to fill screen
+                videoView.layoutParams = videoView.layoutParams.apply {
+                    width = scaledWidth
+                    height = scaledHeight
+                }
+
                 mediaPlayer.start()
             }
 
@@ -104,7 +137,7 @@ class ScreensaverManager(
     fun resetInactivityTimer() {
         handler.removeCallbacks(screensaverRunnable)
         hideScreensaver()
-        if (isEnabled) {
+        if (selectedScreensaver != SCREENSAVER_NONE) {
             handler.postDelayed(screensaverRunnable, inactivityTimeout)
         }
     }
@@ -113,19 +146,19 @@ class ScreensaverManager(
         handler.removeCallbacks(screensaverRunnable)
     }
 
-    fun setEnabled(enabled: Boolean) {
-        isEnabled = enabled
-        if (enabled) {
-            // Restart timer when re-enabled
+    fun setSelectedScreensaver(screensaverType: Int) {
+        selectedScreensaver = screensaverType
+        if (screensaverType != SCREENSAVER_NONE) {
+            // Restart timer when screensaver is enabled
             resetInactivityTimer()
         } else {
-            // Stop timer and hide screensaver when disabled
+            // Stop timer and hide screensaver when disabled (None selected)
             stopInactivityTimer()
             hideScreensaver()
         }
     }
 
-    fun isEnabled(): Boolean = isEnabled
+    fun getSelectedScreensaver(): Int = selectedScreensaver
 
     fun onDestroy() {
         stopInactivityTimer()

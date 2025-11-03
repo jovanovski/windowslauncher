@@ -55,7 +55,6 @@
 <!-- Screen Saver-->
     <RelativeLayout
 
-        android:visibility="gone"
         android:id="@+id/wallpaper_screensaver_screen"
         android:layout_width="359dp"
         android:layout_height="380dp">
@@ -64,6 +63,23 @@
             android:layout_height="380dp"
             android:src="@drawable/wallpaper_screensaver"/>
 
+        <Spinner
+            android:id="@+id/screensaver_selector"
+            android:layout_width="150dp"
+            android:layout_height="16dp"
+            android:layout_marginTop="209dp"
+            android:layout_marginStart="30dp"
+            android:paddingEnd="16dp"
+            android:paddingStart="3dp"
+            android:spinnerMode="dropdown"/>
+
+        <VideoView
+            android:id="@+id/preview_screensaver_video"
+            android:layout_marginStart="110dp"
+            android:layout_marginTop="48dp"
+            android:layout_width="140dp"
+            android:layout_height="102dp"/>
+
         <TextView
             android:id="@+id/preview_screensaver_button"
             android:layout_width="70dp"
@@ -71,22 +87,6 @@
             android:layout_alignParentEnd="true"
             android:layout_marginTop="206dp"
             android:layout_marginEnd="30dp"/>
-
-
-        <CheckBox
-            android:id="@+id/enable_screensaver_checkbox"
-            style="@style/Win95.CheckBox"
-            android:layout_width="wrap_content"
-            android:layout_height="20dp"
-            android:layout_weight="1"
-            android:text="Enable Screensaver"
-            android:textColor="#000000"
-            android:checked="true"
-            android:fontFamily="@font/micross_block"
-            android:textSize="11dp"
-            android:layout_marginTop="233dp"
-            android:layout_marginStart="27dp"
-            android:paddingLeft="4dp" />
 
     </RelativeLayout>
 <!-- Appearance -->

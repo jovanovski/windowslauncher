@@ -205,7 +205,6 @@ class AgentView @JvmOverloads constructor(
                 longPressRunnable = Runnable {
                     if (!hasMoved) {
                         isLongPress = true
-                        Log.d("AgentView", "Long press detected on agent")
                         onAgentLongPress?.invoke(currentAgent, x, y)
                     }
                 }

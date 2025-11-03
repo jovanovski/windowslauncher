@@ -489,7 +489,6 @@ class QuickGlanceWidget @JvmOverloads constructor(
                     panels.removeAll { it.id == "calendar" }
                     panels.add(calendarPanel)
 
-                    Log.d("QuickGlanceWidget", "Updated calendar panel: ${data.title} - ${data.subtitle}")
                 }
 
                 "calendar_permission" -> {

@@ -3,7 +3,14 @@
     <string name="action_settings">Settings</string>
     <string name="taskbar_widget_description">Windows XP-style taskbar widget with clock and system tray</string>
     <string name="accessibility_service_description">Allows the app to lock the screen using the shutdown button while preserving biometric unlock</string>
-    
+
+    <!-- Screensaver options -->
+    <string-array name="screensaver_options">
+        <item>(None)</item>
+        <item>3D Pipes</item>
+        <item>Underwater</item>
+    </string-array>
+
     <!-- Attribution tag labels -->
     <string name="attribution_weather">Weather location access</string>
     <string name="attribution_system">System UI and audio services</string>

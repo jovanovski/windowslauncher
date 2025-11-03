@@ -31,6 +31,7 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
 import android.widget.EditText
+import android.widget.VideoView
 import android.text.TextWatcher
 import android.text.Editable
 import android.view.inputmethod.InputMethodManager
@@ -368,8 +369,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_TASKBAR_HEIGHT_OFFSET = "taskbar_height_offset"
         private const val KEY_SHOWN_WELCOME_FOR_VERSION = "shown_welcome_for_version"
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
-        private const val KEY_SCREENSAVER_ENABLED = "screensaver_enabled"
+        private const val KEY_SELECTED_SCREENSAVER = "selected_screensaver"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
+
+        // Screensaver types
+        private const val SCREENSAVER_NONE = 0
+        private const val SCREENSAVER_3D_PIPES = 1
+        private const val SCREENSAVER_UNDERWATER = 2
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 
@@ -531,9 +537,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Initialize screensaver manager
         screensaverManager = ScreensaverManager(this, binding.root)
 
-        // Load screensaver enabled state from SharedPreferences
-        val screensaverEnabled = prefs.getBoolean(KEY_SCREENSAVER_ENABLED, true)
-        screensaverManager.setEnabled(screensaverEnabled)
+        // Load screensaver selection from SharedPreferences (default to 3D Pipes for backward compatibility)
+        val selectedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+        screensaverManager.setSelectedScreensaver(selectedScreensaver)
 
         // Initialize Google Drive helper
         googleDriveHelper = GoogleDriveHelper(this)
@@ -1601,7 +1607,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         prefs.edit { putBoolean(KEY_CURSOR_VISIBLE, newVisibility) }
 
-        Log.d("MainActivity", "Cursor visibility changed to: ${if (newVisibility) "VISIBLE" else "HIDDEN"}")
     }
 
     private fun getCurrentThemeWallpaperKeys(): Pair<String, String> {
@@ -2563,7 +2568,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up gesture detector for long press and swipe down
         gestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onLongPress(e: MotionEvent) {
-                Log.d("MainActivity", "Long press detected at ${e.x}, ${e.y}")
                 showContextMenu(e.x, e.y)
             }
             
@@ -2620,7 +2624,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             
             override fun onDown(e: MotionEvent): Boolean {
-                Log.d("MainActivity", "Touch down detected")
                 return true
             }
         })
@@ -2916,8 +2919,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         selectedIcon = null
         
         if (::contextMenu.isInitialized) {
-            Log.d("MainActivity", "Context menu initialized, showing at $x, $y")
-            
+
             // Create desktop context menu items
             val menuItems = ContextMenuItems.getDesktopMenuItems(
                 onRefresh = {
@@ -4596,7 +4598,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
         val playEmailSoundCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.play_email_sound_checkbox)
         val showNotificationDotsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_notification_dots_checkbox)
-        val enableScreensaverCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.enable_screensaver_checkbox)
+        val screensaverSelector = contentView.findViewById<android.widget.Spinner>(R.id.screensaver_selector)
+        val previewScreensaverVideo = contentView.findViewById<VideoView>(R.id.preview_screensaver_video)
         val previewScreensaverButton = contentView.findViewById<TextView>(R.id.preview_screensaver_button)
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
 
@@ -4798,20 +4801,73 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         })
 
-        // Set up Enable Screensaver checkbox
-        val screensaverEnabled = prefs.getBoolean(KEY_SCREENSAVER_ENABLED, true)
-        enableScreensaverCheckbox.isChecked = screensaverEnabled
-        enableScreensaverCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit {putBoolean(KEY_SCREENSAVER_ENABLED, isChecked) }
-            if (::screensaverManager.isInitialized) {
-                screensaverManager.setEnabled(isChecked)
+        // Set up Screensaver Selector
+        val screensaverOptions = resources.getStringArray(R.array.screensaver_options)
+        val screensaverAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_screensaver, screensaverOptions)
+        screensaverAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_screensaver)
+        screensaverSelector.adapter = screensaverAdapter
+
+        // Load saved screensaver selection (default to 3D Pipes for backward compatibility)
+        val selectedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+        screensaverSelector.setSelection(selectedScreensaver)
+
+        // Track pending screensaver selection (don't save immediately)
+        var pendingScreensaverSelection: Int = selectedScreensaver
+
+        // Helper function to get video resource for screensaver type
+        fun getScreensaverVideoResource(screensaverType: Int): Int? {
+            return when (screensaverType) {
+                SCREENSAVER_3D_PIPES -> R.raw.screensaver_pipes
+                SCREENSAVER_UNDERWATER -> R.raw.screensaver_underwater
+                else -> null
+            }
+        }
+
+        // Helper function to play preview video
+        fun playPreviewVideo(screensaverType: Int) {
+            val videoResource = getScreensaverVideoResource(screensaverType)
+            if (videoResource != null) {
+                val videoUri = Uri.parse("android.resource://${packageName}/${videoResource}")
+                previewScreensaverVideo.setVideoURI(videoUri)
+                previewScreensaverVideo.visibility = View.VISIBLE
+                previewScreensaverVideo.setOnPreparedListener { mediaPlayer ->
+                    mediaPlayer.isLooping = true
+                    mediaPlayer.start()
+                }
+                // Start the VideoView to begin preparing and playing the video
+                previewScreensaverVideo.start()
+            } else {
+                // No video for "None" option
+                previewScreensaverVideo.stopPlayback()
+                previewScreensaverVideo.visibility = View.INVISIBLE
+            }
+        }
+
+        // Play initial preview
+        playPreviewVideo(selectedScreensaver)
+
+        // Handle screensaver selection changes
+        screensaverSelector.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                pendingScreensaverSelection = position
+                playPreviewVideo(position)
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {
+                // Do nothing
             }
         }
 
         // Set up Preview Screensaver button
         previewScreensaverButton.setOnClickListener {
-            if (::screensaverManager.isInitialized) {
+            if (::screensaverManager.isInitialized && pendingScreensaverSelection != SCREENSAVER_NONE) {
+                // Temporarily set the selected screensaver to the pending selection for preview
+                val previousSelection = screensaverManager.getSelectedScreensaver()
+                screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
                 screensaverManager.showScreensaver()
+
+                // Note: The previous selection will be restored when Apply/OK is pressed or Cancel closes the dialog
+                // For now, we leave it at the pending selection so the preview shows correctly
             }
         }
 
@@ -4946,6 +5002,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 applyTaskbarHeightOffset(pendingTaskbarOffset!!)
             }
 
+            // Apply pending screensaver selection
+            prefs.edit { putInt(KEY_SELECTED_SCREENSAVER, pendingScreensaverSelection) }
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
+            }
+
             currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
 
             // Apply wallpaper if changed
@@ -4959,6 +5021,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up Cancel button - close without applying
         cancelButton.setOnClickListener {
             playClickSound()
+            // Restore the saved screensaver selection if it was changed during preview
+            if (::screensaverManager.isInitialized) {
+                val savedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+                screensaverManager.setSelectedScreensaver(savedScreensaver)
+            }
             floatingWindowManager.removeWindow(windowsDialog)
         }
 
@@ -4991,6 +5058,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 prefs.edit {putInt(KEY_TASKBAR_HEIGHT_OFFSET, pendingTaskbarOffset!!) }
                 applyTaskbarHeightOffset(pendingTaskbarOffset!!)
                 pendingTaskbarOffset = null // Clear after applying
+            }
+
+            // Apply pending screensaver selection
+            prefs.edit { putInt(KEY_SELECTED_SCREENSAVER, pendingScreensaverSelection) }
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
             }
 
             // Apply wallpaper if changed
@@ -8070,6 +8143,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Stop periodic app checking when paused
         stopPeriodicAppChecking()
 
+        // Stop screensaver timer when app loses focus
+        if (::screensaverManager.isInitialized) {
+            screensaverManager.stopInactivityTimer()
+        }
+
         // Clear non-essential caches to free memory when app goes to background
         clearNonEssentialCaches()
     }
@@ -8082,6 +8160,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         checkForNewApps()
         startPeriodicAppChecking()
 
+        // Reset screensaver timer when app regains focus
+        if (::screensaverManager.isInitialized) {
+            screensaverManager.resetInactivityTimer()
+        }
+
         // Update permission error visibility when returning from settings
         updateEmailPermissionError?.invoke()
         updateNotificationDotsPermissionError?.invoke()
@@ -8091,6 +8174,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         super.onStop()
         // With singleTask launch mode and proper manifest settings,
         // the system should handle home screen behavior correctly
+
+        // Stop screensaver timer when app is fully stopped
+        if (::screensaverManager.isInitialized) {
+            screensaverManager.stopInactivityTimer()
+        }
 
         // Release wallpaper bitmap to save memory when fully backgrounded
         releaseWallpaperBitmap()
@@ -9742,7 +9830,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             when (event.action) {
                 MotionEvent.ACTION_DOWN,
                 MotionEvent.ACTION_MOVE -> {
-                    Log.d("MainActivity", "Touch event: initialized=${::cursorEffect.isInitialized}, visible=${isCursorVisible()}, editText=$isTouchingEditableEditText, gameWindow=$isTouchingGameWindow")
                     if (::cursorEffect.isInitialized && isCursorVisible() && !isTouchingEditableEditText && !isTouchingGameWindow) {
                         showCursorAt(event.rawX, event.rawY, isMoving = true)
                     }
@@ -9825,8 +9912,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Cancel any pending cursor hide
         cursorRunnable?.let { cursorHandler.removeCallbacks(it) }
 
-        // Debug log
-        Log.d("MainActivity", "showCursorAt: x=$x, y=$y, isMoving=$isMoving")
 
         // Position the cursor at the touch point (top-left corner)
         cursorEffect.x = x
@@ -9836,7 +9921,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         cursorEffect.visibility = View.VISIBLE
         cursorEffect.bringToFront()
 
-        Log.d("MainActivity", "Cursor visibility set to VISIBLE at position ($x, $y)")
 
         // Only start hide timer when not moving (i.e., on touch up)
         if (!isMoving) {
