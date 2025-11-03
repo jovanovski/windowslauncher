@@ -3,7 +3,6 @@
     android:id="@+id/dialog_overlay"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_marginBottom="46dp"
     android:background="@android:color/transparent"
     android:clickable="true"
     android:clipChildren="false"
@@ -19,7 +18,6 @@
         android:clipToPadding="false"
         android:background="@drawable/win98_start_menu_border"
         android:padding="2dp"
-        android:layout_margin="20dp"
         android:elevation="20dp">
 
         <!-- Windows 98 Title Bar -->
@@ -85,10 +83,11 @@
         </LinearLayout>
 
         <!-- Scrollable Content Area -->
-
-        <ScrollView
+        <FrameLayout
+            android:id="@+id/window_border"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="match_parent">
+
             <LinearLayout
                 android:id="@+id/dialog_content_area"
                 android:clickable="true"
@@ -96,6 +95,6 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:background="#d3cec7"/>
-        </ScrollView>
+        </FrameLayout>
     </LinearLayout>
 </FrameLayout>
