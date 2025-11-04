@@ -5333,7 +5333,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setContentView(contentView)
 
         // Set window size to match the layout: 358dp width + borders/padding, 610dp height + title bar + borders/padding
-        windowsDialog.setWindowSize(404, 422)
+        windowsDialog.setWindowSizePercentage(90f, 60f)
+        windowsDialog.setMaximizable(true)
 
         // Load SharedPreferences
         val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
