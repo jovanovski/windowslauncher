@@ -935,7 +935,7 @@ class WindowsDialog @JvmOverloads constructor(
         isMaximized = true
 
         // Update maximize button icon to show restore icon (if it exists)
-        updateMaximizeButtonIcon()
+//        updateMaximizeButtonIcon()
 
         onMaximizeListener?.invoke()
     }
@@ -961,7 +961,7 @@ class WindowsDialog @JvmOverloads constructor(
         isMaximized = false
 
         // Update maximize button icon to show maximize icon
-        updateMaximizeButtonIcon()
+//        updateMaximizeButtonIcon()
 
         // Center the window after a brief delay to allow layout to update
         post {

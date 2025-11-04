@@ -1,14 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="358dp"
-    android:layout_height="610dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:clickable="true"
+    android:background="?windowBackgroundColor"
     >
 
-    <ImageView
-        android:layout_width="358dp"
-        android:layout_height="610dp"
-        android:src="@drawable/ie6_layout"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="284dp"
+            android:layout_height="93dp"
+            android:background="@drawable/ie6_top_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="93dp"
+            android:layout_weight="1"
+            android:background="@drawable/ie6_top_middle"/>
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="93dp"
+            android:background="@drawable/ie6_top_right"/>
+
+    </LinearLayout>
+
 
     <EditText
         android:id="@+id/url_bar"
@@ -17,7 +35,7 @@
         android:background="@color/white"
         android:layout_marginLeft="73dp"
         android:layout_marginRight="70dp"
-        android:layout_marginTop="71.5dp"
+        android:layout_marginTop="69dp"
         android:textSize="11dp"
         android:text="www.google.com"
         android:textColor="@color/black"
@@ -49,9 +67,8 @@
         android:id="@+id/ie_tools_button"
         android:layout_width="40dp"
         android:layout_height="25dp"
-        android:layout_alignParentEnd="true"
         android:layout_marginTop="0dp"
-        android:layout_marginEnd="144dp" />
+        android:layout_marginStart="174dp" />
 
     <View
         android:id="@+id/ie_back_button"
@@ -86,9 +103,53 @@
         android:layout_marginTop="26dp"
         android:layout_marginEnd="18dp" />
 
+    <pl.droidsonroids.gif.GifImageView
+        android:id="@+id/ie_loading_gif"
+        android:layout_width="37.5dp"
+        android:layout_height="23.5dp"
+        android:layout_marginEnd="2.3dp"
+        android:layout_marginTop="2.3dp"
+        android:src="@drawable/ie_loading"
+        android:layout_alignParentEnd="true"
+        android:adjustViewBounds="true" />
+
+
+    <WebView
+        android:id="@+id/ie_web_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="93dp"
+        android:layout_marginBottom="22dp"
+        android:background="@color/context_menu_background">
+    </WebView>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="284dp"
+            android:layout_height="22dp"
+            android:background="@drawable/ie6_bottom_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_weight="1"
+            android:background="@drawable/ie6_bottom_middle"/>
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="22dp"
+            android:background="@drawable/ie6_bottom_right"/>
+
+    </LinearLayout>
+
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="18dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="3dp"
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true"
         >
@@ -112,41 +173,5 @@
             android:layout_toEndOf="@id/status_icon"
             android:layout_marginStart="3dp"/>
     </LinearLayout>
-
-    <pl.droidsonroids.gif.GifImageView
-        android:id="@+id/ie_loading_gif"
-        android:layout_width="37.5dp"
-        android:layout_height="23.5dp"
-        android:layout_marginEnd="2.3dp"
-        android:layout_marginTop="2.3dp"
-        android:src="@drawable/ie_loading"
-        android:layout_alignParentEnd="true"
-        android:adjustViewBounds="true" />
-
-
-    <WebView
-        android:id="@+id/ie_web_view"
-        android:layout_width="358dp"
-        android:layout_height="492dp"
-        android:layout_marginTop="96dp"
-        android:layout_marginBottom="22dp"
-        android:layout_marginLeft="1.5dp"
-        android:layout_marginRight="1.5dp"
-        android:background="@color/context_menu_background">
-
-
-
-    </WebView>
-
-
-    <View
-        android:visibility="gone"
-        android:id="@+id/ie_enter_button"
-        android:layout_width="50dp"
-        android:layout_height="39dp"
-        android:layout_alignParentEnd="true"
-        android:background="@color/xp_start_green"
-        android:layout_marginTop="426dp"
-        android:layout_marginEnd="124dp" />
 
 </RelativeLayout>

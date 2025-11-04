@@ -23,6 +23,7 @@ import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.util.Log
 import android.view.GestureDetector
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -5181,7 +5182,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set window size: 358dp width + borders/padding, 424dp height + title bar + borders/padding
         // Content: 300x424, Title bar: 36dp, Margins: 2dp sides+bottom
-        windowsDialog.setWindowSize(362, 635)
+        windowsDialog.setWindowSizePercentage(  90f, 60f)
+        windowsDialog.setMaximizable(true)
+
 
         // Create Internet Explorer app instance
         val ieApp = InternetExplorerApp(
@@ -9844,6 +9847,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
         return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+        // Reset screensaver timer on any keyboard input
+        if (::screensaverManager.isInitialized) {
+            screensaverManager.resetInactivityTimer()
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun isTouchInGameWindow(event: MotionEvent): Boolean {

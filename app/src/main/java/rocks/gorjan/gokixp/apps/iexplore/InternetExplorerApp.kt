@@ -33,7 +33,6 @@ class InternetExplorerApp(
         val forwardButton = contentView.findViewById<View>(R.id.ie_forward_button)
         val goButton = contentView.findViewById<View>(R.id.ie_go_button)
         val refreshButton = contentView.findViewById<View>(R.id.ie_refresh_button)
-        val enterButton = contentView.findViewById<View>(R.id.ie_enter_button)
         val homeButton = contentView.findViewById<View>(R.id.ie_home_button)
         val searchButton = contentView.findViewById<View>(R.id.ie_search_button)
         val webView = contentView.findViewById<WebView>(R.id.ie_web_view)
@@ -257,29 +256,7 @@ class InternetExplorerApp(
             webView.reload()
         }
 
-        // Setup enter button to send space key events based on touch
-        @Suppress("ClickableViewAccessibility")
-        enterButton.setOnTouchListener { view, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    // Send key down when button is pressed
-                    sendKeyEvent(webView, KeyEvent.KEYCODE_SPACE, KeyEvent.ACTION_DOWN)
-                    true
-                }
-                android.view.MotionEvent.ACTION_UP -> {
-                    // Send key up when button is released
-                    sendKeyEvent(webView, KeyEvent.KEYCODE_SPACE, KeyEvent.ACTION_UP)
-                    view.performClick()
-                    true
-                }
-                android.view.MotionEvent.ACTION_CANCEL -> {
-                    // Send key up if touch is cancelled
-                    sendKeyEvent(webView, KeyEvent.KEYCODE_SPACE, KeyEvent.ACTION_UP)
-                    true
-                }
-                else -> false
-            }
-        }
+
 
         // Handle Home button click
         homeButton.setOnClickListener {

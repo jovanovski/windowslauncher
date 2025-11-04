@@ -54,7 +54,7 @@
     </RelativeLayout>
 <!-- Screen Saver-->
     <RelativeLayout
-
+        android:visibility="gone"
         android:id="@+id/wallpaper_screensaver_screen"
         android:layout_width="359dp"
         android:layout_height="380dp">
