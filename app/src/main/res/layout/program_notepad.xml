@@ -17,24 +17,30 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            style="@style/MenuBarItem"
+            style="@style/MenuBarItemDisabled"
             android:text="File"/>
-
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            style="@style/MenuBarItem"
+            style="@style/MenuBarItemDisabled"
             android:text="Edit"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            style="@style/MenuBarItem"
+            style="@style/MenuBarItemDisabled"
             android:text="Tools"/>
+
         <TextView
+            android:id="@+id/notepad_add_image"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             style="@style/MenuBarItem"
+            android:text="Add Image"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItemDisabled"
             android:text="Help"/>
 
     </LinearLayout>
@@ -93,32 +99,52 @@
             android:layout_marginTop="-3dp"
             android:visibility="gone"/>
 
-        <EditText
-            android:id="@+id/notes"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginEnd="2dp"
-            android:gravity="top|start"
-            android:background="@android:color/white"
-            android:textColor="@android:color/black"
-            android:fontFamily="?attr/primaryFontFamily"
-            android:textSize="13sp"
-            android:text="Test test"
-            android:padding="4dp"
-            android:paddingEnd="20dp"
-            android:scrollbars="vertical"
-            android:scrollbarStyle="outsideOverlay"
-            android:scrollbarAlwaysDrawVerticalTrack="true"
-            android:scrollbarSize="16dp"
-            android:scrollbarFadeDuration="0"
-            android:scrollbarDefaultDelayBeforeFade="0"
-            android:fadeScrollbars="false"
-            android:scrollbarTrackVertical="?scrollbarTrackDrawable"
-            android:scrollbarThumbVertical="?scrollbarThumbDrawable"
-            android:inputType="textMultiLine|textNoSuggestions"
-            android:lineSpacingMultiplier="1.0"
-            android:lineSpacingExtra="0dp">
-        </EditText>
+            android:orientation="vertical"
+            android:background="@android:color/white">
+
+            <!-- Image Gallery -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/image_gallery"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:orientation="horizontal"
+                android:visibility="gone"
+                android:padding="4dp"
+                android:background="@color/white" />
+
+            <!-- Text Editor -->
+            <EditText
+                android:id="@+id/notes"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="2dp"
+                android:gravity="top|start"
+                android:background="@android:color/white"
+                android:textColor="@android:color/black"
+                android:fontFamily="?attr/primaryFontFamily"
+                android:textSize="13sp"
+                android:text="Test test"
+                android:padding="4dp"
+                android:paddingEnd="20dp"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:scrollbarAlwaysDrawVerticalTrack="true"
+                android:scrollbarSize="16dp"
+                android:scrollbarFadeDuration="0"
+                android:scrollbarDefaultDelayBeforeFade="0"
+                android:fadeScrollbars="false"
+                android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+                android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:lineSpacingMultiplier="1.0"
+                android:lineSpacingExtra="0dp">
+            </EditText>
+
+        </LinearLayout>
 
 
     </LinearLayout>

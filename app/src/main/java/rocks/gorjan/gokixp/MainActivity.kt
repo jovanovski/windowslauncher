@@ -186,6 +186,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    // Notepad image pickers
+    private var currentNotepadApp: rocks.gorjan.gokixp.apps.notepad.NotepadApp? = null
+
+    private val notepadGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        currentNotepadApp?.onImageSelected(uri)
+    }
+
+    private val notepadCameraPickerLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
+        if (success) {
+            // Camera captured successfully, URI is already set
+            currentNotepadApp?.onImageSelected(pendingCameraUri)
+        }
+        pendingCameraUri = null
+    }
+
+    private var pendingCameraUri: Uri? = null
+
     // Preferences export/import launchers
     private var pendingExportJson: String? = null
     private var pendingImportCallback: (() -> Unit)? = null
@@ -5704,8 +5721,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onUpdateWindowTitle = { title ->
                 windowsDialog.setTitle(title)
+            },
+            galleryPickerLauncher = notepadGalleryPickerLauncher,
+            onCameraCapture = { uri ->
+                pendingCameraUri = uri
+                notepadCameraPickerLauncher.launch(uri)
+            },
+            onShowFullscreenImage = { uri ->
+                showFullscreenImage(uri)
+            },
+            getCursorPosition = {
+                Pair(cursorEffect.x, cursorEffect.y)
             }
         )
+
+        // Store reference for launchers to call back
+        currentNotepadApp = notepadApp
 
         // Setup the app
         notepadApp.setupApp(contentView)
@@ -5738,6 +5769,79 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Handler(Looper.getMainLooper()).postDelayed({
             setCursorNormal()
         }, 100) // Small delay to ensure window is fully rendered
+    }
+
+    private fun showFullscreenImage(uri: Uri) {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val imageView = android.widget.ImageView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(android.graphics.Color.BLACK)
+        }
+
+        try {
+            // First, decode the bitmap
+            val inputStream = contentResolver.openInputStream(uri)
+            var bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+
+            if (bitmap == null) {
+                dialog.dismiss()
+                return
+            }
+
+            // Read EXIF orientation and rotate if needed
+            try {
+                val exifInputStream = contentResolver.openInputStream(uri)
+                val exif = exifInputStream?.use {
+                    androidx.exifinterface.media.ExifInterface(it)
+                }
+
+                val orientation = exif?.getAttributeInt(
+                    androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                ) ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+                val rotationAngle = when (orientation) {
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+
+                if (rotationAngle != 0f) {
+                    val matrix = android.graphics.Matrix()
+                    matrix.postRotate(rotationAngle)
+                    val rotatedBitmap = android.graphics.Bitmap.createBitmap(
+                        bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                    )
+                    if (rotatedBitmap != bitmap) {
+                        bitmap.recycle()
+                    }
+                    bitmap = rotatedBitmap
+                }
+            } catch (exifException: Exception) {
+                // Continue with unrotated bitmap if EXIF reading fails
+                Log.e("MainActivity", "Error reading EXIF data", exifException)
+            }
+
+            imageView.setImageBitmap(bitmap)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            dialog.dismiss()
+            return
+        }
+
+        imageView.setOnClickListener {
+            playClickSound()
+            dialog.dismiss()
+        }
+
+        dialog.setContentView(imageView)
+        dialog.show()
     }
 
     private fun showMsnDialog() {

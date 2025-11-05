@@ -1,8 +1,12 @@
 package rocks.gorjan.gokixp.apps.notepad
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.net.Uri
+import android.provider.MediaStore
 import android.text.Editable
 import android.util.Log
 import android.view.LayoutInflater
@@ -11,6 +15,8 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -32,7 +38,11 @@ class NotepadApp(
     private val onSoundPlay: (String) -> Unit,
     private val onShowContextMenu: (List<ContextMenuItem>, Float, Float) -> Unit,
     private val onShowRenameDialog: (String, String, String, (String) -> Unit) -> Unit,
-    private val onUpdateWindowTitle: (String) -> Unit
+    private val onUpdateWindowTitle: (String) -> Unit,
+    private val galleryPickerLauncher: ActivityResultLauncher<String>,
+    private val onCameraCapture: (Uri) -> Unit,
+    private val onShowFullscreenImage: (Uri) -> Unit,
+    private val getCursorPosition: () -> Pair<Float, Float>
 ) {
     companion object {
         private const val PREFS_NAME = "taskbar_widget_prefs"
@@ -57,6 +67,8 @@ class NotepadApp(
     private var addNoteButton: TextView? = null
     private var notesAdapter: NotesAdapter? = null
     private var itemTouchHelper: ItemTouchHelper? = null
+    private var imageGallery: RecyclerView? = null
+    private var imageGalleryAdapter: ImageGalleryAdapter? = null
 
     /**
      * Initialize the app UI
@@ -68,12 +80,18 @@ class NotepadApp(
         notesList = contentView.findViewById(R.id.notes_list)
         expandButton = contentView.findViewById(R.id.expand_button)
         addNoteButton = contentView.findViewById(R.id.add_note_button)
+        imageGallery = contentView.findViewById(R.id.image_gallery)
 
-        // Setup RecyclerView
+        // Setup Notes RecyclerView
         notesAdapter = NotesAdapter()
         notesList?.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = notesAdapter
+        }
+
+        // Setup Image Gallery RecyclerView
+        imageGallery?.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
         }
 
         // Setup ItemTouchHelper for drag-and-drop
@@ -154,11 +172,12 @@ class NotepadApp(
             notes.firstOrNull()
         }
 
-        // Load current note content
+        // Load current note content and images
         currentNote?.let {
             isProgrammaticChange = true
             notesEditText?.setText(it.content)
             isProgrammaticChange = false
+            loadNoteImages(it)
         }
 
         // Set initial title
@@ -203,6 +222,13 @@ class NotepadApp(
             isProgrammaticChange = false
             updateWindowTitle()
             refreshNotesList()
+        }
+
+        // Add Image button
+        val addImageButton = contentView.findViewById<TextView>(R.id.notepad_add_image)
+        addImageButton?.setOnClickListener { view ->
+            onSoundPlay("click")
+            showImageSourcePicker(view)
         }
 
         // Save notes as user types and handle automatic list continuation
@@ -264,7 +290,7 @@ class NotepadApp(
      */
     private fun updateWindowTitle() {
         currentNote?.let {
-            onUpdateWindowTitle("Notepad - ${it.title}")
+            onUpdateWindowTitle("${it.title} - Notepad")
         } ?: onUpdateWindowTitle("Notepad")
     }
 
@@ -273,6 +299,141 @@ class NotepadApp(
      */
     private fun refreshNotesList() {
         notesAdapter?.notifyDataSetChanged()
+    }
+
+    /**
+     * Load images for a note and update the gallery
+     */
+    private fun loadNoteImages(note: Note) {
+        // Ensure imageUris is initialized (for backward compatibility with old notes)
+        if (note.imageUris == null) {
+            note.imageUris = mutableListOf()
+        }
+
+        if (note.imageUris.isEmpty()) {
+            // No images - hide gallery
+            imageGallery?.visibility = View.GONE
+        } else {
+            // Has images - show gallery and load them
+            imageGallery?.visibility = View.VISIBLE
+            imageGalleryAdapter = ImageGalleryAdapter(note.imageUris)
+            imageGallery?.adapter = imageGalleryAdapter
+        }
+    }
+
+    /**
+     * Show image source picker dialog (Gallery or Camera)
+     */
+    private fun showImageSourcePicker(anchorView: View) {
+        val menuItems = listOf(
+            ContextMenuItem(
+                title = "From Gallery",
+                isEnabled = true,
+                action = {
+                    onSoundPlay("click")
+                    // Launch gallery picker
+                    galleryPickerLauncher.launch("image/*")
+                }
+            ),
+            ContextMenuItem(
+                title = "From Camera",
+                isEnabled = true,
+                action = {
+                    onSoundPlay("click")
+                    // Create temporary URI for camera
+                    val tempUri = createTempImageUri()
+                    if (tempUri != null) {
+                        onCameraCapture(tempUri)
+                    }
+                }
+            )
+        )
+
+        // Show context menu right below the Add Image button
+        val location = IntArray(2)
+        anchorView.getLocationOnScreen(location)
+        val x = location[0].toFloat()
+        val y = location[1].toFloat() + anchorView.height
+        onShowContextMenu(menuItems, x, y)
+    }
+
+    /**
+     * Create a temporary URI for camera capture
+     */
+    private fun createTempImageUri(): Uri? {
+        return try {
+            val fileName = "notepad_camera_${System.currentTimeMillis()}.jpg"
+            val contentValues = android.content.ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            }
+            context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        } catch (e: Exception) {
+            Log.e("NotepadApp", "Error creating temp URI", e)
+            null
+        }
+    }
+
+    /**
+     * Handle image selected from gallery or camera
+     */
+    fun onImageSelected(uri: Uri?) {
+        uri?.let { selectedUri ->
+            try {
+                // Take persistent permission for this URI
+                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(selectedUri, takeFlags)
+
+                // Add to current note
+                currentNote?.let { note ->
+                    // Ensure imageUris is initialized (for backward compatibility)
+                    if (note.imageUris == null) {
+                        note.imageUris = mutableListOf()
+                    }
+                    note.imageUris.add(selectedUri.toString())
+                    saveNotes()
+                    loadNoteImages(note)
+                }
+            } catch (e: SecurityException) {
+                Log.e("NotepadApp", "Could not take persistent permission", e)
+                // Still add the image even if we can't take persistent permission
+                currentNote?.let { note ->
+                    // Ensure imageUris is initialized (for backward compatibility)
+                    if (note.imageUris == null) {
+                        note.imageUris = mutableListOf()
+                    }
+                    note.imageUris.add(selectedUri.toString())
+                    saveNotes()
+                    loadNoteImages(note)
+                }
+            } catch (e: Exception) {
+                Log.e("NotepadApp", "Error adding image", e)
+            }
+        }
+    }
+
+    /**
+     * Show context menu for an image
+     */
+    private fun showImageContextMenu(uriString: String) {
+        val menuItems = listOf(
+            ContextMenuItem(
+                title = "Delete",
+                isEnabled = true,
+                action = {
+                    onSoundPlay("click")
+                    // Remove image from current note
+                    currentNote?.let { note ->
+                        note.imageUris?.remove(uriString)
+                        saveNotes()
+                        loadNoteImages(note)
+                    }
+                }
+            )
+        )
+
+        val (x, y) = getCursorPosition()
+        onShowContextMenu(menuItems, x, y)
     }
 
     /**
@@ -463,6 +624,7 @@ class NotepadApp(
                     notesEditText?.setText(note.content)
                     isProgrammaticChange = false
                     updateWindowTitle()
+                    loadNoteImages(note)
                     notifyDataSetChanged()
                 }
 
@@ -498,6 +660,145 @@ class NotepadApp(
         fun onItemDropped() {
             // Save the new order when dragging is complete
             saveNotes()
+        }
+    }
+
+    /**
+     * Image Gallery Adapter for displaying images in horizontal scroll
+     */
+    inner class ImageGalleryAdapter(
+        private val imageUris: MutableList<String>
+    ) : RecyclerView.Adapter<ImageGalleryAdapter.ImageViewHolder>() {
+
+        inner class ImageViewHolder(val imageView: android.widget.ImageView) : RecyclerView.ViewHolder(imageView)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ImageViewHolder {
+            val imageView = android.widget.ImageView(context).apply {
+                layoutParams = ViewGroup.MarginLayoutParams(72.dpToPx(), 72.dpToPx()).apply {
+                    marginEnd = 4.dpToPx()
+                }
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                setBackgroundColor(Color.LTGRAY)
+            }
+            return ImageViewHolder(imageView)
+        }
+
+        override fun onBindViewHolder(holder: ImageViewHolder, position: Int) {
+            val uriString = imageUris[position]
+            val imageView = holder.imageView
+            var isValidImage = false
+
+            try {
+                val uri = android.net.Uri.parse(uriString)
+
+                // Try to load the image with proper orientation
+                val bitmap = loadBitmapWithOrientation(uri)
+
+                if (bitmap != null) {
+                    imageView.setImageBitmap(bitmap)
+                    imageView.setBackgroundColor(Color.TRANSPARENT)
+                    isValidImage = true
+                } else {
+                    // Image couldn't be decoded - show placeholder
+                    showPlaceholder(imageView)
+                }
+
+                // Set up click listener to view full-screen (only for valid images)
+                if (isValidImage) {
+                    imageView.setOnClickListener {
+                        onSoundPlay("click")
+                        onShowFullscreenImage(uri)
+                    }
+                } else {
+                    imageView.setOnClickListener(null)
+                }
+
+            } catch (e: Exception) {
+                // Error loading image - show placeholder
+                Log.e("NotepadApp", "Error loading image: $uriString", e)
+                showPlaceholder(imageView)
+                imageView.setOnClickListener(null)
+            }
+
+            // Set up long press listener to show delete menu (always available)
+            imageView.setOnLongClickListener {
+                showImageContextMenu(uriString)
+                true
+            }
+        }
+
+        private fun loadBitmapWithOrientation(uri: Uri): android.graphics.Bitmap? {
+            try {
+                // First, decode the bitmap
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+
+                if (bitmap == null) return null
+
+                // Read EXIF orientation
+                val exifInputStream = context.contentResolver.openInputStream(uri)
+                val exif = exifInputStream?.use {
+                    androidx.exifinterface.media.ExifInterface(it)
+                }
+
+                val orientation = exif?.getAttributeInt(
+                    androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                ) ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+                // Calculate rotation angle
+                val rotationAngle = when (orientation) {
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+
+                // If no rotation needed, return original bitmap
+                if (rotationAngle == 0f) return bitmap
+
+                // Rotate the bitmap
+                val matrix = android.graphics.Matrix()
+                matrix.postRotate(rotationAngle)
+                val rotatedBitmap = android.graphics.Bitmap.createBitmap(
+                    bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                )
+
+                // Recycle original if different from rotated
+                if (rotatedBitmap != bitmap) {
+                    bitmap.recycle()
+                }
+
+                return rotatedBitmap
+            } catch (e: Exception) {
+                Log.e("NotepadApp", "Error loading bitmap with orientation", e)
+                return null
+            }
+        }
+
+        private fun showPlaceholder(imageView: android.widget.ImageView) {
+            // Create a simple placeholder: gray background with "?" icon
+            imageView.setBackgroundColor(0xFFE0E0E0.toInt())
+            imageView.setImageDrawable(null)
+
+            // Create a simple text drawable as placeholder
+            val textDrawable = android.graphics.drawable.ShapeDrawable().apply {
+                paint.color = Color.GRAY
+                paint.textSize = 32f
+                paint.textAlign = android.graphics.Paint.Align.CENTER
+            }
+
+            // Set a broken image indicator (we'll use a simple colored square for now)
+            imageView.setColorFilter(0xFF999999.toInt())
+        }
+
+        override fun getItemCount(): Int = imageUris.size
+
+        fun updateImages(newImageUris: List<String>) {
+            imageUris.clear()
+            imageUris.addAll(newImageUris)
+            notifyDataSetChanged()
         }
     }
 }
