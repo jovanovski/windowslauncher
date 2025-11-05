@@ -2,13 +2,19 @@ package rocks.gorjan.gokixp.apps.notepad
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.text.Editable
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.edit
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.ContextMenuItem
@@ -41,14 +47,16 @@ class NotepadApp(
     private var currentNote: Note? = null
     private var isListExpanded = false
     private var isProgrammaticChange = false
+    private var noteInMoveMode: Note? = null
 
     // UI references
     private var notesEditText: EditText? = null
     private var notesListContainer: LinearLayout? = null
-    private var notesListScrollView: android.widget.ScrollView? = null
-    private var notesList: android.widget.TableLayout? = null
+    private var notesList: RecyclerView? = null
     private var expandButton: TextView? = null
     private var addNoteButton: TextView? = null
+    private var notesAdapter: NotesAdapter? = null
+    private var itemTouchHelper: ItemTouchHelper? = null
 
     /**
      * Initialize the app UI
@@ -57,10 +65,59 @@ class NotepadApp(
         // Get references to views
         notesEditText = contentView.findViewById(R.id.notes)
         notesListContainer = contentView.findViewById(R.id.notes_list_container)
-        notesListScrollView = contentView.findViewById(R.id.notes_list_scroll)
         notesList = contentView.findViewById(R.id.notes_list)
         expandButton = contentView.findViewById(R.id.expand_button)
         addNoteButton = contentView.findViewById(R.id.add_note_button)
+
+        // Setup RecyclerView
+        notesAdapter = NotesAdapter()
+        notesList?.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = notesAdapter
+        }
+
+        // Setup ItemTouchHelper for drag-and-drop
+        val callback = object : ItemTouchHelper.Callback() {
+            override fun getMovementFlags(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                // Only allow dragging if in move mode
+                val dragFlags = if (noteInMoveMode != null) ItemTouchHelper.UP or ItemTouchHelper.DOWN else 0
+                return makeMovementFlags(dragFlags, 0)
+            }
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPosition = viewHolder.adapterPosition
+                val toPosition = target.adapterPosition
+                notesAdapter?.onItemMove(fromPosition, toPosition)
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                // Not used
+            }
+
+            override fun isLongPressDragEnabled(): Boolean = false
+
+            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                super.clearView(recyclerView, viewHolder)
+                // Called when dragging ends
+                notesAdapter?.onItemDropped()
+
+                // Exit move mode
+                noteInMoveMode = null
+                refreshNotesList()
+                onSoundPlay("click")
+            }
+        }
+
+        itemTouchHelper = ItemTouchHelper(callback)
+        itemTouchHelper?.attachToRecyclerView(notesList)
 
         // Load notes from SharedPreferences
         notes.clear()
@@ -215,72 +272,7 @@ class NotepadApp(
      * Refresh the notes list UI
      */
     private fun refreshNotesList() {
-        notesList?.removeAllViews()
-
-        notes.forEachIndexed { index, note ->
-            val tableRow = android.widget.TableRow(context).apply {
-                layoutParams = android.widget.TableLayout.LayoutParams(
-                    android.widget.TableLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.TableLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            val noteItem = TextView(context).apply {
-                text = note.title
-                setTextColor(android.graphics.Color.BLACK)
-                setPadding(8.dpToPx(), 4.dpToPx(), 8.dpToPx(), 4.dpToPx())
-                layoutParams = android.widget.TableRow.LayoutParams(
-                    android.widget.TableRow.LayoutParams.MATCH_PARENT,
-                    android.widget.TableRow.LayoutParams.WRAP_CONTENT
-                )
-
-                // Use theme's primary font
-                typeface = MainActivity.getInstance()?.getThemePrimaryFont()
-                var currentTheme = ThemeManager(context).getSelectedTheme()
-                if(currentTheme == AppTheme.WindowsClassic){
-                    textSize = 12f
-                }
-                else {
-                    textSize = 11f
-                }
-
-                // Highlight current note with bold font and larger size
-                if (note.id == currentNote?.id) {
-                    setBackgroundColor(0xFFFFFFFF.toInt()) // White background
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
-                setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 6.dpToPx())
-
-
-                // Click to select note
-                setOnClickListener {
-                    // Save current note before switching
-                    currentNote?.content = notesEditText?.text.toString()
-                    saveNotes()
-
-                    // Switch to selected note
-                    currentNote = note
-                    saveLastNoteId()
-                    isProgrammaticChange = true
-                    notesEditText?.setText(note.content)
-                    isProgrammaticChange = false
-                    updateWindowTitle()
-                    refreshNotesList()
-                }
-
-                // Long press for context menu
-                setOnLongClickListener { view ->
-                    val location = IntArray(2)
-                    view.getLocationOnScreen(location)
-                    showNoteContextMenu(note, location[0].toFloat(), location[1].toFloat())
-                    true
-                }
-            }
-
-            tableRow.addView(noteItem)
-            notesList?.addView(tableRow)
-        }
+        notesAdapter?.notifyDataSetChanged()
     }
 
     /**
@@ -305,6 +297,30 @@ class NotepadApp(
                 }
             }
         ))
+
+        // Move option (only if more than one note exists)
+        if (notes.size > 1) {
+            menuItems.add(ContextMenuItem(
+                title = "Move",
+                isEnabled = true,
+                action = {
+                    // Enter move mode for this note
+                    noteInMoveMode = note
+                    refreshNotesList()
+
+                    // Start dragging for this note
+                    val noteIndex = notes.indexOfFirst { it.id == note.id }
+                    notesList?.post {
+                        val viewHolder = notesList?.findViewHolderForAdapterPosition(noteIndex)
+                        viewHolder?.let {
+                            itemTouchHelper?.startDrag(it)
+                        }
+                    }
+
+                    onSoundPlay("click")
+                }
+            ))
+        }
 
         // Delete option (only if more than one note exists)
         if (notes.size > 1) {
@@ -388,5 +404,100 @@ class NotepadApp(
      */
     private fun Int.dpToPx(): Int {
         return (this * context.resources.displayMetrics.density).toInt()
+    }
+
+    /**
+     * RecyclerView Adapter for notes list
+     */
+    inner class NotesAdapter : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
+
+        inner class NoteViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
+            val textView = TextView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setTextColor(Color.BLACK)
+                setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 6.dpToPx())
+
+                // Use theme's primary font
+                typeface = MainActivity.getInstance()?.getThemePrimaryFont()
+                val currentTheme = ThemeManager(context).getSelectedTheme()
+                textSize = if (currentTheme == AppTheme.WindowsClassic) 12f else 11f
+            }
+            return NoteViewHolder(textView)
+        }
+
+        override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
+            val note = notes[position]
+            val textView = holder.textView
+
+            // Set text and appearance based on state
+            if (note.id == noteInMoveMode?.id) {
+                // Note in move mode - highlight with yellow/gold
+                textView.setBackgroundColor(0xFFFFFF99.toInt())
+                textView.text = "↕ ${note.title}"
+            } else if (note.id == currentNote?.id) {
+                // Current note - white background
+                textView.setBackgroundColor(0xFFFFFFFF.toInt())
+                textView.text = note.title
+            } else {
+                // Normal note
+                textView.setBackgroundColor(Color.TRANSPARENT)
+                textView.text = note.title
+            }
+
+            // Click listener (only if not in move mode)
+            if (note.id != noteInMoveMode?.id) {
+                textView.setOnClickListener {
+                    // Save current note before switching
+                    currentNote?.content = notesEditText?.text.toString()
+                    saveNotes()
+
+                    // Switch to selected note
+                    currentNote = note
+                    saveLastNoteId()
+                    isProgrammaticChange = true
+                    notesEditText?.setText(note.content)
+                    isProgrammaticChange = false
+                    updateWindowTitle()
+                    notifyDataSetChanged()
+                }
+
+                // Long press for context menu
+                textView.setOnLongClickListener { view ->
+                    val location = IntArray(2)
+                    view.getLocationOnScreen(location)
+                    showNoteContextMenu(note, location[0].toFloat(), location[1].toFloat())
+                    true
+                }
+            } else {
+                // In move mode - clear listeners
+                textView.setOnClickListener(null)
+                textView.setOnLongClickListener(null)
+            }
+        }
+
+        override fun getItemCount(): Int = notes.size
+
+        fun onItemMove(fromPosition: Int, toPosition: Int) {
+            if (fromPosition < toPosition) {
+                for (i in fromPosition until toPosition) {
+                    notes[i] = notes.set(i + 1, notes[i])
+                }
+            } else {
+                for (i in fromPosition downTo toPosition + 1) {
+                    notes[i] = notes.set(i - 1, notes[i])
+                }
+            }
+            notifyItemMoved(fromPosition, toPosition)
+        }
+
+        fun onItemDropped() {
+            // Save the new order when dragging is complete
+            saveNotes()
+        }
     }
 }
