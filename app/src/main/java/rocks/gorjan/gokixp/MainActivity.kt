@@ -531,8 +531,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * Returns true if flavour spinner should be visible (Classic theme only).
      */
-    private fun shouldShowFlavourSpinner(): Boolean {
-        return themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+    private fun shouldShowFlavourSpinner(theme: AppTheme? = null): Boolean {
+        var checkTheme = theme
+        if(checkTheme == null){
+            checkTheme = themeManager.getSelectedTheme()
+        }
+        return checkTheme is AppTheme.WindowsClassic
     }
 
     // =========================================================
@@ -4020,17 +4024,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set window size to match the layout dimensions (358dp x 244dp) plus window chrome
         // Content: 358x244, Title bar + Borders: +30dp height, +4dp width (same as IE)
 
-
+        windowsDialog.setWindowSizePercentage(90f, 30f)
+        windowsDialog.setMaximizable(true)
         if (selectedTheme == "Windows Classic") {
-            windowsDialog.setWindowSize(362, 268)
-
             val folderNameLarge = contentView.findViewById<TextView>(R.id.folder_name_large)
             val folderIconLarge = contentView.findViewById<ImageView>(R.id.folder_icon_large)
             folderNameLarge.text = folderNameDisplay
             folderIconLarge.setImageDrawable(desktopIcon.icon)
-        }
-        else{
-            windowsDialog.setWindowSize(356, 260)
         }
 
 
@@ -4659,7 +4659,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Show/hide flavour spinner based on current theme
-        val flavourVisibility = if (shouldShowFlavourSpinner()) View.VISIBLE else View.GONE
+        var flavourVisibility = if (shouldShowFlavourSpinner()) View.VISIBLE else View.GONE
         flavourLabel.visibility = flavourVisibility
         flavourSpinner.visibility = flavourVisibility
 
@@ -4903,6 +4903,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val selectedTheme = themes[position]
                 pendingTheme = selectedTheme
 
+                flavourVisibility = if (shouldShowFlavourSpinner(AppTheme.fromString(pendingTheme))) View.VISIBLE else View.GONE
                 // Update flavour spinner visibility based on selected theme
                 flavourLabel.visibility = flavourVisibility
                 flavourSpinner.visibility = flavourVisibility

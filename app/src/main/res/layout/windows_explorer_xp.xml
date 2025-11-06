@@ -1,11 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="358dp"
-    android:layout_height="240dp">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?windowBackgroundColor">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="260dp"
+            android:layout_height="63dp"
+            android:background="@drawable/explorer_xp_top_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="63dp"
+            android:layout_weight="1"
+            android:background="@drawable/explorer_xp_top_middle"/>
+        <ImageView
+            android:layout_width="55dp"
+            android:layout_height="63dp"
+            android:background="@drawable/explorer_xp_top_right"/>
+    </LinearLayout>
 
     <ImageView
         android:layout_width="358dp"
         android:layout_height="240dp"
+        android:visibility="gone"
         android:src="@drawable/explorer_xp"/>
 
     <TextView
@@ -21,20 +43,48 @@
         android:layout_marginStart="54dp"
         />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="63dp"
+        android:background="@color/white"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="110dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/explorer_xp_middle_design"/>
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/explorer_xp_middle_design_repeat"/>
+
+        </LinearLayout>
 
     <GridView
         android:id="@+id/folder_icons_grid"
-        android:layout_width="250dp"
-        android:layout_height="170dp"
-        android:layout_marginStart="103dp"
-        android:layout_marginTop="66dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:numColumns="5"
         android:verticalSpacing="0dp"
         android:horizontalSpacing="0dp"
         android:stretchMode="columnWidth"
         android:columnWidth="62dp"
-
-        android:scrollbars="vertical" />
+        android:paddingEnd="20dp"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarTrackVertical="@drawable/scrollbar_track_xp"
+        android:scrollbarThumbVertical="@drawable/scrollbar_thumb_xp"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:fadeScrollbars="false"/>
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/folder_icon_small"

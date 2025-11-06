@@ -57,6 +57,7 @@ sealed class AppTheme {
 class ThemeManager(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+
     /**
      * Gets the currently selected theme from SharedPreferences.
      * Reads the same key used by legacy code.

@@ -1,12 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="358dp"
-    android:layout_height="240dp">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?windowBackgroundColor">
 
-    <ImageView
-        android:layout_width="358dp"
-        android:layout_height="240dp"
-        android:src="@drawable/explorer_vista"/>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="123dp"
+            android:layout_height="45dp"
+            android:background="@drawable/explorer_vista_top_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="45dp"
+            android:layout_weight="1"
+            android:background="@drawable/explorer_vista_top_middle"/>
+        <ImageView
+            android:layout_width="29dp"
+            android:layout_height="45dp"
+            android:background="@drawable/explorer_vista_top_right"/>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/folder_name_small"
@@ -18,7 +36,7 @@
         android:layout_marginTop="5dp"
         android:textColor="@color/black"
         android:textSize="8.5sp"
-        android:layout_marginStart="68dp"
+        android:layout_marginStart="65dp"
         />
 
     <ImageView
@@ -30,19 +48,44 @@
         />
 
 
-    <GridView
-        android:id="@+id/folder_icons_grid"
-        android:layout_width="240dp"
-        android:layout_height="175dp"
-        android:layout_marginStart="110dp"
-        android:layout_marginTop="66dp"
-        android:numColumns="5"
-        android:verticalSpacing="0dp"
-        android:horizontalSpacing="0dp"
-        android:stretchMode="columnWidth"
-        android:columnWidth="62dp"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="45dp"
+        android:orientation="horizontal"
+        android:background="#91b1c0">
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:background="@color/white">
+                <ImageView
+                    android:layout_width="105dp"
+                    android:layout_height="110dp"
+                    android:background="@drawable/explorer_vista_middle_design"/>
+        </LinearLayout>
+        <GridView
+            android:id="@+id/folder_icons_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:numColumns="5"
+            android:layout_marginStart="1dp"
+            android:verticalSpacing="0dp"
+            android:horizontalSpacing="0dp"
+            android:background="@color/white"
+            android:stretchMode="columnWidth"
+            android:columnWidth="62dp"
+            android:paddingEnd="20dp"
+            android:scrollbars="vertical"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarTrackVertical="@drawable/scrollbar_track_vista"
+            android:scrollbarThumbVertical="@drawable/scrollbar_thumb_vista"
+            android:scrollbarSize="12dp"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:fadeScrollbars="false" />
+    </LinearLayout>
 
-        android:scrollbars="vertical" />
 
 
 

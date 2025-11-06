@@ -8,7 +8,7 @@
     </item>
 
     <!-- Top arrow button -->
-    <item android:top="0dp" android:height="16dp" android:width="16dp">
+    <item android:top="0dp" android:height="12dp" android:width="12dp">
         <layer-list>
             <!-- Button background with win98 border -->
             <item>
@@ -17,28 +17,28 @@
                 </shape>
             </item>
             <!-- White bottom and right borders -->
-            <item android:bottom="2dp" android:right="2dp">
+            <item android:bottom="1.5dp" android:right="1.5dp">
                 <shape android:shape="rectangle">
-                    <stroke android:width="2dp" android:color="#FFFFFF" />
+                    <stroke android:width="1.5dp" android:color="#FFFFFF" />
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Black top and left borders -->
-            <item android:top="2dp" android:left="2dp">
+            <item android:top="1.5dp" android:left="1.5dp">
                 <shape android:shape="rectangle">
-                    <stroke android:width="2dp" android:color="#080808" />
+                    <stroke android:width="1.5dp" android:color="#080808" />
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Inner button area -->
-            <item android:top="2dp" android:left="2dp" android:bottom="2dp" android:right="2dp">
+            <item android:top="1.5dp" android:left="1.5dp" android:bottom="1.5dp" android:right="1.5dp">
                 <shape android:shape="rectangle">
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Up arrow icon -->
-            <item android:gravity="center" android:width="6dp" android:height="4dp">
-                <vector android:width="6dp" android:height="4dp" android:viewportWidth="6" android:viewportHeight="4">
+            <item android:gravity="center" android:width="4.5dp" android:height="3dp">
+                <vector android:width="4.5dp" android:height="3dp" android:viewportWidth="6" android:viewportHeight="4">
                     <path android:fillColor="#000000" android:pathData="M3,0 L0,4 L6,4 Z" />
                 </vector>
             </item>
@@ -46,7 +46,7 @@
     </item>
 
     <!-- Bottom arrow button -->
-    <item android:bottom="0dp" android:height="16dp" android:gravity="bottom">
+    <item android:bottom="0dp" android:height="12dp" android:gravity="bottom">
         <layer-list>
             <!-- Button background with win98 border -->
             <item>
@@ -55,28 +55,28 @@
                 </shape>
             </item>
             <!-- White bottom and right borders -->
-            <item android:bottom="2dp" android:right="2dp">
+            <item android:bottom="1.5dp" android:right="1.5dp">
                 <shape android:shape="rectangle">
-                    <stroke android:width="2dp" android:color="#FFFFFF" />
+                    <stroke android:width="1.5dp" android:color="#FFFFFF" />
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Black top and left borders -->
-            <item android:top="2dp" android:left="2dp">
+            <item android:top="1.5dp" android:left="1.5dp">
                 <shape android:shape="rectangle">
-                    <stroke android:width="2dp" android:color="#080808" />
+                    <stroke android:width="1.5dp" android:color="#080808" />
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Inner button area -->
-            <item android:top="2dp" android:left="2dp" android:bottom="2dp" android:right="2dp">
+            <item android:top="1.5dp" android:left="1.5dp" android:bottom="1.5dp" android:right="1.5dp">
                 <shape android:shape="rectangle">
                     <solid android:color="#d3cec7" />
                 </shape>
             </item>
             <!-- Down arrow icon -->
-            <item android:gravity="center" android:width="6dp" android:height="4dp">
-                <vector android:width="6dp" android:height="4dp" android:viewportWidth="6" android:viewportHeight="4">
+            <item android:gravity="center" android:width="4.5dp" android:height="3dp">
+                <vector android:width="4.5dp" android:height="3dp" android:viewportWidth="6" android:viewportHeight="4">
                     <path android:fillColor="#000000" android:pathData="M0,0 L6,0 L3,4 Z" />
                 </vector>
             </item>

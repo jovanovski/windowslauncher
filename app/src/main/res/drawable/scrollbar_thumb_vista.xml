@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Constrain entire thumb to 16dp width -->
-    <item android:width="16dp">
+    <!-- Constrain entire thumb to 12dp width -->
+    <item android:width="12dp">
         <layer-list>
             <!-- Background gradient -->
             <item>

@@ -1,12 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="358dp"
-    android:layout_height="244dp">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?windowBackgroundColor">
 
-    <ImageView
-        android:layout_width="358dp"
-        android:layout_height="244dp"
-        android:src="@drawable/explorer_98"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="200dp"
+            android:layout_height="43dp"
+            android:background="@drawable/explorer_98_top_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="43dp"
+            android:layout_weight="1"
+            android:background="@drawable/explorer_98_top_middle"/>
+        <ImageView
+            android:layout_width="58dp"
+            android:layout_height="43dp"
+            android:background="@drawable/explorer_98_top_right"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#808080"
+        android:layout_marginTop="43dp"
+        android:layout_marginBottom="20dp"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/white"
+
+            android:layout_marginStart="1dp"
+            android:layout_marginEnd="1dp"
+            android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="110dp"
+            android:layout_height="140dp"
+            android:background="@drawable/explorer_98_middle_design"/>
+
+        <GridView
+            android:id="@+id/folder_icons_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:numColumns="4"
+            android:verticalSpacing="0dp"
+            android:horizontalSpacing="0dp"
+            android:paddingEnd="20dp"
+            android:scrollbars="vertical"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
+            android:scrollbarThumbVertical="@drawable/scrollbar_thumb_98"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:fadeScrollbars="false"/>
+        </LinearLayout>
+    </LinearLayout>
+
 
     <TextView
         android:id="@+id/folder_name_small"
@@ -28,31 +86,12 @@
         android:text="Folder Name"
         android:lines="1"
         android:fontFamily="@font/micross_block_bold"
-        android:layout_marginTop="79dp"
+        android:layout_marginTop="83dp"
         android:textColor="@color/black"
         android:textSize="20sp"
         android:layout_marginStart="10dp"
         />
 
-    <GridView
-        android:id="@+id/folder_icons_grid"
-        android:layout_width="240dp"
-        android:layout_height="178dp"
-        android:layout_marginStart="114dp"
-        android:layout_marginTop="44dp"
-        android:numColumns="4"
-        android:verticalSpacing="0dp"
-        android:horizontalSpacing="0dp"
-        android:paddingEnd="20dp"
-        android:scrollbars="vertical"
-        android:scrollbarStyle="outsideOverlay"
-        android:scrollbarAlwaysDrawVerticalTrack="true"
-        android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
-        android:scrollbarThumbVertical="@drawable/scrollbar_thumb_98"
-        android:scrollbarSize="16dp"
-        android:scrollbarFadeDuration="0"
-        android:scrollbarDefaultDelayBeforeFade="0"
-        android:fadeScrollbars="false"/>
 
     <ImageView
         android:id="@+id/folder_icon_small"
@@ -66,7 +105,7 @@
         android:id="@+id/folder_icon_large"
         android:layout_width="24dp"
         android:layout_height="24dp"
-        android:layout_marginTop="50dp"
+        android:layout_marginTop="52dp"
         android:layout_marginStart="10dp"
         />
 
@@ -82,4 +121,25 @@
         android:adjustViewBounds="true" />
 
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="10dp"
+            android:layout_height="22dp"
+            android:background="@drawable/explorer_98_bottom_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_weight="1"
+            android:background="@drawable/explorer_98_bottom_middle"/>
+        <ImageView
+            android:layout_width="220dp"
+            android:layout_height="22dp"
+            android:background="@drawable/explorer_98_bottom_right"/>
+
+    </LinearLayout>
 </RelativeLayout>
