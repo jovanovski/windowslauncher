@@ -58,21 +58,28 @@
 </RelativeLayout>
 
     <!-- Start Menu Container (content will be dynamically loaded based on theme) -->
-    <RelativeLayout
-        android:id="@+id/start_menu"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/start_menu_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_marginLeft="5dp"
-        android:layout_marginRight="12dp"
-        android:layout_marginBottom="70dp"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:gravity="bottom"
-        android:elevation="150dp">
+        android:layout_marginBottom="70dp">
 
-
-    </RelativeLayout>
+        <RelativeLayout
+            android:id="@+id/start_menu"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:layout_marginEnd="12dp"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:gravity="bottom"
+            android:elevation="150dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintWidth_max="400dp"
+            />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- Context Menu -->
     <rocks.gorjan.gokixp.ContextMenuView

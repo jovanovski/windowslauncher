@@ -56,6 +56,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:background="@color/white"
         android:orientation="horizontal">
 
         <!-- Commands List (40%) -->
@@ -63,10 +64,98 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:layout_weight="0.4"
+            android:layout_weight="0.5"
+            >
+            <!-- Command List-->
+            <LinearLayout
+                android:id="@+id/command_list_wrapper"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
 
-            android:background="#d3e5fb">
+                android:visibility="gone"
+                android:layout_weight="1">
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/commands_recycler_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"/>
+            </LinearLayout>
 
+            <!-- Apps List -->
+            <LinearLayout
+                android:id="@+id/app_list_wrapper"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/apps_recycler_view"
+                        android:layout_alignParentBottom="true"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"/>
+                </RelativeLayout>
+
+            </LinearLayout>
+            <!-- All Programs -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:src="@drawable/start_menu_divider_xp_white"
+                    android:scaleType="fitXY"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    />
+
+                <LinearLayout
+                    android:id="@+id/all_programs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center|end"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingTop="5dp"
+                    android:paddingEnd="18dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingBottom="6dp">
+
+                    <TextView
+                        android:id="@+id/all_programs_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="?attr/primaryFontFamily"
+                        android:maxLines="1"
+                        android:textFontWeight="1000"
+                        android:text="All Programs"
+                        android:textColor="@color/context_menu_text_selector"
+                        android:textSize="13sp" />
+
+                    <ImageView
+                        android:id="@+id/all_programs_arrow"
+                        android:layout_width="25dp"
+                        android:layout_height="25dp"
+                        android:layout_marginStart="5dp"
+                        android:src="@drawable/programs" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <!-- Right Panel (60%) - Apps List with Search Box -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.5"
+            android:background="#d3e5fb"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/welcome_item"
@@ -135,6 +224,16 @@
 
             </LinearLayout>
 
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:src="@drawable/start_menu_divider_xp"
+                android:scaleType="fitXY"
+                android:background="#d3e5fb"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                />
+
 
             <LinearLayout
                 android:id="@+id/settings_item"
@@ -169,121 +268,44 @@
 
             </LinearLayout>
 
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="10dp"
-                android:src="@drawable/start_menu_divider_xp"
-                android:scaleType="fitXY"
-                android:background="#d3e5fb"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/commands_recycler_view"
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:background="#d3e5fb" />
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="10dp"
-                    android:src="@drawable/start_menu_divider_xp"
-                    android:scaleType="fitXY"
-                    android:background="#d3e5fb"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    />
-
-
+                android:layout_weight="1">
+                <!-- Search Box -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="#d3e5fb"
-                    android:gravity="center|end"
-                    android:orientation="horizontal"
-                    android:paddingStart="4dp"
-                    android:paddingTop="5dp"
-                    android:paddingEnd="18dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:paddingBottom="6dp">
+                    android:paddingBottom="4dp"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingTop="4dp"
+                    android:layout_alignParentBottom="true"
+                    >
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
+                    <EditText
+                        android:id="@+id/search_box"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/search_box_background"
+                        android:hint="Run ..."
+                        android:textColor="#000000"
+                        android:textColorHint="#444444"
+                        android:textSize="14sp"
+                        android:textStyle="normal"
+                        android:paddingLeft="8dp"
+                        android:paddingRight="8dp"
+                        android:inputType="text"
+                        android:imeOptions="actionSearch"
+                        android:drawableLeft="@drawable/ic_run_scaled"
+                        android:drawableStart="@drawable/ic_run_scaled"
+                        android:drawablePadding="4dp"
                         android:fontFamily="?attr/primaryFontFamily"
-                        android:maxLines="1"
-                        android:textFontWeight="1000"
-                        android:text="All Programs"
-                        android:textColor="@color/context_menu_text_selector"
-                        android:textSize="13sp" />
-
-                    <ImageView
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        android:layout_marginStart="5dp"
-                        android:src="@drawable/programs" />
-
+                        style="@android:style/Widget.EditText" />
                 </LinearLayout>
-            </LinearLayout>
+            </RelativeLayout>
         </LinearLayout>
-        <!-- Right Panel (60%) - Apps List with Search Box -->
-        <RelativeLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.6"
-            android:background="@color/white">
-
-            <!-- Apps List -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/apps_recycler_view"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
-                android:layout_marginBottom="50dp"
-
-                android:layout_weight="1" />
-
-            <!-- Search Box -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
-
-                android:paddingBottom="4dp"
-                android:paddingLeft="4dp"
-                android:paddingRight="4dp"
-                android:paddingTop="4dp">
-
-                <EditText
-                    android:id="@+id/search_box"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:background="@drawable/search_box_background"
-                    android:hint="Run ..."
-                    android:textColor="#000000"
-                    android:textColorHint="#444444"
-                    android:textSize="14sp"
-                    android:textStyle="normal"
-                    android:paddingLeft="8dp"
-                    android:paddingRight="8dp"
-                    android:inputType="text"
-                    android:imeOptions="actionSearch"
-                    android:drawableLeft="@drawable/ic_run_scaled"
-                    android:drawableStart="@drawable/ic_run_scaled"
-                    android:drawablePadding="4dp"
-                    android:fontFamily="?attr/primaryFontFamily"
-                    style="@android:style/Widget.EditText" />
-            </LinearLayout>
-
-        </RelativeLayout>
     </LinearLayout>
     <!-- Start Menu Footer -->
     <RelativeLayout

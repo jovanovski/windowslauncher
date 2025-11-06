@@ -72,6 +72,7 @@ import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.constraintlayout.widget.ConstraintLayout
 import rocks.gorjan.gokixp.agent.Agent
 import rocks.gorjan.gokixp.agent.AgentView
 import rocks.gorjan.gokixp.agent.TTSService
@@ -149,7 +150,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val APP_CHECK_INTERVAL = 30000L // 30 seconds
     private var isContextMenuVisible = false
     private var isProgramsMenuExpanded = false
-    private var isVistaShowingApps = false // Track Vista start menu state
+    private var isStartMenuShowingApps = false // Track Vista start menu state
     private var lastAppliedTheme: String? = null
     private var selectedIcon: DesktopIconView? = null
     private val desktopIcons = mutableListOf<DesktopIcon>()
@@ -1360,35 +1361,38 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 checkForUpdates(true)
             }
 
-            // Setup Vista-specific All Programs toggle
-            if (selectedTheme is AppTheme.WindowsVista) {
-                val allProgramsText = findViewById<TextView>(R.id.all_programs)
+            // Setup XP/Vista-specific All Programs toggle
+            if (selectedTheme !is AppTheme.WindowsClassic) {
+                val allProgramsWrapper = findViewById<LinearLayout>(R.id.all_programs)
+                val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
+                val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
                 val commandListWrapper = findViewById<LinearLayout>(R.id.command_list_wrapper)
-                val vistaArrow = findViewById<ImageView>(R.id.start_menu_vista_arrow)
+                val allProgramsArrow = findViewById<ImageView>(R.id.all_programs_arrow)
 
                 // Helper function to switch views
                 fun switchToApps() {
-                    if (!isVistaShowingApps) {
-                        isVistaShowingApps = true
-                        recyclerView.visibility = View.VISIBLE
+                    if (!isStartMenuShowingApps) {
+                        isStartMenuShowingApps = true
+                        appListWrapper.visibility = View.VISIBLE
                         commandListWrapper?.visibility = View.GONE
-                        allProgramsText.text = "Back to Pinned"
-                        vistaArrow?.setImageResource(R.drawable.start_menu_vista_arrow_left)
+                        allProgramsText?.text = "Back to Pinned"
+                        allProgramsArrow?.rotation = 180f
                     }
                 }
 
                 fun switchToCommands() {
-                    if (isVistaShowingApps) {
-                        isVistaShowingApps = false
-                        recyclerView.visibility = View.GONE
+                    if (isStartMenuShowingApps) {
+                        isStartMenuShowingApps = false
+                        appListWrapper.visibility = View.GONE
                         commandListWrapper?.visibility = View.VISIBLE
-                        allProgramsText.text = "All Programs"
-                        vistaArrow?.setImageResource(R.drawable.start_menu_vista_arrow_right)
+                        allProgramsText?.text = "All Programs"
+                        allProgramsArrow?.rotation = 0f
+                        searchBoxView.setText("")
                     }
                 }
 
-                allProgramsText?.setOnClickListener {
-                    if (isVistaShowingApps) {
+                allProgramsWrapper?.setOnClickListener {
+                    if (isStartMenuShowingApps) {
                         switchToCommands()
                     } else {
                         switchToApps()
@@ -1397,10 +1401,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
                 // Detect backspace on empty search box
                 searchBoxView.setOnKeyListener { _, keyCode, event ->
-                    if (event.action == android.view.KeyEvent.ACTION_DOWN &&
-                        keyCode == android.view.KeyEvent.KEYCODE_DEL &&
+                    if (event.action == KeyEvent.ACTION_DOWN &&
+                        keyCode == KeyEvent.KEYCODE_DEL &&
                         searchBoxView.text.isEmpty() &&
-                        isVistaShowingApps) {
+                        isStartMenuShowingApps) {
                         switchToCommands()
                         true
                     } else {
@@ -2145,34 +2149,33 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun adjustStartMenuForKeyboard() {
         if (!::startMenu.isInitialized) return
-        
-        val layoutParams = startMenu.layoutParams as RelativeLayout.LayoutParams
-        
+
+        // Get the ConstraintLayout container by ID
+        val startMenuContainer = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.start_menu_container) ?: return
+        val layoutParams = startMenuContainer.layoutParams as? RelativeLayout.LayoutParams ?: return
+
+        // Save original layout params the first time (they have the 70dp bottom margin from XML)
+        if (originalStartMenuLayoutParams == null) {
+            originalStartMenuLayoutParams = RelativeLayout.LayoutParams(layoutParams)
+        }
+
         if (isKeyboardOpen) {
-            // Save original layout params if not already saved
-            if (originalStartMenuLayoutParams == null) {
-                originalStartMenuLayoutParams = RelativeLayout.LayoutParams(layoutParams)
-            }
-            
             // Calculate available space above keyboard
             val rootView = findViewById<View>(android.R.id.content)
             val rect = android.graphics.Rect()
             rootView.getWindowVisibleDisplayFrame(rect)
-            
-            // Get status bar height
-            val statusBarHeight = rect.top
-            
-            // Calculate new height: from status bar to top of keyboard
-            val availableHeight = rect.bottom - statusBarHeight
-            
-            // Adjust start menu to fill available space
+
+            // Calculate available height above keyboard (rect.bottom is where keyboard starts)
+            val availableHeight = rect.bottom
+
+            // Adjust container to fill available space
             layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
             layoutParams.height = availableHeight
-            layoutParams.topMargin = statusBarHeight
+            layoutParams.topMargin = 0
             layoutParams.bottomMargin = 0
-            
+
         } else {
-            // Restore original layout params
+            // Restore original layout params (including the 70dp bottom margin)
             originalStartMenuLayoutParams?.let { original ->
                 layoutParams.height = original.height
                 layoutParams.topMargin = original.topMargin
@@ -2180,8 +2183,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 layoutParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
             }
         }
-        
-        startMenu.layoutParams = layoutParams
+
+        startMenuContainer.layoutParams = layoutParams
     }
     
     private fun loadInstalledApps() {
@@ -2309,7 +2312,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Handle search key press to open search intent
         searchBox.setOnKeyListener { _, keyCode, event ->
-            if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == android.view.KeyEvent.ACTION_DOWN) {
+            if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
                 val query = searchBox.text.toString().trim()
                 if (query.isNotEmpty()) {
                     openSearchWithQuery(query)
@@ -2404,18 +2407,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             commandsAdapter?.setProgramsExpanded(false)
 
             // For Windows Vista theme, reset to show command list instead of app list
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
-                val appsRecyclerView = findViewById<RecyclerView>(R.id.apps_recycler_view)
+            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista || themeManager.getSelectedTheme() is AppTheme.WindowsXP) {
+                val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
                 val commandListWrapper = findViewById<LinearLayout>(R.id.command_list_wrapper)
-                val allProgramsText = findViewById<TextView>(R.id.all_programs)
-                val vistaArrow = findViewById<ImageView>(R.id.start_menu_vista_arrow)
+                val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
+                val allProgramsArrow = findViewById<ImageView>(R.id.all_programs_arrow)
 
                 // Reset state and UI
-                isVistaShowingApps = false
-                appsRecyclerView?.visibility = View.GONE
+                isStartMenuShowingApps = false
+                appListWrapper?.visibility = View.GONE
                 commandListWrapper?.visibility = View.VISIBLE
                 allProgramsText?.text = "All Programs"
-                vistaArrow?.setImageResource(R.drawable.start_menu_vista_arrow_right)
+                allProgramsArrow.rotation = 0f
             }
 
             // Adjust for keyboard if needed (async to avoid blocking)
@@ -2468,9 +2471,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Reset keyboard state flag and restore original layout
             isKeyboardOpen = false
             originalStartMenuLayoutParams?.let { originalParams ->
-                startMenu.layoutParams = originalParams
-                originalStartMenuLayoutParams = null
+                val startMenuContainer = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.start_menu_container)
+                startMenuContainer?.layoutParams = originalParams
             }
+            // Reset saved params so they get re-saved fresh next time
+            originalStartMenuLayoutParams = null
 
             // MEMORY OPTIMIZATION: Clear cached app list to release icon memory when menu closes
             // Icons will be reloaded (from cache) next time menu opens
@@ -2485,24 +2490,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // For Windows Classic theme, make app list visible when opened via swipe up
             // For Vista, keep showing command list until user starts typing
-            if (themeManager.getSelectedTheme() !is AppTheme.WindowsVista) {
+            if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
                 val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
                 appList98?.visibility = View.VISIBLE
                 isProgramsMenuExpanded = true
                 commandsAdapter?.setProgramsExpanded(true)
             } else {
-                // For Vista, ensure we're showing command list
-                val appsRecyclerView = findViewById<RecyclerView>(R.id.apps_recycler_view)
+                val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
                 val commandListWrapper = findViewById<LinearLayout>(R.id.command_list_wrapper)
-                val allProgramsText = findViewById<TextView>(R.id.all_programs)
-                val vistaArrow = findViewById<ImageView>(R.id.start_menu_vista_arrow)
+                val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
+                val allProgramsArrow = findViewById<ImageView>(R.id.all_programs_arrow)
 
                 // Reset state and UI
-                isVistaShowingApps = false
-                appsRecyclerView?.visibility = View.GONE
+                isStartMenuShowingApps = false
+                appListWrapper?.visibility = View.GONE
                 commandListWrapper?.visibility = View.VISIBLE
                 allProgramsText?.text = "All Programs"
-                vistaArrow?.setImageResource(R.drawable.start_menu_vista_arrow_right)
+                allProgramsArrow.rotation = 0f
+
             }
 
             // Adjust for keyboard if needed
@@ -9737,7 +9742,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val taskbarContainer = findViewById<View>(R.id.taskbar_container)
         val floatingWindowsContainer = findViewById<View>(R.id.floating_windows_container)
         val desktopIconsContainer = findViewById<View>(R.id.desktop_icons_container)
-        val startMenu = findViewById<View>(R.id.start_menu)
+        val startMenuContainer = findViewById<View>(R.id.start_menu_container)
         val notificationBubble = findViewById<View>(R.id.notification_bubble)
 
         // Calculate new dimensions
@@ -9784,10 +9789,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         desktopIconsParams.bottomMargin = desktopIconsMarginBottomPx
         desktopIconsContainer.layoutParams = desktopIconsParams
 
-        // Apply to start menu
-        val startMenuParams = startMenu.layoutParams as RelativeLayout.LayoutParams
+        // Apply to start menu container
+        val startMenuParams = startMenuContainer.layoutParams as RelativeLayout.LayoutParams
         startMenuParams.bottomMargin = startMenuMarginBottomPx
-        startMenu.layoutParams = startMenuParams
+        startMenuContainer.layoutParams = startMenuParams
+
+        // Reset saved layout params so they get re-saved with the new margin
+        originalStartMenuLayoutParams = null
 
         // Apply to notification bubble
         val notificationBubbleParams = notificationBubble.layoutParams as RelativeLayout.LayoutParams

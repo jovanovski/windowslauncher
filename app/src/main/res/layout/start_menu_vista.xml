@@ -113,23 +113,29 @@ android:orientation="vertical">
 
                 </LinearLayout>
 
-                <!-- Apps List -->
-                <androidx.recyclerview.widget.RecyclerView
+                <LinearLayout
+                    android:id="@+id/app_list_wrapper"
                     android:visibility="gone"
-                    android:id="@+id/apps_recycler_view"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentBottom="true" />
+                    android:layout_alignParentBottom="true">
+                    <!-- Apps List -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/apps_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
 
 
             </RelativeLayout>
 
-            <RelativeLayout
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/all_programs"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
                 <ImageView
-                    android:id="@+id/start_menu_vista_arrow"
+                    android:id="@+id/all_programs_arrow"
                     android:layout_width="10dp"
                     android:layout_height="14dp"
                     android:layout_marginLeft="18dp"
@@ -138,21 +144,20 @@ android:orientation="vertical">
                     />
 
                 <TextView
-                    android:id="@+id/all_programs"
-                    android:layout_width="225dp"
+                    android:id="@+id/all_programs_text"
+                    android:layout_width="match_parent"
                     android:layout_height="30dp"
                     android:ellipsize="end"
                     android:fontFamily="@font/segoeui_font_family"
                     android:maxLines="1"
-                    android:paddingLeft="25dp"
+                    android:paddingLeft="8dp"
                     android:text="All Programs"
                     android:layout_marginTop="4dp"
-                    android:layout_marginLeft="10dp"
                     android:gravity="center_vertical"
                     android:textColor="@color/context_menu_text_selector"
                     android:textSize="13sp" />
 
-            </RelativeLayout>
+            </LinearLayout>
 
             <EditText
                 android:id="@+id/search_box"
