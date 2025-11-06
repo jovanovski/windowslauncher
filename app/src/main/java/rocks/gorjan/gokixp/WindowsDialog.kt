@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
+import android.util.Log
 import android.view.*
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -76,6 +77,18 @@ class WindowsDialog @JvmOverloads constructor(
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var isDragging = false
+
+    // Resizing from bottom-right corner
+    private var resizeDragView: ImageView? = null
+    private var isResizing = false
+    private var initialWidth = 0
+    private var initialHeight = 0
+    private var resizeInitialTouchX = 0f
+    private var resizeInitialTouchY = 0f
+
+    // Minimum window dimensions in dp (can be set per-app via AppInfo)
+    private var minWindowWidthDp: Int = 300
+    private var minWindowHeightDp: Int = 250
 
     // Current window position (for shake animation)
     private var currentWindowX = 0f
@@ -242,6 +255,7 @@ class WindowsDialog @JvmOverloads constructor(
                 else -> false
             }
         }
+
     }
 
     fun setupFloatingWindow(windowManager: FloatingWindowManager) {
@@ -339,6 +353,8 @@ class WindowsDialog @JvmOverloads constructor(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.MATCH_PARENT
         ))
+        // Setup resize functionality after content is added
+        setupResizeDragView()
     }
 
     fun setWindowSize(widthDp: Int? = null, heightDp: Int? = null) {
@@ -388,11 +404,103 @@ class WindowsDialog @JvmOverloads constructor(
     fun setContentView(layoutResId: Int) {
         contentArea.removeAllViews()
         LayoutInflater.from(context).inflate(layoutResId, contentArea, true)
+        // Setup resize functionality after content is added
+        setupResizeDragView()
     }
 
     fun setOnCloseListener(listener: () -> Unit) { onCloseListener = listener }
     fun setOnMinimizeListener(listener: () -> Unit) { onMinimizeListener = listener }
     fun setOnMaximizeListener(listener: () -> Unit) { onMaximizeListener = listener }
+
+    /**
+     * Set minimum window dimensions for resizing (in dp)
+     * Call this before setContentView() or call setupResizeDragView() after to apply changes
+     */
+    fun setMinimumWindowSize(widthDp: Int, heightDp: Int) {
+        minWindowWidthDp = widthDp
+        minWindowHeightDp = heightDp
+    }
+
+    /**
+     * Set minimum window dimensions from AppInfo
+     * Call this before setContentView() or call setupResizeDragView() after to apply changes
+     */
+    fun setMinimumWindowSize(appInfo: AppInfo) {
+        minWindowWidthDp = appInfo.minWindowWidthDp
+        minWindowHeightDp = appInfo.minWindowHeightDp
+    }
+
+    /**
+     * Sets up the resize drag view functionality if it exists in the content
+     */
+    private fun setupResizeDragView() {
+        // Find the resize drag view in the content area
+        resizeDragView = contentArea.findViewById(R.id.resize_drag_view)
+
+        // Calculate minimum size in pixels using configurable dp values
+        val density = resources.displayMetrics.density
+        val minSizeHeightPx = (minWindowHeightDp * density).toInt()
+        val minSizeWidthPx = (minWindowWidthDp * density).toInt()
+
+        resizeDragView?.setOnTouchListener { v, event ->
+            // Don't allow resizing when maximized
+            if (isMaximized) {
+                return@setOnTouchListener true
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    isResizing = false
+                    // Store initial dimensions
+                    initialWidth = windowFrame.width
+                    initialHeight = windowFrame.height
+                    resizeInitialTouchX = event.rawX
+                    resizeInitialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - resizeInitialTouchX
+                    val dy = event.rawY - resizeInitialTouchY
+
+                    if (!isResizing && (kotlin.math.abs(dx) > 10 || kotlin.math.abs(dy) > 10)) {
+                        isResizing = true
+                    }
+                    if (isResizing) {
+                        val newWidth = (initialWidth + dx).toInt().coerceAtLeast(minSizeWidthPx)
+                        val newHeight = (initialHeight + dy).toInt().coerceAtLeast(minSizeHeightPx)
+
+                        // Ensure window doesn't exceed overlay bounds
+                        val maxWidth = (overlayRoot.width - windowFrame.x).toInt()
+                        val maxHeight = (overlayRoot.height - windowFrame.y).toInt()
+
+                        val finalWidth = newWidth.coerceAtMost(maxWidth)
+                        val finalHeight = newHeight.coerceAtMost(maxHeight)
+
+                        // Update window frame size in real-time
+                        windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+                            width = finalWidth
+                            height = finalHeight
+                        }
+
+                        // Make content area expand to fill available space
+                        windowBorder?.updateLayoutParams<LayoutParams> {
+                            height = LayoutParams.MATCH_PARENT
+                        }
+                        contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+                            height = FrameLayout.LayoutParams.MATCH_PARENT
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!isResizing) v.performClick()
+                    isResizing = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
 
     /**
      * Enable or disable maximize functionality via double-tap on title bar and maximize button

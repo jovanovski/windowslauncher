@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     // System apps configuration
-    private val systemAppActions = mutableMapOf<String, () -> Unit>() // packageName -> action function
+    private val systemAppActions = mutableMapOf<String, (AppInfo?) -> Unit>() // packageName -> action function with optional AppInfo
 
     // Permission request codes
     private val CALENDAR_PERMISSION_REQUEST_CODE = 1003
@@ -1068,43 +1068,43 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun initializeSystemApps() {
         // Register Internet Explorer
-        systemAppActions["system.internet_explorer"] = {
-            showInternetExplorerDialog()
+        systemAppActions["system.internet_explorer"] = { appInfo ->
+            showInternetExplorerDialog(appInfo = appInfo)
         }
 
         // Register Registry Editor
-        systemAppActions["system.registry_editor"] = {
-            showRegistryEditorDialog()
+        systemAppActions["system.registry_editor"] = { appInfo ->
+            showRegistryEditorDialog(appInfo = appInfo)
         }
 
         // Register Dialer
-        systemAppActions["system.dialer"] = {
-            showDialerDialog()
+        systemAppActions["system.dialer"] = { appInfo ->
+            showDialerDialog(appInfo = appInfo)
         }
 
         // Register Notepad
-        systemAppActions["system.notepad"] = {
-            showNotepadDialog()
+        systemAppActions["system.notepad"] = { appInfo ->
+            showNotepadDialog(appInfo = appInfo)
         }
 
         // Register MSN Messenger
-        systemAppActions["system.msn"] = {
-            showMsnDialog()
+        systemAppActions["system.msn"] = { appInfo ->
+            showMsnDialog(appInfo = appInfo)
         }
 
         // Register Winamp
-        systemAppActions["system.winamp"] = {
-            showWinampDialog()
+        systemAppActions["system.winamp"] = { appInfo ->
+            showWinampDialog(appInfo = appInfo)
         }
 
         // Register Minesweeper
-        systemAppActions["system.minesweeper"] = {
-            showMinesweeperDialog()
+        systemAppActions["system.minesweeper"] = { appInfo ->
+            showMinesweeperDialog(appInfo = appInfo)
         }
 
         // Register Solitare
-        systemAppActions["system.solitare"] = {
-            showSolitareDialog()
+        systemAppActions["system.solitare"] = { appInfo ->
+            showSolitareDialog(appInfo = appInfo)
         }
 
         Log.d("MainActivity", "System apps initialized: ${systemAppActions.size} apps")
@@ -1119,7 +1119,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             systemApps.add(AppInfo(
                 name = "Internet Explorer",
                 packageName = "system.internet_explorer",
-                icon = createSquareDrawable(ieDrawable)
+                icon = createSquareDrawable(ieDrawable),
+                minWindowWidthDp = 360
             ))
         }
 
@@ -1197,6 +1198,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     fun launchSystemApp(packageName: String) {
+        // Find the AppInfo for this system app
+        val systemApps = getSystemAppsList()
+        val appInfo = systemApps.find { it.packageName == packageName }
+
         // Check if this app is already open and bring it to front if so
         if (floatingWindowManager.findAndFocusWindow(packageName)) {
             Log.d("MainActivity", "Brought existing window to front: $packageName")
@@ -1205,7 +1210,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val action = systemAppActions[packageName]
         if (action != null) {
-            action.invoke()
+            action.invoke(appInfo)
             Log.d("MainActivity", "Launched system app: $packageName")
         } else {
             Log.w("MainActivity", "No action registered for system app: $packageName")
@@ -5183,22 +5188,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
-    private fun showInternetExplorerDialog(initialUrl: String? = null) {
+    private fun showInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
         // Defer the actual loading to allow cursor to render
         Handler(Looper.getMainLooper()).post {
-            createAndShowInternetExplorerDialog(initialUrl)
+            createAndShowInternetExplorerDialog(initialUrl, appInfo)
         }
     }
 
-    private fun createAndShowInternetExplorerDialog(initialUrl: String? = null) {
+    private fun createAndShowInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.internet_explorer"  // Set identifier for tracking
         windowsDialog.setTitle("Internet Explorer")
         windowsDialog.setTaskbarIcon(themeManager.getIEIcon())
+
+        // Set minimum window size from AppInfo if available
+        if (appInfo != null) {
+            windowsDialog.setMinimumWindowSize(appInfo)
+        }
 
         // Inflate the internet explorer content
         val contentView = layoutInflater.inflate(themeManager.getIELayout(), null)
@@ -5335,7 +5345,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             .show()
     }
 
-    private fun showRegistryEditorDialog() {
+    private fun showRegistryEditorDialog(appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -5614,7 +5624,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun showDialerDialog() {
+    private fun showDialerDialog(appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -5689,7 +5699,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
-    private fun showNotepadDialog() {
+    private fun showNotepadDialog(appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -5851,7 +5861,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         dialog.show()
     }
 
-    private fun showMsnDialog() {
+    private fun showMsnDialog(appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -6182,7 +6192,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Winamp state for permission handling
     private var winampAppInstance: rocks.gorjan.gokixp.apps.winamp.WinampApp? = null
 
-    private fun showMinesweeperDialog() {
+    private fun showMinesweeperDialog(appInfo: AppInfo? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.minesweeper"  // Set identifier for tracking
@@ -6221,7 +6231,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
-    private fun showSolitareDialog() {
+    private fun showSolitareDialog(appInfo: AppInfo? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.solitare"  // Set identifier for tracking
@@ -6256,7 +6266,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
-    private fun showWinampDialog() {
+    private fun showWinampDialog(appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
 
