@@ -69,6 +69,7 @@ import android.text.style.ClickableSpan
 import java.io.InputStream
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.content.res.AppCompatResources
 import rocks.gorjan.gokixp.agent.Agent
@@ -7171,7 +7172,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         } else {
             // Accessibility service not enabled, request it
-            showNotification("Accessibility Required", "Please enable Windows Launcher accessibility service to use screen lock")
+            Toast.makeText(this,"Enable the 'Windows Launcher' accessibility service to use screen lock", Toast.LENGTH_LONG).show()
             requestAccessibilityPermission()
             return
         }

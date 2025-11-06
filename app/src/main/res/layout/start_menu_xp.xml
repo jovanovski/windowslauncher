@@ -135,6 +135,50 @@
 
             </LinearLayout>
 
+
+            <LinearLayout
+                android:id="@+id/settings_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center|start"
+                android:orientation="horizontal"
+                android:paddingLeft="8dp"
+                android:paddingRight="12dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/start_menu_item_background"
+                >
+
+                <ImageView
+                    android:layout_width="25dp"
+                    android:layout_height="25dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/settings_xp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/tahoma"
+                    android:maxLines="1"
+                    android:text="Control Panel"
+                    android:textColor="@color/context_menu_text_selector"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:src="@drawable/start_menu_divider_xp"
+                android:scaleType="fitXY"
+                android:background="#d3e5fb"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/commands_recycler_view"
                 android:layout_width="match_parent"
