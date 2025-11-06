@@ -6358,14 +6358,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         if (shownForVersion != currentVersion) {
             // Welcome not shown for this version yet, show it
-            showWelcomeToWindows()
+            showWelcomeToWindows(showChangeLog = true)
 
             // Save that we've shown it for this version
             prefs.edit { putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion) }
         }
     }
 
-    private fun showWelcomeToWindows() {
+    private fun showWelcomeToWindows(showChangeLog: Boolean = false) {
         // Get theme preferences
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
@@ -6616,6 +6616,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set context menu reference and show as floating window
         windowsDialog.setContextMenuView(contextMenu)
         floatingWindowManager.showWindow(windowsDialog)
+
+        // Trigger change log if requested
+        if (showChangeLog) {
+            changeLogButton?.performClick()
+        }
     }
 
     private fun loadWallpapers(): List<WallpaperItem> {
