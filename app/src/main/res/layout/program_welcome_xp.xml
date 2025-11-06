@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="400dp"
-    android:layout_height="300dp">
+    android:layout_width="350dp"
+    android:layout_height="263dp">
 
     <ImageView
         android:id="@+id/background"
-        android:layout_width="400dp"
-        android:layout_height="300dp"
-        android:src="@drawable/welcome_xp_welcome"/>
-
+        android:layout_width="350dp"
+        android:layout_height="263dp"
+        android:src="@drawable/welcome_xp_welcome" />
 
     <TextView
         android:id="@+id/version"
@@ -16,62 +15,59 @@
         android:layout_height="wrap_content"
         android:text="Version: 1.1"
         android:fontFamily="@font/tahoma"
-        android:textSize="10sp"
+        android:textSize="9sp"
         android:textColor="@color/black"
-        android:layout_marginTop="30dp"
-        android:layout_marginEnd="10dp"
-        android:layout_alignParentEnd="true"
-        />
+        android:layout_marginTop="26dp"
+        android:layout_marginEnd="9dp"
+        android:layout_alignParentEnd="true" />
 
     <ScrollView
-        android:layout_width="250dp"
-        android:layout_height="200dp"
-        android:layout_marginTop="80dp"
-        android:layout_marginStart="10dp"
-
-        android:paddingEnd="20dp"
+        android:layout_width="219dp"
+        android:layout_height="175dp"
+        android:layout_marginTop="70dp"
+        android:layout_marginStart="9dp"
+        android:paddingEnd="18dp"
         android:clipToPadding="false"
         android:scrollbars="vertical"
         android:scrollbarStyle="outsideOverlay"
         android:scrollbarAlwaysDrawVerticalTrack="true"
         android:scrollbarTrackVertical="@drawable/scrollbar_track_xp"
         android:scrollbarThumbVertical="@drawable/scrollbar_thumb_xp"
-        android:scrollbarSize="16dp"
+        android:scrollbarSize="14dp"
         android:scrollbarFadeDuration="0"
         android:scrollbarDefaultDelayBeforeFade="0"
         android:fadeScrollbars="false">
-    <TextView
-        android:id="@+id/welcome_text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/tahoma"
-        android:textColor="@color/black"
-        android:textSize="10sp"
-        android:text="Test test"
-        />
-    </ScrollView>
 
+        <TextView
+            android:id="@+id/welcome_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/tahoma"
+            android:textColor="@color/black"
+            android:textSize="9sp"
+            android:text="Test test" />
+    </ScrollView>
 
     <View
         android:id="@+id/welcome_button"
-        android:layout_marginTop="5dp"
-        android:layout_marginLeft="170dp"
-        android:layout_width="75dp"
-        android:layout_height="45dp"/>
+        android:layout_marginTop="4dp"
+        android:layout_marginLeft="149dp"
+        android:layout_width="66dp"
+        android:layout_height="39dp" />
 
     <View
         android:id="@+id/change_log_button"
-        android:layout_marginTop="5dp"
-        android:layout_marginLeft="246dp"
-        android:layout_width="75dp"
-        android:layout_height="45dp"/>
+        android:layout_marginTop="4dp"
+        android:layout_marginLeft="215dp"
+        android:layout_width="66dp"
+        android:layout_height="39dp" />
 
     <View
         android:id="@+id/close_button"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="3dp"
-        android:layout_marginRight="5dp"
+        android:layout_marginBottom="0dp"
+        android:layout_marginRight="0dp"
         android:layout_width="50dp"
-        android:layout_height="25dp"/>
+        android:layout_height="22dp" />
 </RelativeLayout>

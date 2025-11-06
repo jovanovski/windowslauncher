@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="400dp"
-    android:layout_height="270dp">
+    android:layout_width="350dp"
+    android:layout_height="236dp">
 
     <ImageView
         android:id="@+id/background"
-        android:layout_width="400dp"
-        android:layout_height="270dp"
-        android:src="@drawable/welcome_95_welcome"/>
+        android:layout_width="350dp"
+        android:layout_height="236dp"
+        android:src="@drawable/welcome_95_welcome" />
 
     <TextView
         android:id="@+id/version"
@@ -15,28 +15,28 @@
         android:layout_height="wrap_content"
         android:text="Version: 1.1"
         android:fontFamily="@font/micross_block"
-        android:textSize="10sp"
+        android:textSize="9sp"
         android:textColor="@color/black"
-        android:layout_marginTop="250dp"
-        android:layout_marginStart="10dp"
-        />
+        android:layout_marginTop="219dp"
+        android:layout_marginStart="9dp" />
 
     <ScrollView
-        android:layout_width="230dp"
-        android:layout_height="145dp"
-        android:layout_marginTop="93dp"
-        android:layout_marginStart="164dp"
-        android:paddingEnd="20dp"
+        android:layout_width="201dp"
+        android:layout_height="127dp"
+        android:layout_marginTop="81dp"
+        android:layout_marginStart="144dp"
+        android:paddingEnd="18dp"
         android:clipToPadding="false"
         android:scrollbars="vertical"
         android:scrollbarStyle="outsideOverlay"
         android:scrollbarAlwaysDrawVerticalTrack="true"
         android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
         android:scrollbarThumbVertical="@drawable/win98_start_menu_border"
-        android:scrollbarSize="16dp"
+        android:scrollbarSize="14dp"
         android:scrollbarFadeDuration="0"
         android:scrollbarDefaultDelayBeforeFade="0"
         android:fadeScrollbars="false">
+
         <TextView
             android:id="@+id/welcome_text"
             android:layout_width="match_parent"
@@ -44,31 +44,29 @@
             android:fontFamily="@font/micross_block"
             android:textColor="@color/black"
             android:text="Test test"
-            android:textSize="11sp"
-            />
+            android:textSize="10sp" />
     </ScrollView>
 
     <View
         android:id="@+id/close_button"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="10dp"
-        android:layout_marginRight="5dp"
-        android:layout_width="70dp"
-        android:layout_height="30dp"/>
-
+        android:layout_marginBottom="0dp"
+        android:layout_marginRight="4dp"
+        android:layout_width="61dp"
+        android:layout_height="26dp" />
 
     <View
         android:id="@+id/welcome_button"
-        android:layout_marginTop="80dp"
+        android:layout_marginTop="70dp"
         android:layout_marginLeft="0dp"
-        android:layout_width="150dp"
-        android:layout_height="23dp"/>
+        android:layout_width="131dp"
+        android:layout_height="20dp" />
 
     <View
         android:id="@+id/change_log_button"
-        android:layout_marginTop="103dp"
+        android:layout_marginTop="90dp"
         android:layout_marginLeft="0dp"
-        android:layout_width="150dp"
-        android:layout_height="23dp"/>
+        android:layout_width="131dp"
+        android:layout_height="20dp" />
 </RelativeLayout>

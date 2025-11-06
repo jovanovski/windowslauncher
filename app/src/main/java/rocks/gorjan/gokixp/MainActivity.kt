@@ -6413,9 +6413,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set window size based on layout
         val (width, height) = when (layoutRes) {
-            R.layout.program_welcome_xp -> Pair(404, 326) // 400dp + 4dp border, 300dp + 36dp title bar
-            R.layout.program_welcome_vista -> Pair(404, 326)
-            else -> Pair(404, 292) // 400dp + 4dp border, 270dp + 36dp title bar
+            R.layout.program_welcome_xp -> Pair(354, 286)
+            R.layout.program_welcome_vista -> Pair(354, 286)
+            else -> Pair(354, 258)
         }
         windowsDialog.setWindowSize(width, height)
 
