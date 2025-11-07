@@ -250,10 +250,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             when (value) {
                                 is String -> putString(key, value)
                                 is Boolean -> putBoolean(key, value)
-                                is Int -> putInt(key, value.toInt())
-                                is Long -> putLong(key, value.toLong())
-                                is Float -> putFloat(key, value.toFloat())
-                                is Double -> putFloat(key, value.toFloat())
+                                is Double -> {
+                                    // Gson deserializes all numbers as Double
+                                    // Check if it's a whole number to store as Int, otherwise as Float
+                                    if (value == value.toLong().toDouble()) {
+                                        putInt(key, value.toInt())
+                                    } else {
+                                        putFloat(key, value.toFloat())
+                                    }
+                                }
+                                is Int -> putInt(key, value)
+                                is Long -> putInt(key, value.toInt())
+                                is Float -> putFloat(key, value)
                                 else -> Log.w(
                                     "MainActivity",
                                     "Unknown preference type for key $key: ${value?.javaClass?.name}"
@@ -416,7 +424,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             return prefs.getString(KEY_USER_NAME, "User") ?: "User"
         }
-        
+
+        // Safe getter for integer preferences that handles type mismatches from corrupted imports
+        private fun android.content.SharedPreferences.safeGetInt(key: String, defaultValue: Int): Int {
+            return try {
+                getInt(key, defaultValue)
+            } catch (e: ClassCastException) {
+                // Handle corrupted data from incorrect import
+                Log.w("MainActivity", "Corrupted int preference for key: $key, resetting to default", e)
+                edit().remove(key).apply()
+                defaultValue
+            }
+        }
+
         // Grid constants
         private const val GRID_ROWS = 8
         private const val GRID_COLUMNS = 5
@@ -562,7 +582,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         screensaverManager = ScreensaverManager(this, binding.root)
 
         // Load screensaver selection from SharedPreferences (default to 3D Pipes for backward compatibility)
-        val selectedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+        val selectedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
         screensaverManager.setSelectedScreensaver(selectedScreensaver)
 
         // Initialize Google Drive helper
@@ -4811,7 +4831,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val taskbarHeightInput = contentView.findViewById<EditText>(R.id.taskbar_height_input)
 
         // Load current offset from SharedPreferences
-        val currentOffset = prefs.getInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
+        val currentOffset = prefs.safeGetInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
         taskbarHeightInput.setText(currentOffset.toString())
 
         // Track pending offset value (don't apply immediately)
@@ -4837,7 +4857,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         screensaverSelector.adapter = screensaverAdapter
 
         // Load saved screensaver selection (default to 3D Pipes for backward compatibility)
-        val selectedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+        val selectedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
         screensaverSelector.setSelection(selectedScreensaver)
 
         // Track pending screensaver selection (don't save immediately)
@@ -5053,7 +5073,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playClickSound()
             // Restore the saved screensaver selection if it was changed during preview
             if (::screensaverManager.isInitialized) {
-                val savedScreensaver = prefs.getInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
+                val savedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
                 screensaverManager.setSelectedScreensaver(savedScreensaver)
             }
             floatingWindowManager.removeWindow(windowsDialog)
@@ -9817,7 +9837,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun loadTaskbarHeightOffset() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val offset = prefs.getInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
+        val offset = prefs.safeGetInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
         applyTaskbarHeightOffset(offset)
     }
 
