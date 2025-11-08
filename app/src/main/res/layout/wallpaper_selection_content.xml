@@ -88,6 +88,25 @@
             android:layout_marginTop="206dp"
             android:layout_marginEnd="30dp"/>
 
+        <EditText
+            android:id="@+id/preview_screensaver_timeout_time"
+            android:layout_width="18dp"
+            android:layout_height="11dp"
+            android:background="@color/white"
+            android:layout_marginTop="237dp"
+            android:layout_marginStart="245dp"
+            android:text="30"
+            android:gravity="end"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11sp"
+            android:textColor="@color/black"
+            android:maxLength="2"
+            android:inputType="number"
+            android:digits="0123456789"
+            android:padding="0dp"
+            android:includeFontPadding="false"
+            />
+
     </RelativeLayout>
 <!-- Appearance -->
     <RelativeLayout

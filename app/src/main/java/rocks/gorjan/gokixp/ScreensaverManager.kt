@@ -22,7 +22,7 @@ class ScreensaverManager(
 ) {
     private var screensaverDialog: Dialog? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val inactivityTimeout = 30000L // 30 seconds
+    private var inactivityTimeout = 30000L // Default 30 seconds (configurable)
     private var selectedScreensaver = 1 // Default to 3D Pipes
 
     // Screensaver types
@@ -159,6 +159,16 @@ class ScreensaverManager(
     }
 
     fun getSelectedScreensaver(): Int = selectedScreensaver
+
+    fun setInactivityTimeout(timeoutSeconds: Int) {
+        inactivityTimeout = timeoutSeconds * 1000L // Convert seconds to milliseconds
+        // Restart timer with new timeout if screensaver is enabled
+        if (selectedScreensaver != SCREENSAVER_NONE) {
+            resetInactivityTimer()
+        }
+    }
+
+    fun getInactivityTimeout(): Int = (inactivityTimeout / 1000L).toInt() // Return in seconds
 
     fun onDestroy() {
         stopInactivityTimer()

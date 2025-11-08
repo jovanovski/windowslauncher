@@ -398,6 +398,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SHOWN_WELCOME_FOR_VERSION = "shown_welcome_for_version"
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
         private const val KEY_SELECTED_SCREENSAVER = "selected_screensaver"
+        private const val KEY_SCREENSAVER_TIMEOUT = "screensaver_timeout"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
         private const val KEY_WINDOW_STATES = "window_states"
 
@@ -405,6 +406,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val SCREENSAVER_NONE = 0
         private const val SCREENSAVER_3D_PIPES = 1
         private const val SCREENSAVER_UNDERWATER = 2
+        private const val DEFAULT_SCREENSAVER_TIMEOUT = 30 // Default 30 seconds
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 
@@ -585,6 +587,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Load screensaver selection from SharedPreferences (default to 3D Pipes for backward compatibility)
         val selectedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
         screensaverManager.setSelectedScreensaver(selectedScreensaver)
+
+        // Load screensaver timeout from SharedPreferences (default to 30 seconds)
+        val screensaverTimeout = prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
+        screensaverManager.setInactivityTimeout(screensaverTimeout)
 
         // Initialize Google Drive helper
         googleDriveHelper = GoogleDriveHelper(this)
@@ -4924,6 +4930,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
+        // Set up Screensaver Timeout EditText
+        val screensaverTimeoutInput = contentView.findViewById<EditText>(R.id.preview_screensaver_timeout_time)
+
+        // Load saved timeout (default to 30 seconds)
+        val savedTimeout = prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
+        screensaverTimeoutInput.setText(savedTimeout.toString())
+
+        // Track pending timeout value (don't save immediately)
+        var pendingScreensaverTimeout: Int = savedTimeout
+
+        // Handle text changes
+        screensaverTimeoutInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val value = s.toString().toIntOrNull()
+                if (value != null && value in 10..60) {
+                    pendingScreensaverTimeout = value
+                } else if (s.toString().isEmpty()) {
+                    pendingScreensaverTimeout = DEFAULT_SCREENSAVER_TIMEOUT
+                }
+            }
+        })
+
         customWallpaperButton.setOnClickListener {
                 imagePickerLauncher.launch("image/*")
         }
@@ -5062,6 +5092,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
             }
 
+            // Apply pending screensaver timeout
+            prefs.edit { putInt(KEY_SCREENSAVER_TIMEOUT, pendingScreensaverTimeout) }
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.setInactivityTimeout(pendingScreensaverTimeout)
+            }
+
             currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
 
             // Apply wallpaper if changed
@@ -5118,6 +5154,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             prefs.edit { putInt(KEY_SELECTED_SCREENSAVER, pendingScreensaverSelection) }
             if (::screensaverManager.isInitialized) {
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
+            }
+
+            // Apply pending screensaver timeout
+            prefs.edit { putInt(KEY_SCREENSAVER_TIMEOUT, pendingScreensaverTimeout) }
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.setInactivityTimeout(pendingScreensaverTimeout)
             }
 
             // Apply wallpaper if changed
