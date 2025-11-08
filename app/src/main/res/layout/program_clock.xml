@@ -17,8 +17,9 @@
         android:lines="1"
         android:text="November"
         android:fontFamily="@font/micross_block"
-        android:layout_marginTop="49dp"
-        android:layout_marginStart="27dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginStart="26dp"
+        android:textColor="@color/black"
         android:textSize="11dp"/>
 
     <TextView
@@ -28,8 +29,9 @@
         android:lines="1"
         android:text="2025"
         android:fontFamily="@font/micross_block"
-        android:layout_marginTop="49dp"
+        android:layout_marginTop="48dp"
         android:layout_marginStart="102dp"
+        android:textColor="@color/black"
         android:textSize="11dp"/>
 
 
@@ -40,20 +42,91 @@
         android:lines="1"
         android:text="12:24:44"
         android:fontFamily="@font/micross_block"
-        android:layout_marginTop="175dp"
+        android:textColor="@color/black"
+        android:layout_marginTop="174dp"
         android:layout_marginStart="242dp"
         android:textSize="11dp"/>
 
 
     <TextView
         android:id="@+id/clock_timezone"
-        android:layout_width="50dp"
+        android:layout_width="300dp"
         android:layout_height="wrap_content"
         android:lines="1"
-        android:text="12:24:44"
+        android:text="(GMT -05:00) Eastern Time (US and Canada)"
         android:fontFamily="@font/micross_block"
-        android:layout_marginTop="205dp"
-        android:layout_marginStart="22dp"
+        android:layout_marginTop="236dp"
+        android:layout_marginStart="27dp"
+        android:textColor="@color/black"
         android:textSize="11dp"/>
+
+    <View
+        android:id="@+id/clock_ok"
+        android:layout_width="68dp"
+        android:layout_height="20dp"
+        android:layout_marginTop="309dp"
+        android:layout_marginStart="150dp"
+        />
+
+    <View
+        android:id="@+id/clock_cancel"
+        android:layout_width="68dp"
+        android:layout_height="20dp"
+        android:layout_marginTop="309dp"
+        android:layout_marginStart="223dp"
+        />
+
+    <GridView
+        android:id="@+id/clock_calendar"
+        android:layout_width="137dp"
+        android:layout_height="93dp"
+        android:layout_marginTop="93dp"
+        android:layout_marginStart="26dp"
+        android:verticalSpacing="1dp"
+        android:numColumns="7"
+        android:scrollbars="none"
+        android:columnWidth="19dp"/>
+
+    <ImageView
+        android:id="@+id/clock_arrow_minute"
+        android:layout_width="wrap_content"
+        android:layout_height="65dp"
+        android:layout_marginStart="271dp"
+        android:layout_marginTop="84dp"
+        android:src="@drawable/clock_arrow"/>
+
+
+    <ImageView
+        android:id="@+id/clock_arrow_hour"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:layout_marginStart="271dp"
+        android:layout_marginTop="84dp"
+        android:src="@drawable/clock_arrow"/>
+
+
+    <ImageView
+        android:id="@+id/clock_arrow_second"
+        android:layout_width="1.4dp"
+        android:layout_height="55dp"
+        android:layout_marginStart="273dp"
+        android:layout_marginTop="95dp"
+        android:background="@drawable/clock_arrow_second"/>
+
+    <View
+        android:id="@+id/clock_open_calendar"
+        android:layout_width="170dp"
+        android:layout_height="190dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="10dp"
+        />
+
+    <View
+        android:id="@+id/clock_open_clock"
+        android:layout_width="170dp"
+        android:layout_height="190dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="190dp"
+        />
 
 </RelativeLayout>

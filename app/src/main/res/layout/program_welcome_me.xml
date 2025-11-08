@@ -44,7 +44,7 @@
             android:fontFamily="@font/micross_block"
             android:textColor="@color/black"
             android:text="Test test"
-            android:textSize="10sp" />
+            android:textSize="12sp" />
     </ScrollView>
 
     <View

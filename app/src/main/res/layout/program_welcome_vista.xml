@@ -44,7 +44,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/tahoma"
             android:textColor="@color/black"
-            android:textSize="9sp"
+            android:textSize="12sp"
             android:text="Test test" />
     </ScrollView>
 

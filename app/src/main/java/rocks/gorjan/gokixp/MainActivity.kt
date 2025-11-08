@@ -1142,6 +1142,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showSolitareDialog(appInfo = appInfo)
         }
 
+
+        // Register Clock
+        systemAppActions["system.clock"] = { appInfo ->
+            createAndShowClockDialog()
+        }
+
         Log.d("MainActivity", "System apps initialized: ${systemAppActions.size} apps")
     }
 
@@ -1229,6 +1235,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ))
         }
 
+
+        // Clock - scale icon to match app icon size
+        val clockDrawable = AppCompatResources.getDrawable(this,themeManager.getClockIcon())
+        if (clockDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "Clock",
+                packageName = "system.clock",
+                icon = createSquareDrawable(clockDrawable)
+            ))
+        }
+
         return systemApps
     }
 
@@ -1253,14 +1270,54 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun openClockApp() {
-        try {
-            val clockIntent = Intent()
-            clockIntent.action = "android.intent.action.SHOW_ALARMS"
-            clockIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(clockIntent)
-        } catch (e: Exception) {
-            // Fallback if clock app can't be opened
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowClockDialog()
         }
+    }
+
+    private fun createAndShowClockDialog() {
+        // Create Windows-style dialog with correct theme from start
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.clock"  // Set identifier for tracking
+        windowsDialog.setTitle("Date/Time Properties")
+        windowsDialog.setTaskbarIcon(themeManager.getClockIcon())
+
+        // Inflate the clock content
+        val contentView = layoutInflater.inflate(R.layout.program_clock, null)
+
+        // Create Clock app instance
+        val clockApp = rocks.gorjan.gokixp.apps.clock.ClockApp(
+            context = this,
+            onSoundPlay = { playClickSound() },
+            onCloseWindow = {
+                windowsDialog.closeWindow()
+            }
+        )
+
+        // Setup the app
+        clockApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        // Use fixed size from layout: 370dp x 335dp
+        windowsDialog.setWindowSize(370, 355)
+
+        // Cleanup on close
+        windowsDialog.setOnCloseListener {
+            clockApp.cleanup()
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Set cursor back to normal after window is shown and loaded
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+        }, 100) // Small delay to ensure window is fully rendered
     }
     
     private fun openCalendarApp() {
@@ -1513,6 +1570,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return when (packageName) {
                 "system.internet_explorer" ->AppCompatResources.getDrawable(this, themeManager.getIEIcon())
                 "system.notepad" ->AppCompatResources.getDrawable(this, themeManager.getNotepadIcon())
+                "system.clock" ->AppCompatResources.getDrawable(this, themeManager.getClockIcon())
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
