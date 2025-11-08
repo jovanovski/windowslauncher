@@ -468,10 +468,8 @@ open class DesktopIconView : LinearLayout {
                         // Delete the icon (but not if this is the recycle bin itself)
                         mainActivity.deleteDesktopIcon(this)
                     } else {
-                        // Check if snap to grid is enabled and snap if needed
-                        if (mainActivity?.isSnapToGridEnabled() == true) {
-                            mainActivity.snapSingleIconToGrid(this)
-                        }
+                        // Always snap to grid (grid system is always enabled)
+                        mainActivity?.snapSingleIconToGrid(this)
 
                         // Log position before saving for folders
                         desktopIcon?.let { icon ->

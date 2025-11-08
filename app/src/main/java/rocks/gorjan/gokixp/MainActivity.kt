@@ -371,7 +371,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
         private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
         private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"
-        private const val KEY_SNAP_TO_GRID = "snap_to_grid"
         private const val KEY_ROVER_VISIBLE = "rover_visible"
         private const val KEY_RECYCLE_BIN_VISIBLE = "recycle_bin_visible"
         private const val KEY_SHORTCUT_ARROW_VISIBLE = "shortcut_arrow_visible"
@@ -440,9 +439,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
-        // Grid constants
+        // Grid constants (deprecated - will be calculated dynamically)
+        @Deprecated("Use calculateGridRows() instead")
         private const val GRID_ROWS = 8
+        @Deprecated("Use calculateGridColumns() instead")
         private const val GRID_COLUMNS = 5
+
+        // Orientation enum
+        enum class ScreenOrientation {
+            PORTRAIT,
+            LANDSCAPE
+        }
 
         // Start banner cycling order: 98 -> me -> 2000 -> 95 -> back to 98
         private val START_BANNER_CYCLE = arrayOf(
@@ -703,6 +710,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Show welcome screen if this is the first launch for this version
         Handler(Looper.getMainLooper()).postDelayed({
             showWelcomeScreenIfNeeded()
+            refreshDesktopIcons()
         }, 1000) // Delay to ensure UI is fully loaded
     }
     
@@ -2989,8 +2997,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     refreshEverything()
                 },
                 onChangeWallpaper = { createAndShowWallpaperDialog() },
-                onToggleSnapToGrid = { toggleSnapToGrid() },
-                isSnapToGridEnabled = isSnapToGridEnabled(),
                 onOpenInternetExplorer = { showInternetExplorerDialog() },
                 onNewFolder = { createNewFolder(x, y) }
             )
@@ -3359,7 +3365,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         // Close the parent folder window and reload desktop
                         floatingWindowManager.removeWindow(parentDialog)
                         refreshDesktopIcons()
-                        showNotification("Moved", "${icon.name} moved to desktop")
                     },
                     onChangeIcon = {
                         showFolderIconSelectionDialog(icon, parentDialog)
@@ -7399,20 +7404,29 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun addDesktopIcon(appInfo: AppInfo, x: Float = 100f, y: Float = 100f) {
 
-        // Icons are placed freely, no grid constraints
-
         // Use custom icon if available, otherwise use app icon
         val iconToUse = getAppIcon(appInfo.packageName) ?: appInfo.icon
+
+        // Convert x/y to grid index for current orientation
+        val currentOrientation = getCurrentOrientation()
+        val gridIndex = if (desktopContainer.width > 0) {
+            convertXYToGridIndex(x, y, currentOrientation)
+        } else {
+            null // Will be assigned during migration/reflow
+        }
 
         val desktopIcon = DesktopIcon(
             name = appInfo.name,
             packageName = appInfo.packageName,
             icon = iconToUse,
             x = x,
-            y = y
+            y = y,
+            portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
+            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null
         )
-        
+
         desktopIcons.add(desktopIcon)
+        Log.d("MainActivity", "Added desktop icon ${appInfo.name} with grid index $gridIndex for $currentOrientation")
         
         // Create appropriate icon view (RecycleBinView for recycle bin, DesktopIconView for others)
         val iconView = if (appInfo.packageName == "recycle.bin") {
@@ -7479,16 +7493,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             mapOf(
                 "name" to icon.name,
                 "packageName" to icon.packageName,
-                "x" to icon.x,
-                "y" to icon.y,
+                "x" to icon.x,  // Keep for backwards compatibility
+                "y" to icon.y,  // Keep for backwards compatibility
                 "id" to icon.id,
                 "type" to icon.type.name,
-                "parentFolderId" to icon.parentFolderId
+                "parentFolderId" to icon.parentFolderId,
+                "portraitGridIndex" to icon.portraitGridIndex,
+                "landscapeGridIndex" to icon.landscapeGridIndex
             )
         }
 
         val json = gson.toJson(serializedIcons)
         prefs.edit { putString(KEY_DESKTOP_ICONS, json) }
+        Log.d("MainActivity", "Saved ${desktopIcons.size} desktop icons with grid indices")
     }
     
     private fun loadDesktopIcons() {
@@ -7520,6 +7537,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val id = iconData["id"] as String
                 val parentFolderId = iconData["parentFolderId"] as? String
                 val typeStr = iconData["type"] as? String
+
+                // Read grid indices (may be null for old data)
+                val portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
+                val landscapeGridIndex = (iconData["landscapeGridIndex"] as? Double)?.toInt()
 
 
                 val iconType = if (typeStr != null) {
@@ -7561,7 +7582,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         }
                     }
 
-                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId)
+                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex)
                     desktopIcons.add(desktopIcon)
 
                     // Skip icons that are inside folders - they shouldn't be shown on desktop
@@ -7608,11 +7629,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // Apply current theme font
                     val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                     iconView.setThemeFont(selectedTheme == "Windows Classic")
+
                     // Set position after adding to container
+                    // NOTE: Position will be set by positionIconsFromGridIndices() after all icons are loaded
                     iconView.post {
                         iconView.x = x
                         iconView.y = y
-                        Log.d("MainActivity", "Set view position for $name: x=$x, y=$y")
                     }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error loading desktop icon: $packageName", e)
@@ -7629,6 +7651,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Ensure recycle bin exists as desktop icon (after loading existing icons)
         ensureRecycleBinExists()
+
+        // Post to ensure container has dimensions
+        desktopContainer.post {
+            // Migrate old x/y positions to grid indices if needed
+            migrateIconsToGridSystem()
+
+            // Position icons based on grid indices for current orientation
+            positionIconsFromGridIndices()
+
+            // Reflow any icons without position in current orientation
+            reflowIconsWithoutPosition()
+
+            // Save after migration and reflow
+            saveDesktopIcons()
+        }
     }
     
     private fun ensureRecycleBinExists() {
@@ -7899,7 +7936,309 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "Desktop icon refresh complete")
         }, 200)
     }
-    
+
+    // ========== NEW RESPONSIVE GRID SYSTEM ==========
+
+    /**
+     * Get current screen orientation
+     */
+    private fun getCurrentOrientation(): ScreenOrientation {
+        return if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            ScreenOrientation.LANDSCAPE
+        } else {
+            ScreenOrientation.PORTRAIT
+        }
+    }
+
+    /**
+     * Calculate dynamic number of columns based on screen width and orientation
+     */
+    private fun calculateGridColumns(orientation: ScreenOrientation? = null): Int {
+        val targetOrientation = orientation ?: getCurrentOrientation()
+        val containerWidth = desktopContainer.width.toFloat()
+        val iconWidthDp = 80f // Icon width in dp
+        val iconWidthPx = iconWidthDp * resources.displayMetrics.density
+
+        // Calculate how many icons fit horizontally
+        val columns = (containerWidth / iconWidthPx).toInt()
+
+        // Ensure at least 1 column
+        val result = maxOf(1, columns)
+
+        Log.d("MainActivity", "calculateGridColumns($targetOrientation): containerWidth=$containerWidth, iconWidthPx=$iconWidthPx, columns=$result")
+        return result
+    }
+
+    /**
+     * Calculate dynamic number of rows based on screen height and orientation
+     */
+    private fun calculateGridRows(orientation: ScreenOrientation? = null): Int {
+        val targetOrientation = orientation ?: getCurrentOrientation()
+        val containerHeight = desktopContainer.height.toFloat()
+        val iconHeightDp = 90f // Icon height in dp
+        val iconHeightPx = iconHeightDp * resources.displayMetrics.density
+
+        // Account for taskbar and top margin
+        val taskbarHeightPx = 70 * resources.displayMetrics.density
+        val topMarginPx = 60 * resources.displayMetrics.density
+        val usableHeight = containerHeight - taskbarHeightPx - topMarginPx
+
+        // Calculate how many icons fit vertically
+        val rows = (usableHeight / iconHeightPx).toInt()
+
+        // Ensure at least 1 row
+        val result = maxOf(1, rows)
+
+        Log.d("MainActivity", "calculateGridRows($targetOrientation): usableHeight=$usableHeight, iconHeightPx=$iconHeightPx, rows=$result")
+        return result
+    }
+
+    /**
+     * Convert grid index to (row, col) position
+     * @param index Linear index (0, 1, 2, 3...)
+     * @param orientation Target orientation
+     * @return Pair of (row, col)
+     */
+    private fun convertIndexToPosition(index: Int, orientation: ScreenOrientation? = null): Pair<Int, Int> {
+        val columns = calculateGridColumns(orientation)
+        val row = index / columns
+        val col = index % columns
+        Log.d("MainActivity", "convertIndexToPosition: index=$index, columns=$columns -> row=$row, col=$col")
+        return Pair(row, col)
+    }
+
+    /**
+     * Convert (row, col) position to grid index
+     * @param row Row number
+     * @param col Column number
+     * @param orientation Target orientation
+     * @return Linear index
+     */
+    private fun convertPositionToIndex(row: Int, col: Int, orientation: ScreenOrientation? = null): Int {
+        val columns = calculateGridColumns(orientation)
+        val index = row * columns + col
+        Log.d("MainActivity", "convertPositionToIndex: row=$row, col=$col, columns=$columns -> index=$index")
+        return index
+    }
+
+    /**
+     * Convert old x/y coordinates to grid index
+     * Used for migration from old system
+     */
+    private fun convertXYToGridIndex(x: Float, y: Float, orientation: ScreenOrientation): Int {
+        val columns = calculateGridColumns(orientation)
+        val containerWidth = desktopContainer.width.toFloat()
+        val containerHeight = desktopContainer.height.toFloat()
+
+        val taskbarHeightPx = 70 * resources.displayMetrics.density
+        val topMarginPx = 60 * resources.displayMetrics.density
+        val usableHeight = containerHeight - taskbarHeightPx - topMarginPx
+
+        val cellWidth = containerWidth / columns
+        val cellHeight = usableHeight / calculateGridRows(orientation)
+
+        // Adjust y for top margin
+        val adjustedY = y - topMarginPx
+
+        // Calculate which cell the icon center is in
+        val iconWidthPx = 90f * resources.displayMetrics.density
+        val iconHeightPx = 100f * resources.displayMetrics.density
+        val centerX = x + iconWidthPx / 2
+        val centerY = adjustedY + iconHeightPx / 2
+
+        val col = (centerX / cellWidth).toInt().coerceIn(0, columns - 1)
+        val row = (centerY / cellHeight).toInt().coerceIn(0, calculateGridRows(orientation) - 1)
+
+        val index = row * columns + col
+        Log.d("MainActivity", "convertXYToGridIndex: x=$x, y=$y -> row=$row, col=$col -> index=$index")
+        return index
+    }
+
+    /**
+     * Migrate icons from old x/y system to new grid index system
+     */
+    private fun migrateIconsToGridSystem() {
+        val currentOrientation = getCurrentOrientation()
+        var migrationCount = 0
+
+        desktopIcons.forEach { icon ->
+            // Skip icons in folders - they don't need grid positions
+            if (icon.parentFolderId != null) return@forEach
+
+            // Check if icon needs migration (has no grid indices)
+            if (icon.portraitGridIndex == null && icon.landscapeGridIndex == null) {
+                // Convert x/y to grid index for current orientation
+                val gridIndex = convertXYToGridIndex(icon.x, icon.y, currentOrientation)
+
+                when (currentOrientation) {
+                    ScreenOrientation.PORTRAIT -> {
+                        icon.portraitGridIndex = gridIndex
+                        Log.d("MainActivity", "Migrated icon ${icon.name} from x/y to portrait grid index $gridIndex")
+                    }
+                    ScreenOrientation.LANDSCAPE -> {
+                        icon.landscapeGridIndex = gridIndex
+                        Log.d("MainActivity", "Migrated icon ${icon.name} from x/y to landscape grid index $gridIndex")
+                    }
+                }
+                migrationCount++
+            }
+        }
+
+        if (migrationCount > 0) {
+            Log.d("MainActivity", "Migrated $migrationCount icons from x/y to grid system")
+        }
+    }
+
+    /**
+     * Position all desktop icons based on their grid indices for current orientation
+     */
+    private fun positionIconsFromGridIndices() {
+        val currentOrientation = getCurrentOrientation()
+
+        desktopIcons.forEach { icon ->
+            // Skip icons in folders
+            if (icon.parentFolderId != null) return@forEach
+
+            // Find the corresponding view by matching the icon
+            val iconView = desktopIconViews.find { it.getDesktopIcon() == icon }
+            if (iconView == null) {
+                Log.w("MainActivity", "No view found for icon ${icon.name}")
+                return@forEach
+            }
+
+            // Get grid index for current orientation
+            val gridIndex = when (currentOrientation) {
+                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
+                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
+            }
+
+            if (gridIndex != null) {
+                // Convert grid index to screen position
+                val (row, col) = convertIndexToPosition(gridIndex, currentOrientation)
+                val (x, y) = getGridCoordinatesFromIndex(row, col)
+
+                // Update icon position
+                icon.x = x
+                icon.y = y
+                iconView.x = x
+                iconView.y = y
+
+                Log.d("MainActivity", "Positioned ${icon.name} at grid index $gridIndex (row=$row, col=$col) -> x=$x, y=$y")
+            }
+        }
+    }
+
+    /**
+     * Auto-assign grid indices to icons that don't have position in current orientation
+     */
+    private fun reflowIconsWithoutPosition() {
+        val currentOrientation = getCurrentOrientation()
+
+        // Get icons that need reflow (no grid index for current orientation)
+        val iconsToReflow = desktopIcons.filter { icon ->
+            // Skip icons in folders
+            if (icon.parentFolderId != null) return@filter false
+
+            when (currentOrientation) {
+                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex == null
+                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex == null
+            }
+        }
+
+        if (iconsToReflow.isEmpty()) {
+            Log.d("MainActivity", "No icons need reflow for $currentOrientation orientation")
+            return
+        }
+
+        // Build set of occupied grid indices
+        val occupiedIndices = desktopIcons.mapNotNull { icon ->
+            if (icon.parentFolderId != null) return@mapNotNull null
+
+            when (currentOrientation) {
+                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
+                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
+            }
+        }.toMutableSet()
+
+        // Assign sequential available indices
+        var nextIndex = 0
+        iconsToReflow.forEach { icon ->
+            // Find next available index
+            while (occupiedIndices.contains(nextIndex)) {
+                nextIndex++
+            }
+
+            // Assign this index
+            when (currentOrientation) {
+                ScreenOrientation.PORTRAIT -> {
+                    icon.portraitGridIndex = nextIndex
+                    Log.d("MainActivity", "Auto-assigned portrait grid index $nextIndex to ${icon.name}")
+                }
+                ScreenOrientation.LANDSCAPE -> {
+                    icon.landscapeGridIndex = nextIndex
+                    Log.d("MainActivity", "Auto-assigned landscape grid index $nextIndex to ${icon.name}")
+                }
+            }
+
+            // Convert to screen position
+            val (row, col) = convertIndexToPosition(nextIndex, currentOrientation)
+            val (x, y) = getGridCoordinatesFromIndex(row, col)
+
+            icon.x = x
+            icon.y = y
+
+            // Update view position if it exists (find by matching icon, not by index)
+            val iconView = desktopIconViews.find { it.getDesktopIcon() == icon }
+            if (iconView != null) {
+                iconView.x = x
+                iconView.y = y
+            } else {
+                Log.w("MainActivity", "No view found for reflowed icon ${icon.name}")
+            }
+
+            occupiedIndices.add(nextIndex)
+            nextIndex++
+        }
+
+        Log.d("MainActivity", "Reflowed ${iconsToReflow.size} icons for $currentOrientation orientation")
+    }
+
+    /**
+     * Get screen coordinates from grid row/col
+     * Helper function that uses dynamic grid calculation
+     */
+    private fun getGridCoordinatesFromIndex(row: Int, col: Int): Pair<Float, Float> {
+        val columns = calculateGridColumns()
+        val rows = calculateGridRows()
+
+        val containerWidth = desktopContainer.width.toFloat()
+        val containerHeight = desktopContainer.height.toFloat()
+
+        val taskbarHeightPx = 70 * resources.displayMetrics.density
+        val topMarginPx = 60 * resources.displayMetrics.density
+        val usableHeight = containerHeight - taskbarHeightPx - topMarginPx
+
+        val cellWidth = containerWidth / columns
+        val cellHeight = usableHeight / rows
+
+        val iconWidthDp = 90f
+        val iconHeightDp = 100f
+        val iconWidthPx = iconWidthDp * resources.displayMetrics.density
+        val iconHeightPx = iconHeightDp * resources.displayMetrics.density
+
+        // Calculate center of the grid cell
+        val cellCenterX = (col * cellWidth) + (cellWidth / 2)
+        val cellCenterY = topMarginPx + (row * cellHeight) + (cellHeight / 2)
+
+        // Position icon so its center aligns with cell center
+        val x = cellCenterX - (iconWidthPx / 2)
+        val y = cellCenterY - (iconHeightPx / 2)
+
+        return Pair(x, y)
+    }
+
+    // ========== END NEW RESPONSIVE GRID SYSTEM ==========
+
     private fun getGridDimensions(): Pair<Float, Float> {
         // Use the desktop container dimensions (where icons are placed)
         val containerWidth = desktopContainer.width.toFloat()
@@ -7944,46 +8283,112 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     fun snapSingleIconToGrid(iconView: DesktopIconView) {
-        val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
-        
-        // Get all current occupied positions (excluding the icon being snapped)
-        desktopIcons.forEachIndexed { index, _ ->
-            val view = desktopIconViews.getOrNull(index)
+        val currentOrientation = getCurrentOrientation()
+        val columns = calculateGridColumns()
+        val rows = calculateGridRows()
+
+        val occupiedIndices = mutableSetOf<Int>()
+
+        // Get all current occupied grid indices (excluding the icon being snapped)
+        desktopIcons.forEach { icon ->
+            // Skip icons in folders
+            if (icon.parentFolderId != null) return@forEach
+
+            // Find the view by matching the icon
+            val view = desktopIconViews.find { it.getDesktopIcon() == icon }
             if (view != null && view != iconView && view.parent != null && view.isVisible) {
-                val containerWidth = desktopContainer.width.toFloat()
-                val containerHeight = desktopContainer.height.toFloat()
-                val taskbarHeightPx = 70 * resources.displayMetrics.density
-                val topMarginPx = 60 * resources.displayMetrics.density
-                val usableHeight = containerHeight - taskbarHeightPx - topMarginPx
-                val cellWidth = containerWidth / GRID_COLUMNS
-                val cellHeight = usableHeight / GRID_ROWS
-                
-                val centerX = view.x + view.width / 2
-                val centerY = view.y + view.height / 2 - topMarginPx
-                
-                val col = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
-                val row = (centerY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
-                
-                occupiedPositions.add(Pair(row, col))
+                // Get grid index for current orientation
+                val gridIndex = when (currentOrientation) {
+                    ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
+                    ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
+                }
+
+                if (gridIndex != null) {
+                    occupiedIndices.add(gridIndex)
+                }
             }
         }
 
-        
-        // Find nearest available position for the icon being snapped
-        val nearestPosition = findNearestAvailableGridPosition(iconView.x, iconView.y, occupiedPositions)
-        if (nearestPosition != null) {
-            val (row, col) = nearestPosition
-            val (newX, newY) = getGridCoordinates(row, col)
-            
-            iconView.x = newX
-            iconView.y = newY
-            
-            // Update the desktop icon's position
-            iconView.getDesktopIcon()?.let { icon ->
-                icon.x = newX
-                icon.y = newY
+        // Convert current position to grid index
+        val currentGridIndex = convertXYToGridIndex(iconView.x, iconView.y, currentOrientation)
+
+        // Find nearest available index
+        var nearestIndex = currentGridIndex
+        if (occupiedIndices.contains(nearestIndex)) {
+            // Current position is occupied, find nearest available
+            nearestIndex = findNearestAvailableIndex(currentGridIndex, occupiedIndices, columns, rows)
+        }
+
+        // Convert grid index to position
+        val (row, col) = convertIndexToPosition(nearestIndex, currentOrientation)
+        val (newX, newY) = getGridCoordinatesFromIndex(row, col)
+
+        // Update view position
+        iconView.x = newX
+        iconView.y = newY
+
+        // Update the desktop icon's position and grid index
+        iconView.getDesktopIcon()?.let { icon ->
+            icon.x = newX
+            icon.y = newY
+
+            // Save grid index for current orientation
+            when (currentOrientation) {
+                ScreenOrientation.PORTRAIT -> {
+                    icon.portraitGridIndex = nearestIndex
+                    Log.d("MainActivity", "Snapped ${icon.name} to portrait grid index $nearestIndex (row=$row, col=$col)")
+                }
+                ScreenOrientation.LANDSCAPE -> {
+                    icon.landscapeGridIndex = nearestIndex
+                    Log.d("MainActivity", "Snapped ${icon.name} to landscape grid index $nearestIndex (row=$row, col=$col)")
+                }
             }
         }
+    }
+
+    /**
+     * Find nearest available grid index (spiral search from target index)
+     */
+    private fun findNearestAvailableIndex(targetIndex: Int, occupiedIndices: Set<Int>, columns: Int, rows: Int): Int {
+        // If target is available, use it
+        if (!occupiedIndices.contains(targetIndex)) {
+            return targetIndex
+        }
+
+        val maxGridSize = columns * rows
+        val targetRow = targetIndex / columns
+        val targetCol = targetIndex % columns
+
+        // Spiral search outward from target position
+        for (radius in 1..maxOf(columns, rows)) {
+            for (dr in -radius..radius) {
+                for (dc in -radius..radius) {
+                    // Only check cells at current radius (not interior)
+                    if (Math.abs(dr) != radius && Math.abs(dc) != radius) continue
+
+                    val row = targetRow + dr
+                    val col = targetCol + dc
+
+                    // Check bounds
+                    if (row < 0 || row >= rows || col < 0 || col >= columns) continue
+
+                    val index = row * columns + col
+                    if (index >= 0 && index < maxGridSize && !occupiedIndices.contains(index)) {
+                        return index
+                    }
+                }
+            }
+        }
+
+        // Fallback: find first available index
+        for (i in 0 until maxGridSize) {
+            if (!occupiedIndices.contains(i)) {
+                return i
+            }
+        }
+
+        // No available positions (should never happen)
+        return targetIndex
     }
     
     private fun snapExistingIconsToGrid() {
@@ -8070,22 +8475,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return prefs.getBoolean(KEY_SOUND_MUTED, false)
     }
     
-    fun isSnapToGridEnabled(): Boolean {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        return prefs.getBoolean(KEY_SNAP_TO_GRID, true)
-    }
-    
-    private fun toggleSnapToGrid() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val currentlyEnabled = isSnapToGridEnabled()
-        prefs.edit { putBoolean(KEY_SNAP_TO_GRID, !currentlyEnabled) }
-        
-        // If turning on snap to grid, snap all icons immediately
-        if (!currentlyEnabled) {
-            snapExistingIconsToGrid()
-        }
-    }
-    
+    // Grid system is now always enabled - no toggle needed
+
+
     private fun toggleSoundMute() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val currentlyMuted = isSoundMuted()
@@ -8381,6 +8773,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Update permission error visibility when returning from settings
         updateEmailPermissionError?.invoke()
         updateNotificationDotsPermissionError?.invoke()
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        val newOrientation = getCurrentOrientation()
+        Log.d("MainActivity", "Configuration changed to: $newOrientation")
+
+        // Post to ensure container has updated dimensions
+        desktopContainer.post {
+            // Position icons based on grid indices for new orientation
+            positionIconsFromGridIndices()
+
+            // Reflow any icons without position in new orientation
+            reflowIconsWithoutPosition()
+
+            // Save after reflow
+            saveDesktopIcons()
+
+            // Force refresh to show new positions
+            desktopContainer.postDelayed({
+                refreshDesktopIcons()
+            }, 100)
+        }
     }
 
     override fun onStop() {
@@ -10243,11 +10659,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         return@Thread
                     }
 
-                    val assets = release.getAsJsonArray("assets")
-                    val downloadUrl = if (assets != null && assets.size() > 0)
-                        assets[0].asJsonObject.get("browser_download_url").asString
-                    else
-                        release.get("html_url")?.asString ?: ""
+                    val downloadUrl = release.get("html_url")?.asString ?: ""
 
                     // Current app versionName (like "1.6" or "v1.6")
                     val currentVersionName = try {

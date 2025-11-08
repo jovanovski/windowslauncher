@@ -14,8 +14,6 @@ object ContextMenuItems {
     fun getDesktopMenuItems(
         onRefresh: () -> Unit,
         onChangeWallpaper: () -> Unit,
-        onToggleSnapToGrid: () -> Unit,
-        isSnapToGridEnabled: Boolean,
         onOpenInternetExplorer: () -> Unit,
         onNewFolder: () -> Unit
     ): List<ContextMenuItem> {
@@ -26,7 +24,6 @@ object ContextMenuItems {
             ContextMenuItem("Paste", isEnabled = false),
             ContextMenuItem("Paste Shortcut", isEnabled = false),
             ContextMenuItem("", isEnabled = false), // Divider
-            ContextMenuItem("Snap to Grid", isEnabled = true, hasCheckbox = true, isChecked = isSnapToGridEnabled, action = onToggleSnapToGrid),
             ContextMenuItem("New Folder", isEnabled = true, action = onNewFolder),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Properties", isEnabled = true, action = onChangeWallpaper)

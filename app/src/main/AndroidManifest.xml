@@ -53,7 +53,8 @@
             android:excludeFromRecents="true"
             android:clearTaskOnLaunch="false"
             android:stateNotNeeded="true"
-            android:alwaysRetainTaskState="true">
+            android:alwaysRetainTaskState="true"
+            android:configChanges="orientation|screenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
