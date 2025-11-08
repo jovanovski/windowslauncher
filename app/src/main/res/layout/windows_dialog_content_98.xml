@@ -58,27 +58,24 @@
             <ImageView
                 android:id="@+id/dialog_minimize_button"
                 android:layout_width="16dp"
-                android:layout_height="15dp"
-                android:layout_marginTop="0.5dp"
-                android:background="@drawable/win98_title_bar_minimize"
-                android:scaleType="center" />
+                android:layout_height="14dp"
+                android:src="@drawable/win98_title_bar_minimize"
+                android:scaleType="fitXY" />
 
             <ImageView
                 android:id="@+id/dialog_maximize_button"
                 android:layout_width="16dp"
-                android:layout_height="15dp"
-                android:layout_marginTop="0.5dp"
-                android:background="@drawable/win98_title_bar_maximize"
-                android:scaleType="center" />
+                android:layout_height="14dp"
+                android:src="@drawable/win98_title_bar_maximize"
+                android:scaleType="fitXY" />
 
             <ImageView
                 android:id="@+id/dialog_close_button"
                 android:layout_width="16dp"
-                android:layout_height="15dp"
-                android:layout_marginTop="0.5dp"
+                android:layout_height="14dp"
                 android:layout_marginStart="2dp"
-                android:background="@drawable/win98_title_bar_close"
-                android:scaleType="center" />
+                android:src="@drawable/win98_title_bar_close"
+                android:scaleType="fitXY" />
         </LinearLayout>
 
         <!-- Scrollable Content Area -->

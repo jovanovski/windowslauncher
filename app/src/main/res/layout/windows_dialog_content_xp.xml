@@ -57,27 +57,24 @@
                 android:id="@+id/dialog_minimize_button"
                 android:layout_width="16dp"
                 android:layout_height="16dp"
-                android:background="@drawable/xp_title_bar_minimize"
-                android:padding="3dp"
-                android:scaleType="centerInside" />
+                android:src="@drawable/xp_title_bar_minimize"
+                android:scaleType="fitXY" />
 
             <ImageView
                 android:id="@+id/dialog_maximize_button"
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginLeft="2dp"
-                android:background="@drawable/xp_title_bar_maximize"
-                android:padding="3dp"
-                android:scaleType="centerInside" />
+                android:src="@drawable/xp_title_bar_maximize"
+                android:scaleType="fitXY" />
 
             <ImageView
                 android:id="@+id/dialog_close_button"
                 android:layout_width="16dp"
                 android:layout_height="16dp"
-                android:background="@drawable/xp_title_bar_close"
-                android:padding="3dp"
+                android:src="@drawable/xp_title_bar_close"
                 android:layout_marginLeft="2dp"
-                android:scaleType="centerInside" />
+                android:scaleType="fitXY" />
         </LinearLayout>
 
         <!-- Content Area with Border (excluding top) -->

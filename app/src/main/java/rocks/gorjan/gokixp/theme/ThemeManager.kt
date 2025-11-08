@@ -208,6 +208,18 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.msn_icon_vista
     }
 
+    fun getMaximizeIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.win98_title_bar_maximize
+        AppTheme.WindowsXP -> R.drawable.xp_title_bar_maximize
+        AppTheme.WindowsVista -> R.drawable.vista_title_bar_maximize
+    }
+
+    fun getRestoreIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.win98_title_bar_restore
+        AppTheme.WindowsXP -> R.drawable.xp_title_bar_restore
+        AppTheme.WindowsVista -> R.drawable.vista_title_bar_restore
+    }
+
     /**
      * Gets the taskbar button layout resource ID for the given theme.
      */

@@ -1082,7 +1082,7 @@ class WindowsDialog @JvmOverloads constructor(
         isMaximized = true
 
         // Update maximize button icon to show restore icon (if it exists)
-//        updateMaximizeButtonIcon()
+        updateMaximizeButtonIcon()
 
         onMaximizeListener?.invoke()
 
@@ -1111,7 +1111,7 @@ class WindowsDialog @JvmOverloads constructor(
         isMaximized = false
 
         // Update maximize button icon to show maximize icon
-//        updateMaximizeButtonIcon()
+        updateMaximizeButtonIcon()
 
         // Center the window after a brief delay to allow layout to update
         post {
@@ -1126,15 +1126,15 @@ class WindowsDialog @JvmOverloads constructor(
      */
     private fun updateMaximizeButtonIcon() {
         maximizeButton?.let { button ->
-            // Check if restore icon exists, otherwise keep using maximize icon
-            val iconRes = if (isMaximized) {
-                // Try to use restore icon if available, fallback to maximize icon
-                val restoreIconId = resources.getIdentifier("xp_title_bar_restore", "drawable", context.packageName)
-                if (restoreIconId != 0) restoreIconId else R.drawable.xp_title_bar_maximize
-            } else {
-                R.drawable.xp_title_bar_maximize
+            val mainActivity = context as? MainActivity
+            if (mainActivity != null) {
+                val iconRes = if (isMaximized) {
+                    mainActivity.themeManager.getRestoreIcon()
+                } else {
+                    mainActivity.themeManager.getMaximizeIcon()
+                }
+                button.setImageResource(iconRes)
             }
-            button.setBackgroundResource(iconRes)
         }
     }
 
