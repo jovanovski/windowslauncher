@@ -141,7 +141,7 @@
             android:background="@drawable/ie6_bottom_middle"/>
         <ImageView
             android:id="@+id/resize_drag_view"
-            android:layout_width="14dp"
+            android:layout_width="30dp"
             android:layout_height="22dp"
             android:background="@drawable/ie6_bottom_right"/>
 
