@@ -58,6 +58,7 @@ class NotepadApp(
     private var isListExpanded = false
     private var isProgrammaticChange = false
     private var noteInMoveMode: Note? = null
+    private var showingArchivedNotes = false  // Track if we're viewing archived notes
 
     // UI references
     private var notesEditText: EditText? = null
@@ -65,6 +66,7 @@ class NotepadApp(
     private var notesList: RecyclerView? = null
     private var expandButton: TextView? = null
     private var addNoteButton: TextView? = null
+    private var archiveButton: TextView? = null
     private var notesAdapter: NotesAdapter? = null
     private var itemTouchHelper: ItemTouchHelper? = null
     private var imageGallery: RecyclerView? = null
@@ -80,6 +82,7 @@ class NotepadApp(
         notesList = contentView.findViewById(R.id.notes_list)
         expandButton = contentView.findViewById(R.id.expand_button)
         addNoteButton = contentView.findViewById(R.id.add_note_button)
+        archiveButton = contentView.findViewById(R.id.notepad_archive_button)
         imageGallery = contentView.findViewById(R.id.image_gallery)
 
         // Setup Notes RecyclerView
@@ -164,12 +167,22 @@ class NotepadApp(
             saveNotes()
         }
 
-        // Load the last opened note, or fall back to the first note
+        // Always start with active (non-archived) notes view
+        showingArchivedNotes = false
+        archiveButton?.text = "Archived Notes"
+
+        // Load the last opened note if it's active, otherwise fall back to first active note
         val lastNoteId = prefs.getString(KEY_LAST_NOTE_ID, null)
         currentNote = if (lastNoteId != null) {
-            notes.find { it.id == lastNoteId } ?: notes.firstOrNull()
+            val lastNote = notes.find { it.id == lastNoteId }
+            // Only use last note if it's not archived
+            if (lastNote != null && !lastNote.isArchived) {
+                lastNote
+            } else {
+                getFilteredNotes().firstOrNull()
+            }
         } else {
-            notes.firstOrNull()
+            getFilteredNotes().firstOrNull()
         }
 
         // Load current note content and images
@@ -201,15 +214,19 @@ class NotepadApp(
 
         // Add note button
         addNoteButton?.setOnClickListener {
+            onSoundPlay("click")
+
             // Save current note before creating new one
             currentNote?.content = notesEditText?.text.toString()
             saveNotes()
 
-            // Create new note
+            // Create new note with current archive status matching the view
             val newNote = Note(
                 id = java.util.UUID.randomUUID().toString(),
                 title = "Note ${notes.size + 1}",
-                content = ""
+                content = "",
+                imageUris = mutableListOf(),
+                isArchived = showingArchivedNotes  // Match current view
             )
             notes.add(newNote)
             saveNotes()
@@ -220,6 +237,7 @@ class NotepadApp(
             isProgrammaticChange = true
             notesEditText?.setText("")
             isProgrammaticChange = false
+            imageGallery?.visibility = View.GONE
             updateWindowTitle()
             refreshNotesList()
         }
@@ -229,6 +247,43 @@ class NotepadApp(
         addImageButton?.setOnClickListener { view ->
             onSoundPlay("click")
             showImageSourcePicker(view)
+        }
+
+        // Archive button - toggle between active and archived notes
+        archiveButton?.setOnClickListener {
+            onSoundPlay("click")
+
+            // Save current note before switching views
+            currentNote?.content = notesEditText?.text.toString()
+            saveNotes()
+
+            // Toggle archive view
+            showingArchivedNotes = !showingArchivedNotes
+
+            // Update button text
+            archiveButton?.text = if (showingArchivedNotes) "Active Notes" else "Archived Notes"
+
+            // Switch to first note in the new view (archived or active)
+            val filteredNotes = getFilteredNotes()
+            currentNote = filteredNotes.firstOrNull()
+            saveLastNoteId()
+
+            // Load the new current note
+            currentNote?.let {
+                isProgrammaticChange = true
+                notesEditText?.setText(it.content)
+                isProgrammaticChange = false
+                loadNoteImages(it)
+            } ?: run {
+                // No notes in this view
+                isProgrammaticChange = true
+                notesEditText?.setText("")
+                isProgrammaticChange = false
+                imageGallery?.visibility = View.GONE
+            }
+
+            updateWindowTitle()
+            refreshNotesList()
         }
 
         // Save notes as user types and handle automatic list continuation
@@ -292,6 +347,13 @@ class NotepadApp(
         currentNote?.let {
             onUpdateWindowTitle("${it.title} - Notepad")
         } ?: onUpdateWindowTitle("Notepad")
+    }
+
+    /**
+     * Get filtered notes based on current view (active or archived)
+     */
+    private fun getFilteredNotes(): List<Note> {
+        return notes.filter { it.isArchived == showingArchivedNotes }
     }
 
     /**
@@ -459,8 +521,9 @@ class NotepadApp(
             }
         ))
 
-        // Move option (only if more than one note exists)
-        if (notes.size > 1) {
+        // Move option (only if more than one note exists in current view)
+        val filteredNotes = getFilteredNotes()
+        if (filteredNotes.size > 1) {
             menuItems.add(ContextMenuItem(
                 title = "Move",
                 isEnabled = true,
@@ -470,7 +533,7 @@ class NotepadApp(
                     refreshNotesList()
 
                     // Start dragging for this note
-                    val noteIndex = notes.indexOfFirst { it.id == note.id }
+                    val noteIndex = filteredNotes.indexOfFirst { it.id == note.id }
                     notesList?.post {
                         val viewHolder = notesList?.findViewHolderForAdapterPosition(noteIndex)
                         viewHolder?.let {
@@ -482,6 +545,43 @@ class NotepadApp(
                 }
             ))
         }
+
+        // Archive/Unarchive option
+        menuItems.add(ContextMenuItem(
+            title = if (note.isArchived) "Unarchive" else "Archive",
+            isEnabled = true,
+            action = {
+                onSoundPlay("click")
+
+                // Toggle archive status
+                note.isArchived = !note.isArchived
+                saveNotes()
+
+                // If we archived/unarchived the current note, switch to first available note in current view
+                if (note.id == currentNote?.id) {
+                    val remainingNotes = getFilteredNotes()
+                    currentNote = remainingNotes.firstOrNull()
+                    saveLastNoteId()
+
+                    currentNote?.let {
+                        isProgrammaticChange = true
+                        notesEditText?.setText(it.content)
+                        isProgrammaticChange = false
+                        loadNoteImages(it)
+                    } ?: run {
+                        // No notes left in this view
+                        isProgrammaticChange = true
+                        notesEditText?.setText("")
+                        isProgrammaticChange = false
+                        imageGallery?.visibility = View.GONE
+                    }
+
+                    updateWindowTitle()
+                }
+
+                refreshNotesList()
+            }
+        ))
 
         // Delete option (only if more than one note exists)
         if (notes.size > 1) {
@@ -592,7 +692,8 @@ class NotepadApp(
         }
 
         override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
-            val note = notes[position]
+            val filteredNotes = getFilteredNotes()
+            val note = filteredNotes[position]
             val textView = holder.textView
 
             // Set text and appearance based on state
@@ -642,18 +743,23 @@ class NotepadApp(
             }
         }
 
-        override fun getItemCount(): Int = notes.size
+        override fun getItemCount(): Int = getFilteredNotes().size
 
         fun onItemMove(fromPosition: Int, toPosition: Int) {
-            if (fromPosition < toPosition) {
-                for (i in fromPosition until toPosition) {
-                    notes[i] = notes.set(i + 1, notes[i])
-                }
-            } else {
-                for (i in fromPosition downTo toPosition + 1) {
-                    notes[i] = notes.set(i - 1, notes[i])
-                }
-            }
+            val filteredNotes = getFilteredNotes().toMutableList()
+
+            // Move within filtered list
+            val movedNote = filteredNotes[fromPosition]
+            filteredNotes.removeAt(fromPosition)
+            filteredNotes.add(toPosition, movedNote)
+
+            // Update positions in main notes list
+            // Remove all filtered notes from main list, then re-add in new order
+            val otherNotes = notes.filter { it.isArchived != showingArchivedNotes }
+            notes.clear()
+            notes.addAll(otherNotes)
+            notes.addAll(filteredNotes)
+
             notifyItemMoved(fromPosition, toPosition)
         }
 
