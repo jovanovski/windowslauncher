@@ -156,4 +156,29 @@
 
     </LinearLayout>
 
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:background="?windowBackgroundColor"
+        android:gravity="start">
+        <ImageView
+            android:layout_width="15dp"
+            android:layout_height="18dp"
+            android:background="@drawable/window_bottom_left"/>
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="18dp"
+            android:layout_weight="1"
+            android:background="@drawable/window_bottom_middle"/>
+        <ImageView
+            android:id="@+id/resize_drag_view"
+            android:layout_width="30dp"
+            android:layout_height="18dp"
+            android:background="@drawable/window_bottom_right"/>
+
+    </LinearLayout>
+
 </LinearLayout>
