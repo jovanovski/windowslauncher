@@ -7671,9 +7671,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         recycleBin = desktopIconViews.find {
             it is RecycleBinView
         } as? RecycleBinView ?: throw IllegalStateException("RecycleBinView not found in desktop icons")
-
-        // Theme is already applied when RecycleBinView is created in loadDesktopIcons()
-
         // Restore visibility state - if hidden, remove from desktop
         if (!isRecycleBinVisible()) {
             hideRecycleBin()
@@ -7877,9 +7874,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         desktopIconViews.forEach { iconView ->
             iconView.alpha = 0f
         }
-//        if (::recycleBin.isInitialized) {
-//            recycleBin.alpha = 0f
-//        }
+
         loadDesktopIcons()
         
         // Wait 200ms, then refresh and make them reappear
