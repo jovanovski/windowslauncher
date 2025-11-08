@@ -79,6 +79,10 @@ class WindowsDialog @JvmOverloads constructor(
     private var savedX = 0f
     private var savedY = 0f
 
+    // Keyboard handling for maximized windows
+    private var keyboardHeight = 0
+    private var isKeyboardVisible = false
+
     // Window identifier (for tracking unique instances like app package or folder path)
     var windowIdentifier: String? = null
 
@@ -124,6 +128,7 @@ class WindowsDialog @JvmOverloads constructor(
         clipToPadding = false
 
         setupDialogLayout()
+        setupKeyboardListener()
     }
 
     private fun setupDialogLayout() {
@@ -476,6 +481,98 @@ class WindowsDialog @JvmOverloads constructor(
         val minSizeHeightPx = (minWindowHeightDp * density).toInt()
         val minSizeWidthPx = (minWindowWidthDp * density).toInt()
 
+        setupResizeHandling(density, minSizeHeightPx, minSizeWidthPx)
+    }
+
+    /**
+     * Sets up keyboard visibility listener to adjust maximized window height
+     */
+    private fun setupKeyboardListener() {
+        // Use WindowInsets API to detect keyboard (API 30+)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                if (!isMaximized) return@setOnApplyWindowInsetsListener insets
+
+                val imeVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+                val imeInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+
+                val wasKeyboardVisible = isKeyboardVisible
+                isKeyboardVisible = imeVisible
+                keyboardHeight = if (imeVisible) imeInsets.bottom else 0
+
+                Log.d("WindowsDialog", "Keyboard state: visible=$imeVisible, height=$keyboardHeight")
+
+                // Only adjust if keyboard state changed
+                if (wasKeyboardVisible != isKeyboardVisible) {
+                    adjustMaximizedWindowForKeyboard()
+                }
+
+                insets
+            }
+        } else {
+            // Fallback for older Android versions
+            viewTreeObserver.addOnGlobalLayoutListener {
+                if (!isMaximized) return@addOnGlobalLayoutListener
+
+                val rect = android.graphics.Rect()
+                windowFrame.getWindowVisibleDisplayFrame(rect)
+                val screenHeight = windowFrame.rootView.height
+                val keypadHeight = screenHeight - rect.bottom
+
+                val wasKeyboardVisible = isKeyboardVisible
+                if (keypadHeight > screenHeight * 0.15) { // Keyboard is visible
+                    isKeyboardVisible = true
+                    keyboardHeight = keypadHeight
+                } else {
+                    isKeyboardVisible = false
+                    keyboardHeight = 0
+                }
+
+                // Only adjust if keyboard state changed
+                if (wasKeyboardVisible != isKeyboardVisible) {
+                    adjustMaximizedWindowForKeyboard()
+                }
+            }
+        }
+    }
+
+    /**
+     * Adjusts maximized window bottom margin to accommodate keyboard
+     */
+    private fun adjustMaximizedWindowForKeyboard() {
+        if (!isMaximized) return
+
+        Log.d("WindowsDialog", "Adjusting window for keyboard: visible=$isKeyboardVisible, height=$keyboardHeight")
+
+        windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+            width = FrameLayout.LayoutParams.MATCH_PARENT
+            height = FrameLayout.LayoutParams.MATCH_PARENT
+            if (isKeyboardVisible) {
+                // The floating windows container has 70dp bottom margin for taskbar
+                // We need to subtract that from keyboard height to get the actual adjustment needed
+                val density = resources.displayMetrics.density
+                val taskbarMarginPx = (70 * density).toInt()
+                val adjustedMargin = (keyboardHeight - taskbarMarginPx).coerceAtLeast(0)
+
+                bottomMargin = adjustedMargin
+                Log.d("WindowsDialog", "Keyboard height=$keyboardHeight, taskbar margin=$taskbarMarginPx, adjusted margin=$adjustedMargin")
+            } else {
+                // Fill entire screen
+                bottomMargin = 0
+                Log.d("WindowsDialog", "Cleared windowFrame bottomMargin")
+            }
+        }
+
+        // Also adjust content area
+        windowBorder?.updateLayoutParams<LayoutParams> {
+            height = LayoutParams.MATCH_PARENT
+        }
+        contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+            height = FrameLayout.LayoutParams.MATCH_PARENT
+        }
+    }
+
+    private fun setupResizeHandling(density: Float, minSizeHeightPx: Int, minSizeWidthPx: Int) {
         resizeDragView?.setOnTouchListener { v, event ->
             // Don't allow resizing when maximized
             if (isMaximized) {
@@ -1063,6 +1160,7 @@ class WindowsDialog @JvmOverloads constructor(
         windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
             width = FrameLayout.LayoutParams.MATCH_PARENT
             height = FrameLayout.LayoutParams.MATCH_PARENT
+            bottomMargin = 0 // Reset margin
         }
 
         // Make content area expand to fill
@@ -1096,10 +1194,15 @@ class WindowsDialog @JvmOverloads constructor(
     private fun restoreWindow() {
         if (!isMaximized) return
 
+        // Reset keyboard state
+        isKeyboardVisible = false
+        keyboardHeight = 0
+
         // Restore original dimensions
         windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
             width = savedWidth
             height = savedHeight
+            bottomMargin = 0 // Clear keyboard margin
         }
 
         // Restore original position

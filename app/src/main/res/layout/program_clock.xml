@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="370dp"
+    android:layout_height="335dp"
+    android:background="?windowBackgroundColor"
+    android:padding="2dp"
+    >
+<ImageView
+    android:layout_width="370dp"
+    android:layout_height="335dp"
+    android:src="@drawable/datetime_screen"/>
+
+    <TextView
+        android:id="@+id/clock_month"
+        android:layout_width="50dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:text="November"
+        android:fontFamily="@font/micross_block"
+        android:layout_marginTop="49dp"
+        android:layout_marginStart="27dp"
+        android:textSize="11dp"/>
+
+    <TextView
+        android:id="@+id/clock_year"
+        android:layout_width="50dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:text="2025"
+        android:fontFamily="@font/micross_block"
+        android:layout_marginTop="49dp"
+        android:layout_marginStart="102dp"
+        android:textSize="11dp"/>
+
+
+    <TextView
+        android:id="@+id/clock_time"
+        android:layout_width="50dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:text="12:24:44"
+        android:fontFamily="@font/micross_block"
+        android:layout_marginTop="175dp"
+        android:layout_marginStart="242dp"
+        android:textSize="11dp"/>
+
+
+    <TextView
+        android:id="@+id/clock_timezone"
+        android:layout_width="50dp"
+        android:layout_height="wrap_content"
+        android:lines="1"
+        android:text="12:24:44"
+        android:fontFamily="@font/micross_block"
+        android:layout_marginTop="205dp"
+        android:layout_marginStart="22dp"
+        android:textSize="11dp"/>
+
+</RelativeLayout>
