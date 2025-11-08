@@ -20,6 +20,17 @@ import androidx.core.view.updateLayoutParams
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 
+/**
+ * Data class to store window state for persistence
+ */
+data class WindowState(
+    val x: Float,
+    val y: Float,
+    val width: Int,
+    val height: Int,
+    val isMaximized: Boolean
+)
+
 class WindowsDialog @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -249,7 +260,12 @@ class WindowsDialog @JvmOverloads constructor(
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (!isDragging) v.performClick()
+                    val wasDragging = isDragging
                     isDragging = false
+                    // Save position after dragging
+                    if (wasDragging) {
+                        saveWindowState()
+                    }
                     true
                 }
                 else -> false
@@ -262,21 +278,39 @@ class WindowsDialog @JvmOverloads constructor(
         // Store window manager reference
         this.windowManager = windowManager
 
-        // Immediately make visible and center in the next frame
+        // Immediately make visible and restore saved state or center in the next frame
         post {
             // Request layout to ensure measurements are available
             windowFrame.requestLayout()
 
-            // Center immediately if dimensions are available, otherwise wait
+            // Restore saved state or center immediately if dimensions are available, otherwise wait
             if (windowFrame.width > 0 && windowFrame.height > 0 && overlayRoot.width > 0 && overlayRoot.height > 0) {
-                centerWindowFrame()
+                // Try to restore saved state first, fallback to centering
+                if (windowIdentifier != null) {
+                    restoreWindowState()
+                    // Only center if no saved state was found
+                    if (windowFrame.x == 0f && windowFrame.y == 0f) {
+                        centerWindowFrame()
+                    }
+                } else {
+                    centerWindowFrame()
+                }
                 windowFrame.visibility = View.VISIBLE
             } else {
                 // Only wait for layout if dimensions aren't ready yet
                 windowFrame.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
                     override fun onGlobalLayout() {
                         windowFrame.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        centerWindowFrame()
+                        // Try to restore saved state first, fallback to centering
+                        if (windowIdentifier != null) {
+                            restoreWindowState()
+                            // Only center if no saved state was found
+                            if (windowFrame.x == 0f && windowFrame.y == 0f) {
+                                centerWindowFrame()
+                            }
+                        } else {
+                            centerWindowFrame()
+                        }
                         windowFrame.visibility = View.VISIBLE
                     }
                 })
@@ -494,7 +528,12 @@ class WindowsDialog @JvmOverloads constructor(
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (!isResizing) v.performClick()
+                    val wasResizing = isResizing
                     isResizing = false
+                    // Save size after resizing
+                    if (wasResizing) {
+                        saveWindowState()
+                    }
                     true
                 }
                 else -> false
@@ -1046,6 +1085,9 @@ class WindowsDialog @JvmOverloads constructor(
 //        updateMaximizeButtonIcon()
 
         onMaximizeListener?.invoke()
+
+        // Save the maximized state
+        saveWindowState()
     }
 
     /**
@@ -1074,6 +1116,8 @@ class WindowsDialog @JvmOverloads constructor(
         // Center the window after a brief delay to allow layout to update
         post {
             centerWindowFrame()
+            // Save the restored state after centering is complete
+            saveWindowState()
         }
     }
 
@@ -1155,6 +1199,104 @@ class WindowsDialog @JvmOverloads constructor(
             if (currentTheme is AppTheme.WindowsXP) {
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border_inactive)
             }
+        }
+    }
+
+    /**
+     * Save the current window state to SharedPreferences
+     * Only saves position and size when window is not maximized
+     */
+    private fun saveWindowState() {
+        val identifier = windowIdentifier ?: return
+
+        try {
+            val prefs = context.getSharedPreferences("taskbar_widget_prefs", Context.MODE_PRIVATE)
+            val gson = com.google.gson.Gson()
+
+            // Load existing window states
+            val existingStatesJson = prefs.getString("window_states", "{}")
+            val type = object : com.google.gson.reflect.TypeToken<MutableMap<String, WindowState>>() {}.type
+            val windowStates: MutableMap<String, WindowState> = gson.fromJson(existingStatesJson, type) ?: mutableMapOf()
+
+            // Create current state
+            val currentState = WindowState(
+                x = if (isMaximized) savedX else windowFrame.x,
+                y = if (isMaximized) savedY else windowFrame.y,
+                width = if (isMaximized) savedWidth else windowFrame.width,
+                height = if (isMaximized) savedHeight else windowFrame.height,
+                isMaximized = isMaximized
+            )
+
+            // Update state for this window
+            windowStates[identifier] = currentState
+
+            // Save back to preferences
+            val updatedJson = gson.toJson(windowStates)
+            prefs.edit().putString("window_states", updatedJson).apply()
+
+            Log.d("WindowsDialog", "Saved state for '$identifier': x=${currentState.x}, y=${currentState.y}, " +
+                    "width=${currentState.width}, height=${currentState.height}, maximized=${currentState.isMaximized}")
+        } catch (e: Exception) {
+            Log.e("WindowsDialog", "Error saving window state", e)
+        }
+    }
+
+    /**
+     * Restore the saved window state from SharedPreferences
+     * Called during window setup
+     */
+    private fun restoreWindowState() {
+        val identifier = windowIdentifier ?: return
+
+        try {
+            val prefs = context.getSharedPreferences("taskbar_widget_prefs", Context.MODE_PRIVATE)
+            val gson = com.google.gson.Gson()
+
+            // Load existing window states
+            val existingStatesJson = prefs.getString("window_states", "{}")
+            val type = object : com.google.gson.reflect.TypeToken<MutableMap<String, WindowState>>() {}.type
+            val windowStates: MutableMap<String, WindowState> = gson.fromJson(existingStatesJson, type) ?: mutableMapOf()
+
+            // Get state for this window
+            val savedState = windowStates[identifier] ?: return
+
+            Log.d("WindowsDialog", "Restoring state for '$identifier': x=${savedState.x}, y=${savedState.y}, " +
+                    "width=${savedState.width}, height=${savedState.height}, maximized=${savedState.isMaximized}")
+
+            // Wait for layout to be ready, then apply the state
+            windowFrame.post {
+                // First apply size and position (non-maximized state)
+                if (savedState.width > 0 && savedState.height > 0) {
+                    windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+                        width = savedState.width
+                        height = savedState.height
+                    }
+                }
+
+                // Clamp position to valid bounds
+                val maxX = (overlayRoot.width - savedState.width).coerceAtLeast(0)
+                val maxY = (overlayRoot.height - savedState.height).coerceAtLeast(0)
+                val clampedX = savedState.x.coerceIn(0f, maxX.toFloat())
+                val clampedY = savedState.y.coerceIn(0f, maxY.toFloat())
+
+                windowFrame.x = clampedX
+                windowFrame.y = clampedY
+                currentWindowX = clampedX
+                currentWindowY = clampedY
+
+                // Save the restored position as the new saved position for maximize/restore
+                savedX = clampedX
+                savedY = clampedY
+                savedWidth = savedState.width
+                savedHeight = savedState.height
+
+                // If it was maximized, maximize it now
+                if (savedState.isMaximized && canMaximize) {
+                    maximizeWindow()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("WindowsDialog", "Error restoring window state", e)
         }
     }
 }

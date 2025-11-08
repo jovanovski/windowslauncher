@@ -399,6 +399,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
         private const val KEY_SELECTED_SCREENSAVER = "selected_screensaver"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
+        private const val KEY_WINDOW_STATES = "window_states"
 
         // Screensaver types
         private const val SCREENSAVER_NONE = 0
