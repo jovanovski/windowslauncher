@@ -160,4 +160,16 @@
         android:visibility="gone"
         android:elevation="200dp"
         android:scaleType="fitXY"/>
+    <ImageView
+        android:id="@+id/safe_to_turn_off_splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/black"
+        android:src="@drawable/safe_to_turn_off"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:elevation="1000dp"
+        />
 </RelativeLayout>

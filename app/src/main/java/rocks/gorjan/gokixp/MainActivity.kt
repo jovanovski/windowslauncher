@@ -1365,7 +1365,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             val logoffItem = findViewById<LinearLayout>(R.id.logoff_item)
             logoffItem?.setOnClickListener {
-                handleShutdown()
+                handleShutdown(isLogoff = true)
             }
 
             val settingsItem = findViewById<LinearLayout>(R.id.settings_item)
@@ -7161,7 +7161,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
-    private fun handleShutdown() {
+    private fun handleShutdown(isLogoff: Boolean = false) {
         // Close start menu if it's open
         if (isStartMenuVisible) {
             hideStartMenu()
@@ -7170,8 +7170,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         playShutdownSound()
         // Delay the screen lock to allow sound to play
         Handler(Looper.getMainLooper()).postDelayed({
-            lockScreen()
-        }, 1000) // 1 second delay
+            if(themeManager.isClassicTheme()) {
+                if(isLogoff){
+                    lockScreen()
+                }
+                else {
+                    showSafeToTurnOffScreen()
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        lockScreen()
+                    }, 1500)
+                }
+            }
+            else{
+                lockScreen()
+            }
+        }, 1500) // 1 second delay
     }
     
     private fun playShutdownSound() {
@@ -7197,7 +7210,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playSound(R.raw.shutdown)
         }
     }
-    
+
+    private fun showSafeToTurnOffScreen() {
+        val safeToTurnOffSplash = findViewById<ImageView>(R.id.safe_to_turn_off_splash)
+        safeToTurnOffSplash?.visibility = View.VISIBLE
+    }
+
     private fun lockScreen() {
         // Check Android version compatibility
 
@@ -8301,6 +8319,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::screensaverManager.isInitialized) {
             screensaverManager.stopInactivityTimer()
         }
+
+        // Hide safe to turn off splash if visible
+        val safeToTurnOffSplash = findViewById<ImageView>(R.id.safe_to_turn_off_splash)
+        safeToTurnOffSplash?.visibility = View.GONE
 
         // Clear non-essential caches to free memory when app goes to background
         clearNonEssentialCaches()
