@@ -2157,19 +2157,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun setupKeyboardDetection() {
         val rootView = findViewById<View>(android.R.id.content)
-        rootView.viewTreeObserver.addOnGlobalLayoutListener {
-            val rect = android.graphics.Rect()
-            rootView.getWindowVisibleDisplayFrame(rect)
-            val screenHeight = rootView.height
-            val keypadHeight = screenHeight - rect.bottom
-            
+
+        // Use modern WindowInsets API for reliable keyboard detection (API 30+)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
+            val imeVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            val imeHeight = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+
             val wasKeyboardOpen = isKeyboardOpen
-            isKeyboardOpen = keypadHeight > screenHeight * 0.15 // If more than 15% of screen is taken by keypad
-            
+            isKeyboardOpen = imeVisible
+
             // Only adjust if keyboard state changed and start menu is visible
             if (wasKeyboardOpen != isKeyboardOpen && isStartMenuVisible) {
                 adjustStartMenuForKeyboard()
             }
+
+            // Return insets to allow other listeners to handle them
+            insets
         }
     }
     
