@@ -17,6 +17,9 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.updateLayoutParams
+import com.google.api.services.drive.model.App
+import eightbitlab.com.blurview.BlurView
+import eightbitlab.com.blurview.BlurTarget
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 
@@ -168,6 +171,29 @@ class WindowsDialog @JvmOverloads constructor(
         // Get border frame only for Windows XP theme
         if (currentTheme is AppTheme.WindowsXP || currentTheme is AppTheme.WindowsVista) {
             windowBorder = findViewById(R.id.window_border)
+
+
+//            // Setup Windows Aero blur effect for Vista theme
+//            if (currentTheme is AppTheme.WindowsVista) {
+//                // Delay blur setup until views are laid out to avoid crashes
+//                post {
+//                    try {
+//                        val blurView = findViewById<BlurView>(R.id.title_blur_view)
+//                        val blurTarget = findViewById<BlurTarget>(R.id.blur_target)
+//
+//                        // Get the window's decor view for background drawable
+//                        val decorView = (context as? Activity)?.window?.decorView
+//                        val windowBackground = decorView?.background
+//
+//                        // Setup BlurView to blur content behind it
+//                        blurView.setupWith(blurTarget)
+//                            .setFrameClearDrawable(windowBackground) // Optional: makes background opaque
+//                            .setBlurRadius(15f) // Adjust blur intensity (0-25 recommended)
+//                    } catch (e: Exception) {
+//                        Log.e("WindowsDialog", "Error setting up blur effect", e)
+//                    }
+//                }
+//            }
         }
 
         // Set window frame width to 80% of screen, height wraps content

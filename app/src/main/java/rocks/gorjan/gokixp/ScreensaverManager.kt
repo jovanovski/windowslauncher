@@ -60,6 +60,10 @@ class ScreensaverManager(
                 setBackgroundDrawableResource(android.R.color.black)
                 addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+                addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+
+                // Clear any flags that might prevent fullscreen
+                clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
 
                 // Hide system bars
                 WindowCompat.setDecorFitsSystemWindows(this, false)
@@ -88,8 +92,11 @@ class ScreensaverManager(
                 // Scale video to fill screen (center crop)
                 val videoWidth = mediaPlayer.videoWidth
                 val videoHeight = mediaPlayer.videoHeight
-                val screenWidth = videoView.width
-                val screenHeight = videoView.height
+
+                // Get actual screen dimensions from display metrics
+                val displayMetrics = context.resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val screenHeight = displayMetrics.heightPixels
 
                 // Calculate scale to fill screen (using max instead of min for crop behavior)
                 val scaleX = screenWidth.toFloat() / videoWidth

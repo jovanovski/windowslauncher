@@ -5,7 +5,7 @@
     <!-- Border stroke -->
     <stroke
         android:width="2dp"
-        android:color="#bccfe6" />
+        android:color="#CCc1cfe6" />
 
     <!-- Border radius only at bottom -->
     <corners

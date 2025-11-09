@@ -90,6 +90,7 @@
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
             android:paddingBottom="2dp"
+            android:paddingTop="2dp"
             android:background="@drawable/windows_vista_dialog_border">
 
                 <LinearLayout
@@ -97,8 +98,7 @@
                     android:clickable="true"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:background="#f0f0f0" />
+                    android:orientation="vertical" />
         </FrameLayout>
     </LinearLayout>
 </FrameLayout>
