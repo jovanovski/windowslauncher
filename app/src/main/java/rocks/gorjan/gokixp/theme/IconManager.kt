@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import rocks.gorjan.gokixp.MainActivity
 
 /**
  * Manages custom icon mappings for each theme.
@@ -14,7 +15,7 @@ import com.google.gson.reflect.TypeToken
  * - User custom icons are fully preserved during migration
  */
 class IconManager(private val context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
     private val mapType = object : TypeToken<Map<String, String>>() {}.type
 
@@ -130,7 +131,6 @@ class IconManager(private val context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "taskbar_widget_prefs"  // Must match MainActivity's PREFS_NAME
         private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
         private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
         private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"

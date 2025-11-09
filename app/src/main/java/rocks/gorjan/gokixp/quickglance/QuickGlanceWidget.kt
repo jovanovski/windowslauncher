@@ -38,8 +38,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
     // Movement threshold for distinguishing between tap, drag, and long press
     private val MOVEMENT_THRESHOLD = 10f
     
-    // SharedPreferences keys for position and settings
-    private val PREFS_NAME = "quick_glance_position"
+    // SharedPreferences keys for position and settings - use MainActivity.PREFS_NAME for consistency
     private val KEY_WIDGET_X = "widget_x"
     private val KEY_WIDGET_Y = "widget_y"
     private val KEY_SHOW_CALENDAR_EVENTS = "show_calendar_events"
@@ -365,7 +364,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
     
     private fun savePosition() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().apply {
             putFloat(KEY_WIDGET_X, x)
             putFloat(KEY_WIDGET_Y, y)
@@ -375,7 +374,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
     
     fun restorePosition() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val savedX = prefs.getFloat(KEY_WIDGET_X, -1f)
         val savedY = prefs.getFloat(KEY_WIDGET_Y, -1f)
         
@@ -552,12 +551,12 @@ class QuickGlanceWidget @JvmOverloads constructor(
     
     // Calendar events setting management
     fun isShowCalendarEventsEnabled(): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(KEY_SHOW_CALENDAR_EVENTS, false) // Default to false (unchecked)
     }
 
     fun setShowCalendarEvents(enabled: Boolean) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_SHOW_CALENDAR_EVENTS, enabled).apply()
 
         if (enabled) {

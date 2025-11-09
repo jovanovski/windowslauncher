@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.core.content.edit
 import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 
 /**
@@ -20,12 +21,11 @@ class DialerApp(
     private val onShowContextMenu: (List<ContextMenuItem>, Float, Float) -> Unit
 ) {
     companion object {
-        private const val PREFS_NAME = "taskbar_widget_prefs"
         private const val SPEED_DIAL_COUNT = 8
     }
 
     // App state
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
     private var currentContacts = listOf<ContactInfo>()
     private var isPickingSlot = false
     private var contactToSave: ContactInfo? = null

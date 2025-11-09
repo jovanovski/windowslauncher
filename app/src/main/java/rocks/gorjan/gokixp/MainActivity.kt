@@ -360,7 +360,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     companion object {
-        private const val PREFS_NAME = "taskbar_widget_prefs"
+        const val PREFS_NAME = "taskbar_widget_prefs"  // Public constant for shared preferences name
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_SOUND_MUTED = "sound_muted"
@@ -388,6 +388,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WEATHER_TIMESTAMP = "weather_timestamp"
         private const val KEY_WEATHER_UNIT = "weather_unit"
         private const val KEY_QUICK_GLANCE_VISIBLE = "quick_glance_visible"
+        private const val KEY_AGENT_X = "agent_x"
+        private const val KEY_AGENT_Y = "agent_y"
+        private const val KEY_CURRENT_AGENT = "current_agent_id"
+        private const val KEY_WIDGET_X = "widget_x"
+        private const val KEY_WIDGET_Y = "widget_y"
+        private const val KEY_SHOW_CALENDAR_EVENTS = "show_calendar_events"
+        private const val KEY_IE_HOMEPAGE = "ie_homepage"
         private const val KEY_SWIPE_RIGHT_APP = "swipe_right_app"
         private const val KEY_WEATHER_APP = "weather_app"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
@@ -659,6 +666,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Set up modern back press handling
         setupBackPressHandling()
+
+        // Migrate custom mappings from old preferences file if needed
+        migrateCustomMappingsIfNeeded()
 
         // Load custom icon mappings first so they're available when loading desktop icons
         loadCustomIconMappings()
@@ -2416,7 +2426,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
                 val query = searchBox.text.toString().trim()
                 if (query.isNotEmpty()) {
-                    openSearchWithQuery(query)
+                    if(query == "marti"){
+                        val url = "https://gorjan.rocks/clients/marti/"
+                        showInternetExplorerDialog(url)
+                    }
+                    else {
+                        openSearchWithQuery(query)
+                    }
                     hideStartMenu()
                 }
                 true
@@ -2902,9 +2918,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Restore saved position or set default position after adding to layout
         handler.post {
             // Use the same preference system as ClippyView for consistency
-            val prefs = getSharedPreferences("agent_settings", MODE_PRIVATE)
-            val savedX = prefs.getFloat("agent_x", -1f)
-            val savedY = prefs.getFloat("agent_y", -1f)
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val savedX = prefs.getFloat(KEY_AGENT_X, -1f)
+            val savedY = prefs.getFloat(KEY_AGENT_Y, -1f)
 
             if (savedX >= 0 && savedY >= 0) {
                 // Restore saved position using ClippyView's restore method
@@ -2955,9 +2971,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Restore saved position or set default position after adding to layout
         handler.post {
-            val prefs = getSharedPreferences("quick_glance_position", MODE_PRIVATE)
-            val savedX = prefs.getFloat("widget_x", -1f)
-            val savedY = prefs.getFloat("widget_y", -1f)
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val savedX = prefs.getFloat(KEY_WIDGET_X, -1f)
+            val savedY = prefs.getFloat(KEY_WIDGET_Y, -1f)
             
             if (savedX >= 0 && savedY >= 0) {
                 // Restore saved position
@@ -4288,7 +4304,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun saveCustomIconMappings() {
-        val prefs = getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         // Use the reliable getCustomIconsPath() method to determine current theme
         val expectedIconsPath = getCustomIconsPath()
@@ -4306,9 +4322,84 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             putString(themeKey, jsonString)
         }
     }
-    
+
+    // Migrate all settings from old separate SharedPreferences files to current PREFS_NAME
+    // This function can be deleted in a future version after users have migrated
+    private fun migrateCustomMappingsIfNeeded() {
+        val newPrefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // List of old SharedPreferences files to migrate from
+        val oldPrefsToMigrate = listOf(
+            "launcher_prefs",
+            "agent_settings",
+            "quick_glance_position",
+            "GokiXP",  // Internet Explorer homepage
+            "msn_thread_prefs"  // MSN message read status
+        )
+
+        var migrationNeeded = false
+
+        // Check if any old prefs files have data that's not in the new prefs
+        oldPrefsToMigrate.forEach { oldPrefsName ->
+            val oldPrefs = getSharedPreferences(oldPrefsName, Context.MODE_PRIVATE)
+            if (oldPrefs.all.isNotEmpty()) {
+                // Check if any key from old prefs is missing in new prefs
+                oldPrefs.all.keys.forEach { key ->
+                    if (!newPrefs.contains(key)) {
+                        migrationNeeded = true
+                    }
+                }
+            }
+        }
+
+        if (migrationNeeded) {
+            Log.d("MainActivity", "Migrating settings from old SharedPreferences files to $PREFS_NAME")
+            newPrefs.edit {
+                oldPrefsToMigrate.forEach { oldPrefsName ->
+                    val oldPrefs = getSharedPreferences(oldPrefsName, Context.MODE_PRIVATE)
+                    val allOldPrefs = oldPrefs.all
+
+                    if (allOldPrefs.isNotEmpty()) {
+                        Log.d("MainActivity", "Migrating from $oldPrefsName (${allOldPrefs.size} keys)")
+
+                        allOldPrefs.forEach { (key, value) ->
+                            if (!newPrefs.contains(key)) {
+                                when (value) {
+                                    is String -> {
+                                        putString(key, value)
+                                        Log.d("MainActivity", "  Migrated String: $key")
+                                    }
+                                    is Boolean -> {
+                                        putBoolean(key, value)
+                                        Log.d("MainActivity", "  Migrated Boolean: $key = $value")
+                                    }
+                                    is Int -> {
+                                        putInt(key, value)
+                                        Log.d("MainActivity", "  Migrated Int: $key = $value")
+                                    }
+                                    is Long -> {
+                                        putLong(key, value)
+                                        Log.d("MainActivity", "  Migrated Long: $key = $value")
+                                    }
+                                    is Float -> {
+                                        putFloat(key, value)
+                                        Log.d("MainActivity", "  Migrated Float: $key = $value")
+                                    }
+                                    else -> {
+                                        Log.w("MainActivity", "  Unknown type for key $key: ${value?.javaClass?.name}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Log.d("MainActivity", "Migration completed successfully")
+        }
+    }
+
     private fun loadCustomIconMappings() {
-        val prefs = getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         // Use the reliable getCustomIconsPath() method to determine current theme
         val expectedIconsPath = getCustomIconsPath()
@@ -4358,7 +4449,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun saveCustomNameMappings() {
-        val prefs = getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit {
             // Convert map to JSON string (simple approach)
             val jsonString =
@@ -4368,7 +4459,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun loadCustomNameMappings() {
-        val prefs = getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonString = prefs.getString(KEY_CUSTOM_NAMES, "") ?: ""
         
         customNameMappings.clear()
@@ -5320,7 +5411,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
         // Set cursor to busy while loading
         setCursorBusy()
-
         // Defer the actual loading to allow cursor to render
         Handler(Looper.getMainLooper()).post {
             createAndShowInternetExplorerDialog(initialUrl, appInfo)
@@ -5513,7 +5603,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onImportFromLocalFile = { importFromLocalFile() },
             onImportFromGoogleDrive = { importFromGoogleDrive() },
             onAutoSyncChanged = { enabled -> handleAutoSyncChanged(enabled) },
-            getLastSyncTime = { preferences.getLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L) }
+            getLastSyncTime = { preferences.getSafeLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L) }
         )
 
         // Store instance for auto-sync updates
@@ -9435,10 +9525,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun getCachedWeatherTimestamp(): Long {
         return try {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            prefs.getLong(KEY_WEATHER_TIMESTAMP, 0)
+            prefs.getSafeLong(KEY_WEATHER_TIMESTAMP, 0L)
         } catch (e: Exception) {
             Log.e("MainActivity", "Error retrieving weather timestamp", e)
-            0
+            0L
         }
     }
     
@@ -9498,9 +9588,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    // Helper function to safely get Long values from SharedPreferences
+    // Handles migration from Integer to Long by removing old values
+    private fun android.content.SharedPreferences.getSafeLong(key: String, defaultValue: Long): Long {
+        return try {
+            getLong(key, defaultValue)
+        } catch (e: ClassCastException) {
+            // Handle migration from Integer to Long - remove old value
+            edit { remove(key) }
+            Log.w("MainActivity", "Migrated $key from Integer to Long")
+            defaultValue
+        }
+    }
+
     private fun isCachedWeatherDataOld(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val timestamp = prefs.getLong(KEY_WEATHER_TIMESTAMP, 0L)
+        val timestamp = prefs.getSafeLong(KEY_WEATHER_TIMESTAMP, 0L)
         val currentTime = System.currentTimeMillis()
         val thirtyMinutesAgo = currentTime - (30 * 60 * 1000) // 30 minutes
         return timestamp < thirtyMinutesAgo

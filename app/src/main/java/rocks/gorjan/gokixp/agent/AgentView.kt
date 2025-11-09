@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.ImageView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.gif.GifDrawable
+import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.agent.Agent
@@ -40,8 +41,7 @@ class AgentView @JvmOverloads constructor(
     private var longPressRunnable: Runnable? = null
     private var isLongPress = false
     
-    // SharedPreferences keys
-    private val PREFS_NAME = "agent_settings"
+    // SharedPreferences keys - use MainActivity.PREFS_NAME for consistency
     private val KEY_AGENT_X = "agent_x"
     private val KEY_AGENT_Y = "agent_y"
     private val KEY_CURRENT_AGENT = "current_agent_id"
@@ -78,7 +78,7 @@ class AgentView @JvmOverloads constructor(
     }
     
     private fun loadCurrentAgent() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val savedAgentId = prefs.getString(KEY_CURRENT_AGENT, Agent.ROVER.id) ?: Agent.ROVER.id
         currentAgent = Agent.getAgentById(savedAgentId) ?: Agent.ROVER
         Log.d("AgentView", "Loaded current agent: ${currentAgent.name}")
@@ -94,7 +94,7 @@ class AgentView @JvmOverloads constructor(
     }
     
     private fun saveCurrentAgent() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_CURRENT_AGENT, currentAgent.id).apply()
     }
     
@@ -258,7 +258,7 @@ class AgentView @JvmOverloads constructor(
     }
     
     fun savePosition() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().apply {
             putFloat(KEY_AGENT_X, x)
             putFloat(KEY_AGENT_Y, y)
@@ -268,7 +268,7 @@ class AgentView @JvmOverloads constructor(
     }
     
     fun restorePosition() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         val savedX = prefs.getFloat(KEY_AGENT_X, -1f)
         val savedY = prefs.getFloat(KEY_AGENT_Y, -1f)
         

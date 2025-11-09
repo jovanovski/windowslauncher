@@ -45,14 +45,13 @@ class NotepadApp(
     private val getCursorPosition: () -> Pair<Float, Float>
 ) {
     companion object {
-        private const val PREFS_NAME = "taskbar_widget_prefs"
         private const val KEY_NOTES = "notepad_notes"
         private const val KEY_OLD_NOTE = "notepad_content"
         private const val KEY_LAST_NOTE_ID = "notepad_last_note_id"
     }
 
     // Game state
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
     private val notes = mutableListOf<Note>()
     private var currentNote: Note? = null
     private var isListExpanded = false

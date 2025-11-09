@@ -15,11 +15,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.updateLayoutParams
-import com.google.api.services.drive.model.App
-import eightbitlab.com.blurview.BlurView
-import eightbitlab.com.blurview.BlurTarget
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 
@@ -1339,7 +1335,7 @@ class WindowsDialog @JvmOverloads constructor(
         val identifier = windowIdentifier ?: return
 
         try {
-            val prefs = context.getSharedPreferences("taskbar_widget_prefs", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             val gson = com.google.gson.Gson()
 
             // Load existing window states
@@ -1378,7 +1374,7 @@ class WindowsDialog @JvmOverloads constructor(
         val identifier = windowIdentifier ?: return
 
         try {
-            val prefs = context.getSharedPreferences("taskbar_widget_prefs", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             val gson = com.google.gson.Gson()
 
             // Load existing window states

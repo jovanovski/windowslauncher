@@ -11,6 +11,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 
 class InternetExplorerApp(
@@ -24,7 +25,7 @@ class InternetExplorerApp(
 
     fun setupApp(contentView: View, initialUrl: String? = null) {
         // Load homepage from shared preferences
-        val prefs = context.getSharedPreferences("GokiXP", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         homepage = prefs.getString("ie_homepage", "https://news.google.com") ?: "https://news.google.com"
 
         // Get references to views
@@ -269,7 +270,7 @@ class InternetExplorerApp(
             if (currentUrl != null && currentUrl.isNotEmpty()) {
                 // Save new homepage
                 homepage = currentUrl
-                val prefs = context.getSharedPreferences("GokiXP", Context.MODE_PRIVATE)
+                val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().putString("ie_homepage", homepage).apply()
 
                 onShowNotification("Homepage Changed", "Set to: $currentUrl")

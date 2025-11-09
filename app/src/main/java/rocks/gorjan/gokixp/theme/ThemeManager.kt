@@ -2,6 +2,7 @@ package rocks.gorjan.gokixp.theme
 
 import android.content.Context
 import androidx.core.content.edit
+import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 
 /**
@@ -55,7 +56,7 @@ sealed class AppTheme {
  * - No breaking changes to user settings
  */
 class ThemeManager(private val context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
 
 
     /**
@@ -344,7 +345,6 @@ class ThemeManager(private val context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "taskbar_widget_prefs"  // Must match MainActivity's PREFS_NAME
         private const val KEY_SELECTED_THEME = "selected_theme"
     }
 }

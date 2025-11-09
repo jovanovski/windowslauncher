@@ -82,7 +82,7 @@ class MsnApp(
 
     // SharedPreferences for tracking read status
     private val prefs by lazy {
-        context.getSharedPreferences("msn_thread_prefs", Context.MODE_PRIVATE)
+        context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     /**
