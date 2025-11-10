@@ -4903,7 +4903,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
 
         // Set up theme spinner with appropriate layouts based on current theme
-        val themes = arrayOf("Windows Vista", "Windows XP", "Windows Classic")
+        val themes = arrayOf("Windows Classic", "Windows XP", "Windows Vista")
         val spinnerLayoutId = themeManager.getSpinnerItemLayoutRes(currentTheme)
         val dropdownLayoutId = themeManager.getSpinnerDropdownLayoutRes(currentTheme)
 
@@ -6734,13 +6734,25 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         wmpApp.setupApp(contentView)
 
         windowsDialog.setContentView(contentView)
-        if(themeManager.isClassicTheme()) {
-            windowsDialog.setWindowSize(286, 412)
-        }
-        else if(themeManager.isXPTheme()) {
-            windowsDialog.setWindowSize(384, 262)
-        }else {
-            windowsDialog.setWindowSize(384, 284)
+
+        // Disable state persistence - WMP has fixed size per theme
+        windowsDialog.setSaveState(false)
+
+        // Set window size based on theme
+        when {
+            themeManager.isClassicTheme() -> {
+                windowsDialog.setWindowSize(286, 412)
+            }
+            themeManager.isXPTheme() -> {
+                windowsDialog.setWindowSize(384, 262)
+            }
+            themeManager.isVistaTheme() -> {
+                windowsDialog.setWindowSize(384, 284)
+            }
+            else -> {
+                // Fallback to XP size
+                windowsDialog.setWindowSize(384, 262)
+            }
         }
 
         // Set up window control handlers

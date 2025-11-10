@@ -78,6 +78,9 @@ class WindowsDialog @JvmOverloads constructor(
     private var savedX = 0f
     private var savedY = 0f
 
+    // State persistence control
+    private var shouldSaveState = true
+
     // Keyboard handling for maximized windows
     private var keyboardHeight = 0
     private var isKeyboardVisible = false
@@ -668,6 +671,14 @@ class WindowsDialog @JvmOverloads constructor(
         canMaximize = enabled
         // Show or hide maximize button based on enabled state
         maximizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Enable or disable saving/restoring window state (position and size).
+     * Useful for windows that should have a fixed size per theme.
+     */
+    fun setSaveState(enabled: Boolean) {
+        shouldSaveState = enabled
     }
 
     /**
@@ -1332,6 +1343,9 @@ class WindowsDialog @JvmOverloads constructor(
      * Only saves position and size when window is not maximized
      */
     private fun saveWindowState() {
+        // Skip saving if state saving is disabled
+        if (!shouldSaveState) return
+
         val identifier = windowIdentifier ?: return
 
         try {
@@ -1371,6 +1385,9 @@ class WindowsDialog @JvmOverloads constructor(
      * Called during window setup
      */
     private fun restoreWindowState() {
+        // Skip restoration if state saving is disabled
+        if (!shouldSaveState) return
+
         val identifier = windowIdentifier ?: return
 
         try {
