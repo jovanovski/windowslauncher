@@ -6210,7 +6210,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         msnApp.setupApp(contentView)
 
         windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(400, 533)
+        windowsDialog.setWindowSize(400, 522)
 
         // Set up window control handlers
         windowsDialog.setOnMinimizeListener {

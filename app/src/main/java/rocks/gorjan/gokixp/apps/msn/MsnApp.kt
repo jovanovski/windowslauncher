@@ -53,12 +53,15 @@ class MsnApp(
     private var toggleThreadsButton: TextView? = null
     private var messageThreadScrollView: ScrollView? = null
     private var backgroundImage: ImageView? = null
+    private var contactSearchBox: EditText? = null
 
     // Current state
     private var currentThreadAddress: String? = null
     private val smsThreads = mutableListOf<SmsThread>()
     private val currentMessages = mutableListOf<SmsMessage>()
     private var selectedThread: SmsThread? = null
+    private var isSearchMode: Boolean = false
+    private val searchResults = mutableListOf<ContactInfo>()
 
     // Lazy loading state
     private var threadsLoaded = 0
@@ -79,6 +82,11 @@ class MsnApp(
 
     // Toggle state
     private var isThreadsVisible = true
+
+    // Search debouncing
+    private var searchHandler: android.os.Handler? = null
+    private var searchRunnable: Runnable? = null
+    private val SEARCH_DELAY_MS = 300L
 
     // SharedPreferences for tracking read status
     private val prefs by lazy {
@@ -108,15 +116,24 @@ class MsnApp(
         toggleThreadsButton = contentView.findViewById(R.id.msn_toggle_threads)
         messageThreadScrollView = contentView.findViewById(R.id.msn_message_thread_wrapper)
         backgroundImage = contentView.findViewById(R.id.msn_background)
+        contactSearchBox = contentView.findViewById(R.id.msn_contact_search_box)
 
         // Find the ScrollView parent
-        recentThreadsScrollView = recentThreadsTable?.parent as? ScrollView
+        recentThreadsScrollView = contentView.findViewById(R.id.msn_recent_message_threads_wrapper)
+
+        // Disable layout animations to prevent scroll jumping during lazy load
+        recentThreadsTable?.layoutTransition = null
 
         // Load initial batch of SMS threads
         loadMoreThreads()
 
         // Set up scroll listener for lazy loading
         recentThreadsScrollView?.setOnScrollChangeListener { v, scrollX, scrollY, oldScrollX, oldScrollY ->
+            // Only enable lazy loading when NOT in search mode
+            if (isSearchMode) {
+                return@setOnScrollChangeListener
+            }
+
             val scrollView = v as ScrollView
             val child = scrollView.getChildAt(0)
 
@@ -162,7 +179,184 @@ class MsnApp(
         // Set up SMS receiver
         setupSmsReceiver()
 
+        // Set up contact search box listener
+        setupContactSearch()
+
         return contentView
+    }
+
+    /**
+     * Set up contact search functionality
+     */
+    private fun setupContactSearch() {
+        searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        contactSearchBox?.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString() ?: ""
+
+                // Cancel any pending search
+                searchRunnable?.let { searchHandler?.removeCallbacks(it) }
+
+                if (query.isNotEmpty()) {
+                    // Enter search mode
+                    isSearchMode = true
+
+                    // Debounce the search - wait for user to stop typing
+                    searchRunnable = Runnable {
+                        performContactSearch(query)
+                    }
+                    searchHandler?.postDelayed(searchRunnable!!, SEARCH_DELAY_MS)
+                } else {
+                    // Exit search mode immediately
+                    isSearchMode = false
+                    reloadAllThreads()
+                }
+            }
+        })
+    }
+
+    /**
+     * Perform contact search and display results
+     */
+    private fun performContactSearch(query: String) {
+        searchResults.clear()
+        searchResults.addAll(searchContacts(query))
+        displaySearchResults()
+    }
+
+    /**
+     * Display search results in the thread list
+     */
+    private fun displaySearchResults() {
+        recentThreadsTable?.removeAllViews()
+
+        searchResults.forEach { contact ->
+            val tableRow = TableRow(context).apply {
+                layoutParams = TableLayout.LayoutParams(
+                    TableLayout.LayoutParams.MATCH_PARENT,
+                    TableLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            // Inflate the thread item layout
+            val threadItem = LayoutInflater.from(context).inflate(
+                R.layout.program_msn_thread_item,
+                tableRow,
+                false
+            )
+
+            val threadName = threadItem.findViewById<TextView>(R.id.thread_name)
+            val notificationDot = threadItem.findViewById<View>(R.id.notification_dot)
+
+            // Set the contact name
+            threadName.text = contact.name
+
+            // Hide notification dot for search results
+            notificationDot?.visibility = View.GONE
+
+            // Set styling
+            threadItem.alpha = 0.6f
+            threadItem.setBackgroundColor(0xFFFFFFFF.toInt())
+
+            // Set click listener to open thread with this contact
+            threadItem.setOnClickListener {
+                onSoundPlay()
+                openThreadWithContact(contact)
+            }
+
+            tableRow.addView(threadItem)
+            recentThreadsTable?.addView(tableRow)
+        }
+    }
+
+    /**
+     * Open a thread with a contact (create new thread if no messages exist)
+     */
+    private fun openThreadWithContact(contact: ContactInfo) {
+        // Clear search box and exit search mode
+        contactSearchBox?.setText("")
+        isSearchMode = false
+
+        // Find or create thread for this contact
+        val existingThread = smsThreads.find { it.address == contact.phoneNumber }
+
+        if (existingThread != null) {
+            // Load existing thread
+            loadThread(existingThread)
+        } else {
+            // Create new empty thread
+            val newThread = SmsThread(
+                address = contact.phoneNumber,
+                contactName = contact.name,
+                lastMessage = "",
+                timestamp = 0L
+            )
+            selectedThread = newThread
+            currentThreadAddress = contact.phoneNumber
+            currentMessages.clear()
+
+            // Update recipient field
+            recipientText?.setText("${contact.name} (${contact.phoneNumber})")
+
+            // Clear message display
+            displayMessages()
+
+            // Reload thread list
+            reloadAllThreads()
+        }
+    }
+
+    /**
+     * Search contacts by name, last name, nickname, company
+     */
+    private fun searchContacts(query: String): List<ContactInfo> {
+        val contacts = mutableListOf<ContactInfo>()
+
+        // Check if we have READ_CONTACTS permission
+        if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return contacts
+        }
+
+        try {
+            val queryLower = query.lowercase()
+
+            val cursor = context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null,
+                null,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+            )
+
+            cursor?.use {
+                val nameIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+
+                while (it.moveToNext()) {
+                    val name = it.getString(nameIndex) ?: continue
+                    val number = it.getString(numberIndex) ?: continue
+
+                    // Clean the phone number (remove spaces, dashes, etc.)
+                    val cleanNumber = number.replace(Regex("[^0-9+]"), "")
+
+                    // Match by name (case insensitive, contains query)
+                    if (name.lowercase().contains(queryLower)) {
+                        contacts.add(ContactInfo(name, cleanNumber))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error searching contacts", e)
+        }
+
+        // Remove duplicates by name and return results
+        return contacts.distinctBy { it.name }
     }
 
     /**
@@ -645,6 +839,33 @@ class MsnApp(
         messageThreadTable?.removeAllViews()
 
         currentMessages.forEach { message ->
+            // Add timestamp above message
+            val timestampView = TextView(context).apply {
+                text = formatTimestamp(message.timestamp)
+                textSize = 8f
+                setTextColor(0xFF666666.toInt())
+                // Align timestamp same as message (right for sent, left for received)
+                gravity = if (message.isSent) {
+                    android.view.Gravity.END
+                } else {
+                    android.view.Gravity.START
+                }
+                typeface = MainActivity.getInstance()?.getThemePrimaryFont()
+                layoutParams = TableLayout.LayoutParams(
+                    TableLayout.LayoutParams.MATCH_PARENT,
+                    TableLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    if(message.isSent){
+                        setMargins(0, 4.dpToPx(), 5.dpToPx(), 1.dpToPx())
+                    }
+                    else{
+                        setMargins(5.dpToPx(), 4.dpToPx(), 0, 1.dpToPx())
+                    }
+
+                }
+            }
+            messageThreadTable?.addView(timestampView)
+
             // Create a container LinearLayout for proper alignment
             val messageContainer = android.widget.LinearLayout(context).apply {
                 orientation = android.widget.LinearLayout.HORIZONTAL
@@ -670,10 +891,11 @@ class MsnApp(
                     message.body
                 }
                 textSize = 12f
-                setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
+                setPadding(6.dpToPx(), 4.dpToPx(), 6.dpToPx(), 4.dpToPx())
 
                 // Use theme's primary font
                 typeface = MainActivity.getInstance()?.getThemePrimaryFont()
+                lineHeight = 14.dpToPx()
 
                 // Set max width to ensure messages don't overflow (TableLayout is 233dp, leave some margin)
                 maxWidth = 180.dpToPx()
@@ -719,6 +941,14 @@ class MsnApp(
             val scrollView = messageThreadTable?.parent as? ScrollView
             scrollView?.fullScroll(View.FOCUS_DOWN)
         }
+    }
+
+    /**
+     * Format timestamp to "Mon, 10 Nov, 08:22" format
+     */
+    private fun formatTimestamp(timestamp: Long): String {
+        val sdf = SimpleDateFormat("EEE, dd MMM, HH:mm", Locale.getDefault())
+        return sdf.format(Date(timestamp))
     }
 
     /**
@@ -899,6 +1129,11 @@ class MsnApp(
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering SMS receiver", e)
         }
+
+        // Cancel any pending search operations
+        searchRunnable?.let { searchHandler?.removeCallbacks(it) }
+        searchHandler = null
+        searchRunnable = null
     }
 
     /**
@@ -927,4 +1162,12 @@ data class SmsMessage(
     val body: String,
     val timestamp: Long,
     val isSent: Boolean
+)
+
+/**
+ * Data class for contact information
+ */
+data class ContactInfo(
+    val name: String,
+    val phoneNumber: String
 )

@@ -17,8 +17,7 @@
         android:layout_height="wrap_content"
         android:lines="1"
         android:ellipsize="end"
-        android:text=""
-        android:layout_marginTop="58dp"
+        android:layout_marginTop="56dp"
         android:layout_marginLeft="32dp"
         android:textSize="10sp"
         android:background="@android:color/transparent"
@@ -58,16 +57,17 @@
     <EditText
         android:id="@+id/msn_compose_message"
         android:layout_width="188dp"
-        android:layout_height="53dp"
+        android:layout_height="58dp"
         android:background="@android:color/transparent"
-        android:layout_marginTop="420dp"
-        android:layout_marginLeft="12dp"
+        android:layout_marginTop="416dp"
+        android:layout_marginLeft="10dp"
         android:fontFamily="?primaryFontFamily"
         android:textSize="12sp"
         android:textColor="@color/black"
         android:hint="Compose a message..."
         android:textColorHint="#666"
-        android:paddingStart="2dp"
+        android:paddingStart="4dp"
+        android:paddingTop="2dp"
         android:gravity="start"
         android:imeOptions="actionSend"
         android:inputType="text"
@@ -89,13 +89,28 @@
         android:layout_marginTop="50dp"
         android:layout_marginLeft="251dp"
         android:background="@color/white">
-
-        <TableLayout
-            android:id="@+id/msn_recent_message_threads"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <EditText
+                android:id="@+id/msn_contact_search_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Search for a contact..."
+                android:textSize="11sp"
+                android:textColor="@color/black"
+                android:textColorHint="#777"
+                android:background="@android:color/transparent"
+                android:fontFamily="?primaryFontFamily"
+                android:padding="3dp"
             />
-
+            <TableLayout
+                android:id="@+id/msn_recent_message_threads"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                />
+        </LinearLayout>
     </ScrollView>
 
 
@@ -109,6 +124,7 @@
         android:textSize="12sp"
         android:paddingStart="0dp"
         android:paddingEnd="0dp"
+        android:paddingTop="0dp"
         style="?winButtonStyle"
         />
 
