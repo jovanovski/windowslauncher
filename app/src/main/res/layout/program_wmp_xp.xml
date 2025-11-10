@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="282dp"
+    android:layout_height="370dp">
+
+    <ImageView
+        android:id="@+id/background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/wmp_98_screen"/>
+
+
+    <VideoView
+        android:id="@+id/wmp_video_player"
+        android:layout_marginTop="21dp"
+        android:layout_marginStart="3dp"
+        android:layout_width="276dp"
+        android:layout_height="181dp"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="92dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginEnd="3dp"
+        android:layout_marginTop="276dp">
+        <TableLayout
+            android:id="@+id/wmp_playlist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </ScrollView>
+
+    <View
+        android:id="@+id/wmp_play_pause_toggle"
+        android:layout_marginTop="222dp"
+        android:layout_marginStart="1dp"
+        android:layout_width="25dp"
+        android:layout_height="25dp"/>
+    
+</RelativeLayout>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="270dp">
+
+    <ImageView
+        android:id="@+id/background"
+        android:layout_width="400dp"
+        android:layout_height="270dp"
+        android:src="@drawable/welcome_2000_welcome"/>
+
+    <TextView
+        android:id="@+id/version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Version: 1.1"
+        android:fontFamily="@font/micross_block"
+        android:textSize="10sp"
+        android:textColor="@color/black"
+        android:layout_marginTop="250dp"
+        android:layout_marginStart="10dp"
+        />
+
+    <ScrollView
+        android:layout_width="230dp"
+        android:layout_height="135dp"
+        android:layout_marginTop="107dp"
+        android:layout_marginStart="164dp"
+        android:paddingEnd="20dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
+        android:scrollbarThumbVertical="@drawable/win98_start_menu_border"
+        android:scrollbarSize="16dp"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:fadeScrollbars="false">
+        <TextView
+            android:id="@+id/welcome_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:fontFamily="@font/micross_block"
+            android:text="Test test"
+            android:textColor="@color/black"
+            />
+    </ScrollView>
+
+    <View
+        android:id="@+id/close_button"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="5dp"
+        android:layout_width="50dp"
+        android:layout_height="30dp"/>
+
+
+
+    <View
+        android:id="@+id/welcome_button"
+        android:layout_marginTop="75dp"
+        android:layout_marginLeft="0dp"
+        android:layout_width="150dp"
+        android:layout_height="23dp"/>
+
+    <View
+        android:id="@+id/change_log_button"
+        android:layout_marginTop="100dp"
+        android:layout_marginLeft="0dp"
+        android:layout_width="150dp"
+        android:layout_height="23dp"/>
+
+
+</RelativeLayout>
