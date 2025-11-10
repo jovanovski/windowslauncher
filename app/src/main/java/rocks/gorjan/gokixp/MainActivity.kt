@@ -95,6 +95,9 @@ import java.net.URL
 import androidx.core.graphics.toColorInt
 import androidx.core.view.isVisible
 import androidx.core.view.isEmpty
+import androidx.window.layout.WindowInfoTracker
+import androidx.window.layout.FoldingFeature
+import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : AppCompatActivity(), AppChangeListener {
 
@@ -159,6 +162,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var iconInMoveMode: DesktopIconView? = null
     private val customIconMappings = mutableMapOf<String, String>() // packageName -> customIconPath
     private val customNameMappings = mutableMapOf<String, String>() // packageName -> customName
+
+    // Foldable device state
+    private var isFoldableUnfolded = false
 
     // Icon bitmap cache - uses 1/8th of available memory
     private val iconBitmapCache: LruCache<String, Bitmap> by lazy {
@@ -625,9 +631,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val floatingWindowsContainer = findViewById<android.widget.FrameLayout>(R.id.floating_windows_container)
         floatingWindowManager = FloatingWindowManager(this, floatingWindowsContainer)
 
+        // Setup foldable device detection
+        setupFoldableDeviceDetection()
+
         // Enable edge-to-edge display after content view is set
         enableEdgeToEdge()
-        
+
         // Initialize sound system
         initializeSoundPool()
 
@@ -8147,10 +8156,70 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // ========== NEW RESPONSIVE GRID SYSTEM ==========
 
     /**
+     * Setup foldable device detection using WindowManager library
+     */
+    private fun setupFoldableDeviceDetection() {
+        lifecycleScope.launch {
+            val windowInfoTracker = WindowInfoTracker.getOrCreate(this@MainActivity)
+            windowInfoTracker.windowLayoutInfo(this@MainActivity)
+                .collectLatest { info ->
+                    val foldingFeature = info.displayFeatures
+                        .filterIsInstance<FoldingFeature>()
+                        .firstOrNull()
+
+                    val previousState = isFoldableUnfolded
+
+                    if (foldingFeature != null) {
+                        // Device has a folding feature (hinge)
+                        isFoldableUnfolded = when (foldingFeature.state) {
+                            FoldingFeature.State.FLAT -> {
+                                // Device is fully unfolded → using internal (main) screen
+                                Log.d("MainActivity", "Foldable device detected: FLAT (unfolded)")
+                                true
+                            }
+                            FoldingFeature.State.HALF_OPENED -> {
+                                // Device is partially folded (like laptop mode)
+                                Log.d("MainActivity", "Foldable device detected: HALF_OPENED")
+                                true
+                            }
+                            else -> {
+                                Log.d("MainActivity", "Foldable device detected: ${foldingFeature.state}")
+                                false
+                            }
+                        }
+                    } else {
+                        // No folding feature detected - this is a regular phone or tablet
+                        // Don't override orientation for tablets/large phones
+                        // Only actual foldables with a hinge should trigger landscape mode in portrait
+                        isFoldableUnfolded = false
+                        Log.d("MainActivity", "No folding feature detected - using device orientation")
+                    }
+
+                    // If state changed, refresh desktop layout
+                    if (previousState != isFoldableUnfolded) {
+                        Log.d("MainActivity", "Foldable state changed from $previousState to $isFoldableUnfolded - refreshing desktop")
+                        runOnUiThread {
+                            refreshDesktopIcons()
+                        }
+                    }
+                }
+        }
+    }
+
+    /**
      * Get current screen orientation
+     * Returns LANDSCAPE if:
+     * - Device is in landscape orientation, OR
+     * - Device is a foldable/tablet with large screen active
      */
     private fun getCurrentOrientation(): ScreenOrientation {
-        return if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+        // Check if in landscape orientation
+        if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            return ScreenOrientation.LANDSCAPE
+        }
+
+        // Check if foldable is unfolded or if it's a large screen device
+        return if (isFoldableUnfolded) {
             ScreenOrientation.LANDSCAPE
         } else {
             ScreenOrientation.PORTRAIT
