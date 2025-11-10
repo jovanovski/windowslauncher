@@ -145,4 +145,17 @@
             android:background="@drawable/explorer_98_bottom_right"/>
 
     </LinearLayout>
+
+
+    <TextView
+        android:id="@+id/explorer_number_of_items"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:fontFamily="?primaryFontFamily"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="3dp"
+        android:textSize="11sp"
+        android:textColor="@color/black"
+        android:text="12 items"/>
 </RelativeLayout>

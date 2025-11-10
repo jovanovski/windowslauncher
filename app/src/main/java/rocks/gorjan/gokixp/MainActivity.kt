@@ -2129,7 +2129,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         prefs.edit {putString(KEY_SWIPE_RIGHT_APP, appInfo.packageName) }
 
         Log.d("MainActivity", "Set swipe right app to: ${appInfo.name} (${appInfo.packageName})")
-        showNotification("Tip", "Swipe right app set to ${appInfo.name}")
+        showNotification("Swipe Right App changed", "Swipe right app set to ${appInfo.name}")
     }
 
     private fun getSwipeRightApp(): String? {
@@ -3251,6 +3251,28 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         openAppInfo(desktopIcon.packageName)
                     }
                 },
+                onSetSwipeRightApp = {
+                    icon?.let { desktopIcon ->
+                        // Create AppInfo from DesktopIcon
+                        val appInfo = AppInfo(
+                            name = desktopIcon.name,
+                            packageName = desktopIcon.packageName,
+                            icon = desktopIcon.icon
+                        )
+                        setSwipeRightApp(appInfo)
+                    }
+                },
+                onSetWeatherApp = {
+                    icon?.let { desktopIcon ->
+                        // Create AppInfo from DesktopIcon
+                        val appInfo = AppInfo(
+                            name = desktopIcon.name,
+                            packageName = desktopIcon.packageName,
+                            icon = desktopIcon.icon
+                        )
+                        setWeatherApp(appInfo)
+                    }
+                },
                 isSystemApp = isSystemApp
             )
             
@@ -3454,6 +3476,26 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         hideContextMenu()
                         openAppInfo(icon.packageName)
                     },
+                    onSetSwipeRightApp = {
+                        hideContextMenu()
+                        // Create AppInfo from DesktopIcon
+                        val appInfo = AppInfo(
+                            name = icon.name,
+                            packageName = icon.packageName,
+                            icon = icon.icon
+                        )
+                        setSwipeRightApp(appInfo)
+                    },
+                    onSetWeatherApp = {
+                        hideContextMenu()
+                        // Create AppInfo from DesktopIcon
+                        val appInfo = AppInfo(
+                            name = icon.name,
+                            packageName = icon.packageName,
+                            icon = icon.icon
+                        )
+                        setWeatherApp(appInfo)
+                    },
                     isSystemApp = isSystemApp
                 )
             }
@@ -3625,7 +3667,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             folderIconsGrid.invalidateViews()
             folderIconsGrid.requestLayout()
 
+            // Update item count
+            updateFolderItemCount(contentView, iconsInFolder.size)
+
             Log.d("MainActivity", "GridView refresh complete - ${iconsInFolder.size} icons")
+        }
+    }
+
+    private fun updateFolderItemCount(contentView: View, count: Int) {
+        val itemCountTextView = contentView.findViewById<TextView>(R.id.explorer_number_of_items)
+        if (itemCountTextView != null) {
+            val itemText = if (count == 1) "1 item" else "$count items"
+            itemCountTextView.text = itemText
+            Log.d("MainActivity", "Updated folder item count: $itemText")
+        } else {
+            Log.w("MainActivity", "Could not find explorer_number_of_items TextView")
         }
     }
 
@@ -4208,6 +4264,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         )
         folderIconsGrid.adapter = adapter
+
+        // Update item count
+        updateFolderItemCount(contentView, iconsInFolder.size)
 
         // Set context menu reference and show as floating window immediately
         windowsDialog.setContextMenuView(contextMenu)

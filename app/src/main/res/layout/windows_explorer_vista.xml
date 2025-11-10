@@ -52,6 +52,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginTop="45dp"
+        android:layout_marginBottom="22dp"
         android:orientation="horizontal"
         android:background="#91b1c0">
         <LinearLayout
@@ -89,5 +90,35 @@
 
 
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:gravity="start">
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_weight="1"
+            android:background="@drawable/ie7_bottom_left"/>
+        <ImageView
+            android:id="@+id/resize_drag_view"
+            android:layout_width="54dp"
+            android:layout_height="22dp"
+            android:background="@drawable/ie7_bottom_right"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/explorer_number_of_items"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:fontFamily="?primaryFontFamily"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="2dp"
+        android:textSize="12sp"
+        android:textColor="@color/black"
+        android:text="12 items"/>
 
 </RelativeLayout>

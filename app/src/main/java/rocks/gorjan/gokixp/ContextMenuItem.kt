@@ -38,6 +38,8 @@ object ContextMenuItems {
         onDelete: () -> Unit,
         onRename: () -> Unit,
         onProperties: () -> Unit,
+        onSetSwipeRightApp: () -> Unit,
+        onSetWeatherApp: () -> Unit,
         isSystemApp: Boolean = false
     ): List<ContextMenuItem> {
         val items = mutableListOf(
@@ -45,6 +47,8 @@ object ContextMenuItems {
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Move Icon", isEnabled = true, action = onMoveIcon),
             ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon),
+            ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp),
+            ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Delete", isEnabled = true, action = onDelete),
             ContextMenuItem("Rename", isEnabled = true, action = onRename)
@@ -169,6 +173,8 @@ object ContextMenuItems {
         onDelete: () -> Unit,
         onRename: () -> Unit,
         onProperties: () -> Unit,
+        onSetSwipeRightApp: () -> Unit,
+        onSetWeatherApp: () -> Unit,
         isSystemApp: Boolean = false
     ): List<ContextMenuItem> {
         val items = mutableListOf(
@@ -176,6 +182,8 @@ object ContextMenuItems {
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Move to Desktop", isEnabled = true, action = onMoveToDesktop),
             ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon),
+            ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp),
+            ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Delete", isEnabled = true, action = onDelete),
             ContextMenuItem("Rename", isEnabled = true, action = onRename)
