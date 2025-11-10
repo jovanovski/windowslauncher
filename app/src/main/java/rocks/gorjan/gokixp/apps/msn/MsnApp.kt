@@ -4,6 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaPlayer
 import android.net.Uri
@@ -19,10 +25,12 @@ import android.widget.ScrollView
 import android.widget.TableLayout
 import android.widget.TableRow
 import android.widget.TextView
+import androidx.core.view.marginTop
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
+import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -157,6 +165,10 @@ class MsnApp(
             composeMessageEdit?.setText("/nudge")
         }
 
+        if(ThemeManager(context).isClassicTheme()){
+            (recipientText?.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.topMargin = 57.dpToPx()
+        }
+
         // Set up IME action listener for send on enter
         composeMessageEdit?.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND) {
@@ -253,6 +265,17 @@ class MsnApp(
 
             // Set the contact name
             threadName.text = contact.name
+
+            // Load contact photo if available
+            val threadIcon = threadItem.findViewById<ImageView>(R.id.thread_icon)
+            val contactPhoto = getContactPhoto(contact.phoneNumber)
+            if (contactPhoto != null) {
+                threadIcon.setImageBitmap(getCircularBitmap(contactPhoto))
+                threadIcon.scaleType = ImageView.ScaleType.CENTER_CROP
+            } else {
+                threadIcon.setImageResource(R.drawable.msn_icon)
+                threadIcon.scaleType = ImageView.ScaleType.FIT_CENTER
+            }
 
             // Hide notification dot for search results
             notificationDot?.visibility = View.GONE
@@ -687,6 +710,16 @@ class MsnApp(
         }
         threadName.text = displayName
 
+        // Load contact photo if available
+        val contactPhoto = getContactPhoto(thread.address)
+        if (contactPhoto != null) {
+            threadIcon.setImageBitmap(getCircularBitmap(contactPhoto))
+            threadIcon.scaleType = ImageView.ScaleType.CENTER_CROP
+        } else {
+            threadIcon.setImageResource(R.drawable.msn_icon)
+            threadIcon.scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+
         // Show or hide notification dot based on unread status
         notificationDot?.visibility = if (hasUnreadMessages(thread)) View.VISIBLE else View.GONE
 
@@ -694,11 +727,12 @@ class MsnApp(
         val isSelected = selectedThread?.address == thread.address
         if (isSelected) {
             threadItem.alpha = 1f
-            threadItem.setBackgroundColor(0xFFdae7f7.toInt())
+            threadItem.setBackgroundColor(0xFFFFFFFF.toInt())
+
 
         } else {
-            threadItem.alpha = 0.6f
-            threadItem.setBackgroundColor(0xFFFFFFFF.toInt())
+            threadItem.setBackgroundColor(0x00dae7f7.toInt())
+
         }
 
         // Set click listener to load this thread
@@ -1053,6 +1087,65 @@ class MsnApp(
             Log.e(TAG, "Error getting contact name", e)
         }
         return null
+    }
+
+    /**
+     * Get contact photo from phone number
+     */
+    private fun getContactPhoto(phoneNumber: String): Bitmap? {
+        // Check if we have READ_CONTACTS permission
+        if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+
+        try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(phoneNumber)
+            )
+            val cursor = context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.PHOTO_URI),
+                null,
+                null,
+                null
+            )
+
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val photoUriIndex = it.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                    val photoUriString = it.getString(photoUriIndex)
+
+                    if (photoUriString != null) {
+                        val photoUri = Uri.parse(photoUriString)
+                        val inputStream: InputStream? = context.contentResolver.openInputStream(photoUri)
+                        return BitmapFactory.decodeStream(inputStream)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting contact photo", e)
+        }
+        return null
+    }
+
+    /**
+     * Convert a bitmap to circular shape
+     */
+    private fun getCircularBitmap(bitmap: Bitmap): Bitmap {
+        val size = minOf(bitmap.width, bitmap.height)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+
+        val canvas = Canvas(output)
+        val paint = Paint().apply {
+            isAntiAlias = true
+            shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        }
+
+        val radius = size / 2f
+        canvas.drawCircle(radius, radius, radius, paint)
+
+        return output
     }
 
     /**

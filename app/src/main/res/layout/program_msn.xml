@@ -17,7 +17,7 @@
         android:layout_height="wrap_content"
         android:lines="1"
         android:ellipsize="end"
-        android:layout_marginTop="56dp"
+        android:layout_marginTop="55dp"
         android:layout_marginLeft="32dp"
         android:textSize="10sp"
         android:background="@android:color/transparent"
@@ -84,11 +84,10 @@
 
     <ScrollView
         android:id="@+id/msn_recent_message_threads_wrapper"
-        android:layout_width="140dp"
+        android:layout_width="150dp"
         android:layout_height="440dp"
-        android:layout_marginTop="50dp"
-        android:layout_marginLeft="251dp"
-        android:background="@color/white">
+        android:layout_marginTop="52dp"
+        android:layout_marginLeft="246dp">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -101,7 +100,7 @@
                 android:textSize="11sp"
                 android:textColor="@color/black"
                 android:textColorHint="#777"
-                android:background="@android:color/transparent"
+                android:background="@android:color/white"
                 android:fontFamily="?primaryFontFamily"
                 android:padding="3dp"
             />
@@ -121,11 +120,13 @@
         android:text="&gt;"
         android:layout_marginLeft="361dp"
         android:layout_marginTop="18dp"
-        android:textSize="12sp"
+        android:textSize="14sp"
         android:paddingStart="0dp"
         android:paddingEnd="0dp"
         android:paddingTop="0dp"
-        style="?winButtonStyle"
+        android:background="@drawable/msn_button"
+        android:gravity="center"
+        android:textColor="@color/black"
         />
 
     <View
