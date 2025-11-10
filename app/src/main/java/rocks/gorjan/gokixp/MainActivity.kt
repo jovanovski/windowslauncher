@@ -186,6 +186,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Permission request codes
     private val CALENDAR_PERMISSION_REQUEST_CODE = 1003
     private val AUDIO_PERMISSION_REQUEST_CODE = 200
+    private val VIDEO_PERMISSION_REQUEST_CODE = 201
 
     // Image picker launcher for wallpaper selection
     private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -1151,6 +1152,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showWinampDialog(appInfo = appInfo)
         }
 
+        // Register Windows Media Player
+        systemAppActions["system.wmp"] = { appInfo ->
+            showWmpDialog(appInfo = appInfo)
+        }
+
         // Register Minesweeper
         systemAppActions["system.minesweeper"] = { appInfo ->
             showMinesweeperDialog(appInfo = appInfo)
@@ -1231,6 +1237,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 name = "Winamp",
                 packageName = "system.winamp",
                 icon = createSquareDrawable(winampDrawable)
+            ))
+        }
+
+        // Windows Media Player - scale icon to match app icon size
+        val wmpDrawable = AppCompatResources.getDrawable(this,themeManager.getWmpIcon())
+        if (wmpDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "Windows Media Player",
+                packageName = "system.wmp",
+                icon = createSquareDrawable(wmpDrawable)
             ))
         }
 
@@ -1594,6 +1610,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
+                "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
+                "system.msn" ->AppCompatResources.getDrawable(this, themeManager.getMsnIcon())
                 else -> null
             }
         }
@@ -6479,6 +6497,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Winamp state for permission handling
     private var winampAppInstance: rocks.gorjan.gokixp.apps.winamp.WinampApp? = null
 
+    // WMP state for permission handling
+    private var wmpAppInstance: rocks.gorjan.gokixp.apps.wmp.WmpApp? = null
+
     private fun showMinesweeperDialog(appInfo: AppInfo? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
@@ -6642,6 +6663,106 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
+    private fun showWmpDialog(appInfo: AppInfo? = null) {
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowWmpDialog()
+        }
+    }
+
+    private fun createAndShowWmpDialog() {
+        // Create Windows-style dialog
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.wmp"  // Set identifier for tracking
+        windowsDialog.setTitle("Windows Media Player")
+        windowsDialog.setTaskbarIcon(themeManager.getWmpIcon())
+
+        // Inflate the wmp content based on theme
+        val contentView = layoutInflater.inflate(themeManager.getWmpLayout(), null)
+
+        // Create WMP app instance
+        val wmpApp = rocks.gorjan.gokixp.apps.wmp.WmpApp(
+            context = this,
+            onRequestPermissions = {
+                // Request video permissions
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // For Android 13+, request READ_MEDIA_VIDEO
+                    requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_VIDEO), VIDEO_PERMISSION_REQUEST_CODE)
+                } else {
+                    // For older Android versions, request READ_EXTERNAL_STORAGE
+                    requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), VIDEO_PERMISSION_REQUEST_CODE)
+                }
+            },
+            hasVideoPermission = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    checkSelfPermission(android.Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                }
+            },
+            canRequestPermissions = {
+                // Check if we should show rationale (if user denied before) or can request
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    shouldShowRequestPermissionRationale(android.Manifest.permission.READ_MEDIA_VIDEO)
+                } else {
+                    shouldShowRequestPermissionRationale(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            },
+            onShowPermissionNotification = {
+                // Show notification that opens app settings when tapped
+                showNotification(
+                    title = "Permission Missing",
+                    description = "Windows Media Player needs the storage permission, tap here to grant it.",
+                    onTap = {
+                        // Open app settings
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = android.net.Uri.fromParts("package", packageName, null)
+                        }
+                        startActivity(intent)
+                    }
+                )
+            }
+        )
+
+        // Store reference for permission callback
+        wmpAppInstance = wmpApp
+
+        // Setup the app
+        wmpApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        if(themeManager.isClassicTheme()) {
+            windowsDialog.setWindowSize(286, 412)
+        }
+        else if(themeManager.isXPTheme()) {
+            windowsDialog.setWindowSize(384, 262)
+        }else {
+            windowsDialog.setWindowSize(384, 284)
+        }
+
+        // Set up window control handlers
+        windowsDialog.setOnMinimizeListener {
+            // Keep playing when minimized
+        }
+
+        windowsDialog.setOnCloseListener {
+            // Stop playback and cleanup
+            wmpApp.cleanup()
+            wmpAppInstance = null
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Set cursor back to normal after window is shown and loaded
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+        }, 100) // Small delay to ensure window is fully rendered
+    }
 
     /**
      * Shows the welcome screen once per app version
@@ -9821,6 +9942,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             } else {
                 Log.d("Winamp", "Audio permission denied")
                 showNotification("Permission Needed", "Storage permission required to access music files")
+            }
+
+            VIDEO_PERMISSION_REQUEST_CODE -> if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("WMP", "Video permission granted")
+
+                // Load videos if WMP is open
+                wmpAppInstance?.loadVideos()
+            } else {
+                Log.d("WMP", "Video permission denied")
+                showNotification("Permission Needed", "Storage permission required to access video files")
             }
 
             NOTIFICATION_PERMISSION_REQUEST_CODE -> if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {

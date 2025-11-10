@@ -15,6 +15,6 @@
         android:bottomRightRadius="0dp" />
 
     <!-- Transparent background to allow content background to show -->
-    <solid android:color="@android:color/transparent" />
+    <solid android:color="#CCc1cfe6" />
 
 </shape>

@@ -189,6 +189,11 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.winamp_icon_xp
     }
 
+    fun getWmpIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.wmp_98_icon
+        AppTheme.WindowsXP -> R.drawable.wmp_xp_icon
+        AppTheme.WindowsVista -> R.drawable.wmp_vista_icon
+    }
 
     fun getMinesweeperIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.minesweeper_icon_98
@@ -214,6 +219,12 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsClassic -> R.drawable.msn_icon
         AppTheme.WindowsXP -> R.drawable.msn_icon
         AppTheme.WindowsVista -> R.drawable.msn_icon_vista
+    }
+
+    fun getWmpLayout(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.layout.program_wmp_98
+        AppTheme.WindowsXP -> R.layout.program_wmp_xp
+        AppTheme.WindowsVista -> R.layout.program_wmp_vista
     }
 
     fun getMaximizeIcon(): Int = when (getSelectedTheme()){

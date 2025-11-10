@@ -1,27 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="380dp"
-    android:layout_height="238dp">
+    android:layout_height="258dp">
 
     <ImageView
         android:id="@+id/background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:src="@drawable/wmp_xp_screen"/>
+        android:src="@drawable/wmp_vista_screen"/>
 
 
-    <VideoView
-        android:id="@+id/wmp_video_player"
+    <FrameLayout
         android:layout_marginTop="21dp"
-        android:layout_marginStart="56dp"
-        android:layout_width="204dp"
-        android:layout_height="158dp"/>
+        android:layout_marginStart="0dp"
+        android:layout_width="280dp"
+        android:layout_height="200dp"
+        android:background="@android:color/black">
+
+        <VideoView
+            android:id="@+id/wmp_video_player"
+            android:layout_width="280dp"
+            android:layout_height="200dp"
+            android:layout_gravity="center"/>
+    </FrameLayout>
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="157dp"
-        android:layout_marginStart="260dp"
-        android:layout_marginEnd="5dp"
+        android:layout_height="197dp"
+        android:layout_marginStart="280dp"
+        android:layout_marginEnd="0dp"
         android:layout_marginTop="21dp">
         <TableLayout
             android:id="@+id/wmp_playlist"
@@ -31,8 +38,8 @@
 
     <View
         android:id="@+id/wmp_play_pause_toggle"
-        android:layout_marginTop="210dp"
-        android:layout_marginStart="54dp"
+        android:layout_marginTop="227dp"
+        android:layout_marginStart="177dp"
         android:layout_width="25dp"
         android:layout_height="25dp"/>
     

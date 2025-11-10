@@ -1,76 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="400dp"
-    android:layout_height="270dp">
+    android:layout_width="282dp"
+    android:layout_height="392dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#c0c7c8"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="File"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="View"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Play"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Favourites"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Go"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Help"
+            style="@style/MenuBarItem"/>
+
+    </LinearLayout>
+    <!-- Game area -->
 
     <ImageView
         android:id="@+id/background"
-        android:layout_width="400dp"
-        android:layout_height="270dp"
-        android:src="@drawable/welcome_2000_welcome"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="22dp"
+        android:src="@drawable/wmp_98_screen"/>
 
-    <TextView
-        android:id="@+id/version"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Version: 1.1"
-        android:fontFamily="@font/micross_block"
-        android:textSize="10sp"
-        android:textColor="@color/black"
-        android:layout_marginTop="250dp"
-        android:layout_marginStart="10dp"
-        />
+
+    <FrameLayout
+        android:layout_marginTop="43dp"
+        android:layout_marginStart="3dp"
+        android:layout_width="276dp"
+        android:layout_height="181dp"
+        android:background="@android:color/black">
+
+        <VideoView
+            android:id="@+id/wmp_video_player"
+            android:layout_width="276dp"
+            android:layout_height="181dp"
+            android:layout_gravity="center"/>
+    </FrameLayout>
 
     <ScrollView
-        android:layout_width="230dp"
-        android:layout_height="135dp"
-        android:layout_marginTop="107dp"
-        android:layout_marginStart="164dp"
-        android:paddingEnd="20dp"
-        android:clipToPadding="false"
-        android:scrollbars="vertical"
-        android:scrollbarStyle="outsideOverlay"
-        android:scrollbarAlwaysDrawVerticalTrack="true"
-        android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
-        android:scrollbarThumbVertical="@drawable/win98_start_menu_border"
-        android:scrollbarSize="16dp"
-        android:scrollbarFadeDuration="0"
-        android:scrollbarDefaultDelayBeforeFade="0"
-        android:fadeScrollbars="false">
-        <TextView
-            android:id="@+id/welcome_text"
+        android:layout_width="match_parent"
+        android:layout_height="91dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginEnd="3dp"
+        android:layout_marginTop="298dp">
+        <TableLayout
+            android:id="@+id/wmp_playlist"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:fontFamily="@font/micross_block"
-            android:text="Test test"
-            android:textColor="@color/black"
-            />
+            android:layout_height="wrap_content"/>
     </ScrollView>
 
     <View
-        android:id="@+id/close_button"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentBottom="true"
-        android:layout_marginBottom="5dp"
-        android:layout_width="50dp"
-        android:layout_height="30dp"/>
-
-
-
-    <View
-        android:id="@+id/welcome_button"
-        android:layout_marginTop="75dp"
-        android:layout_marginLeft="0dp"
-        android:layout_width="150dp"
-        android:layout_height="23dp"/>
-
-    <View
-        android:id="@+id/change_log_button"
-        android:layout_marginTop="100dp"
-        android:layout_marginLeft="0dp"
-        android:layout_width="150dp"
-        android:layout_height="23dp"/>
-
+        android:id="@+id/wmp_play_pause_toggle"
+        android:layout_marginTop="244dp"
+        android:layout_marginStart="1dp"
+        android:layout_width="25dp"
+        android:layout_height="25dp"/>
 
 </RelativeLayout>
