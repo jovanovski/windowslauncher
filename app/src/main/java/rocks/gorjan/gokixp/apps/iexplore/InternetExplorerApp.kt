@@ -39,12 +39,16 @@ class InternetExplorerApp(
         private const val KEY_FAVOURITES = "ie_favourites"
         private const val DEFAULT_FAVOURITE_NAME = "Windows Launcher"
         private const val DEFAULT_FAVOURITE_URL = "https://github.com/jovanovski/windowslauncher/"
+        private const val SOUND_THROTTLE_MS = 2000L // Only allow one sound per second
     }
 
     private var homepage: String = "https://news.google.com"
     private var webView: WebView? = null
     private val favourites = mutableListOf<Favourite>()
     private var isPageLoaded = false
+    private var lastSoundPlayTime = 0L
+    private var isLoadingErrorPage = false
+    private var lastAttemptedUrl: String? = null
 
     fun setupApp(contentView: View, initialUrl: String? = null) {
         // Load homepage from shared preferences
@@ -128,13 +132,22 @@ class InternetExplorerApp(
                         return true
                     }
                 }
-
+                // Don't play sound here - onPageStarted will handle it with throttling
                 return false // Let WebView handle http/https URLs
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                urlEditText.setText(url ?: "")
+
+                // Don't update URL bar if we're loading an error page
+                if (url?.startsWith("file:///android_asset/html/ie_error.html") == true) {
+                    isLoadingErrorPage = true
+                    // Keep the failed URL in the address bar
+                } else {
+                    isLoadingErrorPage = false
+                    lastAttemptedUrl = url
+                    urlEditText.setText(url ?: "")
+                }
 
                 // Update status to loading
                 statusIcon?.setImageResource(R.drawable.ie_status_loading)
@@ -143,22 +156,28 @@ class InternetExplorerApp(
                 // Mark page as not loaded
                 isPageLoaded = false
 
-                onSoundPlay()
+                // Play sound with throttling to avoid rapid-fire sounds on redirects
+                playSoundThrottled()
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
 
-                // Update status to done
-                statusIcon?.setImageResource(R.drawable.ie_status_done)
-                statusText.text = "Done"
+                // Update status based on whether it's an error page
+                if (isLoadingErrorPage) {
+                    statusIcon?.setImageResource(R.drawable.ie_status_done)
+                    statusText.text = "Cannot find server"
+                } else {
+                    statusIcon?.setImageResource(R.drawable.ie_status_done)
+                    statusText.text = "Done"
+                }
 
-                // Mark page as loaded
-                isPageLoaded = true
+                // Mark page as loaded (but only for non-error pages)
+                isPageLoaded = !isLoadingErrorPage
 
                 // Update window title with page title
                 val pageTitle = view?.title
-                if (!pageTitle.isNullOrEmpty()) {
+                if (!pageTitle.isNullOrEmpty() && !isLoadingErrorPage) {
                     onUpdateWindowTitle("$pageTitle - Internet Explorer")
                     tabName?.text = pageTitle
                 } else {
@@ -173,11 +192,8 @@ class InternetExplorerApp(
                 // Only show error page for main frame errors (not subresources like images, scripts, etc.)
                 if (request?.isForMainFrame == true) {
                     // Load custom error page from assets
+                    // onPageStarted and onPageFinished will handle URL bar and status updates
                     view?.loadUrl("file:///android_asset/html/ie_error.html")
-
-                    // Update status to error
-                    statusIcon?.setImageResource(R.drawable.ie_status_done)
-                    statusText.text = "Cannot find server"
                 } else {
                     // For non-main frame errors, try to handle as intent URL if it's a non-http(s) URL
                     request?.url?.toString()?.let { url ->
@@ -337,6 +353,31 @@ class InternetExplorerApp(
         }
     }
 
+    /**
+     * Play sound with rate limiting (max once per second)
+     */
+    private fun playSoundThrottled() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastSoundPlayTime >= SOUND_THROTTLE_MS) {
+            onSoundPlay()
+            lastSoundPlayTime = currentTime
+        }
+    }
+
+    /**
+     * Check if the browser can navigate back in history
+     */
+    fun canNavigateBack(): Boolean {
+        return webView?.canGoBack() == true
+    }
+
+    /**
+     * Navigate back in browser history
+     */
+    fun navigateBack() {
+        webView?.goBack()
+    }
+
     fun cleanup() {
         // Properly clean up WebView to free memory and resources
         webView?.apply {
@@ -383,7 +424,6 @@ class InternetExplorerApp(
                 title = favourite.name,
                 isEnabled = true,
                 action = {
-                    onSoundPlay()
                     // Navigate to favourite URL
                     webView?.loadUrl(favourite.url)
                 },

@@ -2683,9 +2683,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         hideStartMenu()
                     }
                     floatingWindowManager.getFrontWindow() != null -> {
-                        // If there's a floating window, close the front-most one
-                        Log.d("MainActivity", "Back pressed (modern): closing front window")
-                        floatingWindowManager.closeFrontWindow()
+                        val frontWindow = floatingWindowManager.getFrontWindow()
+
+                        // Check if front window is Internet Explorer with navigation history
+                        val ieApp = frontWindow?.internetExplorerApp as? InternetExplorerApp
+                        if (ieApp != null && ieApp.canNavigateBack()) {
+                            // Navigate back in browser history
+                            Log.d("MainActivity", "Back pressed (modern): navigating back in IE")
+                            ieApp.navigateBack()
+                        } else {
+                            // Close the front-most window
+                            Log.d("MainActivity", "Back pressed (modern): closing front window")
+                            floatingWindowManager.closeFrontWindow()
+                        }
                     }
                     else -> {
                         // If start menu is closed, do nothing
@@ -5520,6 +5530,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         )
 
         ieApp.setupApp(contentView, initialUrl)
+
+        // Store IE app instance in window for back navigation handling
+        windowsDialog.internetExplorerApp = ieApp
 
         // Set up window control handlers
         windowsDialog.setOnMinimizeListener {
@@ -9122,9 +9135,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 hideStartMenu()
             }
             floatingWindowManager.getFrontWindow() != null -> {
-                // If there's a floating window, close the front-most one
-                Log.d("MainActivity", "Back pressed: closing front window")
-                floatingWindowManager.closeFrontWindow()
+                val frontWindow = floatingWindowManager.getFrontWindow()
+
+                // Check if front window is Internet Explorer with navigation history
+                val ieApp = frontWindow?.internetExplorerApp as? InternetExplorerApp
+                if (ieApp != null && ieApp.canNavigateBack()) {
+                    // Navigate back in browser history
+                    Log.d("MainActivity", "Back pressed: navigating back in IE")
+                    ieApp.navigateBack()
+                } else {
+                    // Close the front-most window
+                    Log.d("MainActivity", "Back pressed: closing front window")
+                    floatingWindowManager.closeFrontWindow()
+                }
             }
             else -> {
                 // If start menu is closed, do nothing (don't call super.onBackPressed())

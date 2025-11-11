@@ -88,6 +88,9 @@ class WindowsDialog @JvmOverloads constructor(
     // Window identifier (for tracking unique instances like app package or folder path)
     var windowIdentifier: String? = null
 
+    // Reference to InternetExplorerApp instance (if this window is IE)
+    var internetExplorerApp: Any? = null
+
     // Dragging on the title bar
     private var initialX = 0f
     private var initialY = 0f
