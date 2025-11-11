@@ -59,16 +59,16 @@
         android:id="@+id/ie_refresh_button"
         android:layout_width="50dp"
         android:layout_height="39dp"
-        android:layout_alignParentEnd="true"
+        android:layout_alignParentStart="true"
         android:layout_marginTop="26dp"
-        android:layout_marginEnd="124dp" />
+        android:layout_marginStart="184dp" />
 
     <View
-        android:id="@+id/ie_tools_button"
-        android:layout_width="40dp"
+        android:id="@+id/ie_favourites_button"
+        android:layout_width="60dp"
         android:layout_height="25dp"
         android:layout_marginTop="0dp"
-        android:layout_marginStart="174dp" />
+        android:layout_marginStart="114dp" />
 
     <View
         android:id="@+id/ie_back_button"
@@ -90,9 +90,9 @@
         android:id="@+id/ie_home_button"
         android:layout_width="50dp"
         android:layout_height="39dp"
-        android:layout_alignParentEnd="true"
+        android:layout_alignParentStart="true"
         android:layout_marginTop="26dp"
-        android:layout_marginEnd="74dp" />
+        android:layout_marginStart="233dp" />
 
 
     <View

@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
+import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
@@ -206,21 +207,25 @@ class SolitareGame(
         // Setup menu buttons
         val newGameButton = contentView.findViewById<android.widget.TextView>(R.id.solitare_new_game)
         newGameButton?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             resetGame()
         }
 
         val changeDeckButton = contentView.findViewById<android.widget.TextView>(R.id.solitare_change_deck)
         changeDeckButton?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             changeDeck()
         }
 
         val changeCardSizeButton = contentView.findViewById<android.widget.TextView>(R.id.solitare_change_card_size)
         changeCardSizeButton?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             toggleCardSize()
         }
 
         hintTextView = contentView.findViewById(R.id.solitare_hint)
         hintTextView?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             showHint()
         }
 
@@ -1092,15 +1097,17 @@ class SolitareGame(
         // Check if the game is won first
         if (isGameWon()) {
             noMovesLeftTextView?.text = "Game won!"
-            noMovesLeftTextView?.visibility = android.view.View.VISIBLE
+            noMovesLeftTextView?.visibility = View.VISIBLE
             isGameOver = true
+            Helpers.performHapticFeedback(context)
             return
         }
 
         // Once game is over, keep the message shown until new game
         if (isGameOver) {
             noMovesLeftTextView?.text = "Game over - no valid moves"
-            noMovesLeftTextView?.visibility = android.view.View.VISIBLE
+            noMovesLeftTextView?.visibility = View.VISIBLE
+            Helpers.performHapticFeedback(context)
             return
         }
 
@@ -1110,7 +1117,8 @@ class SolitareGame(
             // Game is now definitively over - set flag so it stays shown
             isGameOver = true
             noMovesLeftTextView?.text = "Game over - no valid moves"
-            noMovesLeftTextView?.visibility = android.view.View.VISIBLE
+            noMovesLeftTextView?.visibility = View.VISIBLE
+            Helpers.performHapticFeedback(context)
         }
     }
 

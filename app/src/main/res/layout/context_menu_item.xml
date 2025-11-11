@@ -37,4 +37,22 @@
         android:fontFamily="?attr/primaryFontFamily"
  />
 
+    <View
+        android:id="@+id/menu_item_separator"
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="4dp"
+        android:layout_marginRight="4dp"
+        android:background="#DDDDDD"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/menu_item_sub_action_icon"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:visibility="gone"
+        android:scaleType="fitCenter"
+        android:paddingLeft="4dp"
+        android:paddingRight="4dp" />
+
 </LinearLayout>

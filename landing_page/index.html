@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows XP Launcher</title>
+    <link rel="stylesheet" href="src/css/main.css">
+</head>
+<body>
+    <!-- Main Container -->
+    <div id="main-background" class="main-background">
+
+        <!-- Gesture Bar Background (Mobile) -->
+        <div id="gesture-bar-background" class="gesture-bar-background"></div>
+
+        <!-- Desktop Icons Container -->
+        <div id="desktop-icons-container" class="desktop-icons-container">
+            <!-- Icons will be dynamically added here -->
+        </div>
+
+        <!-- Floating Windows Container -->
+        <div id="floating-windows-container" class="floating-windows-container">
+            <!-- Floating windows will be added here -->
+        </div>
+
+        <!-- Taskbar -->
+        <div id="taskbar-container" class="taskbar-container">
+            <!-- Taskbar Background -->
+            <div class="taskbar-background"></div>
+
+            <!-- Taskbar Content -->
+            <div class="taskbar-content">
+                <!-- Start Button -->
+                <div id="start-button" class="start-button">
+                    <img src="src/img/start.png" alt="Start" />
+                </div>
+
+                <!-- Empty Taskbar Space (for open windows) -->
+                <div id="taskbar-empty-space" class="taskbar-empty-space">
+                    <!-- Open window buttons will be added here -->
+                </div>
+
+                <!-- System Tray Wrapper -->
+                <div id="system-tray-wrapper" class="system-tray-wrapper">
+                    <!-- System Tray -->
+                    <div id="system-tray" class="system-tray">
+                        <!-- Date Display -->
+                        <div id="date-container" class="date-container">
+                            <span id="date-day" class="date-day">26</span>
+                            <span id="date-ordinal" class="date-ordinal">th</span>
+                        </div>
+
+                        <!-- Volume Icon -->
+                        <div id="volume-icon-wrapper" class="volume-icon-wrapper">
+                            <img id="volume-icon" src="src/img/sound.png" alt="Volume" />
+                        </div>
+
+                        <!-- Update Icon (hidden by default) -->
+                        <div id="update-icon" class="update-icon" style="display: none;">
+                            <div class="update-badge">!</div>
+                        </div>
+
+                        <!-- Clock -->
+                        <div id="clock-time" class="clock-time">01:23</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Menu Container -->
+        <div id="start-menu-container" class="start-menu-container">
+            <div id="start-menu" class="start-menu">
+                <!-- Start Menu Header -->
+                <div class="start-menu-header">
+                    <img class="profile-picture" src="src/img/user.png" alt="User" onerror="this.style.background='white'"/>
+                    <div class="profile-name">User</div>
+                </div>
+
+                <!-- Start Menu Body (Two Columns) -->
+                <div class="start-menu-body">
+                    <!-- Left Panel (Apps List) -->
+                    <div class="start-menu-left-panel">
+                        <div class="app-list-wrapper">
+                            <div id="apps-list" class="apps-list">
+                                <!-- Apps will be dynamically added here -->
+                            </div>
+                        </div>
+
+                        <div class="all-programs-divider"></div>
+
+                        <div id="all-programs" class="all-programs">
+                            <span class="all-programs-text">All Programs</span>
+                            <span class="all-programs-arrow">▶</span>
+                        </div>
+                    </div>
+
+                    <!-- Right Panel (System Items) -->
+                    <div class="start-menu-right-panel">
+                        <div class="start-menu-item" id="welcome-item">
+                            <span class="item-icon">🪟</span>
+                            <span class="item-text">Welcome</span>
+                        </div>
+
+                        <div class="start-menu-item" id="windows-update-item">
+                            <span class="item-icon">🔄</span>
+                            <span class="item-text">Windows Update</span>
+                        </div>
+
+                        <div class="start-menu-divider"></div>
+
+                        <div class="start-menu-item" id="settings-item">
+                            <span class="item-icon">⚙️</span>
+                            <span class="item-text">Control Panel</span>
+                        </div>
+
+                        <div class="search-box-wrapper">
+                            <input type="text" id="search-box" class="search-box" placeholder="Run ...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Start Menu Footer -->
+                <div class="start-menu-footer">
+                    <div id="shutdown-button" class="shutdown-button">
+                        <span>Turn off computer</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Context Menu -->
+        <div id="context-menu" class="context-menu" style="display: none;">
+            <div class="context-menu-item">Refresh</div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item">Properties</div>
+        </div>
+
+        <!-- Please Wait Indicator -->
+        <div id="please-wait" class="please-wait" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Notification Bubble -->
+        <div id="notification-bubble" class="notification-bubble" style="display: none;">
+            <div id="close-notification-button" class="close-notification-button">×</div>
+            <div id="notification-title" class="notification-title">Notification title</div>
+            <div id="notification-text" class="notification-text">Notification text</div>
+        </div>
+
+        <!-- Cursor Effect -->
+        <div id="cursor-effect" class="cursor-effect" style="display: none;">
+            <img src="src/img/cursor.png" alt="Cursor" />
+        </div>
+
+        <!-- Safe to Turn Off Splash -->
+        <div id="safe-to-turn-off-splash" class="safe-to-turn-off-splash" style="display: none;">
+            <h1>It's now safe to turn off your computer.</h1>
+        </div>
+    </div>
+
+    <script src="src/js/main.js"></script>
+</body>
+</html>

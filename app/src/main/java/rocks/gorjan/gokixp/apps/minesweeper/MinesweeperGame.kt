@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.TextView
+import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.R
 import kotlin.random.Random
 
@@ -46,6 +47,7 @@ class MinesweeperGame(
     private var timerDigit2: ImageView? = null
     private var timerDigit3: ImageView? = null
     private var smileyButton: ImageView? = null
+    private var newGameMenuItem: TextView? = null
     private var gridButtons = Array(GRID_SIZE) { Array<ImageView?>(GRID_SIZE) { null } }
 
     // Cell data structure
@@ -68,6 +70,7 @@ class MinesweeperGame(
         timerDigit2 = contentView.findViewById(R.id.timer_digit_2)
         timerDigit3 = contentView.findViewById(R.id.timer_digit_3)
         smileyButton = contentView.findViewById(R.id.smiley_button)
+        newGameMenuItem = contentView.findViewById(R.id.minesweeper_new_game)
 
         val mineGrid = contentView.findViewById<GridLayout>(R.id.mine_grid)
 
@@ -161,6 +164,13 @@ class MinesweeperGame(
         // Smiley button to restart
         smileyButton?.setOnClickListener {
             onSoundPlay("click")
+            Helpers.performHapticFeedback(context)
+            resetGame()
+        }
+
+        newGameMenuItem?.setOnClickListener {
+            onSoundPlay("click")
+            Helpers.performHapticFeedback(context)
             resetGame()
         }
 
@@ -400,6 +410,7 @@ class MinesweeperGame(
 
         // Reveal all mines if lost
         if (!won) {
+            Helpers.performHapticFeedback(context)
             for (row in 0 until GRID_SIZE) {
                 for (col in 0 until GRID_SIZE) {
                     val cell = grid[row][col]

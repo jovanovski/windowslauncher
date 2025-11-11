@@ -6,7 +6,9 @@ data class ContextMenuItem(
     val hasSubmenu: Boolean = false,
     val hasCheckbox: Boolean = false,
     val isChecked: Boolean = false,
-    val action: (() -> Unit)? = null
+    val action: (() -> Unit)? = null,
+    val subActionIcon: Int? = null,  // Drawable resource ID
+    val subAction: (() -> Unit)? = null
 )
 
 object ContextMenuItems {

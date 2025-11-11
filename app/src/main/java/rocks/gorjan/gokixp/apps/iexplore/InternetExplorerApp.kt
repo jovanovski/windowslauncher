@@ -11,22 +11,49 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.content.edit
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
+
+/**
+ * Data class for a favourite website
+ */
+data class Favourite(
+    val name: String,
+    val url: String,
+    val isDefault: Boolean = false
+)
 
 class InternetExplorerApp(
     private val context: Context,
     private val onSoundPlay: () -> Unit,
     private val onShowNotification: (String, String) -> Unit,
-    private val onUpdateWindowTitle: (String) -> Unit
+    private val onUpdateWindowTitle: (String) -> Unit,
+    private val onShowContextMenu: (List<ContextMenuItem>, Float, Float) -> Unit
 ) {
+    companion object {
+        private const val KEY_FAVOURITES = "ie_favourites"
+        private const val DEFAULT_FAVOURITE_NAME = "Windows Launcher"
+        private const val DEFAULT_FAVOURITE_URL = "https://github.com/jovanovski/windowslauncher/"
+    }
+
     private var homepage: String = "https://news.google.com"
     private var webView: WebView? = null
+    private val favourites = mutableListOf<Favourite>()
+    private var isPageLoaded = false
 
     fun setupApp(contentView: View, initialUrl: String? = null) {
         // Load homepage from shared preferences
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         homepage = prefs.getString("ie_homepage", "https://news.google.com") ?: "https://news.google.com"
+
+        // Load favourites
+        favourites.clear()
+        favourites.addAll(loadFavourites())
 
         // Get references to views
         val urlEditText = contentView.findViewById<android.widget.EditText>(R.id.url_bar)
@@ -113,6 +140,9 @@ class InternetExplorerApp(
                 statusIcon?.setImageResource(R.drawable.ie_status_loading)
                 statusText.text = "Locating site"
 
+                // Mark page as not loaded
+                isPageLoaded = false
+
                 onSoundPlay()
             }
 
@@ -122,6 +152,9 @@ class InternetExplorerApp(
                 // Update status to done
                 statusIcon?.setImageResource(R.drawable.ie_status_done)
                 statusText.text = "Done"
+
+                // Mark page as loaded
+                isPageLoaded = true
 
                 // Update window title with page title
                 val pageTitle = view?.title
@@ -236,6 +269,7 @@ class InternetExplorerApp(
         // Handle Back button click
         backButton.setOnClickListener {
             if (webView.canGoBack()) {
+                Helpers.performHapticFeedback(context)
                 webView.goBack()
             }
         }
@@ -243,17 +277,20 @@ class InternetExplorerApp(
         // Handle Forward button click
         forwardButton.setOnClickListener {
             if (webView.canGoForward()) {
+                Helpers.performHapticFeedback(context)
                 webView.goForward()
             }
         }
 
         // Handle Go button click
         goButton?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             navigateToUrl()
         }
 
         // Handle Refresh button click
         refreshButton.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             webView.reload()
         }
 
@@ -261,6 +298,7 @@ class InternetExplorerApp(
 
         // Handle Home button click
         homeButton.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             webView.loadUrl(homepage)
         }
 
@@ -272,23 +310,31 @@ class InternetExplorerApp(
                 homepage = currentUrl
                 val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().putString("ie_homepage", homepage).apply()
-
                 onShowNotification("Homepage Changed", "Set to: $currentUrl")
-
                 onSoundPlay()
+                Helpers.performHapticFeedback(context)
             }
             true
         }
 
         // Handle Search button click
         searchButton?.setOnClickListener {
+            Helpers.performHapticFeedback(context)
             webView.loadUrl("https://www.google.com")
         }
-    }
 
-    private fun sendKeyEvent(webView: WebView, keyCode: Int, action: Int) {
-        val event = KeyEvent(action, keyCode)
-        webView.dispatchKeyEvent(event)
+        // Handle Favourites button click
+        val favouritesButton = contentView.findViewById<View>(R.id.ie_favourites_button)
+        favouritesButton?.setOnClickListener { view ->
+            showFavouritesMenu(view)
+        }
+
+        // Handle Add to Favourites button click (IE7 layout)
+        val addFavouritesButton = contentView.findViewById<View>(R.id.ie_add_favourites_button)
+        addFavouritesButton?.setOnClickListener {
+            onSoundPlay()
+            saveCurrentSiteToFavourites()
+        }
     }
 
     fun cleanup() {
@@ -310,5 +356,144 @@ class InternetExplorerApp(
 
         // Remove reference
         webView = null
+    }
+
+    /**
+     * Show favourites menu
+     */
+    private fun showFavouritesMenu(anchorView: View) {
+        val menuItems = mutableListOf<ContextMenuItem>()
+
+        // Add "Save current site" option
+        menuItems.add(ContextMenuItem(
+            title = "Add to Favourites",
+            isEnabled = true,
+            action = {
+                onSoundPlay()
+                saveCurrentSiteToFavourites()
+            }
+        ))
+
+        // Add separator
+        menuItems.add(ContextMenuItem(title = "", isEnabled = false))
+
+        // Add all favourites (newest first)
+        favourites.forEach { favourite ->
+            menuItems.add(ContextMenuItem(
+                title = favourite.name,
+                isEnabled = true,
+                action = {
+                    onSoundPlay()
+                    // Navigate to favourite URL
+                    webView?.loadUrl(favourite.url)
+                },
+                subActionIcon = if (favourite.isDefault) null else R.drawable.delete_icon,
+                subAction = if (favourite.isDefault) null else {
+                    {
+                        onSoundPlay()
+                        deleteFavourite(favourite)
+                    }
+                }
+            ))
+        }
+
+        // Position menu at bottom left of favourites button
+        val location = IntArray(2)
+        anchorView.getLocationOnScreen(location)
+        val x = location[0].toFloat()
+        val y = location[1].toFloat() + anchorView.height
+        onShowContextMenu(menuItems, x, y)
+    }
+
+    /**
+     * Save current site to favourites
+     */
+    private fun saveCurrentSiteToFavourites() {
+        // Only allow adding to favourites if page is fully loaded
+        if (!isPageLoaded) {
+            return
+        }
+
+        val currentUrl = webView?.url
+        val currentTitle = webView?.title
+
+        if (currentUrl != null && currentUrl.isNotEmpty() &&
+            currentUrl != "about:blank" && !currentUrl.startsWith("file://")) {
+
+            val siteName = if (!currentTitle.isNullOrEmpty()) currentTitle else currentUrl
+
+            // Check if this URL is already in favourites
+            val existingFavourite = favourites.find { it.url == currentUrl }
+            if (existingFavourite != null) {
+                return
+            }
+
+            // Add new favourite at the beginning (newest first)
+            val newFavourite = Favourite(
+                name = siteName,
+                url = currentUrl,
+                isDefault = false
+            )
+            favourites.add(0, newFavourite)
+            saveFavourites()
+
+            // Extract domain from URL for notification
+            val domain = try {
+                Uri.parse(currentUrl).host ?: currentUrl
+            } catch (e: Exception) {
+                currentUrl
+            }
+
+            onShowNotification("Saved to Favourites", "$domain saved to IE favourites")
+        }
+    }
+
+    /**
+     * Delete a favourite
+     */
+    private fun deleteFavourite(favourite: Favourite) {
+        if (!favourite.isDefault) {
+            favourites.remove(favourite)
+            saveFavourites()
+        }
+    }
+
+    /**
+     * Load favourites from SharedPreferences
+     */
+    private fun loadFavourites(): MutableList<Favourite> {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val favouritesJson = prefs.getString(KEY_FAVOURITES, null)
+
+        val loadedFavourites = if (favouritesJson != null) {
+            val type = object : TypeToken<MutableList<Favourite>>() {}.type
+            Gson().fromJson<MutableList<Favourite>>(favouritesJson, type) ?: mutableListOf()
+        } else {
+            mutableListOf()
+        }
+
+        // Ensure default favourite exists and is at the end
+        val defaultFavourite = loadedFavourites.find { it.isDefault }
+        if (defaultFavourite == null) {
+            // Add default favourite at the end
+            loadedFavourites.add(Favourite(
+                name = DEFAULT_FAVOURITE_NAME,
+                url = DEFAULT_FAVOURITE_URL,
+                isDefault = true
+            ))
+        }
+
+        return loadedFavourites
+    }
+
+    /**
+     * Save favourites to SharedPreferences
+     */
+    private fun saveFavourites() {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val favouritesJson = Gson().toJson(favourites)
+        prefs.edit {
+            putString(KEY_FAVOURITES, favouritesJson)
+        }
     }
 }

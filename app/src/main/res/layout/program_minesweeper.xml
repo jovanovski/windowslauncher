@@ -17,15 +17,16 @@
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/minesweeper_new_game"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             style="@style/MenuBarItem"
-            android:text="Game"/>
+            android:text="New Game"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            style="@style/MenuBarItem"
+            style="@style/MenuBarItemDisabled"
             android:text="Help"/>
 
     </LinearLayout>

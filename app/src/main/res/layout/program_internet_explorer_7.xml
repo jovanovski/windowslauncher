@@ -145,4 +145,20 @@
         android:layout_marginEnd="60dp"
         android:layout_marginStart="3dp"/>
 
+
+    <View
+        android:id="@+id/ie_favourites_button"
+        android:layout_width="36dp"
+        android:layout_height="35dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginStart="0dp" />
+
+
+    <View
+        android:id="@+id/ie_add_favourites_button"
+        android:layout_width="36dp"
+        android:layout_height="35dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginStart="36dp" />
+
 </RelativeLayout>

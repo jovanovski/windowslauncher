@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
@@ -214,6 +215,7 @@ class NotepadApp(
         // Add note button
         addNoteButton?.setOnClickListener {
             onSoundPlay("click")
+            Helpers.performHapticFeedback(context)
 
             // Save current note before creating new one
             currentNote?.content = notesEditText?.text.toString()
@@ -251,6 +253,7 @@ class NotepadApp(
         // Archive button - toggle between active and archived notes
         archiveButton?.setOnClickListener {
             onSoundPlay("click")
+            Helpers.performHapticFeedback(context)
 
             // Save current note before switching views
             currentNote?.content = notesEditText?.text.toString()

@@ -1,15 +1,11 @@
 package rocks.gorjan.gokixp
 
 import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.AttributeSet
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.View.MeasureSpec
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import rocks.gorjan.gokixp.theme.AppTheme
@@ -37,7 +33,7 @@ class ContextMenuView @JvmOverloads constructor(
 
     fun showMenu(items: List<ContextMenuItem>, x: Float, y: Float) {
         // Trigger haptic feedback when opening context menu
-        performContextMenuVibration()
+        Helpers.performHapticFeedback(context)
         
         // Clear existing items
         removeAllViews()
@@ -188,6 +184,8 @@ class ContextMenuView @JvmOverloads constructor(
                 val textView = itemView.findViewById<TextView>(R.id.menu_item_text)
                 val arrowView = itemView.findViewById<TextView>(R.id.menu_item_arrow)
                 val checkboxView = itemView.findViewById<TextView>(R.id.menu_item_checkbox)
+                val separatorView = itemView.findViewById<View>(R.id.menu_item_separator)
+                val subActionIconView = itemView.findViewById<ImageView>(R.id.menu_item_sub_action_icon)
 
                 textView.text = item.title
 
@@ -220,7 +218,39 @@ class ContextMenuView @JvmOverloads constructor(
                 
                 // Show/hide submenu arrow
                 arrowView.visibility = if (item.hasSubmenu) VISIBLE else GONE
-                
+
+                // Show/hide sub-action icon and separator
+                if (item.subActionIcon != null && item.subAction != null) {
+                    separatorView.visibility = VISIBLE
+                    subActionIconView.visibility = VISIBLE
+                    subActionIconView.setImageResource(item.subActionIcon)
+
+                    // Apply enabled/disabled state to sub-action icon
+                    if (item.isEnabled) {
+                        subActionIconView.alpha = 1.0f
+                        subActionIconView.isEnabled = true
+                    } else {
+                        subActionIconView.alpha = 0.5f
+                        subActionIconView.isEnabled = false
+                    }
+
+                    // Set click listener for sub-action icon
+                    if (item.isEnabled) {
+                        subActionIconView.setOnClickListener {
+                            // Play click sound for menu options
+                            (context as? MainActivity)?.let { mainActivity ->
+                                mainActivity.playClickSound()
+                            }
+                            item.subAction.invoke()
+                            onItemClickListener?.invoke(item)
+                            hideMenu()
+                        }
+                    }
+                } else {
+                    separatorView.visibility = GONE
+                    subActionIconView.visibility = GONE
+                }
+
                 // Set click listener
                 if (item.isEnabled && item.action != null) {
                     itemView.setOnClickListener {
@@ -307,41 +337,6 @@ class ContextMenuView @JvmOverloads constructor(
         }
 
         return 0 // Return 0 to indicate taskbar not found (use screen height instead)
-    }
-    
-    private fun performContextMenuVibration() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // Android 12+ - Use VibratorManager
-                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                val vibrator = vibratorManager?.defaultVibrator
-                
-                if (vibrator?.hasVibrator() == true) {
-                    // Short, subtle vibration for context menu (50ms)
-                    val vibrationEffect = VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
-                    vibrator.vibrate(vibrationEffect)
-                }
-            } else {
-                // Pre-Android 12 - Use legacy Vibrator
-                @Suppress("DEPRECATION")
-                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                
-                if (vibrator?.hasVibrator() == true) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        // Android 8.0+ - Use VibrationEffect
-                        val vibrationEffect = VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
-                        vibrator.vibrate(vibrationEffect)
-                    } else {
-                        // Pre-Android 8.0 - Use deprecated vibrate method
-                        @Suppress("DEPRECATION")
-                        vibrator.vibrate(50)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore vibration errors - not critical functionality
-            // Log.d("ContextMenuView", "Could not perform vibration: ${e.message}")
-        }
     }
     
     private fun Int.dpToPx(): Int {

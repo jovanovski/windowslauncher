@@ -19,8 +19,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.VibratorManager
 import android.util.Log
 import android.view.GestureDetector
 import android.view.KeyEvent
@@ -72,7 +70,6 @@ import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.constraintlayout.widget.ConstraintLayout
 import rocks.gorjan.gokixp.agent.Agent
 import rocks.gorjan.gokixp.agent.AgentView
 import rocks.gorjan.gokixp.agent.TTSService
@@ -196,7 +193,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     // Notepad image pickers
-    private var currentNotepadApp: rocks.gorjan.gokixp.apps.notepad.NotepadApp? = null
+    private var currentNotepadApp: NotepadApp? = null
 
     private val notepadGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         currentNotepadApp?.onImageSelected(uri)
@@ -1076,17 +1073,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun vibrateShort() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorContext =
-                createAttributionContext("system")
-            val vibratorManager =
-                vibratorContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            val vibrator = vibratorManager.defaultVibrator
-            vibrator.vibrate(VibrationEffect.createOneShot(25, 70))
-        }
-    }
-
     private fun setupChargingDetection() {
         chargingReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -1129,22 +1115,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Register Registry Editor
         systemAppActions["system.registry_editor"] = { appInfo ->
-            showRegistryEditorDialog(appInfo = appInfo)
+            showRegistryEditorDialog()
         }
 
         // Register Dialer
         systemAppActions["system.dialer"] = { appInfo ->
-            showDialerDialog(appInfo = appInfo)
+            showDialerDialog()
         }
 
         // Register Notepad
         systemAppActions["system.notepad"] = { appInfo ->
-            showNotepadDialog(appInfo = appInfo)
+            showNotepadDialog()
         }
 
         // Register MSN Messenger
         systemAppActions["system.msn"] = { appInfo ->
-            showMsnDialog(appInfo = appInfo)
+            showMsnDialog()
         }
 
         // Register Winamp
@@ -3084,7 +3070,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun showContextMenu(x: Float, y: Float) {
         Log.d("MainActivity", "showContextMenu called")
-        vibrateShort()
+        Helpers.performHapticFeedback(this)
         
         // Clear any previously selected icon
         selectedIcon?.setSelected(false)
@@ -3153,8 +3139,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun showStartMenuAppContextMenu(appInfo: AppInfo, x: Float, y: Float) {
         Log.d("MainActivity", "showStartMenuAppContextMenu called for ${appInfo.name}")
-        vibrateShort()
-
+        Helpers.performHapticFeedback(this)
+        
         // Clear any previously selected icon
         selectedIcon?.setSelected(false)
         selectedIcon = null
@@ -3224,8 +3210,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     fun showDesktopIconContextMenu(iconView: DesktopIconView, x: Float, y: Float) {
         Log.d("MainActivity", "showDesktopIconContextMenu called")
-        vibrateShort()
-        
+        Helpers.performHapticFeedback(this)        
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
         if (iconInMoveMode != null) {
@@ -3318,8 +3303,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     fun showRecycleBinContextMenu(recycleBinView: RecycleBinView, x: Float, y: Float) {
         Log.d("MainActivity", "showRecycleBinContextMenu called")
-        vibrateShort()
-
+        Helpers.performHapticFeedback(this)
+        
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
         selectedIcon = null
@@ -3356,7 +3341,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     fun showFolderContextMenu(folderView: FolderView, x: Float, y: Float) {
         Log.d("MainActivity", "showFolderContextMenu called")
-        vibrateShort()
+        Helpers.performHapticFeedback(this)
 
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
@@ -3392,7 +3377,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun showFolderIconContextMenu(iconView: DesktopIconView, icon: DesktopIcon, parentDialog: WindowsDialog, touchX: Float, touchY: Float) {
         Log.d("MainActivity", "showFolderIconContextMenu called for ${icon.name}")
-        vibrateShort()
+        Helpers.performHapticFeedback(this)
 
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
@@ -5126,7 +5111,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         fun playPreviewVideo(screensaverType: Int) {
             val videoResource = getScreensaverVideoResource(screensaverType)
             if (videoResource != null) {
-                val videoUri = Uri.parse("android.resource://${packageName}/${videoResource}")
+                val videoUri = "android.resource://${packageName}/${videoResource}".toUri()
                 previewScreensaverVideo.setVideoURI(videoUri)
                 previewScreensaverVideo.visibility = View.VISIBLE
                 previewScreensaverVideo.setOnPreparedListener { mediaPlayer ->
@@ -5161,12 +5146,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         previewScreensaverButton.setOnClickListener {
             if (::screensaverManager.isInitialized && pendingScreensaverSelection != SCREENSAVER_NONE) {
                 // Temporarily set the selected screensaver to the pending selection for preview
-                val previousSelection = screensaverManager.getSelectedScreensaver()
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
                 screensaverManager.showScreensaver()
-
-                // Note: The previous selection will be restored when Apply/OK is pressed or Cancel closes the dialog
-                // For now, we leave it at the pending selection so the preview shows correctly
             }
         }
 
@@ -5181,10 +5162,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         var pendingScreensaverTimeout: Int = savedTimeout
 
         // Handle text changes
-        screensaverTimeoutInput.addTextChangedListener(object : android.text.TextWatcher {
+        screensaverTimeoutInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
+            override fun afterTextChanged(s: Editable?) {
                 val value = s.toString().toIntOrNull()
                 if (value != null && value in 10..60) {
                     pendingScreensaverTimeout = value
@@ -5530,7 +5511,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             context = this,
             onSoundPlay = { playClickSound() },
             onShowNotification = { title, message -> showNotification(title, message) },
-            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) }
+            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) },
+            onShowContextMenu = { items, x, y ->
+                if (::contextMenu.isInitialized) {
+                    contextMenu.showMenu(items, x, y)
+                }
+            }
         )
 
         ieApp.setupApp(contentView, initialUrl)
@@ -5650,7 +5636,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             .show()
     }
 
-    private fun showRegistryEditorDialog(appInfo: AppInfo? = null) {
+    private fun showRegistryEditorDialog() {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -5929,7 +5915,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun showDialerDialog(appInfo: AppInfo? = null) {
+    private fun showDialerDialog() {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -6004,7 +5990,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
-    private fun showNotepadDialog(appInfo: AppInfo? = null) {
+    private fun showNotepadDialog() {
         // Set cursor to busy while loading
         setCursorBusy()
 
@@ -6095,19 +6081,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun showFullscreenImage(uri: Uri) {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-        val imageView = android.widget.ImageView(this).apply {
+        val imageView = ImageView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(android.graphics.Color.BLACK)
+            setBackgroundColor(Color.BLACK)
         }
 
         try {
             // First, decode the bitmap
             val inputStream = contentResolver.openInputStream(uri)
-            var bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            var bitmap = BitmapFactory.decodeStream(inputStream)
             inputStream?.close()
 
             if (bitmap == null) {
@@ -6166,7 +6152,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         dialog.show()
     }
 
-    private fun showMsnDialog(appInfo: AppInfo? = null) {
+    private fun showMsnDialog() {
         // Set cursor to busy while loading
         setCursorBusy()
 
