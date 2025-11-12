@@ -9248,12 +9248,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "onNewIntent called with action: ${intent?.action}, categories: ${intent?.categories}")
         
         // Handle home intent when we're already the active launcher
-        if (intent?.action == Intent.ACTION_MAIN && 
+        if (intent?.action == Intent.ACTION_MAIN &&
             intent.hasCategory(Intent.CATEGORY_HOME)) {
             Log.d("MainActivity", "Home intent received - ensuring we stay visible")
             // We're already the home screen, just ensure we're in the right state
             if (isStartMenuVisible) {
                 hideStartMenu()
+            }
+
+            // Minimize all non-minimized floating windows when user does home gesture
+            if (::floatingWindowManager.isInitialized) {
+                val activeWindows = floatingWindowManager.getAllActiveWindows()
+                val nonMinimizedWindows = activeWindows.filter { !it.isMinimized() }
+
+                if (nonMinimizedWindows.isNotEmpty()) {
+                    Log.d("MainActivity", "Home gesture detected - minimizing ${nonMinimizedWindows.size} active windows")
+                    nonMinimizedWindows.forEach { it.minimize() }
+                }
             }
         }
         
