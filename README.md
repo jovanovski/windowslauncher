@@ -32,6 +32,17 @@ This is a Windows inspired launcher for Android 11+, which tries to faithfully r
 ## More Screenshots
 ![Start Menus](https://i.imgur.com/5ShmfUq.jpeg)
 
+## Special Permissions
+In order for the launcher to do some of it's things like turn off your screen on shutdown, or access notifications for the notification dots, it need special permissions which Android restricts by default, especially for side-loaded apps. In order to enable them, follow these steps:
+
+1. Settings → Apps → See all apps → Windows Launcher
+2. Tap the ⋮ three-dot menu (top right)
+3. Tap “Allow restricted settings”, Unlock with PIN if asked
+4. Now go to Accessibility or Notification access and enable your service.
+
+
 ## Notes
 1) Claude Code was used to create most of this as a fun side-project of mine. Do **NOT** expect super clean code or great organization, it was never the goal. Feel free to refactor things that need refactoring, and submit a PR if something is bothering you.
 2) I claim **NO** copyright over any of the assets used in this project. Most of them belong to Microsoft, and there is no goal to do anything illegal with them. This is just a nostalgia project for all us old Windows fans.
+
+
