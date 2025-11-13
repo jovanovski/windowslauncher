@@ -9255,17 +9255,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (isStartMenuVisible) {
                 hideStartMenu()
             }
-
-            // Minimize all non-minimized floating windows when user does home gesture
-            if (::floatingWindowManager.isInitialized) {
-                val activeWindows = floatingWindowManager.getAllActiveWindows()
-                val nonMinimizedWindows = activeWindows.filter { !it.isMinimized() }
-
-                if (nonMinimizedWindows.isNotEmpty()) {
-                    Log.d("MainActivity", "Home gesture detected - minimizing ${nonMinimizedWindows.size} active windows")
-                    nonMinimizedWindows.forEach { it.minimize() }
-                }
-            }
         }
         
         // Update intent for activity

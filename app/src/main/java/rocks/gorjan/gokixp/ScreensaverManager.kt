@@ -62,8 +62,9 @@ class ScreensaverManager(
                 addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
 
-                // Clear any flags that might prevent fullscreen
+                // Clear any flags that might prevent fullscreen or keep screen on
                 clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+                clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
                 // Hide system bars
                 WindowCompat.setDecorFitsSystemWindows(this, false)
@@ -113,6 +114,9 @@ class ScreensaverManager(
                 }
 
                 mediaPlayer.start()
+
+                // Allow screen to turn off during screensaver
+                videoView.keepScreenOn = false
             }
 
             // Start will be called in onPrepared listener
