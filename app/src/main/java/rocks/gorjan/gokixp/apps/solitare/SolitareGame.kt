@@ -1267,7 +1267,7 @@ class SolitareGame(
         // If we haven't started tracking a cycle yet, start now
         if (drawPileCardsAtCycleStart == 0 && totalDrawPileCards > 0) {
             drawPileCardsAtCycleStart = totalDrawPileCards
-            cardsDrawnThisCycle = 0
+            // Don't reset cardsDrawnThisCycle - it may have already been incremented
             wasteCardUsedThisCycle = false
             return false
         }
