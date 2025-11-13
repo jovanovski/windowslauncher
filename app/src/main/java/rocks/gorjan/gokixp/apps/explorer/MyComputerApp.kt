@@ -85,7 +85,7 @@ class MyComputerApp(
 
         // Load initial view (My Computer root with drives)
         navigateToDirectory(null, addToHistory = true)
-
+        onSoundPlay("click")
         return contentView
     }
 
@@ -123,6 +123,7 @@ class MyComputerApp(
         if (historyIndex > 0) {
             historyIndex--
             currentPath = navigationHistory[historyIndex]
+            onSoundPlay("click")
             updateFolderDisplay()
             loadDirectoryContents()
         }
