@@ -301,9 +301,13 @@ class MyComputerApp(
                     // Navigate to internal storage
                     navigateToDirectory(Environment.getExternalStorageDirectory(), addToHistory = true)
                 }
-                DriveType.FLOPPY, DriveType.OPTICAL -> {
-                    // Do nothing for now
-                    Log.d(TAG, "Clicked on ${item.name} - not implemented yet")
+                DriveType.FLOPPY -> {
+                    // Play floppy read sound with busy cursor
+                    playDriveSound(R.raw.floppy_read)
+                }
+                DriveType.OPTICAL -> {
+                    // Play CD spin sound with busy cursor
+                    playDriveSound(R.raw.cd_spin)
                 }
                 null -> Log.e(TAG, "Drive item with null drive type")
             }
@@ -363,6 +367,39 @@ class MyComputerApp(
 
         } catch (e: Exception) {
             Log.e(TAG, "Error opening file: ${file.name}", e)
+        }
+    }
+
+    /**
+     * Play drive sound effect with busy cursor
+     */
+    private fun playDriveSound(soundResId: Int) {
+        // Set cursor to busy
+        onSetCursorBusy()
+
+        try {
+            // Create MediaPlayer for the drive sound
+            val mediaPlayer = android.media.MediaPlayer.create(context, soundResId)
+
+            // Set listener to restore cursor when sound finishes
+            mediaPlayer.setOnCompletionListener {
+                onSetCursorNormal()
+                it.release()
+            }
+
+            // Set listener to restore cursor on error
+            mediaPlayer.setOnErrorListener { mp, _, _ ->
+                onSetCursorNormal()
+                mp.release()
+                true
+            }
+
+            // Start playing
+            mediaPlayer.start()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing drive sound", e)
+            onSetCursorNormal()
         }
     }
 
