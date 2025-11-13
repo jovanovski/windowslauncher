@@ -91,6 +91,9 @@ class WindowsDialog @JvmOverloads constructor(
     // Reference to InternetExplorerApp instance (if this window is IE)
     var internetExplorerApp: Any? = null
 
+    // Reference to MyComputerApp instance (if this window is My Computer)
+    var myComputerApp: Any? = null
+
     // Dragging on the title bar
     private var initialX = 0f
     private var initialY = 0f

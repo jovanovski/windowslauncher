@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val CALENDAR_PERMISSION_REQUEST_CODE = 1003
     private val AUDIO_PERMISSION_REQUEST_CODE = 200
     private val VIDEO_PERMISSION_REQUEST_CODE = 201
+    private val STORAGE_PERMISSION_REQUEST_CODE = 202
 
     // Image picker launcher for wallpaper selection
     private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -2692,9 +2693,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             Log.d("MainActivity", "Back pressed (modern): navigating back in IE")
                             ieApp.navigateBack()
                         } else {
-                            // Close the front-most window
-                            Log.d("MainActivity", "Back pressed (modern): closing front window")
-                            floatingWindowManager.closeFrontWindow()
+                            // Check if front window is My Computer with navigation history
+                            val mcApp = frontWindow?.myComputerApp as? rocks.gorjan.gokixp.apps.explorer.MyComputerApp
+                            if (mcApp != null && mcApp.canNavigateBack()) {
+                                // Navigate back in folder history
+                                Log.d("MainActivity", "Back pressed (modern): navigating back in My Computer")
+                                mcApp.navigateBackPublic()
+                            } else {
+                                // Close the front-most window
+                                Log.d("MainActivity", "Back pressed (modern): closing front window")
+                                floatingWindowManager.closeFrontWindow()
+                            }
                         }
                     }
                     else -> {
@@ -3051,16 +3060,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             val alreadyRequested = prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)
-            
+
             if (!alreadyRequested) {
                 Log.d("MainActivity", "First launch - requesting notification permission")
-                
-                if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) 
+
+                if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
-                    
+
                     // Mark as requested so we don't ask again
                     prefs.edit { putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true) }
-                    
+
                     ActivityCompat.requestPermissions(
                         this,
                         arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
@@ -3077,7 +3086,42 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "Android version < 13, notification permission not required")
         }
     }
-    
+
+    private fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // For Android 11+, check MANAGE_EXTERNAL_STORAGE
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            // For older versions, check READ_EXTERNAL_STORAGE
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // For Android 11+, request MANAGE_EXTERNAL_STORAGE via settings
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to general storage settings
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivity(intent)
+            }
+        } else {
+            // For older versions, request READ_EXTERNAL_STORAGE
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE),
+                STORAGE_PERMISSION_REQUEST_CODE
+            )
+        }
+    }
+
     private fun showContextMenu(x: Float, y: Float) {
         Log.d("MainActivity", "showContextMenu called")
         Helpers.performHapticFeedback(this)
@@ -3374,6 +3418,39 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 },
                 onChangeIcon = {
                     showIconSelectionDialog(folderView)
+                }
+            )
+
+            // Show the menu
+            contextMenu.showMenu(menuItems, x, y)
+            isContextMenuVisible = true
+        } else {
+            Log.d("MainActivity", "Context menu not initialized")
+        }
+    }
+
+    fun showMyComputerContextMenu(myComputerView: rocks.gorjan.gokixp.apps.explorer.MyComputerView, x: Float, y: Float) {
+        Log.d("MainActivity", "showMyComputerContextMenu called")
+        Helpers.performHapticFeedback(this)
+
+        // Clear any previously selected icon or icon in move mode
+        selectedIcon?.setSelected(false)
+        selectedIcon = null
+        if (iconInMoveMode != null) {
+            exitIconMoveMode()
+        }
+
+        if (::contextMenu.isInitialized) {
+            // Create My Computer context menu items: Open, separator, Move Icon, Properties
+            val menuItems = ContextMenuItems.getMyComputerMenuItems(
+                onOpen = {
+                    openMyComputer(myComputerView)
+                },
+                onMove = {
+                    startIconMoveMode(myComputerView)
+                },
+                onProperties = {
+                    createAndShowWallpaperDialog("settings")
                 }
             )
 
@@ -7763,12 +7840,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             null // Will be assigned during migration/reflow
         }
 
+        // Determine icon type based on package name
+        val iconType = when (appInfo.packageName) {
+            "recycle.bin" -> IconType.RECYCLE_BIN
+            "my.computer" -> IconType.MY_COMPUTER
+            else -> IconType.APP
+        }
+
         val desktopIcon = DesktopIcon(
             name = appInfo.name,
             packageName = appInfo.packageName,
             icon = iconToUse,
             x = x,
             y = y,
+            type = iconType,
             portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
             landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null
         )
@@ -7776,24 +7861,35 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         desktopIcons.add(desktopIcon)
         Log.d("MainActivity", "Added desktop icon ${appInfo.name} with grid index $gridIndex for $currentOrientation")
         
-        // Create appropriate icon view (RecycleBinView for recycle bin, DesktopIconView for others)
-        val iconView = if (appInfo.packageName == "recycle.bin") {
-            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-            Log.d("MainActivity", "OPA: selectedTheme = $selectedTheme")
-
-            RecycleBinView(this).apply {
-                setDesktopIcon(desktopIcon)
-                // Apply current theme for recycle bin
+        // Create appropriate icon view (RecycleBinView for recycle bin, MyComputerView for my computer, DesktopIconView for others)
+        val iconView = when (appInfo.packageName) {
+            "recycle.bin" -> {
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                 Log.d("MainActivity", "OPA: selectedTheme = $selectedTheme")
-                val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
-                setThemeFont(isClassic)
-                setThemeIcon(isClassic)
+
+                RecycleBinView(this).apply {
+                    setDesktopIcon(desktopIcon)
+                    // Apply current theme for recycle bin
+                    Log.d("MainActivity", "OPA: selectedTheme = $selectedTheme")
+                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    setThemeFont(isClassic)
+                    setThemeIcon(isClassic)
+                }
             }
-        } else {
-            DesktopIconView(this).apply {
-                setDesktopIcon(desktopIcon)
-                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+            "my.computer" -> {
+                rocks.gorjan.gokixp.apps.explorer.MyComputerView(this).apply {
+                    setDesktopIcon(desktopIcon)
+                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    setThemeFont(isClassic)
+                    setThemeIcon(isClassic)
+                }
+            }
+            else -> {
+                DesktopIconView(this).apply {
+                    setDesktopIcon(desktopIcon)
+                    setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                }
             }
         }
         
@@ -7895,10 +7991,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     try {
                         IconType.valueOf(typeStr)
                     } catch (e: Exception) {
-                        if (packageName == "recycle.bin") IconType.RECYCLE_BIN else IconType.APP
+                        when (packageName) {
+                            "recycle.bin" -> IconType.RECYCLE_BIN
+                            "my.computer" -> IconType.MY_COMPUTER
+                            else -> IconType.APP
+                        }
                     }
                 } else {
-                    if (packageName == "recycle.bin") IconType.RECYCLE_BIN else IconType.APP
+                    when (packageName) {
+                        "recycle.bin" -> IconType.RECYCLE_BIN
+                        "my.computer" -> IconType.MY_COMPUTER
+                        else -> IconType.APP
+                    }
                 }
 
                 try {
@@ -7906,6 +8010,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         IconType.RECYCLE_BIN -> {
                             // Special case for recycle bin - use recycle drawable
                             AppCompatResources.getDrawable(this, R.drawable.recycle)!!
+                        }
+                        IconType.MY_COMPUTER -> {
+                            // Special case for My Computer - use theme-appropriate icon
+                            AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())!!
                         }
                         IconType.FOLDER -> {
                             // Use custom icon if available, otherwise use theme-appropriate folder icon
@@ -7946,6 +8054,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // Apply current theme for recycle bin
                                 val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                                 Log.d("MainActivity", "LoadDesktopIcons: selectedTheme = $selectedTheme")
+                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                            }
+                        }
+                        IconType.MY_COMPUTER -> {
+                            rocks.gorjan.gokixp.apps.explorer.MyComputerView(this).apply {
+                                setDesktopIcon(desktopIcon)
                                 setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
                                 setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
                             }
@@ -7999,6 +8114,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Ensure recycle bin exists as desktop icon (after loading existing icons)
         ensureRecycleBinExists()
+
+        // Ensure My Computer exists as desktop icon
+        ensureMyComputerExists()
 
         // Post to ensure container has dimensions
         desktopContainer.post {
@@ -8061,7 +8179,92 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             hideRecycleBin()
         }
     }
-    
+
+    private fun ensureMyComputerExists() {
+        // Check if My Computer already exists in desktop icons
+        val myComputerExists = desktopIcons.any { it.packageName == "my.computer" }
+
+        if (!myComputerExists) {
+            // Create My Computer as a desktop icon with theme-appropriate icon
+            val myComputerDrawable = AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())!!
+            val myComputerAppInfo = AppInfo(
+                name = "My Computer",
+                packageName = "my.computer",
+                icon = myComputerDrawable
+            )
+
+            // Set default position (top-left, below Recycle Bin)
+            val defaultX = 50f
+            val defaultY = 200f
+
+            addDesktopIcon(myComputerAppInfo, defaultX, defaultY)
+            saveDesktopIcons() // Save immediately
+        }
+
+        Log.d("MainActivity", "My Computer ensured in desktop icons")
+    }
+
+    fun openMyComputer(myComputerView: rocks.gorjan.gokixp.apps.explorer.MyComputerView) {
+        val desktopIcon = myComputerView.getDesktopIcon() ?: return
+
+        // Check and request storage permissions
+        if (!hasStoragePermission()) {
+            requestStoragePermission()
+            return
+        }
+
+        // Check if window is already open
+        val windowId = "mycomputer:${desktopIcon.id}"
+        if (floatingWindowManager.findAndFocusWindow(windowId)) {
+            return  // Window already open
+        }
+
+        // Create Windows dialog
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = windowId
+        windowsDialog.setTitle("My Computer")
+        windowsDialog.setTaskbarIcon(themeManager.getMyComputerIcon())
+
+        // Inflate layout based on current theme (reuse Windows Explorer layouts)
+        val explorerLayoutRes = themeManager.getWindowsExplorerLayoutRes(themeManager.getSelectedTheme())
+        val contentView = layoutInflater.inflate(explorerLayoutRes, null)
+
+        // Create MyComputerApp instance
+        val myComputerApp = rocks.gorjan.gokixp.apps.explorer.MyComputerApp(
+            context = this,
+            theme = themeManager.getSelectedTheme(),
+            themeManager = themeManager,
+            onSoundPlay = { soundType ->
+                when (soundType) {
+                    "click" -> playClickSound()
+                    else -> playClickSound()
+                }
+            },
+            onUpdateWindowTitle = { title ->
+                windowsDialog.setTitle(title)
+            },
+            onSetCursorBusy = {
+                setCursorBusy()
+            },
+            onSetCursorNormal = {
+                setCursorNormal()
+            }
+        )
+
+        // Setup the app
+        myComputerApp.setupApp(contentView)
+
+        // Store reference to MyComputerApp instance
+        windowsDialog.myComputerApp = myComputerApp
+
+        // Set content and show window
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSizePercentage(90f, 30f)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
     fun deleteDesktopIcon(iconView: DesktopIconView) {
         // Play recycle sound
         playRecycleSound()
@@ -9144,9 +9347,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     Log.d("MainActivity", "Back pressed: navigating back in IE")
                     ieApp.navigateBack()
                 } else {
-                    // Close the front-most window
-                    Log.d("MainActivity", "Back pressed: closing front window")
-                    floatingWindowManager.closeFrontWindow()
+                    // Check if front window is My Computer with navigation history
+                    val mcApp = frontWindow?.myComputerApp as? rocks.gorjan.gokixp.apps.explorer.MyComputerApp
+                    if (mcApp != null && mcApp.canNavigateBack()) {
+                        // Navigate back in folder history
+                        Log.d("MainActivity", "Back pressed: navigating back in My Computer")
+                        mcApp.navigateBackPublic()
+                    } else {
+                        // Close the front-most window
+                        Log.d("MainActivity", "Back pressed: closing front window")
+                        floatingWindowManager.closeFrontWindow()
+                    }
                 }
             }
             else -> {

@@ -5,7 +5,8 @@ import android.graphics.drawable.Drawable
 enum class IconType {
     APP,
     FOLDER,
-    RECYCLE_BIN
+    RECYCLE_BIN,
+    MY_COMPUTER
 }
 
 data class DesktopIcon(

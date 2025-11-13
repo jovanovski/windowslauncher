@@ -125,4 +125,26 @@
         android:textColor="@color/black"
         android:text="12 items"/>
 
+
+    <View
+        android:id="@+id/back_button"
+        android:layout_marginTop="16dp"
+        android:layout_width="60dp"
+        android:layout_height="30dp"/>
+
+    <View
+        android:id="@+id/forward_button"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="60dp"
+        android:layout_width="40dp"
+        android:layout_height="30dp"/>
+
+
+    <View
+        android:id="@+id/up_button"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="90dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"/>
+
 </RelativeLayout>

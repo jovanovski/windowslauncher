@@ -44,6 +44,7 @@ class FolderIconAdapter(
             val view = when (icon.type) {
                 IconType.RECYCLE_BIN -> RecycleBinView(context, R.layout.folder_icon)
                 IconType.FOLDER -> FolderView(context, theme, R.layout.folder_icon)
+                IconType.MY_COMPUTER -> rocks.gorjan.gokixp.apps.explorer.MyComputerView(context, R.layout.folder_icon)
                 IconType.APP -> DesktopIconView(context, R.layout.folder_icon)
             }
             view

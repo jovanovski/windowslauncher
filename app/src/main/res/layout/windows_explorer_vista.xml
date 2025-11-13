@@ -122,4 +122,17 @@
         android:textColor="@color/black"
         android:text="12 items"/>
 
+
+    <View
+        android:id="@+id/back_button"
+        android:layout_width="22dp"
+        android:layout_height="22dp"/>
+
+
+    <View
+        android:id="@+id/forward_button"
+        android:layout_marginStart="22dp"
+        android:layout_width="22dp"
+        android:layout_height="22dp"/>
+
 </RelativeLayout>

@@ -4,11 +4,59 @@
     android:layout_height="match_parent"
     android:background="?windowBackgroundColor">
 
+    <LinearLayout
+        android:id="@+id/solitare_menu"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="?windowBackgroundColor"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="File"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Edit"
+            style="@style/MenuBarItem"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="View"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Favourites"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tools"
+            style="@style/MenuBarItem"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Help"
+            style="@style/MenuBarItem"/>
+
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:layout_marginTop="22dp"
         android:gravity="start">
         <ImageView
             android:layout_width="200dp"
@@ -29,7 +77,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#808080"
-        android:layout_marginTop="43dp"
+        android:layout_marginTop="65dp"
         android:layout_marginBottom="20dp"
         android:orientation="horizontal">
         <LinearLayout
@@ -75,7 +123,7 @@
         android:text="Folder Name"
         android:lines="1"
         android:fontFamily="@font/micross_block"
-        android:layout_marginTop="26dp"
+        android:layout_marginTop="48dp"
         android:textColor="@color/black"
         android:textSize="10sp"
         android:layout_marginStart="59dp"
@@ -83,12 +131,14 @@
 
     <TextView
         android:id="@+id/folder_name_large"
-        android:layout_width="wrap_content"
+        android:layout_width="100dp"
         android:layout_height="wrap_content"
         android:text="Folder Name"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:lines="1"
         android:fontFamily="@font/micross_block_bold"
-        android:layout_marginTop="83dp"
+        android:layout_marginTop="105dp"
         android:textColor="@color/black"
         android:textSize="20sp"
         android:layout_marginStart="10dp"
@@ -99,7 +149,7 @@
         android:id="@+id/folder_icon_small"
         android:layout_width="13dp"
         android:layout_height="13dp"
-        android:layout_marginTop="25dp"
+        android:layout_marginTop="47dp"
         android:layout_marginStart="44dp"
         />
 
@@ -107,7 +157,7 @@
         android:id="@+id/folder_icon_large"
         android:layout_width="24dp"
         android:layout_height="24dp"
-        android:layout_marginTop="52dp"
+        android:layout_marginTop="74dp"
         android:layout_marginStart="10dp"
         />
 
@@ -158,4 +208,27 @@
         android:textSize="11sp"
         android:textColor="@color/black"
         android:text="12 items"/>
+
+    <View
+        android:id="@+id/back_button"
+        android:layout_marginTop="22dp"
+        android:layout_width="50dp"
+        android:layout_height="22dp"/>
+
+
+    <View
+        android:id="@+id/forward_button"
+        android:layout_marginTop="22dp"
+        android:layout_marginStart="50dp"
+        android:layout_width="40dp"
+        android:layout_height="22dp"/>
+
+
+    <View
+        android:id="@+id/up_button"
+        android:layout_marginTop="22dp"
+        android:layout_marginStart="83dp"
+        android:layout_width="30dp"
+        android:layout_height="22dp"/>
+
 </RelativeLayout>

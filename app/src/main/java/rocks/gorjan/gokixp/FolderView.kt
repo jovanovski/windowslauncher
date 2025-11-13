@@ -8,6 +8,7 @@ import rocks.gorjan.gokixp.theme.ThemeAware
 class FolderView : DesktopIconView, ThemeAware {
 
     private var currentTheme: AppTheme = AppTheme.WindowsXP
+    private var disableContextMenu: Boolean = false
 
     @JvmOverloads
     constructor(
@@ -50,8 +51,17 @@ class FolderView : DesktopIconView, ThemeAware {
 
     // Override to show folder specific context menu
     override fun showIconContextMenu(x: Float, y: Float) {
+        // Don't show context menu if disabled (e.g., for read-only file browser)
+        if (disableContextMenu) {
+            return
+        }
         val mainActivity = context as? MainActivity
         mainActivity?.showFolderContextMenu(this, x, y)
+    }
+
+    // Method to disable context menu (for read-only views like Windows Explorer)
+    fun setContextMenuEnabled(enabled: Boolean) {
+        disableContextMenu = !enabled
     }
 
     // Phase 3: Implement ThemeAware interface

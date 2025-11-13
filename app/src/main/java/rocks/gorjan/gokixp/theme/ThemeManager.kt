@@ -221,6 +221,12 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.msn_icon_vista
     }
 
+    fun getMyComputerIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.my_computer_98_icon
+        AppTheme.WindowsXP -> R.drawable.my_computer_xp_icon
+        AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
+    }
+
     fun getWmpLayout(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.layout.program_wmp_98
         AppTheme.WindowsXP -> R.layout.program_wmp_xp

@@ -213,4 +213,18 @@ object ContextMenuItems {
             ContextMenuItem("Close", isEnabled = true, action = onClose)
         )
     }
+
+    // My Computer context menu items
+    fun getMyComputerMenuItems(
+        onOpen: () -> Unit,
+        onMove: () -> Unit,
+        onProperties: () -> Unit
+    ): List<ContextMenuItem> {
+        return listOf(
+            ContextMenuItem("Open", isEnabled = true, action = onOpen),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Move Icon", isEnabled = true, action = onMove),
+            ContextMenuItem("Properties", isEnabled = true, action = onProperties)
+        )
+    }
 }
