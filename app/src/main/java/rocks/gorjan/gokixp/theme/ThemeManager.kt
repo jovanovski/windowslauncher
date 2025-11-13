@@ -227,6 +227,48 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
     }
 
+    fun getFileGenericIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.file_generic_98
+        AppTheme.WindowsXP -> R.drawable.file_generic_xp
+        AppTheme.WindowsVista -> R.drawable.file_generic_vista
+    }
+
+    fun getFileImageIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.file_image_98
+        AppTheme.WindowsXP -> R.drawable.file_image_xp
+        AppTheme.WindowsVista -> R.drawable.file_image_vista
+    }
+
+    fun getFileAudioIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.file_audio_98
+        AppTheme.WindowsXP -> R.drawable.file_audio_xp
+        AppTheme.WindowsVista -> R.drawable.file_audio_vista
+    }
+
+    fun getFileVideoIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.file_video_98
+        AppTheme.WindowsXP -> R.drawable.file_video_xp
+        AppTheme.WindowsVista -> R.drawable.file_video_vista
+    }
+
+    fun getDriveFloppyIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.drive_floppy_98
+        AppTheme.WindowsXP -> R.drawable.drive_floppy_xp
+        AppTheme.WindowsVista -> R.drawable.drive_floppy_vista
+    }
+
+    fun getDriveLocalIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.drive_local_98
+        AppTheme.WindowsXP -> R.drawable.drive_local_xp
+        AppTheme.WindowsVista -> R.drawable.drive_local_vista
+    }
+
+    fun getDriveOpticalIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.drive_optical_98
+        AppTheme.WindowsXP -> R.drawable.drive_optical_xp
+        AppTheme.WindowsVista -> R.drawable.drive_optical_vista
+    }
+
     fun getWmpLayout(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.layout.program_wmp_98
         AppTheme.WindowsXP -> R.layout.program_wmp_xp

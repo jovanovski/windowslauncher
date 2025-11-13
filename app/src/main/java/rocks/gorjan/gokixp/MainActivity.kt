@@ -11225,14 +11225,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     // Switch cursor to busy (hourglass) state
     private fun setCursorBusy() {
+        Log.v("GOKII", "BUSY")
         if (::cursorEffect.isInitialized) {
+            Log.v("GOKII", "BUSY YES" )
             cursorEffect.setImageResource(R.drawable.cursor_busy)
         }
     }
 
     // Switch cursor back to normal (pointer) state
     private fun setCursorNormal() {
+        Log.v("GOKII", "NORMAL" )
+
         if (::cursorEffect.isInitialized) {
+            Log.v("GOKII", "NORMAL YES" )
+
             cursorEffect.setImageResource(R.drawable.cursor)
         }
     }

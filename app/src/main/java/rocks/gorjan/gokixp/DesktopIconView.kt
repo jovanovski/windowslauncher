@@ -160,7 +160,12 @@ open class DesktopIconView : LinearLayout {
         iconText.text = displayName.replace("\\n", "\n")
 
         // Set initial shortcut arrow visibility based on preferences
-        val isShortcutArrowVisible = mainActivity?.isShortcutArrowVisible() ?: true
+        // Only show arrow for APP type icons (not folders, recycle bin, My Computer, etc.)
+        val isShortcutArrowVisible = if (icon.type == IconType.APP) {
+            mainActivity?.isShortcutArrowVisible() ?: true
+        } else {
+            false  // Never show arrow for non-app icons
+        }
         updateShortcutArrowVisibility(isShortcutArrowVisible)
 
         // Position will be set by the caller after adding to container
@@ -576,10 +581,18 @@ open class DesktopIconView : LinearLayout {
     
     private fun updateSelectionTint() {
         if (isSelected) {
-            // Apply semi-transparent blue background only (don't color the icon)
-            setBackgroundColor(Color.parseColor("#803399FF")) // Blue background with 0.5 opacity (80 in hex = ~50%)
+            // Apply blue background to text and white text color
+            iconText.setBackgroundColor(Color.parseColor("#0000FF")) // Solid blue background
+            iconText.setTextColor(Color.WHITE) // White text
+            iconText.maxLines = Int.MAX_VALUE // Remove line limit to show full filename
+            // Remove background from the whole view
+            setBackgroundColor(Color.TRANSPARENT)
         } else {
-            // Remove background
+            // Remove text background
+            iconText.setBackgroundColor(Color.TRANSPARENT)
+            iconText.setTextColor(Color.BLACK) // Reset to black for file browser context
+            iconText.maxLines = 2 // Restore line limit
+            // Remove background from the whole view
             setBackgroundColor(Color.TRANSPARENT)
         }
     }

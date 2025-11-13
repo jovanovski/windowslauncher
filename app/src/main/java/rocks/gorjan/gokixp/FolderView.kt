@@ -85,7 +85,6 @@ class FolderView : DesktopIconView, ThemeAware {
             }
         }
 
-        android.util.Log.d("FolderView", "Using folder icon resource: $iconResource")
 
         val drawable = context.getDrawable(iconResource)!!
         setIconDrawable(drawable)
@@ -93,7 +92,6 @@ class FolderView : DesktopIconView, ThemeAware {
         // Also update the desktop icon data
         getDesktopIcon()?.let { desktopIcon ->
             desktopIcon.icon = drawable
-            android.util.Log.d("FolderView", "Desktop icon data updated")
         }
     }
 

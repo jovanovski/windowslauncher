@@ -69,7 +69,7 @@
         android:verticalSpacing="0dp"
         android:horizontalSpacing="0dp"
         android:stretchMode="none"
-        android:columnWidth="62dp"
+        android:columnWidth="50dp"
         android:paddingEnd="20dp"
         android:scrollbars="vertical"
         android:scrollbarStyle="outsideOverlay"

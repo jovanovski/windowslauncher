@@ -51,13 +51,31 @@ class FileSystemAdapter(
             iconView.setContextMenuEnabled(false)
         }
 
-        // Get the appropriate icon
-        val iconDrawable = if (item.isDirectory) {
+        // Get the appropriate icon based on file type
+        val iconDrawable = if (item.isDrive) {
+            // Use drive icon based on drive type
+            val iconResId = when (item.driveType) {
+                DriveType.FLOPPY -> themeManager.getDriveFloppyIcon()
+                DriveType.LOCAL_DISK -> themeManager.getDriveLocalIcon()
+                DriveType.OPTICAL -> themeManager.getDriveOpticalIcon()
+                null -> themeManager.getFolderIconRes(theme) // Fallback
+            }
+            context.getDrawable(iconResId)
+        } else if (item.isDirectory) {
             // Use theme-specific folder icon
             context.getDrawable(themeManager.getFolderIconRes(theme))
         } else {
-            // Use generic file icon (you can enhance this with file type detection)
-            context.getDrawable(R.drawable.notepad_icon_xp) // Placeholder for files
+            // Determine file type and use appropriate icon
+            val fileType = FileSystemItem.getFileType(item)
+            val iconResId = when (fileType) {
+                FileType.IMAGE -> themeManager.getFileImageIcon()
+                FileType.AUDIO -> themeManager.getFileAudioIcon()
+                FileType.VIDEO -> themeManager.getFileVideoIcon()
+                FileType.GENERIC -> themeManager.getFileGenericIcon()
+                FileType.DIRECTORY -> themeManager.getFolderIconRes(theme) // Should not happen
+                FileType.DRIVE -> themeManager.getFolderIconRes(theme) // Should not happen
+            }
+            context.getDrawable(iconResId)
         }
 
         // Create a pseudo DesktopIcon for the file/folder
@@ -77,6 +95,9 @@ class FileSystemAdapter(
         iconView.setThemeFont(isClassic)
         iconView.setTextColor(Color.BLACK)
         iconView.removeTextShadow()
+
+        // Hide shortcut arrow for files, folders, and drives (only apps should have it)
+        iconView.updateShortcutArrowVisibility(false)
 
         // Remove padding and margins
         iconView.setIconPadding(0, 0, 0, 0)

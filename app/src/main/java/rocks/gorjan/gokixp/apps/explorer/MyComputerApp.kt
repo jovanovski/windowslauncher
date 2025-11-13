@@ -30,11 +30,12 @@ class MyComputerApp(
 ) {
     companion object {
         private const val TAG = "MyComputerApp"
+        private const val MY_COMPUTER_ROOT = "MY_COMPUTER_ROOT"  // Virtual root path
     }
 
     // Navigation state
-    private var currentPath: File = Environment.getExternalStorageDirectory()
-    private val navigationHistory = mutableListOf<File>()
+    private var currentPath: File? = null  // null means we're at My Computer root
+    private val navigationHistory = mutableListOf<File?>()  // null entries represent root
     private var historyIndex = -1
 
     // UI references
@@ -47,6 +48,9 @@ class MyComputerApp(
     private var backButton: View? = null
     private var forwardButton: View? = null
     private var upButton: View? = null
+
+    // Selection tracking
+    private var currentSelectedView: View? = null
 
     /**
      * Initialize the app UI
@@ -79,17 +83,18 @@ class MyComputerApp(
             navigateUp()
         }
 
-        // Load initial directory (root of internal storage)
-        navigateToDirectory(currentPath, addToHistory = true)
+        // Load initial view (My Computer root with drives)
+        navigateToDirectory(null, addToHistory = true)
 
         return contentView
     }
 
     /**
-     * Navigate to a specific directory
+     * Navigate to a specific directory (null = My Computer root)
      */
-    private fun navigateToDirectory(directory: File, addToHistory: Boolean = true) {
-        if (!directory.exists() || !directory.isDirectory) {
+    private fun navigateToDirectory(directory: File?, addToHistory: Boolean = true) {
+        // Validate if not null
+        if (directory != null && (!directory.exists() || !directory.isDirectory)) {
             Log.e(TAG, "Invalid directory: ${directory.absolutePath}")
             return
         }
@@ -153,18 +158,27 @@ class MyComputerApp(
      * Navigate up to parent directory
      */
     private fun navigateUp() {
-        // Don't allow navigation above internal storage root
-        val rootDirectory = Environment.getExternalStorageDirectory()
-        if (currentPath == rootDirectory) {
-            Log.d(TAG, "Already at root directory, cannot navigate up")
+        // If at My Computer root, can't go up
+        if (currentPath == null) {
+            Log.d(TAG, "Already at My Computer root, cannot navigate up")
             return
         }
 
-        val parent = currentPath.parentFile
+        val rootDirectory = Environment.getExternalStorageDirectory()
+
+        // If at internal storage root, go to My Computer root
+        if (currentPath == rootDirectory) {
+            Log.d(TAG, "Navigating up to My Computer root")
+            navigateToDirectory(null, addToHistory = true)
+            return
+        }
+
+        val parent = currentPath?.parentFile
         if (parent != null && parent.exists()) {
             // Don't allow going above internal storage root
             if (parent.absolutePath.length < rootDirectory.absolutePath.length) {
-                Log.d(TAG, "Cannot navigate above internal storage root")
+                Log.d(TAG, "Cannot navigate above internal storage root, going to My Computer root")
+                navigateToDirectory(null, addToHistory = true)
                 return
             }
             navigateToDirectory(parent, addToHistory = true)
@@ -175,10 +189,10 @@ class MyComputerApp(
      * Update the folder name and icon display
      */
     private fun updateFolderDisplay() {
-        val displayName = if (currentPath == Environment.getExternalStorageDirectory()) {
-            "Internal Storage"
-        } else {
-            currentPath.name
+        val displayName = when {
+            currentPath == null -> "My Computer"
+            currentPath == Environment.getExternalStorageDirectory() -> "Local Disk (C:)"
+            else -> currentPath!!.name
         }
 
         // Update small folder name and icon (in address bar)
@@ -200,60 +214,125 @@ class MyComputerApp(
      * Load and display directory contents
      */
     private fun loadDirectoryContents() {
+        // Clear selection when loading new directory
+        clearSelection()
+
         // Set cursor to busy while loading
         onSetCursorBusy()
 
-        try {
-            // Get list of files and folders
-            val files = currentPath.listFiles()?.toList() ?: emptyList()
+        // Load files in background thread
+        Thread {
+            try {
+                val items = if (currentPath == null) {
+                    // At My Computer root - show virtual drives
+                    val dummyFile = Environment.getExternalStorageDirectory()
+                    listOf(
+                        FileSystemItem.createDrive("3.5 Floppy (A:)", DriveType.FLOPPY, dummyFile),
+                        FileSystemItem.createDrive("Local Disk (C:)", DriveType.LOCAL_DISK, dummyFile),
+                        FileSystemItem.createDrive("Compact Disc (D:)", DriveType.OPTICAL, dummyFile)
+                    )
+                } else {
+                    // In a real directory - show files and folders
+                    val files = currentPath?.listFiles()?.toList() ?: emptyList()
 
-            // Sort: directories first, then by name
-            val sortedFiles = files.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+                    // Sort: directories first, then by name
+                    val sortedFiles = files.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
 
-            // Convert to FileSystemItem
-            val items = sortedFiles.map { FileSystemItem.from(it) }
-
-            // Create adapter and set to GridView
-            val adapter = FileSystemAdapter(
-                context = context,
-                items = items,
-                theme = theme,
-                themeManager = themeManager,
-                onItemClick = { item, _ ->
-                    handleItemClick(item)
+                    // Convert to FileSystemItem
+                    sortedFiles.map { FileSystemItem.from(it) }
                 }
-            )
 
-            folderIconsGrid?.adapter = adapter
+                // Update UI on main thread
+                (context as? android.app.Activity)?.runOnUiThread {
+                    try {
+                        // Create adapter and set to GridView
+                        val adapter = FileSystemAdapter(
+                            context = context,
+                            items = items,
+                            theme = theme,
+                            themeManager = themeManager,
+                            onItemClick = { item, view ->
+                                handleItemClick(item, view)
+                            }
+                        )
 
-            // Update item count
-            explorerNumberOfItems?.text = "${items.size} items"
+                        folderIconsGrid?.adapter = adapter
 
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Permission denied reading directory: ${currentPath.absolutePath}", e)
-            explorerNumberOfItems?.text = "0 items"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error reading directory: ${currentPath.absolutePath}", e)
-            explorerNumberOfItems?.text = "0 items"
-        } finally {
-            // Always restore cursor to normal after loading
-            onSetCursorNormal()
-        }
+                        // Update item count
+                        explorerNumberOfItems?.text = "${items.size} items"
+
+                        // Restore cursor to normal after UI updates
+                        onSetCursorNormal()
+
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error updating UI: ${e.message}", e)
+                        explorerNumberOfItems?.text = "0 items"
+                        onSetCursorNormal()
+                    }
+                }
+
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Permission denied reading directory: ${currentPath?.absolutePath ?: "My Computer"}", e)
+                (context as? android.app.Activity)?.runOnUiThread {
+                    explorerNumberOfItems?.text = "0 items"
+                    onSetCursorNormal()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reading directory: ${currentPath?.absolutePath ?: "My Computer"}", e)
+                (context as? android.app.Activity)?.runOnUiThread {
+                    explorerNumberOfItems?.text = "0 items"
+                    onSetCursorNormal()
+                }
+            }
+        }.start()
     }
 
     /**
      * Handle click on a file or folder
      */
-    private fun handleItemClick(item: FileSystemItem) {
+    private fun handleItemClick(item: FileSystemItem, view: View) {
         onSoundPlay("click")
 
-        if (item.isDirectory) {
+        if (item.isDrive) {
+            // Handle drive clicks
+            when (item.driveType) {
+                DriveType.LOCAL_DISK -> {
+                    // Navigate to internal storage
+                    navigateToDirectory(Environment.getExternalStorageDirectory(), addToHistory = true)
+                }
+                DriveType.FLOPPY, DriveType.OPTICAL -> {
+                    // Do nothing for now
+                    Log.d(TAG, "Clicked on ${item.name} - not implemented yet")
+                }
+                null -> Log.e(TAG, "Drive item with null drive type")
+            }
+        } else if (item.isDirectory) {
             // Navigate into directory
             navigateToDirectory(item.file, addToHistory = true)
         } else {
             // Open file with default app
             openFile(item.file)
         }
+    }
+
+    /**
+     * Select a file and deselect all others
+     */
+    private fun selectFile(view: View) {
+        // Deselect previously selected view
+        currentSelectedView?.isSelected = false
+
+        // Select the new view
+        view.isSelected = true
+        currentSelectedView = view
+    }
+
+    /**
+     * Clear all selections
+     */
+    private fun clearSelection() {
+        currentSelectedView?.isSelected = false
+        currentSelectedView = null
     }
 
     /**
