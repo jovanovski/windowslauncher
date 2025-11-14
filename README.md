@@ -35,6 +35,12 @@ This is a Windows inspired launcher for Android 11+, which tries to faithfully r
 ## Special Permissions
 In order for the launcher to do some of it's things like turn off your screen on shutdown, or access notifications for the notification dots, it need special permissions which Android restricts by default, especially for side-loaded apps. In order to enable them, follow these steps:
 
+### Option 1 - Install via ADB
+Apps installed with adb install aren’t treated as the “untrusted sideload” case, so Restricted Settings doesn’t trigger.
+Just: `adb install -r app-release.apk`
+Then go to Settings → Accessibility / Notification access and you should be able to toggle your services without the “Restricted setting” dialog.
+
+### Option 2 - Allow restricted settings
 1. Settings → Apps → See all apps → Windows Launcher
 2. Tap the ⋮ three-dot menu (top right)
 3. Tap “Allow restricted settings”, Unlock with PIN if asked
