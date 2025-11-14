@@ -1,12 +1,14 @@
 package rocks.gorjan.gokixp.apps.iexplore
 
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Environment
 import android.util.Log
-import android.view.KeyEvent
 import android.view.View
+import android.webkit.URLUtil
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -79,6 +81,43 @@ class InternetExplorerApp(
         webView.settings.domStorageEnabled = true
         webView.settings.loadWithOverviewMode = true
         webView.settings.useWideViewPort = true
+
+        // Store touch position for context menu
+        var lastTouchX = 0f
+        var lastTouchY = 0f
+
+        // Capture touch position
+        webView.setOnTouchListener { view, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                lastTouchX = event.rawX
+                lastTouchY = event.rawY
+            }
+            false // Don't consume the event
+        }
+
+        // Enable long-click on images and links to show context menu
+        webView.setOnLongClickListener { view ->
+            val hitTestResult = (view as WebView).hitTestResult
+            when (hitTestResult.type) {
+                WebView.HitTestResult.IMAGE_TYPE,
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                    val imageUrl = hitTestResult.extra
+                    if (imageUrl != null) {
+                        showImageContextMenu(imageUrl, lastTouchX, lastTouchY)
+                    }
+                    true
+                }
+                WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
+                    val linkUrl = hitTestResult.extra
+                    if (linkUrl != null) {
+                        showLinkContextMenu(linkUrl, lastTouchX, lastTouchY)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
@@ -206,13 +245,29 @@ class InternetExplorerApp(
             }
         }
 
-        // Handle file downloads by opening in external browser
+        // Handle file downloads using DownloadManager
         webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
             try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                context.startActivity(intent)
+                // Get filename from content disposition or URL
+                val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+
+                val request = DownloadManager.Request(Uri.parse(url))
+                    .setTitle(fileName)
+                    .setDescription("Downloading from Internet Explorer")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                    .setAllowedOverMetered(true)
+                    .setAllowedOverRoaming(true)
+                    .setMimeType(mimetype)
+
+                val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                downloadManager.enqueue(request)
+
+                onShowNotification("Download Started", "Downloading $fileName")
+                onSoundPlay()
             } catch (e: Exception) {
-                Log.e("InternetExplorerApp", "Error opening download URL in external browser: $url", e)
+                Log.e("InternetExplorerApp", "Error downloading file: $url", e)
+                onShowNotification("Download Failed", "Could not download file")
             }
         }
 
@@ -378,6 +433,13 @@ class InternetExplorerApp(
         webView?.goBack()
     }
 
+    /**
+     * Navigate to a new URL
+     */
+    fun navigateToUrl(url: String) {
+        webView?.loadUrl(url)
+    }
+
     fun cleanup() {
         // Properly clean up WebView to free memory and resources
         webView?.apply {
@@ -534,6 +596,182 @@ class InternetExplorerApp(
         val favouritesJson = Gson().toJson(favourites)
         prefs.edit {
             putString(KEY_FAVOURITES, favouritesJson)
+        }
+    }
+
+    /**
+     * Show context menu for long-pressed images
+     */
+    private fun showImageContextMenu(imageUrl: String, touchX: Float, touchY: Float) {
+        Helpers.performHapticFeedback(context)
+        onSoundPlay()
+
+        val menuItems = listOf(
+            ContextMenuItem(
+                title = "Save Image",
+                isEnabled = true,
+                action = {
+                    downloadImage(imageUrl)
+                }
+            ),
+            ContextMenuItem(
+                title = "Share Image",
+                isEnabled = true,
+                action = {
+                    shareImage(imageUrl)
+                }
+            ),
+            ContextMenuItem(
+                title = "Copy Image URL",
+                isEnabled = true,
+                action = {
+                    copyImageUrl(imageUrl)
+                }
+            )
+        )
+
+        // Show context menu at the touch position
+        onShowContextMenu(menuItems, touchX, touchY)
+    }
+
+    /**
+     * Download an image from a URL using DownloadManager
+     */
+    private fun downloadImage(imageUrl: String) {
+        try {
+            val fileName = URLUtil.guessFileName(imageUrl, null, null)
+            val request = DownloadManager.Request(Uri.parse(imageUrl))
+                .setTitle(fileName)
+                .setDescription("Downloading image from Internet Explorer")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadManager.enqueue(request)
+
+            onShowNotification("Download Started", "Saving $fileName")
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error downloading image: $imageUrl", e)
+            onShowNotification("Download Failed", "Could not download image")
+        }
+    }
+
+    /**
+     * Share an image URL
+     */
+    private fun shareImage(imageUrl: String) {
+        try {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, imageUrl)
+                putExtra(Intent.EXTRA_SUBJECT, "Image from Internet Explorer")
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Image URL"))
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error sharing image: $imageUrl", e)
+            onShowNotification("Share Failed", "Could not share image")
+        }
+    }
+
+    /**
+     * Copy image URL to clipboard
+     */
+    private fun copyImageUrl(imageUrl: String) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Image URL", imageUrl)
+            clipboard.setPrimaryClip(clip)
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error copying image URL: $imageUrl", e)
+            onShowNotification("Copy Failed", "Could not copy image URL")
+        }
+    }
+
+    /**
+     * Show context menu for long-pressed links
+     */
+    private fun showLinkContextMenu(linkUrl: String, touchX: Float, touchY: Float) {
+        Helpers.performHapticFeedback(context)
+        onSoundPlay()
+
+        val menuItems = listOf(
+            ContextMenuItem(
+                title = "Open in External App",
+                isEnabled = true,
+                action = {
+                    openInExternalApp(linkUrl)
+                }
+            ),
+            ContextMenuItem(
+                title = "Share URL",
+                isEnabled = true,
+                action = {
+                    shareLinkUrl(linkUrl)
+                }
+            ),
+            ContextMenuItem(
+                title = "Copy URL",
+                isEnabled = true,
+                action = {
+                    copyLinkUrl(linkUrl)
+                }
+            )
+        )
+
+        // Show context menu at the touch position
+        onShowContextMenu(menuItems, touchX, touchY)
+    }
+
+    /**
+     * Open a URL in an external app (system browser)
+     */
+    private fun openInExternalApp(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            // Add FLAG_ACTIVITY_NEW_TASK since we're starting from a non-Activity context
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            onShowNotification("Opening Link", "Opened in external app")
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error opening URL in external app: $url", e)
+            onShowNotification("Open Failed", "Could not open link in external app")
+        }
+    }
+
+    /**
+     * Share a link URL
+     */
+    private fun shareLinkUrl(url: String) {
+        try {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, url)
+                putExtra(Intent.EXTRA_SUBJECT, "Link from Internet Explorer")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Link").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error sharing URL: $url", e)
+            onShowNotification("Share Failed", "Could not share link")
+        }
+    }
+
+    /**
+     * Copy link URL to clipboard
+     */
+    private fun copyLinkUrl(url: String) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Link URL", url)
+            clipboard.setPrimaryClip(clip)
+            onShowNotification("Copied", "Link URL copied to clipboard")
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error copying link URL: $url", e)
+            onShowNotification("Copy Failed", "Could not copy link URL")
         }
     }
 }

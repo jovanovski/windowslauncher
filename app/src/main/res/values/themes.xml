@@ -21,7 +21,8 @@
         <item name="scrollbarTrackDrawable">@drawable/scrollbar_track_xp</item>
         <item name="scrollbarThumbDrawable">@drawable/scrollbar_thumb_xp</item>
         <item name="winButtonStyle">@style/WinXPButton</item>
-        <item name="windowBackgroundColor">#d4cec6</item>
+        <item name="windowBackgroundColor">#ebe9da</item>
+        <item name="dialogBackgroundColor">#ebe9da</item>
         <item name="menuBarBackground">@drawable/menu_bar</item>
         <item name="solitareGreen">@color/solitare_green</item>
         <item name="notificationBubble">@drawable/bubble</item>
@@ -38,6 +39,7 @@
         <item name="scrollbarThumbDrawable">@drawable/scrollbar_thumb_vista</item>
         <item name="winButtonStyle">@style/WinVistaButton</item>
         <item name="windowBackgroundColor">#cad9e7</item>
+        <item name="dialogBackgroundColor">#FFFFFF</item>
         <item name="menuBarBackground">@drawable/menu_bar_vista</item>
         <item name="solitareGreen">@drawable/solitare_green</item>
         <item name="notificationBubble">@drawable/bubble_vista</item>
@@ -49,6 +51,8 @@
     <!-- Windows Classic Theme -->
     <style name="Theme.GokiXP.Classic" parent="Base.Theme.GokiXP">
         <item name="primaryFontFamily">@font/micross_font_family</item>
+        <item name="windowBackgroundColor">#d4cec6</item>
+        <item name="dialogBackgroundColor">#d4cec6</item>
         <item name="secondaryFontFamily">@font/micross_font_family</item>
         <item name="scrollbarTrackDrawable">@drawable/scrollbar_track_98</item>
         <item name="scrollbarThumbDrawable">@drawable/win98_start_menu_border</item>

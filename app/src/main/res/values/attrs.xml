@@ -12,6 +12,7 @@
     <attr name="winButtonStyle" format="reference" />
 
     <attr name="windowBackgroundColor" format="color" />
+    <attr name="dialogBackgroundColor" format="color"/>
     <attr name="solitareGreen" format="reference"/>
     <attr name="menuBarBackground" format="reference" />
     <attr name="notificationBubble" format="reference"/>

@@ -72,6 +72,7 @@ class WindowsDialog @JvmOverloads constructor(
 
     // Maximize state
     private var canMaximize = false
+    private var canMinimize = true
     private var isMaximized = false
     private var savedWidth = 0
     private var savedHeight = 0
@@ -214,6 +215,7 @@ class WindowsDialog @JvmOverloads constructor(
         }
 
         minimizeButton.setOnClickListener {
+            if (!canMinimize) return@setOnClickListener
             minimizeWindow()
         }
 
@@ -679,6 +681,13 @@ class WindowsDialog @JvmOverloads constructor(
         maximizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
     }
 
+
+    fun setMinimizable(enabled: Boolean) {
+        canMinimize = enabled
+        // Show or hide maximize button based on enabled state
+        minimizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
+    }
+
     /**
      * Enable or disable saving/restoring window state (position and size).
      * Useful for windows that should have a fixed size per theme.
@@ -808,7 +817,9 @@ class WindowsDialog @JvmOverloads constructor(
      * Public method to minimize the window - used by both bordered and borderless windows
      */
     fun minimizeWindow() {
-        minimize()
+        if(canMinimize) {
+            minimize()
+        }
     }
 
     /**
@@ -872,7 +883,9 @@ class WindowsDialog @JvmOverloads constructor(
             // Try to find minimize button in content
             val contentMinimizeButton = contentArea.findViewById<ImageView>(R.id.dialog_minimize_button)
             contentMinimizeButton?.setOnClickListener {
-                minimizeWindow()
+                if(canMinimize){
+                    minimizeWindow()
+                }
             }
 
             // Try to find close button in content

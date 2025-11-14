@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.GridView
@@ -26,7 +28,8 @@ class MyComputerApp(
     private val onSoundPlay: (String) -> Unit,
     private val onUpdateWindowTitle: (String) -> Unit,
     private val onSetCursorBusy: () -> Unit,
-    private val onSetCursorNormal: () -> Unit
+    private val onSetCursorNormal: () -> Unit,
+    private val onShowDialog: (rocks.gorjan.gokixp.apps.dialogbox.DialogType, String) -> Unit
 ) {
     companion object {
         private const val TAG = "MyComputerApp"
@@ -302,12 +305,12 @@ class MyComputerApp(
                     navigateToDirectory(Environment.getExternalStorageDirectory(), addToHistory = true)
                 }
                 DriveType.FLOPPY -> {
-                    // Play floppy read sound with busy cursor
-                    playDriveSound(R.raw.floppy_read)
+                    // Play floppy read sound with busy cursor and show error
+                    playDriveSound(R.raw.floppy_read, rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR, "A:/ is not accessible", timeout = 2000)
                 }
                 DriveType.OPTICAL -> {
-                    // Play CD spin sound with busy cursor
-                    playDriveSound(R.raw.cd_spin)
+                    // Play CD spin sound with busy cursor and show error
+                    playDriveSound(R.raw.cd_spin, rocks.gorjan.gokixp.apps.dialogbox.DialogType.WARNING, "Please insert a disk into drive D:", timeout = 2000)
                 }
                 null -> Log.e(TAG, "Drive item with null drive type")
             }
@@ -371,9 +374,14 @@ class MyComputerApp(
     }
 
     /**
-     * Play drive sound effect with busy cursor
+     * Play drive sound effect with busy cursor and optionally show dialog
      */
-    private fun playDriveSound(soundResId: Int) {
+    private fun playDriveSound(
+        soundResId: Int,
+        dialogType: rocks.gorjan.gokixp.apps.dialogbox.DialogType? = null,
+        message: String? = null,
+        timeout: Long? = null
+    ) {
         // Set cursor to busy
         onSetCursorBusy()
 
@@ -385,6 +393,12 @@ class MyComputerApp(
             mediaPlayer.setOnCompletionListener {
                 onSetCursorNormal()
                 it.release()
+            }
+
+            if(dialogType != null && message != null && timeout != null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    onShowDialog(dialogType, message)
+                }, timeout)
             }
 
             // Set listener to restore cursor on error

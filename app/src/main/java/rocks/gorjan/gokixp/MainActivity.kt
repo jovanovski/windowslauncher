@@ -747,10 +747,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         updateIcon.setOnClickListener {
             updateDownloadLink?.let { link ->
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.data = link.toUri()
-                    startActivity(intent)
-                    playClickSound()
+//                    val intent = Intent(Intent.ACTION_VIEW)
+//                    intent.data = link.toUri()
+//                    startActivity(intent)
+                    showInternetExplorerDialog(link)
+//                    playClickSound()
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error opening update link", e)
                 }
@@ -5563,12 +5564,44 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun showInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
+        // Check if an IE window is already open
+        val existingIEWindow = findExistingInternetExplorerWindow()
+
+        if (existingIEWindow != null && initialUrl != null) {
+            // Reuse existing window and navigate to new URL
+            val ieApp = existingIEWindow.internetExplorerApp as? InternetExplorerApp
+            if (ieApp != null) {
+                ieApp.navigateToUrl(initialUrl)
+                // Bring the window to front and restore if minimized
+                existingIEWindow.bringToFront()
+                if (existingIEWindow.isMinimized()) {
+                    existingIEWindow.restore()
+                }
+                setCursorNormal()
+                return
+            }
+        }
+
         // Set cursor to busy while loading
         setCursorBusy()
         // Defer the actual loading to allow cursor to render
         Handler(Looper.getMainLooper()).post {
             createAndShowInternetExplorerDialog(initialUrl, appInfo)
         }
+    }
+
+    /**
+     * Find an existing Internet Explorer window if one is open
+     */
+    private fun findExistingInternetExplorerWindow(): WindowsDialog? {
+        val floatingWindowsContainer = findViewById<android.widget.FrameLayout>(R.id.floating_windows_container)
+        for (i in 0 until floatingWindowsContainer.childCount) {
+            val child = floatingWindowsContainer.getChildAt(i)
+            if (child is WindowsDialog && child.windowIdentifier == "system.internet_explorer") {
+                return child
+            }
+        }
+        return null
     }
 
     private fun createAndShowInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
@@ -7028,9 +7061,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val clickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                val intent = Intent(Intent.ACTION_VIEW,
-                    "https://buymeacoffee.com/jovanovski".toUri())
-                startActivity(intent)
+//                val intent = Intent(Intent.ACTION_VIEW,
+//                    "https://buymeacoffee.com/jovanovski".toUri())
+                showInternetExplorerDialog("https://buymeacoffee.com/jovanovski")
             }
 
             override fun updateDrawState(ds: TextPaint) {
@@ -7065,8 +7098,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val gorjanClickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                val intent = Intent(Intent.ACTION_VIEW, "https://gorjan.rocks".toUri())
-                startActivity(intent)
+//                val intent = Intent(Intent.ACTION_VIEW, "https://gorjan.rocks".toUri())
+//                startActivity(intent)
+                showInternetExplorerDialog("https://gorjan.rocks")
             }
 
             override fun updateDrawState(ds: TextPaint) {
@@ -7518,10 +7552,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         updateIcon.setOnClickListener {
             updateDownloadLink?.let { link ->
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.data = link.toUri()
-                    startActivity(intent)
-                    playClickSound()
+//                    val intent = Intent(Intent.ACTION_VIEW)
+//                    intent.data = link.toUri()
+//                    startActivity(intent)
+//                    playClickSound()
+                    showInternetExplorerDialog(link)
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error opening update link", e)
                 }
@@ -8248,6 +8283,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onSetCursorNormal = {
                 setCursorNormal()
+            },
+            onShowDialog = { dialogType, message ->
+                showDialogBox(dialogType, message)
             }
         )
 
@@ -8262,6 +8300,43 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setWindowSizePercentage(90f, 30f)
         windowsDialog.setMaximizable(true)
         windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
+    /**
+     * Show a system dialog box (Information, Warning, or Error)
+     */
+    fun showDialogBox(dialogType: rocks.gorjan.gokixp.apps.dialogbox.DialogType, message: String) {
+        // Create Windows dialog
+        val windowsDialog = createThemedWindowsDialog()
+
+        // Inflate layout
+        val contentView = layoutInflater.inflate(R.layout.program_dialog_box, null)
+
+        // Create DialogBoxApp instance
+        val dialogBoxApp = rocks.gorjan.gokixp.apps.dialogbox.DialogBoxApp(
+            context = this,
+            theme = themeManager.getSelectedTheme(),
+            themeManager = themeManager,
+            dialogType = dialogType,
+            message = message,
+            onClose = {
+                floatingWindowManager.removeWindow(windowsDialog)
+            }
+        )
+
+        // Setup the dialog
+        dialogBoxApp.setupDialog(contentView)
+
+        // Set window properties
+        windowsDialog.setTitle(dialogBoxApp.getTitle())
+        windowsDialog.setTaskbarIcon(dialogBoxApp.getIconResId())
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSize(240)
+        windowsDialog.setMinimizable(false)
+        windowsDialog.setContextMenuView(contextMenu)
+
+        // Show the dialog
         floatingWindowManager.showWindow(windowsDialog)
     }
 
@@ -11349,8 +11424,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             ) {
                                 if (downloadUrl.isNotEmpty()) {
                                     try {
-                                        val intent = Intent(Intent.ACTION_VIEW, downloadUrl.toUri())
-                                        startActivity(intent)
+//                                        val intent = Intent(Intent.ACTION_VIEW, downloadUrl.toUri())
+//                                        startActivity(intent)
+                                        showInternetExplorerDialog(downloadUrl)
                                     } catch (e: Exception) {
                                         Log.e("MainActivity", "Error opening link", e)
                                     }
