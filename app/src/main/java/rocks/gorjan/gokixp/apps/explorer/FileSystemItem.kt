@@ -8,6 +8,7 @@ import java.io.File
 enum class FileType {
     DIRECTORY,
     IMAGE,
+    PDF,
     AUDIO,
     VIDEO,
     GENERIC,
@@ -47,6 +48,11 @@ data class FileSystemItem(
 
         private val VIDEO_EXTENSIONS = setOf(
             "mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v", "mpg", "mpeg", "3gp"
+        )
+
+
+        private val PDF_EXTENSIONS = setOf(
+            "pdf"
         )
 
         /**
@@ -95,6 +101,7 @@ data class FileSystemItem(
                 extension in IMAGE_EXTENSIONS -> FileType.IMAGE
                 extension in AUDIO_EXTENSIONS -> FileType.AUDIO
                 extension in VIDEO_EXTENSIONS -> FileType.VIDEO
+                extension in PDF_EXTENSIONS -> FileType.PDF
                 else -> FileType.GENERIC
             }
         }

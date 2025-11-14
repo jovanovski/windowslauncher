@@ -134,4 +134,12 @@ class FloatingWindowManager(private val context: Context, private val container:
         }
         return false
     }
+
+    /**
+     * Finds a window by its identifier without focusing it.
+     * Returns the window if found, null otherwise.
+     */
+    fun findWindowByIdentifier(identifier: String): WindowsDialog? {
+        return activeWindows.find { it.windowIdentifier == identifier }
+    }
 }

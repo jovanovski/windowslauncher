@@ -10,6 +10,7 @@ import rocks.gorjan.gokixp.FolderView
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
+import java.io.File
 
 /**
  * Adapter for displaying file system items in a GridView
@@ -20,7 +21,9 @@ class FileSystemAdapter(
     private val items: List<FileSystemItem>,
     private val theme: AppTheme,
     private val themeManager: ThemeManager,
-    private val onItemClick: (FileSystemItem, View) -> Unit
+    private val onItemClick: (FileSystemItem, View) -> Unit,
+    private val onItemLongClick: ((FileSystemItem, Float, Float) -> Unit)? = null,
+    private val isFileCut: ((File) -> Boolean)? = null
 ) : BaseAdapter() {
 
     override fun getCount(): Int = items.size
@@ -32,24 +35,9 @@ class FileSystemAdapter(
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val item = items[position]
 
-        // Create appropriate view based on whether it's a folder or file
-        val iconView = (convertView as? DesktopIconView) ?: run {
-            if (item.isDirectory) {
-                // Use FolderView for directories
-                FolderView(context, theme, R.layout.folder_icon).apply {
-                    // Disable context menu for read-only Windows Explorer
-                    setContextMenuEnabled(false)
-                }
-            } else {
-                // Use regular DesktopIconView for files
-                DesktopIconView(context, R.layout.folder_icon)
-            }
-        }
-
-        // Make sure context menu is disabled for recycled FolderViews too
-        if (item.isDirectory && iconView is FolderView) {
-            iconView.setContextMenuEnabled(false)
-        }
+        // Create DesktopIconView for both files and folders
+        // Don't use FolderView here as it has desktop-specific context menu
+        val iconView = (convertView as? DesktopIconView) ?: DesktopIconView(context, R.layout.folder_icon)
 
         // Get the appropriate icon based on file type
         val iconDrawable = if (item.isDrive) {
@@ -69,6 +57,7 @@ class FileSystemAdapter(
             val fileType = FileSystemItem.getFileType(item)
             val iconResId = when (fileType) {
                 FileType.IMAGE -> themeManager.getFileImageIcon()
+                FileType.PDF -> themeManager.getPDFImageIcon()
                 FileType.AUDIO -> themeManager.getFileAudioIcon()
                 FileType.VIDEO -> themeManager.getFileVideoIcon()
                 FileType.GENERIC -> themeManager.getFileGenericIcon()
@@ -116,8 +105,22 @@ class FileSystemAdapter(
             onItemClick(item, iconView)
         }
 
-        // Disable long click context menu for read-only mode
-        iconView.setCustomLongClickHandler { _, _ -> /* Do nothing */ }
+        // Set long click handler for files and folders (not drives)
+        if (!item.isDrive && onItemLongClick != null) {
+            iconView.setCustomLongClickHandler { x, y ->
+                onItemLongClick.invoke(item, x, y)
+            }
+        } else {
+            // Disable long click for drives only
+            iconView.setCustomLongClickHandler { _, _ -> /* Do nothing */ }
+        }
+
+        // Apply opacity if file is cut
+        if (!item.isDrive && isFileCut != null && isFileCut.invoke(item.file)) {
+            iconView.alpha = 0.6f
+        } else {
+            iconView.alpha = 1.0f
+        }
 
         return iconView
     }

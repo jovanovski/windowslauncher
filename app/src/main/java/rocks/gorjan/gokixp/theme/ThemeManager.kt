@@ -239,6 +239,13 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.file_image_vista
     }
 
+
+    fun getPDFImageIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.file_pdf_98
+        AppTheme.WindowsXP -> R.drawable.file_pdf_xp
+        AppTheme.WindowsVista -> R.drawable.file_pdf_vista
+    }
+
     fun getFileAudioIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_audio_98
         AppTheme.WindowsXP -> R.drawable.file_audio_xp

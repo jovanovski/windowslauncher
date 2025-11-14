@@ -45,6 +45,7 @@ open class DesktopIconView : LinearLayout {
     private var isSelected = false
     private var customLongClickHandler: ((Float, Float) -> Unit)? = null
     private var hadSignificantMovement = false
+    private var originalTextColor: Int = Color.WHITE // Store original text color
 
     @JvmOverloads
     constructor(
@@ -183,6 +184,7 @@ open class DesktopIconView : LinearLayout {
     }
 
     fun setTextColor(color: Int) {
+        originalTextColor = color
         iconText.setTextColor(color)
     }
 
@@ -590,7 +592,7 @@ open class DesktopIconView : LinearLayout {
         } else {
             // Remove text background
             iconText.setBackgroundColor(Color.TRANSPARENT)
-            iconText.setTextColor(Color.BLACK) // Reset to black for file browser context
+            iconText.setTextColor(originalTextColor) // Restore original text color (white for desktop, black for folders)
             iconText.maxLines = 2 // Restore line limit
             // Remove background from the whole view
             setBackgroundColor(Color.TRANSPARENT)

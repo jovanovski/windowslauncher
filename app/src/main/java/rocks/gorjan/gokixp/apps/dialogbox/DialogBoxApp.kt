@@ -26,7 +26,8 @@ class DialogBoxApp(
     private val themeManager: ThemeManager,
     private val dialogType: DialogType,
     private val message: String,
-    private val onClose: () -> Unit
+    private val onClose: () -> Unit,
+    private val onPlaySound: ((Int) -> Unit)? = null
 ) {
 
     /**
@@ -45,12 +46,27 @@ class DialogBoxApp(
         // Set the message
         dialogMessage.text = message
 
+        // Play sound based on dialog type
+        playDialogSound()
+
         // Set OK button click listener
         okButton.setOnClickListener {
             onClose()
         }
 
         return contentView
+    }
+
+    /**
+     * Play the appropriate sound based on dialog type
+     */
+    private fun playDialogSound() {
+        val soundResId = when (dialogType) {
+            DialogType.ERROR -> R.raw.error_xp
+            DialogType.WARNING -> R.raw.warning_xp
+            DialogType.INFORMATION -> R.raw.information_xp
+        }
+        onPlaySound?.invoke(soundResId)
     }
 
     /**

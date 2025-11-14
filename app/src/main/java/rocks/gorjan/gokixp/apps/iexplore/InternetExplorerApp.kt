@@ -1,10 +1,13 @@
 package rocks.gorjan.gokixp.apps.iexplore
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.util.Log
 import android.view.View
@@ -39,6 +42,7 @@ class InternetExplorerApp(
 ) {
     companion object {
         private const val KEY_FAVOURITES = "ie_favourites"
+        private const val KEY_LAST_URL = "ie_last_url"
         private const val DEFAULT_FAVOURITE_NAME = "Windows Launcher"
         private const val DEFAULT_FAVOURITE_URL = "https://github.com/jovanovski/windowslauncher/"
         private const val SOUND_THROTTLE_MS = 2000L // Only allow one sound per second
@@ -51,6 +55,7 @@ class InternetExplorerApp(
     private var lastSoundPlayTime = 0L
     private var isLoadingErrorPage = false
     private var lastAttemptedUrl: String? = null
+    private var downloadCompleteReceiver: BroadcastReceiver? = null
 
     fun setupApp(contentView: View, initialUrl: String? = null) {
         // Load homepage from shared preferences
@@ -60,6 +65,9 @@ class InternetExplorerApp(
         // Load favourites
         favourites.clear()
         favourites.addAll(loadFavourites())
+
+        // Register download complete receiver
+        setupDownloadCompleteReceiver()
 
         // Get references to views
         val urlEditText = contentView.findViewById<android.widget.EditText>(R.id.url_bar)
@@ -214,6 +222,11 @@ class InternetExplorerApp(
                 // Mark page as loaded (but only for non-error pages)
                 isPageLoaded = !isLoadingErrorPage
 
+                // Save the current URL as the last URL (but only for non-error pages)
+                if (!isLoadingErrorPage && url != null && url != "about:blank" && !url.startsWith("file://")) {
+                    saveLastUrl(url)
+                }
+
                 // Update window title with page title
                 val pageTitle = view?.title
                 if (!pageTitle.isNullOrEmpty() && !isLoadingErrorPage) {
@@ -263,7 +276,7 @@ class InternetExplorerApp(
                 val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 downloadManager.enqueue(request)
 
-                onShowNotification("Download Started", "Downloading $fileName")
+                onShowNotification("Download Started", "Downloading $fileName, check notifications")
                 onSoundPlay()
             } catch (e: Exception) {
                 Log.e("InternetExplorerApp", "Error downloading file: $url", e)
@@ -271,8 +284,9 @@ class InternetExplorerApp(
             }
         }
 
-        // Determine which URL to load (initialUrl takes precedence)
-        val urlToLoad = initialUrl ?: homepage
+        // Determine which URL to load (initialUrl takes precedence, then last URL, then homepage)
+        val lastUrl = prefs.getString(KEY_LAST_URL, null)
+        val urlToLoad = initialUrl ?: lastUrl ?: homepage
 
         // Load the page
         webView.loadUrl(urlToLoad)
@@ -441,6 +455,16 @@ class InternetExplorerApp(
     }
 
     fun cleanup() {
+        // Unregister download complete receiver
+        downloadCompleteReceiver?.let {
+            try {
+                context.unregisterReceiver(it)
+            } catch (e: Exception) {
+                Log.e("InternetExplorerApp", "Error unregistering download receiver", e)
+            }
+            downloadCompleteReceiver = null
+        }
+
         // Properly clean up WebView to free memory and resources
         webView?.apply {
             // Stop all loading
@@ -459,6 +483,57 @@ class InternetExplorerApp(
 
         // Remove reference
         webView = null
+    }
+
+    /**
+     * Setup broadcast receiver for download completion
+     */
+    private fun setupDownloadCompleteReceiver() {
+        downloadCompleteReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                if (downloadId != -1L) {
+                    handleDownloadComplete(downloadId)
+                }
+            }
+        }
+
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(downloadCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(downloadCompleteReceiver, filter)
+        }
+    }
+
+    /**
+     * Handle download completion
+     */
+    private fun handleDownloadComplete(downloadId: Long) {
+        try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val query = DownloadManager.Query().setFilterById(downloadId)
+            val cursor = downloadManager.query(query)
+
+            if (cursor.moveToFirst()) {
+                val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                val status = cursor.getInt(statusIndex)
+
+                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                    val titleIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
+                    val fileName = cursor.getString(titleIndex)
+
+                    // Show notification
+                    onShowNotification("Download Complete", "$fileName saved to Downloads")
+                    onSoundPlay()
+
+                    // Note: The system's download notification will allow the user to open the file
+                }
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            Log.e("InternetExplorerApp", "Error handling download complete", e)
+        }
     }
 
     /**
@@ -596,6 +671,16 @@ class InternetExplorerApp(
         val favouritesJson = Gson().toJson(favourites)
         prefs.edit {
             putString(KEY_FAVOURITES, favouritesJson)
+        }
+    }
+
+    /**
+     * Save the last visited URL to SharedPreferences
+     */
+    private fun saveLastUrl(url: String) {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit {
+            putString(KEY_LAST_URL, url)
         }
     }
 

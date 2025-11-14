@@ -294,7 +294,7 @@ class ContextMenuView @JvmOverloads constructor(
         var finalY = y
 
         // Handle horizontal positioning
-        if (x + menuWidth + 150 > screenWidth) {
+        if (x + menuWidth + 250 > screenWidth) {
             // Would go off right edge - position to the left of click point
             finalX = (x - menuWidth).coerceAtLeast(0f)
         }

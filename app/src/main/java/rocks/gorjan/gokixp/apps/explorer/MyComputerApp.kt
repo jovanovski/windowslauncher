@@ -29,7 +29,10 @@ class MyComputerApp(
     private val onUpdateWindowTitle: (String) -> Unit,
     private val onSetCursorBusy: () -> Unit,
     private val onSetCursorNormal: () -> Unit,
-    private val onShowDialog: (rocks.gorjan.gokixp.apps.dialogbox.DialogType, String) -> Unit
+    private val onShowDialog: (rocks.gorjan.gokixp.apps.dialogbox.DialogType, String) -> Unit,
+    private val onShowContextMenu: (List<rocks.gorjan.gokixp.ContextMenuItem>, Float, Float) -> Unit,
+    private val onShowRenameDialog: (File, (String) -> Unit) -> Unit,
+    private val onShowConfirmDialog: (String, String, () -> Unit) -> Unit
 ) {
     companion object {
         private const val TAG = "MyComputerApp"
@@ -40,6 +43,15 @@ class MyComputerApp(
     private var currentPath: File? = null  // null means we're at My Computer root
     private val navigationHistory = mutableListOf<File?>()  // null entries represent root
     private var historyIndex = -1
+
+    // Clipboard state for copy/cut/paste
+    private var clipboardFile: File? = null
+    private var clipboardOperation: ClipboardOperation? = null
+
+    enum class ClipboardOperation {
+        COPY,
+        CUT
+    }
 
     // UI references
     private var folderIconsGrid: GridView? = null
@@ -84,6 +96,57 @@ class MyComputerApp(
         upButton?.setOnClickListener {
             onSoundPlay("click")
             navigateUp()
+        }
+
+        // Setup touch listener on GridView to handle long-press on empty space
+        var longPressHandler: android.os.Handler? = null
+        var longPressRunnable: Runnable? = null
+        var touchDownX = 0f
+        var touchDownY = 0f
+
+        folderIconsGrid?.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    touchDownX = event.rawX
+                    touchDownY = event.rawY
+
+                    // Check if touch is on an empty space (not on a child view)
+                    val gridView = view as? GridView
+                    if (gridView != null) {
+                        val position = gridView.pointToPosition(event.x.toInt(), event.y.toInt())
+                        if (position == GridView.INVALID_POSITION && currentPath != null) {
+                            // Touch is on empty space, start long-press timer
+                            longPressRunnable = Runnable {
+                                rocks.gorjan.gokixp.Helpers.performHapticFeedback(context)
+                                showEmptySpaceContextMenu(touchDownX, touchDownY)
+                            }
+                            longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                            longPressHandler?.postDelayed(longPressRunnable!!, 500)
+                        }
+                    }
+                    false
+                }
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL -> {
+                    // Cancel long-press if finger lifted
+                    longPressRunnable?.let { longPressHandler?.removeCallbacks(it) }
+                    longPressRunnable = null
+                    longPressHandler = null
+                    false
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    // Cancel long-press if finger moved too far
+                    val deltaX = Math.abs(event.rawX - touchDownX)
+                    val deltaY = Math.abs(event.rawY - touchDownY)
+                    if (deltaX > 10 || deltaY > 10) {
+                        longPressRunnable?.let { longPressHandler?.removeCallbacks(it) }
+                        longPressRunnable = null
+                        longPressHandler = null
+                    }
+                    false
+                }
+                else -> false
+            }
         }
 
         // Load initial view (My Computer root with drives)
@@ -199,8 +262,14 @@ class MyComputerApp(
             else -> currentPath!!.name
         }
 
-        // Update small folder name and icon (in address bar)
-        folderNameSmall?.text = displayName
+        // For the small folder name (address bar), show full Windows-style path
+        val pathDisplayName = when {
+            currentPath == null -> "My Computer"
+            else -> getWindowsStylePath(currentPath!!)
+        }
+
+        // Update small folder name with full path (in address bar)
+        folderNameSmall?.text = pathDisplayName
 
         // Update large folder name (in Windows 98 left panel)
         folderNameLarge?.text = displayName
@@ -209,9 +278,30 @@ class MyComputerApp(
         onUpdateWindowTitle(displayName)
 
         // Update folder icons (both small and large)
-        val folderIconRes = themeManager.getFolderIconRes(theme)
-        folderIconSmall?.setImageResource(folderIconRes)
-        folderIconLarge?.setImageResource(folderIconRes)
+        // Use My Computer icon when at root, otherwise use folder icon
+        val iconRes = if (currentPath == null) {
+            themeManager.getMyComputerIcon()
+        } else {
+            themeManager.getFolderIconRes(theme)
+        }
+        folderIconSmall?.setImageResource(iconRes)
+        folderIconLarge?.setImageResource(iconRes)
+    }
+
+    /**
+     * Convert Android file path to Windows-style path
+     * Internal storage root -> C:\
+     * Subdirectories -> C:\folder\subfolder
+     */
+    private fun getWindowsStylePath(file: File): String {
+        val rootDirectory = Environment.getExternalStorageDirectory()
+
+        return if (file == rootDirectory) {
+            "C:\\"
+        } else {
+            val relativePath = file.absolutePath.removePrefix(rootDirectory.absolutePath)
+            "C:" + relativePath.replace("/", "\\")
+        }
     }
 
     /**
@@ -239,8 +329,11 @@ class MyComputerApp(
                     // In a real directory - show files and folders
                     val files = currentPath?.listFiles()?.toList() ?: emptyList()
 
+                    // Filter out hidden files (files starting with a dot)
+                    val visibleFiles = files.filter { !it.name.startsWith(".") }
+
                     // Sort: directories first, then by name
-                    val sortedFiles = files.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+                    val sortedFiles = visibleFiles.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
 
                     // Convert to FileSystemItem
                     sortedFiles.map { FileSystemItem.from(it) }
@@ -257,6 +350,12 @@ class MyComputerApp(
                             themeManager = themeManager,
                             onItemClick = { item, view ->
                                 handleItemClick(item, view)
+                            },
+                            onItemLongClick = { item, x, y ->
+                                showFileContextMenu(item, x, y)
+                            },
+                            isFileCut = { file ->
+                                isFileCut(file)
                             }
                         )
 
@@ -306,11 +405,11 @@ class MyComputerApp(
                 }
                 DriveType.FLOPPY -> {
                     // Play floppy read sound with busy cursor and show error
-                    playDriveSound(R.raw.floppy_read, rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR, "A:/ is not accessible", timeout = 2000)
+                    playDriveSound(R.raw.floppy_read, rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR, "A:/ is not accessible", timeout = 3000)
                 }
                 DriveType.OPTICAL -> {
                     // Play CD spin sound with busy cursor and show error
-                    playDriveSound(R.raw.cd_spin, rocks.gorjan.gokixp.apps.dialogbox.DialogType.WARNING, "Please insert a disk into drive D:", timeout = 2000)
+                    playDriveSound(R.raw.cd_spin, rocks.gorjan.gokixp.apps.dialogbox.DialogType.WARNING, "Please insert a disk into drive D:", timeout = 3000)
                 }
                 null -> Log.e(TAG, "Drive item with null drive type")
             }
@@ -434,5 +533,390 @@ class MyComputerApp(
             "apk" -> "application/vnd.android.package-archive"
             else -> "*/*"
         }
+    }
+
+    /**
+     * Show context menu for a file or folder
+     */
+    private fun showFileContextMenu(item: FileSystemItem, x: Float, y: Float) {
+        val file = item.file
+        val itemType = if (item.isDirectory) "Folder" else "File"
+
+        val menuItems = listOf(
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Open",
+                isEnabled = true,
+                action = {
+                    if (item.isDirectory) {
+                        navigateToDirectory(file, addToHistory = true)
+                    } else {
+                        openFile(file)
+                    }
+                }
+            ),
+            rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false), // Separator
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Copy",
+                isEnabled = true,
+                action = {
+                    copyToClipboard(file)
+                }
+            ),
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Cut",
+                isEnabled = true,
+                action = {
+                    cutToClipboard(file)
+                }
+            ),
+            rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false), // Separator
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Rename",
+                isEnabled = true,
+                action = {
+                    onShowRenameDialog(file) { newName ->
+                        if (item.isDirectory) {
+                            renameFolder(file, newName)
+                        } else {
+                            renameFile(file, newName)
+                        }
+                    }
+                }
+            ),
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Delete",
+                isEnabled = true,
+                action = {
+                    if (item.isDirectory) {
+                        deleteFolder(file)
+                    } else {
+                        deleteFile(file)
+                    }
+                }
+            )
+        )
+
+        onShowContextMenu(menuItems, x, y)
+    }
+
+    /**
+     * Rename a file
+     */
+    private fun renameFile(file: File, newName: String) {
+        try {
+            val newFile = File(file.parent, newName)
+            if (file.renameTo(newFile)) {
+                // Refresh the current directory to show the renamed file
+                loadDirectoryContents()
+            } else {
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "Could not rename file"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error renaming file", e)
+            onShowDialog(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "Error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Rename a folder
+     */
+    private fun renameFolder(folder: File, newName: String) {
+        try {
+            val newFolder = File(folder.parent, newName)
+            if (folder.renameTo(newFolder)) {
+                // Refresh the current directory to show the renamed folder
+                loadDirectoryContents()
+            } else {
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "Could not rename folder"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error renaming folder", e)
+            onShowDialog(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "Error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Delete a file
+     */
+    private fun deleteFile(file: File) {
+        onShowConfirmDialog(
+            "Delete File",
+            "Are you sure you want to delete '${file.name}'?"
+        ) {
+            try {
+                if (file.delete()) {
+                    // Refresh the current directory to show the file is gone
+                    loadDirectoryContents()
+                } else {
+                    onShowDialog(
+                        rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                        "Could not delete file"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting file", e)
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "Error: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Delete a folder (recursively if not empty)
+     */
+    private fun deleteFolder(folder: File) {
+        val fileCount = folder.listFiles()?.size ?: 0
+        val message = if (fileCount > 0) {
+            "Are you sure you want to delete '${folder.name}' and all its contents? ($fileCount items)"
+        } else {
+            "Are you sure you want to delete '${folder.name}'?"
+        }
+
+        onShowConfirmDialog(
+            "Delete Folder",
+            message
+        ) {
+            try {
+                if (deleteRecursive(folder)) {
+                    // Refresh the current directory to show the folder is gone
+                    loadDirectoryContents()
+                } else {
+                    onShowDialog(
+                        rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                        "Could not delete folder"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting folder", e)
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "Error: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Recursively delete a folder and its contents
+     */
+    private fun deleteRecursive(file: File): Boolean {
+        if (file.isDirectory) {
+            val children = file.listFiles()
+            if (children != null) {
+                for (child in children) {
+                    if (!deleteRecursive(child)) {
+                        return false
+                    }
+                }
+            }
+        }
+        return file.delete()
+    }
+
+    /**
+     * Show context menu for empty space (whitespace) in the grid
+     */
+    private fun showEmptySpaceContextMenu(x: Float, y: Float) {
+        val menuItems = listOf(
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "New Folder",
+                isEnabled = true,
+                action = {
+                    showNewFolderDialog()
+                }
+            ),
+            rocks.gorjan.gokixp.ContextMenuItem(
+                title = "Paste",
+                isEnabled = clipboardFile != null && clipboardOperation != null,
+                action = {
+                    pasteFromClipboard()
+                }
+        ),
+        )
+
+        onShowContextMenu(menuItems, x, y)
+    }
+
+    /**
+     * Show dialog to create a new folder
+     */
+    private fun showNewFolderDialog() {
+        val dummyFile = File(currentPath, "New Folder")
+        onShowRenameDialog(dummyFile) { folderName ->
+            createNewFolder(folderName)
+        }
+    }
+
+    /**
+     * Create a new folder in the current directory
+     */
+    private fun createNewFolder(folderName: String) {
+        if (currentPath == null) {
+            onShowDialog(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "Cannot create folder at this location"
+            )
+            return
+        }
+
+        try {
+            val newFolder = File(currentPath, folderName)
+
+            if (newFolder.exists()) {
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "A file or folder with this name already exists"
+                )
+                return
+            }
+
+            if (newFolder.mkdir()) {
+                // Refresh the current directory to show the new folder
+                loadDirectoryContents()
+            } else {
+                onShowDialog(
+                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                    "Could not create folder"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating folder", e)
+            onShowDialog(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "Error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Copy a file/folder to clipboard
+     */
+    private fun copyToClipboard(file: File) {
+        clipboardFile = file
+        clipboardOperation = ClipboardOperation.COPY
+        // Refresh to update UI (no opacity change for copy)
+        loadDirectoryContents()
+    }
+
+    /**
+     * Cut a file/folder to clipboard
+     */
+    private fun cutToClipboard(file: File) {
+        clipboardFile = file
+        clipboardOperation = ClipboardOperation.CUT
+        // Refresh to update UI with opacity change
+        loadDirectoryContents()
+    }
+
+    /**
+     * Paste from clipboard to current directory
+     */
+    private fun pasteFromClipboard() {
+        val sourceFile = clipboardFile ?: return
+        val operation = clipboardOperation ?: return
+        val destDir = currentPath ?: return
+
+        val destFile = File(destDir, sourceFile.name)
+
+        // Check if destination already exists
+        if (destFile.exists()) {
+            onShowConfirmDialog(
+                "Overwrite",
+                "A file or folder named '${sourceFile.name}' already exists. Do you want to overwrite it?"
+            ) {
+                performPaste(sourceFile, destFile, operation)
+            }
+        } else {
+            performPaste(sourceFile, destFile, operation)
+        }
+    }
+
+    /**
+     * Perform the actual paste operation
+     */
+    private fun performPaste(sourceFile: File, destFile: File, operation: ClipboardOperation) {
+        try {
+            when (operation) {
+                ClipboardOperation.COPY -> {
+                    if (sourceFile.isDirectory) {
+                        copyDirectoryRecursive(sourceFile, destFile)
+                    } else {
+                        sourceFile.copyTo(destFile, overwrite = true)
+                    }
+                }
+                ClipboardOperation.CUT -> {
+                    if (sourceFile.renameTo(destFile)) {
+                        // Clear clipboard after successful cut
+                        clipboardFile = null
+                        clipboardOperation = null
+                    } else {
+                        onShowDialog(
+                            rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                            "Could not move file or folder"
+                        )
+                        return
+                    }
+                }
+            }
+
+            // Refresh directory to show the pasted item
+            loadDirectoryContents()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pasting file/folder", e)
+            onShowDialog(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "Error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Recursively copy a directory
+     */
+    private fun copyDirectoryRecursive(source: File, dest: File) {
+        if (source.isDirectory) {
+            if (!dest.exists()) {
+                dest.mkdir()
+            }
+            val children = source.listFiles()
+            if (children != null) {
+                for (child in children) {
+                    copyDirectoryRecursive(child, File(dest, child.name))
+                }
+            }
+        } else {
+            source.copyTo(dest, overwrite = true)
+        }
+    }
+
+    /**
+     * Reset clipboard (call when window reopens)
+     */
+    fun resetClipboard() {
+        clipboardFile = null
+        clipboardOperation = null
+    }
+
+    /**
+     * Check if a file is currently cut (for opacity change)
+     */
+    fun isFileCut(file: File): Boolean {
+        return clipboardFile?.absolutePath == file.absolutePath &&
+               clipboardOperation == ClipboardOperation.CUT
     }
 }

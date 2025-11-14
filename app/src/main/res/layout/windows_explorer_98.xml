@@ -118,7 +118,7 @@
 
     <TextView
         android:id="@+id/folder_name_small"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Folder Name"
         android:lines="1"
@@ -127,6 +127,8 @@
         android:textColor="@color/black"
         android:textSize="10sp"
         android:layout_marginStart="59dp"
+        android:layout_marginEnd="60dp"
+        android:ellipsize="end"
         />
 
     <TextView

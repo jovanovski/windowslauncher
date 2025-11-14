@@ -1001,6 +1001,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.num_9] = soundPool.load(audioContext, R.raw.num_9, 1)
         soundIds[R.raw.num_other] = soundPool.load(audioContext, R.raw.num_other, 1)
         soundIds[R.raw.youve_got_mail] = soundPool.load(audioContext, R.raw.youve_got_mail, 1)
+        soundIds[R.raw.error_xp] = soundPool.load(audioContext, R.raw.error_xp, 1)
+        soundIds[R.raw.warning_xp] = soundPool.load(audioContext, R.raw.warning_xp, 1)
+        soundIds[R.raw.information_xp] = soundPool.load(audioContext, R.raw.information_xp, 1)
 
         // Preload egg sounds
         for (resourceId in eggSounds) {
@@ -3359,13 +3362,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun showRecycleBinContextMenu(recycleBinView: RecycleBinView, x: Float, y: Float) {
         Log.d("MainActivity", "showRecycleBinContextMenu called")
         Helpers.performHapticFeedback(this)
-        
+
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
-        selectedIcon = null
         if (iconInMoveMode != null) {
             exitIconMoveMode()
         }
+
+        // Set this icon as selected
+        selectedIcon = recycleBinView
+        recycleBinView.setSelected(true)
 
         if (::contextMenu.isInitialized) {
             // Create recycle bin context menu items
@@ -3400,10 +3406,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
-        selectedIcon = null
         if (iconInMoveMode != null) {
             exitIconMoveMode()
         }
+
+        // Set this folder as selected
+        selectedIcon = folderView
+        folderView.setSelected(true)
 
         if (::contextMenu.isInitialized) {
             // Create folder context menu items
@@ -3436,10 +3445,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Clear any previously selected icon or icon in move mode
         selectedIcon?.setSelected(false)
-        selectedIcon = null
         if (iconInMoveMode != null) {
             exitIconMoveMode()
         }
+
+        // Set this icon as selected
+        selectedIcon = myComputerView
+        myComputerView.setSelected(true)
 
         if (::contextMenu.isInitialized) {
             // Create My Computer context menu items: Open, separator, Move Icon, Properties
@@ -4240,6 +4252,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (selectedIcon == folderView) {
                 selectedIcon = null
             }
+        }
+    }
+
+    private fun showFileRenameDialog(file: java.io.File, onRename: (String) -> Unit) {
+        val currentName = file.name
+
+        showRenameDialog(
+            title = "Rename File",
+            initialText = currentName,
+            hint = "File name"
+        ) { newName ->
+            onRename(newName)
         }
     }
 
@@ -8251,7 +8275,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Check if window is already open
         val windowId = "mycomputer:${desktopIcon.id}"
         if (floatingWindowManager.findAndFocusWindow(windowId)) {
-            return  // Window already open
+            // Window already open, reset clipboard
+            val existingWindow = floatingWindowManager.findWindowByIdentifier(windowId)
+            (existingWindow?.myComputerApp as? rocks.gorjan.gokixp.apps.explorer.MyComputerApp)?.resetClipboard()
+            return
         }
 
         // Create Windows dialog
@@ -8286,6 +8313,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onShowDialog = { dialogType, message ->
                 showDialogBox(dialogType, message)
+            },
+            onShowContextMenu = { items, x, y ->
+                if (::contextMenu.isInitialized) {
+                    contextMenu.showMenu(items, x, y)
+                }
+            },
+            onShowRenameDialog = { file, onRename ->
+                showFileRenameDialog(file, onRename)
+            },
+            onShowConfirmDialog = { title, message, onConfirm ->
+                showConfirmDialog(title, message, onConfirm)
             }
         )
 
@@ -8322,6 +8360,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             message = message,
             onClose = {
                 floatingWindowManager.removeWindow(windowsDialog)
+            },
+            onPlaySound = { soundResId ->
+                playSound(soundResId)
             }
         )
 
@@ -8332,7 +8373,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setTitle(dialogBoxApp.getTitle())
         windowsDialog.setTaskbarIcon(dialogBoxApp.getIconResId())
         windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(240)
+        windowsDialog.setWindowSize(260)
         windowsDialog.setMinimizable(false)
         windowsDialog.setContextMenuView(contextMenu)
 
