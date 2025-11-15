@@ -195,6 +195,12 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsVista -> R.drawable.wmp_vista_icon
     }
 
+    fun getPhotosIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.photos_98_icon
+        AppTheme.WindowsXP -> R.drawable.photos_xp_icon
+        AppTheme.WindowsVista -> R.drawable.photos_vista_icon
+    }
+
     fun getMinesweeperIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.minesweeper_icon_98
         AppTheme.WindowsXP -> R.drawable.minesweeper_icon_xp

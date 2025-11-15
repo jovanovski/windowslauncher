@@ -27,7 +27,8 @@ class WmpApp(
     private val onRequestPermissions: () -> Unit,
     private val hasVideoPermission: () -> Boolean,
     private val canRequestPermissions: () -> Boolean,
-    private val onShowPermissionNotification: () -> Unit
+    private val onShowPermissionNotification: () -> Unit,
+    private val fileToPlay: String? = null
 ) {
     companion object {
         private const val TAG = "WmpApp"
@@ -36,6 +37,7 @@ class WmpApp(
     // Video playback state
     private var videoView: VideoView? = null
     private var playlistView: TableLayout? = null
+    private var playlistScrollView: android.widget.ScrollView? = null
     private var playPauseButton: View? = null
 
     private var allVideos = mutableListOf<VideoTrack>()
@@ -48,6 +50,7 @@ class WmpApp(
         // Get references to views
         videoView = contentView.findViewById(R.id.wmp_video_player)
         playlistView = contentView.findViewById(R.id.wmp_playlist)
+        playlistScrollView = contentView.findViewById(R.id.wmp_playlist_scroll)
         playPauseButton = contentView.findViewById(R.id.wmp_play_pause_toggle)
 
 
@@ -59,6 +62,11 @@ class WmpApp(
         // Check permissions and load videos
         if (hasVideoPermission()) {
             loadVideos()
+
+            // If a file was provided to play on launch, play it
+            fileToPlay?.let { filePath ->
+                playSpecificFile(filePath)
+            }
         } else {
             // Check if we can request permissions
             if (canRequestPermissions()) {
@@ -296,12 +304,78 @@ class WmpApp(
     }
 
     /**
+     * Play a specific video file by path
+     */
+    fun playSpecificFile(filePath: String) {
+        val videoIndex = allVideos.indexOfFirst { it.uri == filePath || android.net.Uri.parse(it.uri).path == filePath }
+        if (videoIndex >= 0) {
+            // Video found in library
+            val video = allVideos[videoIndex]
+            selectedVideoIndex = videoIndex
+            playVideo(video)
+            displayVideoList()
+            scrollToSelectedVideo()
+        } else {
+            // Video not in library - add temporarily and play
+            val file = java.io.File(filePath)
+            if (file.exists()) {
+                val uri = android.content.ContentUris.withAppendedId(
+                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    0 // This won't work for external files, we'll use file URI
+                )
+                val fileUri = android.net.Uri.fromFile(file)
+                val displayName = file.name.replaceFirst(Regex("\\.[^.]+$"), "")
+
+                // Get duration if possible
+                val retriever = android.media.MediaMetadataRetriever()
+                var duration = 0L
+                try {
+                    retriever.setDataSource(context, fileUri)
+                    val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    duration = durationStr?.toLongOrNull() ?: 0L
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error getting video duration", e)
+                } finally {
+                    retriever.release()
+                }
+
+                val tempVideo = VideoTrack(fileUri.toString(), displayName, duration)
+                allVideos.add(0, tempVideo)
+                selectedVideoIndex = 0
+                playVideo(tempVideo)
+                displayVideoList()
+                scrollToSelectedVideo()
+            }
+        }
+    }
+
+    /**
+     * Scroll to the currently selected video in the playlist
+     */
+    private fun scrollToSelectedVideo() {
+        if (selectedVideoIndex < 0) return
+
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            playlistView?.let { tableLayout ->
+                if (selectedVideoIndex < tableLayout.childCount) {
+                    val selectedRow = tableLayout.getChildAt(selectedVideoIndex)
+                    selectedRow?.let { row ->
+                        val scrollY = row.top - (playlistScrollView?.height ?: 0) / 2 + row.height / 2
+                        playlistScrollView?.smoothScrollTo(0, scrollY.coerceAtLeast(0))
+                    }
+                }
+            }
+        }, 100)
+    }
+
+    /**
      * Cleanup when app is closed
      */
     fun cleanup() {
         videoView?.stopPlayback()
         videoView = null
         playlistView = null
+        playlistScrollView = null
         playPauseButton = null
         allVideos.clear()
         selectedVideoIndex = -1

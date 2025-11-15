@@ -12,6 +12,7 @@ import android.widget.GridView
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.FileProvider
+import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
@@ -443,9 +444,76 @@ class MyComputerApp(
     }
 
     /**
-     * Open a file with the default system app
+     * Check if a file is an audio file
+     */
+    private fun isAudioFile(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        return extension in listOf("mp3", "wav", "ogg", "flac", "m4a", "aac", "wma")
+    }
+
+    /**
+     * Check if a file is a video file
+     */
+    private fun isVideoFile(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        return extension in listOf("mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "3gp", "m4v")
+    }
+
+    /**
+     * Check if a file is an image file
+     */
+    private fun isImageFile(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        return extension in listOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
+    }
+
+    /**
+     * Open a file - audio files open in Winamp, video files open in WMP, images open in Photo Viewer, others use external app
      */
     private fun openFile(file: File) {
+        if (isAudioFile(file)) {
+            // Open audio files in Winamp
+            openFileInWinamp(file)
+        } else if (isVideoFile(file)) {
+            // Open video files in Windows Media Player
+            openFileInWmp(file)
+        } else if (isImageFile(file)) {
+            // Open image files in Photo Viewer
+            openFileInPhotoViewer(file)
+        } else {
+            // Open other files with external app
+            openFileInExternalApp(file)
+        }
+    }
+
+    /**
+     * Open a file in Winamp
+     */
+    private fun openFileInWinamp(file: File) {
+        val mainActivity = context as? MainActivity
+        mainActivity?.openWinamp(file.absolutePath)
+    }
+
+    /**
+     * Open a file in Windows Media Player
+     */
+    private fun openFileInWmp(file: File) {
+        val mainActivity = context as? MainActivity
+        mainActivity?.openWmp(file.absolutePath)
+    }
+
+    /**
+     * Open a file in Photo Viewer
+     */
+    private fun openFileInPhotoViewer(file: File) {
+        val mainActivity = context as? MainActivity
+        mainActivity?.openPhotoViewer(file.absolutePath)
+    }
+
+    /**
+     * Open a file with the default system app
+     */
+    private fun openFileInExternalApp(file: File) {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
@@ -527,8 +595,23 @@ class MyComputerApp(
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
             "gif" -> "image/gif"
-            "mp4" -> "video/mp4"
+            "bmp" -> "image/bmp"
+            "webp" -> "image/webp"
+            "mp4", "m4v" -> "video/mp4"
+            "avi" -> "video/x-msvideo"
+            "mkv" -> "video/x-matroska"
+            "mov" -> "video/quicktime"
+            "wmv" -> "video/x-ms-wmv"
+            "flv" -> "video/x-flv"
+            "webm" -> "video/webm"
+            "3gp" -> "video/3gpp"
             "mp3" -> "audio/mpeg"
+            "wav" -> "audio/wav"
+            "ogg" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "wma" -> "audio/x-ms-wma"
             "zip" -> "application/zip"
             "apk" -> "application/vnd.android.package-archive"
             else -> "*/*"
@@ -541,8 +624,14 @@ class MyComputerApp(
     private fun showFileContextMenu(item: FileSystemItem, x: Float, y: Float) {
         val file = item.file
         val itemType = if (item.isDirectory) "Folder" else "File"
+        val isAudio = !item.isDirectory && isAudioFile(file)
+        val isVideo = !item.isDirectory && isVideoFile(file)
+        val isImage = !item.isDirectory && isImageFile(file)
 
-        val menuItems = listOf(
+        val menuItems = mutableListOf<rocks.gorjan.gokixp.ContextMenuItem>()
+
+        // Add "Open" option
+        menuItems.add(
             rocks.gorjan.gokixp.ContextMenuItem(
                 title = "Open",
                 isEnabled = true,
@@ -553,8 +642,27 @@ class MyComputerApp(
                         openFile(file)
                     }
                 }
-            ),
-            rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false), // Separator
+            )
+        )
+
+        // Add "Open in External App" for audio, video, and image files
+        if (isAudio || isVideo || isImage) {
+            menuItems.add(
+                rocks.gorjan.gokixp.ContextMenuItem(
+                    title = "Open in External App",
+                    isEnabled = true,
+                    action = {
+                        openFileInExternalApp(file)
+                    }
+                )
+            )
+        }
+
+        // Separator after Open options
+        menuItems.add(rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false))
+
+        // Add Copy, Cut, Rename, Delete
+        menuItems.addAll(listOf(
             rocks.gorjan.gokixp.ContextMenuItem(
                 title = "Copy",
                 isEnabled = true,
@@ -594,7 +702,7 @@ class MyComputerApp(
                     }
                 }
             )
-        )
+        ))
 
         onShowContextMenu(menuItems, x, y)
     }

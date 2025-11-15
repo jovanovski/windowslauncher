@@ -25,6 +25,7 @@
     </FrameLayout>
 
     <ScrollView
+        android:id="@+id/wmp_playlist_scroll"
         android:layout_width="match_parent"
         android:layout_height="197dp"
         android:layout_marginStart="280dp"

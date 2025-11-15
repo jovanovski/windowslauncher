@@ -44,7 +44,8 @@ class WinampApp(
     private val hasAudioPermission: () -> Boolean,
     private val onShowRenameDialog: (title: String, initialText: String, hint: String, onConfirm: (String) -> Unit) -> Unit,
     private val onShowConfirmDialog: (title: String, message: String, onConfirm: () -> Unit) -> Unit,
-    private val contextMenuView: rocks.gorjan.gokixp.ContextMenuView
+    private val contextMenuView: rocks.gorjan.gokixp.ContextMenuView,
+    private val fileToPlay: String? = null // Optional file path to play on launch
 ) {
     companion object {
         private const val NOTIFICATION_ID = 1001
@@ -99,6 +100,7 @@ class WinampApp(
     private var statusView: ImageView? = null
     private var playingAnimationView: View? = null
     private var trackListView: android.widget.TableLayout? = null
+    private var trackListScrollView: android.widget.ScrollView? = null
     private var playlistNameView: TextView? = null
     private var backgroundView: ImageView? = null
 
@@ -115,6 +117,7 @@ class WinampApp(
         // Get references to views
         trackNameView = contentView.findViewById(R.id.track_name)
         trackListView = contentView.findViewById(R.id.track_list)
+        trackListScrollView = contentView.findViewById(R.id.track_list_scroll)
         trackSecondsView = contentView.findViewById(R.id.track_seconds)
         tabView = contentView.findViewById(R.id.winamp_tab)
         statusView = contentView.findViewById(R.id.winamp_status)
@@ -488,6 +491,11 @@ class WinampApp(
 
         // Initial list refresh
         refreshTrackListUI()
+
+        // If a file was specified to play on launch, play it
+        if (fileToPlay != null) {
+            playSpecificFile(fileToPlay)
+        }
     }
 
     /**
@@ -502,7 +510,30 @@ class WinampApp(
         } else {
             // Show track list
             showTrackList()
+            // Scroll to selected track after list is populated
+            scrollToSelectedTrack()
         }
+    }
+
+    /**
+     * Scroll to the selected track in the list
+     */
+    private fun scrollToSelectedTrack() {
+        if (selectedTrackIndex < 0 || isShowingPlaylists) return
+
+        // Post with delay to ensure the view is laid out
+        Handler(Looper.getMainLooper()).postDelayed({
+            trackListView?.let { tableLayout ->
+                if (selectedTrackIndex < tableLayout.childCount) {
+                    val selectedRow = tableLayout.getChildAt(selectedTrackIndex)
+                    selectedRow?.let { row ->
+                        // Calculate the scroll position to center the selected track
+                        val scrollY = row.top - (trackListScrollView?.height ?: 0) / 2 + row.height / 2
+                        trackListScrollView?.smoothScrollTo(0, scrollY.coerceAtLeast(0))
+                    }
+                }
+            }
+        }, 100) // Small delay to ensure layout is complete
     }
 
     /**
@@ -798,6 +829,71 @@ class WinampApp(
 
         } catch (e: Exception) {
             Log.e("WinampApp", "Error playing track: ${track.path}", e)
+        }
+    }
+
+    /**
+     * Play a specific file by path
+     */
+    fun playSpecificFile(filePath: String) {
+        // Find the track in allTracks
+        val trackIndex = allTracks.indexOfFirst { it.path == filePath }
+
+        if (trackIndex >= 0) {
+            // Track found in library
+            val track = allTracks[trackIndex]
+            selectedTrackIndex = trackIndex
+
+            // Switch to "ALL LOCAL FILES" playlist
+            currentPlaylistIndex = 0
+            isShowingPlaylists = false
+
+            // Update track name display
+            val title = track.title.uppercase()
+            trackNameView?.text = "$title     $title     $title"
+
+            // Play the track
+            playTrack(track)
+            refreshTrackListUI()
+
+            Log.d("WinampApp", "Playing file from library: ${track.title}")
+        } else {
+            // Track not in library - add it temporarily and play
+            try {
+                val file = java.io.File(filePath)
+                val displayName = file.nameWithoutExtension
+
+                // Get duration
+                val tempPlayer = MediaPlayer().apply {
+                    setDataSource(filePath)
+                    prepare()
+                }
+                val duration = tempPlayer.duration.toLong()
+                tempPlayer.release()
+
+                // Create and play track
+                val track = MusicTrack(filePath, displayName, duration)
+
+                // Add to allTracks temporarily
+                allTracks.add(0, track)
+                updateAllLocalFilesPlaylist()
+
+                selectedTrackIndex = 0
+                currentPlaylistIndex = 0
+                isShowingPlaylists = false
+
+                // Update track name display
+                val title = track.title.uppercase()
+                trackNameView?.text = "$title     $title     $title"
+
+                // Play the track
+                playTrack(track)
+                refreshTrackListUI()
+
+                Log.d("WinampApp", "Playing external file: ${track.title}")
+            } catch (e: Exception) {
+                Log.e("WinampApp", "Error playing external file: $filePath", e)
+            }
         }
     }
 

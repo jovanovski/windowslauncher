@@ -199,6 +199,7 @@
 
 
     <ScrollView
+        android:id="@+id/track_list_scroll"
         android:layout_width="313dp"
         android:layout_height="184dp"
         android:layout_marginTop="179dp"

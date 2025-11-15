@@ -6707,17 +6707,36 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
-    private fun showWinampDialog(appInfo: AppInfo? = null) {
+    /**
+     * Public API to open Winamp with optional file to play
+     */
+    fun openWinamp(fileToPlay: String? = null) {
+        showWinampDialog(fileToPlay = fileToPlay)
+    }
+
+    private fun showWinampDialog(appInfo: AppInfo? = null, fileToPlay: String? = null) {
+        // Check if Winamp is already open
+        val existingWindow = floatingWindowManager.findWindowByIdentifier("system.winamp")
+        if (existingWindow != null) {
+            // Winamp already open, bring to front
+            floatingWindowManager.findAndFocusWindow("system.winamp")
+            // If a file was specified, play it
+            if (fileToPlay != null) {
+                winampAppInstance?.playSpecificFile(fileToPlay)
+            }
+            return
+        }
+
         // Set cursor to busy while loading
         setCursorBusy()
 
         // Defer the actual loading to allow cursor to render
         Handler(Looper.getMainLooper()).post {
-            createAndShowWinampDialog()
+            createAndShowWinampDialog(fileToPlay)
         }
     }
 
-    private fun createAndShowWinampDialog() {
+    private fun createAndShowWinampDialog(fileToPlay: String? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.winamp"  // Set identifier for tracking
@@ -6751,7 +6770,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onShowConfirmDialog = { title, message, onConfirm ->
                 showConfirmDialog(title, message, onConfirm)
             },
-            contextMenuView = contextMenu
+            contextMenuView = contextMenu,
+            fileToPlay = fileToPlay
         )
 
         // Store reference for permission callback
@@ -6796,17 +6816,36 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
-    private fun showWmpDialog(appInfo: AppInfo? = null) {
+    /**
+     * Public API to open Windows Media Player with optional file to play
+     */
+    fun openWmp(fileToPlay: String? = null) {
+        showWmpDialog(fileToPlay = fileToPlay)
+    }
+
+    private fun showWmpDialog(appInfo: AppInfo? = null, fileToPlay: String? = null) {
+        // Check if WMP is already open
+        val existingWindow = floatingWindowManager.findWindowByIdentifier("system.wmp")
+        if (existingWindow != null) {
+            // WMP already open, bring to front
+            floatingWindowManager.findAndFocusWindow("system.wmp")
+            // If a file was specified, play it
+            if (fileToPlay != null) {
+                wmpAppInstance?.playSpecificFile(fileToPlay)
+            }
+            return
+        }
+
         // Set cursor to busy while loading
         setCursorBusy()
 
         // Defer the actual loading to allow cursor to render
         Handler(Looper.getMainLooper()).post {
-            createAndShowWmpDialog()
+            createAndShowWmpDialog(fileToPlay)
         }
     }
 
-    private fun createAndShowWmpDialog() {
+    private fun createAndShowWmpDialog(fileToPlay: String? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.wmp"  // Set identifier for tracking
@@ -6857,7 +6896,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         startActivity(intent)
                     }
                 )
-            }
+            },
+            fileToPlay = fileToPlay
         )
 
         // Store reference for permission callback
@@ -6897,6 +6937,64 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Stop playback and cleanup
             wmpApp.cleanup()
             wmpAppInstance = null
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Set cursor back to normal after window is shown and loaded
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+        }, 100) // Small delay to ensure window is fully rendered
+    }
+
+    /**
+     * Public API to open Photo Viewer with an image file
+     */
+    fun openPhotoViewer(imagePath: String) {
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowPhotoViewerDialog(imagePath)
+        }
+    }
+
+    private fun createAndShowPhotoViewerDialog(imagePath: String) {
+        val imageFile = java.io.File(imagePath)
+        if (!imageFile.exists()) {
+            Log.e("MainActivity", "Image file does not exist: $imagePath")
+            setCursorNormal()
+            return
+        }
+
+        // Create Windows-style dialog
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.photoviewer.${imagePath.hashCode()}"  // Unique identifier per image
+        windowsDialog.setTitle(imageFile.name)
+        windowsDialog.setTaskbarIcon(themeManager.getPhotosIcon())
+
+        // Inflate the photo viewer content
+        val contentView = layoutInflater.inflate(R.layout.program_photos, null)
+
+        // Create Photo Viewer app instance
+        val photoViewerApp = rocks.gorjan.gokixp.apps.photos.PhotoViewerApp(
+            context = this,
+            imageFile = imageFile
+        )
+
+        // Setup the app
+        photoViewerApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setWindowSizePercentage(90f, 40f)
+
+        // Cleanup on close
+        windowsDialog.setOnCloseListener {
+            photoViewerApp.cleanup()
         }
 
         // Set context menu reference and show as floating window
