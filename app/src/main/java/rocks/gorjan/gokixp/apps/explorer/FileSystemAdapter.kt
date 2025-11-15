@@ -26,11 +26,29 @@ class FileSystemAdapter(
     private val isFileCut: ((File) -> Boolean)? = null
 ) : BaseAdapter() {
 
+    private var selectedPosition: Int = -1
+
     override fun getCount(): Int = items.size
 
     override fun getItem(position: Int): FileSystemItem = items[position]
 
     override fun getItemId(position: Int): Long = position.toLong()
+
+    /**
+     * Clear the current selection
+     */
+    fun clearSelection() {
+        selectedPosition = -1
+        notifyDataSetChanged()
+    }
+
+    /**
+     * Set the selected item by file path
+     */
+    fun setSelectedItem(file: File) {
+        selectedPosition = items.indexOfFirst { it.file.absolutePath == file.absolutePath }
+        notifyDataSetChanged()
+    }
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val item = items[position]
@@ -108,12 +126,18 @@ class FileSystemAdapter(
         // Set long click handler for files and folders (not drives)
         if (!item.isDrive && onItemLongClick != null) {
             iconView.setCustomLongClickHandler { x, y ->
+                // Set this item as selected
+                selectedPosition = position
+                iconView.isSelected = true
                 onItemLongClick.invoke(item, x, y)
             }
         } else {
             // Disable long click for drives only
             iconView.setCustomLongClickHandler { _, _ -> /* Do nothing */ }
         }
+
+        // Apply selection state
+        iconView.isSelected = (position == selectedPosition)
 
         // Apply opacity if file is cut
         if (!item.isDrive && isFileCut != null && isFileCut.invoke(item.file)) {

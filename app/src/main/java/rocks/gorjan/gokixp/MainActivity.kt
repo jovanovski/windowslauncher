@@ -6536,93 +6536,48 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         message: String,
         onConfirm: () -> Unit
     ) {
+        // Create Windows dialog
         val windowsDialog = createThemedWindowsDialog()
+
+        // Inflate layout
+        val contentView = layoutInflater.inflate(R.layout.program_dialog_box, null)
+
+        // Create DialogBoxApp instance with cancel button enabled
+        val dialogBoxApp = rocks.gorjan.gokixp.apps.dialogbox.DialogBoxApp(
+            context = this,
+            theme = themeManager.getSelectedTheme(),
+            themeManager = themeManager,
+            dialogType = rocks.gorjan.gokixp.apps.dialogbox.DialogType.WARNING,
+            message = message,
+            onClose = {
+                playClickSound()
+                onConfirm()
+                floatingWindowManager.removeWindow(windowsDialog)
+            },
+            onPlaySound = { soundResId ->
+                playSound(soundResId)
+            },
+            showCancelButton = true,
+            onCancel = {
+                playClickSound()
+                floatingWindowManager.removeWindow(windowsDialog)
+            }
+        )
+
+        // Setup the dialog
+        dialogBoxApp.setupDialog(contentView)
+
+        // Set window properties
         windowsDialog.setTitle(title)
-
-        val contentView = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
-        }
-
-        // Create message TextView
-        val messageText = TextView(this).apply {
-            text = message
-            setTextColor(Color.BLACK)
-            textSize = 12f
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = 12.dpToPx()
-            }
-        }
-
-        contentView.addView(messageText)
-
-        // Create buttons container
-        val buttonsContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.END
-        }
-
-        // Create OK button
-        val okButton = TextView(this).apply {
-            text = "OK"
-            setTextColor(Color.BLACK)
-            textSize = 12f
-            gravity = android.view.Gravity.CENTER
-            setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
-            background = ContextCompat.getDrawable(this@MainActivity, getThemedButtonBackground())
-            backgroundTintList = null
-            isClickable = true
-            isFocusable = true
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginEnd = 8.dpToPx()
-            }
-        }
-
-        // Create Cancel button
-        val cancelButton = TextView(this).apply {
-            text = "Cancel"
-            setTextColor(Color.BLACK)
-            textSize = 12f
-            gravity = android.view.Gravity.CENTER
-            setPadding(20.dpToPx(), 4.dpToPx(), 20.dpToPx(), 4.dpToPx())
-            background = ContextCompat.getDrawable(this@MainActivity, getThemedButtonBackground())
-            backgroundTintList = null
-            isClickable = true
-            isFocusable = true
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        buttonsContainer.addView(okButton)
-        buttonsContainer.addView(cancelButton)
-        contentView.addView(buttonsContainer)
-
+        windowsDialog.setTaskbarIcon(dialogBoxApp.getIconResId())
         windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(300, null)
-
-        // OK button handler
-        okButton.setOnClickListener {
-            playClickSound()
-            onConfirm()
-            floatingWindowManager.removeWindow(windowsDialog)
-        }
-
-        // Cancel button handler
-        cancelButton.setOnClickListener {
-            playClickSound()
-            floatingWindowManager.removeWindow(windowsDialog)
-        }
+        windowsDialog.setWindowSize(260)
+        windowsDialog.setMinimizable(false)
 
         // Set context menu reference
         windowsDialog.setContextMenuView(contextMenu)
+
+        // Show the window
         floatingWindowManager.showWindow(windowsDialog)
     }
 
@@ -8427,6 +8382,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Setup the app
         myComputerApp.setupApp(contentView)
+
+        // Setup context menu callback to clear selection when menu is hidden
+        if (::contextMenu.isInitialized) {
+            myComputerApp.setupContextMenuCallback(contextMenu)
+        }
 
         // Store reference to MyComputerApp instance
         windowsDialog.myComputerApp = myComputerApp

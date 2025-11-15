@@ -67,6 +67,16 @@ class MyComputerApp(
 
     // Selection tracking
     private var currentSelectedView: View? = null
+    private var currentAdapter: FileSystemAdapter? = null
+
+    /**
+     * Set up callback to clear selection when context menu is hidden
+     */
+    fun setupContextMenuCallback(contextMenu: rocks.gorjan.gokixp.ContextMenuView) {
+        contextMenu.setOnMenuHiddenListener {
+            currentAdapter?.clearSelection()
+        }
+    }
 
     /**
      * Initialize the app UI
@@ -133,6 +143,15 @@ class MyComputerApp(
                     longPressRunnable?.let { longPressHandler?.removeCallbacks(it) }
                     longPressRunnable = null
                     longPressHandler = null
+
+                    // Clear selection when tapping on empty space
+                    val gridView = view as? GridView
+                    if (gridView != null && event.action == android.view.MotionEvent.ACTION_UP) {
+                        val position = gridView.pointToPosition(event.x.toInt(), event.y.toInt())
+                        if (position == GridView.INVALID_POSITION) {
+                            currentAdapter?.clearSelection()
+                        }
+                    }
                     false
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
@@ -360,6 +379,8 @@ class MyComputerApp(
                             }
                         )
 
+                        // Store reference to adapter
+                        currentAdapter = adapter
                         folderIconsGrid?.adapter = adapter
 
                         // Update item count
@@ -396,6 +417,9 @@ class MyComputerApp(
      */
     private fun handleItemClick(item: FileSystemItem, view: View) {
         onSoundPlay("click")
+
+        // Clear selection on any click
+        currentAdapter?.clearSelection()
 
         if (item.isDrive) {
             // Handle drive clicks
@@ -623,7 +647,6 @@ class MyComputerApp(
      */
     private fun showFileContextMenu(item: FileSystemItem, x: Float, y: Float) {
         val file = item.file
-        val itemType = if (item.isDirectory) "Folder" else "File"
         val isAudio = !item.isDirectory && isAudioFile(file)
         val isVideo = !item.isDirectory && isVideoFile(file)
         val isImage = !item.isDirectory && isImageFile(file)
@@ -636,6 +659,7 @@ class MyComputerApp(
                 title = "Open",
                 isEnabled = true,
                 action = {
+                    currentAdapter?.clearSelection()
                     if (item.isDirectory) {
                         navigateToDirectory(file, addToHistory = true)
                     } else {
@@ -652,6 +676,7 @@ class MyComputerApp(
                     title = "Open in External App",
                     isEnabled = true,
                     action = {
+                        currentAdapter?.clearSelection()
                         openFileInExternalApp(file)
                     }
                 )
@@ -668,6 +693,7 @@ class MyComputerApp(
                 isEnabled = true,
                 action = {
                     copyToClipboard(file)
+                    currentAdapter?.clearSelection()
                 }
             ),
             rocks.gorjan.gokixp.ContextMenuItem(
@@ -675,6 +701,7 @@ class MyComputerApp(
                 isEnabled = true,
                 action = {
                     cutToClipboard(file)
+                    currentAdapter?.clearSelection()
                 }
             ),
             rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false), // Separator
@@ -682,6 +709,7 @@ class MyComputerApp(
                 title = "Rename",
                 isEnabled = true,
                 action = {
+                    currentAdapter?.clearSelection()
                     onShowRenameDialog(file) { newName ->
                         if (item.isDirectory) {
                             renameFolder(file, newName)
@@ -695,6 +723,7 @@ class MyComputerApp(
                 title = "Delete",
                 isEnabled = true,
                 action = {
+                    currentAdapter?.clearSelection()
                     if (item.isDirectory) {
                         deleteFolder(file)
                     } else {

@@ -18,6 +18,7 @@ class ContextMenuView @JvmOverloads constructor(
 ) : LinearLayout(context, attrs, defStyleAttr), ThemeAware {
 
     private var onItemClickListener: ((ContextMenuItem) -> Unit)? = null
+    private var onMenuHiddenListener: (() -> Unit)? = null
     private var currentTheme: AppTheme = AppTheme.WindowsXP
 
     // Backward compatible property
@@ -55,10 +56,15 @@ class ContextMenuView @JvmOverloads constructor(
     
     fun hideMenu() {
         visibility = GONE
+        onMenuHiddenListener?.invoke()
     }
-    
+
     fun setOnItemClickListener(listener: (ContextMenuItem) -> Unit) {
         onItemClickListener = listener
+    }
+
+    fun setOnMenuHiddenListener(listener: () -> Unit) {
+        onMenuHiddenListener = listener
     }
 
     fun setThemeBackground(isWindows98: Boolean) {

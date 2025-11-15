@@ -3,6 +3,8 @@ package rocks.gorjan.gokixp.apps.wmp
 import android.content.Context
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TableLayout
 import android.widget.TableRow
 import android.widget.TextView
@@ -39,9 +41,24 @@ class WmpApp(
     private var playlistView: TableLayout? = null
     private var playlistScrollView: android.widget.ScrollView? = null
     private var playPauseButton: View? = null
+    private var tabView: ImageView? = null
+    private var trackView: LinearLayout? = null
 
     private var allVideos = mutableListOf<VideoTrack>()
     private var selectedVideoIndex = -1
+
+    // Update handlers
+    private val updateHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var updateRunnable: Runnable? = null
+    private var lastTabPosition = 0 // Track last tab position to prevent backwards movement
+
+    // Fullscreen state
+    private var isFullscreen = false
+    private var originalParent: android.view.ViewGroup? = null
+    private var originalLayoutParams: android.view.ViewGroup.LayoutParams? = null
+    private var originalIndex: Int = -1
+    private var fullscreenContainer: android.widget.FrameLayout? = null
+    private var onBackPressedCallback: androidx.activity.OnBackPressedCallback? = null
 
     /**
      * Initialize the app UI
@@ -52,12 +69,19 @@ class WmpApp(
         playlistView = contentView.findViewById(R.id.wmp_playlist)
         playlistScrollView = contentView.findViewById(R.id.wmp_playlist_scroll)
         playPauseButton = contentView.findViewById(R.id.wmp_play_pause_toggle)
-
+        tabView = contentView.findViewById(R.id.wmp_tab)
+        trackView = contentView.findViewById(R.id.wmp_track)
 
         // Set up play/pause button
         playPauseButton?.setOnClickListener {
             togglePlayPause()
         }
+
+        // Set up draggable tab for seeking
+        setupSeekBar()
+
+        // Set up double-tap to fullscreen on VideoView
+        setupDoubleTapFullscreen()
 
         // Check permissions and load videos
         if (hasVideoPermission()) {
@@ -239,6 +263,14 @@ class WmpApp(
      */
     private fun playVideo(video: VideoTrack) {
         try {
+            // Stop any existing updates immediately
+            updateRunnable?.let { updateHandler.removeCallbacks(it) }
+            updateRunnable = null
+
+            // Reset tab position to left immediately
+            lastTabPosition = 0
+            tabView?.translationX = 0f
+
             videoView?.apply {
                 setVideoURI(android.net.Uri.parse(video.uri))
                 setOnPreparedListener { mediaPlayer ->
@@ -273,10 +305,20 @@ class WmpApp(
 
                     // Start playback
                     start()
+
+                    // Start updating the tab position immediately
+                    startUpdates()
                 }
                 setOnCompletionListener {
                     // Video finished playing - don't loop
                     Log.d(TAG, "Video playback completed: ${video.title}")
+
+                    // Stop updates
+                    updateRunnable?.let { updateHandler.removeCallbacks(it) }
+
+                    // Reset tab position to left
+                    lastTabPosition = 0
+                    tabView?.translationX = 0f
                 }
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "Error playing video: what=$what, extra=$extra")
@@ -295,9 +337,15 @@ class WmpApp(
         videoView?.apply {
             if (isPlaying) {
                 pause()
+                updateRunnable?.let { updateHandler.removeCallbacks(it) }
+                updateRunnable = null
                 Log.d(TAG, "Video paused")
             } else {
+                // Stop any existing updates before starting new ones
+                updateRunnable?.let { updateHandler.removeCallbacks(it) }
+                updateRunnable = null
                 start()
+                startUpdates()
                 Log.d(TAG, "Video resumed")
             }
         }
@@ -369,16 +417,377 @@ class WmpApp(
     }
 
     /**
+     * Set up seek bar dragging and clicking
+     */
+    private fun setupSeekBar() {
+        var isDraggingThumb = false
+        var wasPlayingBeforeDrag = false
+
+        tabView?.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    // Start dragging - pause playback if playing
+                    isDraggingThumb = true
+                    wasPlayingBeforeDrag = videoView?.isPlaying == true
+                    if (wasPlayingBeforeDrag) {
+                        videoView?.pause()
+                        updateRunnable?.let { updateHandler.removeCallbacks(it) }
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (isDraggingThumb && videoView != null) {
+                        seekToPosition(view, event.rawX)
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    // Stop dragging - resume playback if it was playing before
+                    isDraggingThumb = false
+                    if (wasPlayingBeforeDrag) {
+                        videoView?.start()
+                        startUpdates()
+                        wasPlayingBeforeDrag = false
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Set up click-to-seek on the scrubber track
+        trackView?.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    // Check if touch is on the track (not on the thumb)
+                    val thumbBounds = android.graphics.Rect()
+                    tabView?.getHitRect(thumbBounds)
+
+                    // If touch is not on the thumb, handle as a track click
+                    if (!thumbBounds.contains(event.x.toInt(), event.y.toInt())) {
+                        videoView?.let { vv ->
+                            if (vv.duration > 0) {
+                                val touchX = event.x - view.paddingLeft
+                                val trackWidth = view.width - view.paddingLeft - view.paddingRight
+                                val tabWidth = tabView?.width ?: 0
+                                val maxMarginPx = trackWidth - tabWidth
+                                val newMarginPx = touchX.toInt().coerceIn(0, maxMarginPx)
+
+                                // Update last tab position to allow seeking in any direction
+                                lastTabPosition = newMarginPx
+
+                                // Update the tab position using translationX for better performance
+                                tabView?.translationX = newMarginPx.toFloat()
+
+                                // Seek the video player to the corresponding position
+                                try {
+                                    val progress = newMarginPx.toFloat() / maxMarginPx.toFloat()
+                                    val newPosition = (vv.duration * progress).toInt()
+                                    vv.seekTo(newPosition)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error seeking on track click", e)
+                                }
+                            }
+                        }
+                        true
+                    } else {
+                        // Touch is on thumb, let thumb's touch listener handle it
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+    }
+
+    /**
+     * Seek to a position based on touch X coordinate
+     */
+    private fun seekToPosition(view: View, rawX: Float) {
+        val parent = view.parent as? android.view.ViewGroup
+        parent?.let { parentView ->
+            // Calculate the new left margin based on touch position
+            val trackWidth = parentView.width - parentView.paddingLeft - parentView.paddingRight
+            val tabWidth = view.width
+            val maxMarginPx = trackWidth - tabWidth
+
+            val parentLeft = IntArray(2)
+            parentView.getLocationOnScreen(parentLeft)
+            // Account for parent's left padding
+            val touchX = rawX - parentLeft[0] - parentView.paddingLeft
+
+            // Clamp the margin between 0 and maxMargin (in pixels)
+            val newMarginPx = touchX.toInt().coerceIn(0, maxMarginPx)
+
+            // Update last tab position to allow seeking in any direction
+            lastTabPosition = newMarginPx
+
+            // Update the tab position using translationX for better performance
+            view.translationX = newMarginPx.toFloat()
+
+            // Seek the video player to the corresponding position
+            videoView?.let { vv ->
+                try {
+                    if (vv.duration > 0) {
+                        val progress = newMarginPx.toFloat() / maxMarginPx.toFloat()
+                        val newPosition = (vv.duration * progress).toInt()
+                        vv.seekTo(newPosition)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error seeking", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Start periodic updates for playback UI
+     */
+    private fun startUpdates() {
+        // Stop any existing update runnable first
+        updateRunnable?.let { updateHandler.removeCallbacks(it) }
+        updateRunnable = null
+
+        // Ensure track view is laid out before starting updates
+        trackView?.let { track ->
+            if (track.width <= 0) {
+                // View not laid out yet, try again after a short delay
+                updateHandler.postDelayed({
+                    startUpdates()
+                }, 50)
+                return
+            }
+        }
+
+        updateRunnable = object : Runnable {
+            override fun run() {
+                videoView?.let { vv ->
+                    if (vv.isPlaying) {
+                        try {
+                            val currentPosition = vv.currentPosition
+                            val duration = vv.duration
+
+                            // Update tab position
+                            if (duration > 0) {
+                                val progress = currentPosition.toFloat() / duration.toFloat()
+
+                                // Calculate max margin based on track width and tab width
+                                trackView?.let { track ->
+                                    val trackWidth = track.width - track.paddingLeft - track.paddingRight
+                                    val tabWidth = tabView?.width ?: 0
+                                    if (trackWidth > 0 && tabWidth > 0) {
+                                        val maxMarginPx = trackWidth - tabWidth
+                                        val newLeftMarginPx = (maxMarginPx * progress).toInt().coerceAtLeast(0)
+
+                                        // Allow small backwards movement (tolerance of 3px) but prevent large jumps
+                                        // This handles natural timing variations while preventing the initial stutter
+                                        val backwardTolerance = 3
+                                        if (newLeftMarginPx >= lastTabPosition - backwardTolerance && newLeftMarginPx != lastTabPosition) {
+                                            // Only update if position has actually changed
+                                            lastTabPosition = newLeftMarginPx
+                                            // Use translationX for better performance (doesn't trigger layout)
+                                            tabView?.translationX = newLeftMarginPx.toFloat()
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Schedule next update
+                            updateHandler.postDelayed(this, 100) // Update every 100ms
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error updating playback UI", e)
+                        }
+                    }
+                }
+            }
+        }
+        updateRunnable?.let { updateHandler.post(it) }
+    }
+
+    /**
+     * Set up double-tap to fullscreen on VideoView
+     */
+    private fun setupDoubleTapFullscreen() {
+        val gestureDetector = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                Log.d(TAG, "Double tap detected!")
+                toggleFullscreen()
+                return true
+            }
+
+            override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                // Allow single tap to pass through (for play/pause if needed)
+                return false
+            }
+        })
+
+        // Get the video container (FrameLayout that contains the VideoView)
+        val videoContainer = videoView?.parent as? View
+
+        // Attach listener to the container instead of VideoView itself
+        videoContainer?.setOnTouchListener { view, event ->
+            val result = gestureDetector.onTouchEvent(event)
+            Log.d(TAG, "Touch event on container: action=${event.action}, result=$result")
+            // Return true to consume the event so double-tap works
+            true
+        }
+    }
+
+    /**
+     * Toggle fullscreen mode for the VideoView
+     */
+    private fun toggleFullscreen() {
+        if (isFullscreen) {
+            exitFullscreen()
+        } else {
+            enterFullscreen()
+        }
+    }
+
+    /**
+     * Enter fullscreen mode
+     */
+    private fun enterFullscreen() {
+        videoView?.let { vv ->
+            // Save original parent and layout params
+            originalParent = vv.parent as? android.view.ViewGroup
+            originalLayoutParams = vv.layoutParams
+            originalIndex = originalParent?.indexOfChild(vv) ?: -1
+
+            // Remove from current parent
+            originalParent?.removeView(vv)
+
+            // Create gesture detector for fullscreen mode
+            val fullscreenGestureDetector = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                    Log.d(TAG, "Double tap detected in fullscreen!")
+                    exitFullscreen()
+                    return true
+                }
+            })
+
+            // Create fullscreen container
+            val activity = context as? android.app.Activity ?: return
+            fullscreenContainer = android.widget.FrameLayout(context).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                )
+
+                // Make it clickable to intercept all touches
+                isClickable = true
+                isFocusable = true
+
+                // Set up touch listener to capture all touches and detect double-tap
+                setOnTouchListener { _, event ->
+                    fullscreenGestureDetector.onTouchEvent(event)
+                    // Always return true to consume all touch events
+                    true
+                }
+
+                // Add VideoView to fullscreen container
+                addView(vv, android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.view.Gravity.CENTER
+                ))
+            }
+
+            // Add fullscreen container to activity's content view
+            val rootView = activity.window.decorView.findViewById<android.view.ViewGroup>(android.R.id.content)
+            rootView.addView(fullscreenContainer)
+
+            // Hide system UI using modern API
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                activity.window.insetsController?.let { controller ->
+                    controller.hide(android.view.WindowInsets.Type.systemBars())
+                    controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                activity.window.decorView.systemUiVisibility = (
+                    android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+            }
+
+            // Set up back press handler
+            val componentActivity = activity as? androidx.activity.ComponentActivity
+            onBackPressedCallback = object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    exitFullscreen()
+                }
+            }
+            componentActivity?.onBackPressedDispatcher?.addCallback(onBackPressedCallback!!)
+
+            isFullscreen = true
+        }
+    }
+
+    /**
+     * Exit fullscreen mode
+     */
+    private fun exitFullscreen() {
+        videoView?.let { vv ->
+            // Remove from fullscreen container
+            fullscreenContainer?.removeView(vv)
+
+            // Remove fullscreen container from activity
+            val activity = context as? android.app.Activity ?: return
+            val rootView = activity.window.decorView.findViewById<android.view.ViewGroup>(android.R.id.content)
+            rootView.removeView(fullscreenContainer)
+            fullscreenContainer = null
+
+            // Restore to original parent
+            originalParent?.addView(vv, originalIndex, originalLayoutParams)
+
+            // Show system UI using modern API
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                activity.window.insetsController?.show(android.view.WindowInsets.Type.systemBars())
+            } else {
+                @Suppress("DEPRECATION")
+                activity.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+            }
+
+            // Remove back press callback
+            onBackPressedCallback?.remove()
+            onBackPressedCallback = null
+
+            isFullscreen = false
+        }
+    }
+
+    /**
      * Cleanup when app is closed
      */
     fun cleanup() {
+        // Exit fullscreen if active
+        if (isFullscreen) {
+            exitFullscreen()
+        }
+
+        // Stop updates
+        updateRunnable?.let { updateHandler.removeCallbacks(it) }
+        updateRunnable = null
+
         videoView?.stopPlayback()
         videoView = null
         playlistView = null
         playlistScrollView = null
         playPauseButton = null
+        tabView = null
+        trackView = null
         allVideos.clear()
         selectedVideoIndex = -1
+
+        // Clean up fullscreen state
+        onBackPressedCallback?.remove()
+        onBackPressedCallback = null
+        fullscreenContainer = null
+        originalParent = null
+        originalLayoutParams = null
     }
 
     /**

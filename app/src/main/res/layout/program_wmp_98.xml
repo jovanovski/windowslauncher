@@ -61,6 +61,7 @@
 
 
     <FrameLayout
+        android:id="@+id/wmp_video_container"
         android:layout_marginTop="43dp"
         android:layout_marginStart="3dp"
         android:layout_width="276dp"
@@ -94,4 +95,16 @@
         android:layout_width="25dp"
         android:layout_height="25dp"/>
 
+    <LinearLayout
+        android:id="@+id/wmp_track"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="224dp">
+        <ImageView
+            android:id="@+id/wmp_tab"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:padding="4dp"
+            android:src="@drawable/wmp_98_thumb"/>
+    </LinearLayout>
 </RelativeLayout>

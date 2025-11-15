@@ -27,7 +27,9 @@ class DialogBoxApp(
     private val dialogType: DialogType,
     private val message: String,
     private val onClose: () -> Unit,
-    private val onPlaySound: ((Int) -> Unit)? = null
+    private val onPlaySound: ((Int) -> Unit)? = null,
+    private val showCancelButton: Boolean = false,
+    private val onCancel: (() -> Unit)? = null
 ) {
 
     /**
@@ -38,6 +40,7 @@ class DialogBoxApp(
         val dialogIcon = contentView.findViewById<ImageView>(R.id.dialog_icon)
         val dialogMessage = contentView.findViewById<TextView>(R.id.dialog_message)
         val okButton = contentView.findViewById<TextView>(R.id.dialog_ok_button)
+        val cancelButton = contentView.findViewById<TextView>(R.id.dialog_cancel_button)
 
         // Set the icon based on dialog type and theme
         val iconResId = getDialogIcon(dialogType, theme)
@@ -46,12 +49,20 @@ class DialogBoxApp(
         // Set the message
         dialogMessage.text = message
 
+        // Show/hide cancel button based on configuration
+        cancelButton.visibility = if (showCancelButton) View.VISIBLE else View.GONE
+
         // Play sound based on dialog type
         playDialogSound()
 
         // Set OK button click listener
         okButton.setOnClickListener {
             onClose()
+        }
+
+        // Set Cancel button click listener
+        cancelButton.setOnClickListener {
+            onCancel?.invoke() ?: onClose()
         }
 
         return contentView
