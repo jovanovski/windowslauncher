@@ -36,6 +36,7 @@ import android.text.Editable
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.BackEventCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
@@ -136,6 +137,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var notificationHideRunnable: Runnable? = null
     private var notificationTapCallback: (() -> Unit)? = null
     var isStartMenuVisible = false
+
+    // Back gesture tracking
+    private var isBackGestureInProgress = false
+    private var potentialBackGestureStartTime = 0L
+    private val BACK_GESTURE_EDGE_THRESHOLD_DP = 20 // Touch within 20dp from edge is potential back gesture
+    private val BACK_GESTURE_TIMEOUT_MS = 300L // If no back gesture confirmed within 300ms, allow touch
 
     // Update checker
     private val updateCheckHandler = Handler(Looper.getMainLooper())
@@ -2681,6 +2688,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Modern back press handling for Android 13+ (API 33+)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                // Reset the gesture flag when back is completed
+                isBackGestureInProgress = false
+
                 when {
                     isStartMenuVisible -> {
                         // If start menu is open, close it
@@ -2716,6 +2726,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         Log.d("MainActivity", "Back pressed (modern): ignored (home screen)")
                     }
                 }
+            }
+
+            override fun handleOnBackStarted(backEvent: BackEventCompat) {
+                // Mark that back gesture has started
+                isBackGestureInProgress = true
+                Log.d("MainActivity", "Back gesture started")
+            }
+
+            override fun handleOnBackProgressed(backEvent: BackEventCompat) {
+                // Back gesture is in progress - keep blocking touches
+                // No action needed, just keep the flag set
+            }
+
+            override fun handleOnBackCancelled() {
+                // User cancelled the back gesture - re-enable touches
+                isBackGestureInProgress = false
+                potentialBackGestureStartTime = 0L
+                Log.d("MainActivity", "Back gesture cancelled")
             }
         })
     }
@@ -11274,6 +11302,44 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         ev?.let { event ->
+            val edgeThresholdPx = BACK_GESTURE_EDGE_THRESHOLD_DP * resources.displayMetrics.density
+            val screenWidth = resources.displayMetrics.widthPixels
+            val isEdgeTouch = event.rawX <= edgeThresholdPx || event.rawX >= (screenWidth - edgeThresholdPx)
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    // If touch starts at edge, mark as potential back gesture
+                    if (isEdgeTouch) {
+                        potentialBackGestureStartTime = System.currentTimeMillis()
+                        Log.d("MainActivity", "Potential back gesture detected at x=${event.rawX}")
+                    } else {
+                        potentialBackGestureStartTime = 0L
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    // Reset potential gesture tracking
+                    potentialBackGestureStartTime = 0L
+                }
+            }
+
+            // Block edge touches that could be back gestures
+            if (isEdgeTouch && potentialBackGestureStartTime > 0L) {
+                val timeSinceEdgeTouch = System.currentTimeMillis() - potentialBackGestureStartTime
+
+                // Block if:
+                // 1. Back gesture is confirmed, OR
+                // 2. Touch is at edge and we're within the timeout window
+                if (isBackGestureInProgress || timeSinceEdgeTouch < BACK_GESTURE_TIMEOUT_MS) {
+                    Log.d("MainActivity", "Blocking edge touch (gesture=${isBackGestureInProgress}, time=${timeSinceEdgeTouch}ms)")
+                    return true // Consume the event without processing
+                }
+            }
+
+            // Also block if back gesture is confirmed (even if not at edge anymore)
+            if (isBackGestureInProgress) {
+                return true // Consume the event without processing
+            }
+
             // Reset screensaver timer on any touch event
             if (::screensaverManager.isInitialized) {
                 screensaverManager.resetInactivityTimer()
