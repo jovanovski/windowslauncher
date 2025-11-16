@@ -2777,7 +2777,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up gesture detector for long press and swipe down
         gestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onLongPress(e: MotionEvent) {
-                showContextMenu(e.x, e.y)
+                // Don't show context menu if long press originated from screen edge
+                // (this prevents context menu from appearing during slow back gestures)
+                val edgeThresholdDp = 20 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
+                val edgeThresholdPx = edgeThresholdDp * this@MainActivity.resources.displayMetrics.density
+                val screenWidth = this@MainActivity.resources.displayMetrics.widthPixels
+                val isEdgeTouch = e.rawX <= edgeThresholdPx || e.rawX >= (screenWidth - edgeThresholdPx)
+
+                if (!isEdgeTouch) {
+                    showContextMenu(e.x, e.y)
+                }
             }
             
             override fun onSingleTapUp(e: MotionEvent): Boolean {

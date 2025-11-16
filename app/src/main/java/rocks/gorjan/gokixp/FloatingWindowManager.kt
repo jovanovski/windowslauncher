@@ -1,7 +1,6 @@
 package rocks.gorjan.gokixp
 
 import android.content.Context
-import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import rocks.gorjan.gokixp.theme.AppTheme
@@ -79,7 +78,6 @@ class FloatingWindowManager(private val context: Context, private val container:
     fun bringToFront(windowsDialog: WindowsDialog) {
         // Use bringToFront() which is more efficient and doesn't disrupt layout
         if (activeWindows.contains(windowsDialog)) {
-            Log.v("FloatingWindowManager", "Bringing dialog to front")
             // Unfocus all windows
             activeWindows.forEach { it.setUnfocused() }
 
