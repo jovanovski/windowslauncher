@@ -43,6 +43,9 @@ class WindowsDialog @JvmOverloads constructor(
 
     // Title bar + content
     private lateinit var titleBar: LinearLayout
+    private lateinit var xpTitleBarLeft: ImageView
+    private lateinit var xpTitleBarRight: ImageView
+    private lateinit var xpTitleBarMiddle: ImageView
     private lateinit var titleText: TextView
     private lateinit var closeButton: ImageView
     private lateinit var minimizeButton: ImageView
@@ -167,6 +170,9 @@ class WindowsDialog @JvmOverloads constructor(
 
         // Core parts
         titleBar = findViewById(R.id.dialog_title_bar)
+        xpTitleBarLeft = findViewById(R.id.dialog_xp_title_bar_left)
+        xpTitleBarMiddle = findViewById(R.id.dialog_xp_title_bar_middle)
+        xpTitleBarRight = findViewById(R.id.dialog_xp_title_bar_right)
         titleText = findViewById(R.id.dialog_title_text)
         closeButton = findViewById(R.id.dialog_close_button)
         minimizeButton = findViewById(R.id.dialog_minimize_button)
@@ -1317,18 +1323,23 @@ class WindowsDialog @JvmOverloads constructor(
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
-            val activeBackground = if (currentTheme is AppTheme.WindowsClassic) {
-                R.drawable.windows_98_dialog_title_bar
-            }  else if (currentTheme is AppTheme.WindowsVista) {
-                R.drawable.windows_vista_title_bar_rounded
-            } else {
-                R.drawable.windows_dialog_title_bar
+            if(currentTheme is AppTheme.WindowsClassic || currentTheme is AppTheme.WindowsVista) {
+                val activeBackground = if (currentTheme is AppTheme.WindowsClassic) {
+                    R.drawable.windows_98_dialog_title_bar
+                } else {
+                    R.drawable.windows_vista_title_bar_rounded
+                }
+                titleBar.setBackgroundResource(activeBackground)
             }
-            titleBar.setBackgroundResource(activeBackground)
 
-            // Update border for Windows XP theme
             if (currentTheme is AppTheme.WindowsXP) {
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border)
+                xpTitleBarLeft.setBackgroundResource(R.drawable.xp_title_bar_corner)
+                xpTitleBarMiddle.setBackgroundResource(R.drawable.xp_title_bar_repeat)
+                xpTitleBarRight.setBackgroundResource(R.drawable.xp_title_bar_corner_end)
+                minimizeButton.setImageResource(R.drawable.xp_title_bar_minimize)
+                maximizeButton?.setImageResource(R.drawable.xp_title_bar_maximize)
+                closeButton.setImageResource(R.drawable.xp_title_bar_close)
             }
         }
     }
@@ -1341,18 +1352,17 @@ class WindowsDialog @JvmOverloads constructor(
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
-            if (currentTheme is AppTheme.WindowsClassic || currentTheme is AppTheme.WindowsXP) {
-                val inactiveBackground = if (currentTheme is AppTheme.WindowsClassic) {
-                    R.drawable.windows_98_dialog_title_bar_inactive
-                } else {
-                    R.drawable.windows_dialog_title_bar_inactive
-                }
-                titleBar.setBackgroundResource(inactiveBackground)
+            if (currentTheme is AppTheme.WindowsClassic) {
+                titleBar.setBackgroundResource(R.drawable.windows_98_dialog_title_bar_inactive)
             }
-
-            // Update border for Windows XP theme
-            if (currentTheme is AppTheme.WindowsXP) {
+            else if (currentTheme is AppTheme.WindowsXP){
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border_inactive)
+                xpTitleBarLeft.setBackgroundResource(R.drawable.xp_title_bar_corner_gray)
+                xpTitleBarMiddle.setBackgroundResource(R.drawable.xp_title_bar_repeat_gray)
+                xpTitleBarRight.setBackgroundResource(R.drawable.xp_title_bar_corner_end_gray)
+                minimizeButton.setImageResource(R.drawable.xp_title_bar_minimize_gray)
+                maximizeButton?.setImageResource(R.drawable.xp_title_bar_maximize_gray)
+                closeButton.setImageResource(R.drawable.xp_title_bar_close_gray)
             }
         }
     }

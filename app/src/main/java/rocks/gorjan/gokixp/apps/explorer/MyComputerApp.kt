@@ -491,6 +491,10 @@ class MyComputerApp(
         return extension in listOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
     }
 
+    private fun isPdfFile(file: File): Boolean {
+        return file.extension.lowercase() == "pdf"
+    }
+
     /**
      * Open a file - audio files open in Winamp, video files open in WMP, images open in Photo Viewer, others use external app
      */
@@ -501,8 +505,8 @@ class MyComputerApp(
         } else if (isVideoFile(file)) {
             // Open video files in Windows Media Player
             openFileInWmp(file)
-        } else if (isImageFile(file)) {
-            // Open image files in Photo Viewer
+        } else if (isImageFile(file) || isPdfFile(file)) {
+            // Open image and PDF files in Photo Viewer
             openFileInPhotoViewer(file)
         } else {
             // Open other files with external app

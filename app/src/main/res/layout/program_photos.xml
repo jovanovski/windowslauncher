@@ -7,7 +7,8 @@
         android:id="@+id/photos_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter"/>
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="true"/>
 
 
     <pl.droidsonroids.gif.GifImageView
@@ -15,5 +16,19 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:adjustViewBounds="true" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/pdfScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:background="#000000">
+
+        <LinearLayout
+            android:id="@+id/pdfPagesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+    </androidx.core.widget.NestedScrollView>
     
 </RelativeLayout>

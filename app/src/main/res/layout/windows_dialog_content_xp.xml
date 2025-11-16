@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
-    android:clipChildren="false"
     android:clickable="true"
+    android:clipChildren="false"
     android:clipToPadding="false">
 
     <!-- Movable window -->
@@ -13,68 +13,102 @@
         android:id="@+id/window_frame"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:elevation="20dp">
+        android:elevation="20dp"
+        android:orientation="vertical">
 
         <!-- Windows XP Title Bar -->
         <LinearLayout
             android:id="@+id/dialog_title_bar"
             android:layout_width="match_parent"
             android:layout_height="22dp"
-            android:background="@drawable/windows_dialog_title_bar"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
             android:clipToOutline="true"
-            android:paddingLeft="8dp"
-            android:paddingRight="4dp">
+            android:orientation="horizontal">
 
-            <ImageView
-                android:id="@+id/dialog_window_icon"
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:src="@drawable/ic_dialog_window"
-                android:layout_marginRight="6dp"
-                android:visibility="gone" />
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent">
 
-            <TextView
-                android:id="@+id/dialog_title_text"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Dialog Title"
-                android:letterSpacing="0.03"
-                android:textColor="#ffffff"
-                android:textSize="10sp"
-                android:textFontWeight="500"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:fontFamily="?attr/primaryFontFamily" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/dialog_xp_title_bar_left"
+                        android:layout_width="5dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/xp_title_bar_corner"/>
+                    <ImageView
+                        android:id="@+id/dialog_xp_title_bar_middle"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/xp_title_bar_repeat"/>
+                    <ImageView
+                        android:id="@+id/dialog_xp_title_bar_right"
+                        android:layout_width="5dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/xp_title_bar_corner_end"/>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="4dp">
+
+                    <ImageView
+                        android:id="@+id/dialog_window_icon"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_marginRight="6dp"
+                        android:src="@drawable/ic_dialog_window"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/dialog_title_text"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:fontFamily="?attr/primaryFontFamily"
+                        android:letterSpacing="0.03"
+                        android:maxLines="1"
+                        android:text="Dialog Title"
+                        android:textColor="#ffffff"
+                        android:textFontWeight="500"
+                        android:textSize="10sp" />
 
 
-            <ImageView
-                android:id="@+id/dialog_minimize_button"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:src="@drawable/xp_title_bar_minimize"
-                android:scaleType="fitXY" />
+                    <ImageView
+                        android:id="@+id/dialog_minimize_button"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/xp_title_bar_minimize" />
 
-            <ImageView
-                android:id="@+id/dialog_maximize_button"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginLeft="2dp"
-                android:src="@drawable/xp_title_bar_maximize"
-                android:scaleType="fitXY" />
+                    <ImageView
+                        android:id="@+id/dialog_maximize_button"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginLeft="2dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/xp_title_bar_maximize" />
 
-            <ImageView
-                android:id="@+id/dialog_close_button"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:src="@drawable/xp_title_bar_close"
-                android:layout_marginLeft="2dp"
-                android:scaleType="fitXY" />
+                    <ImageView
+                        android:id="@+id/dialog_close_button"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginLeft="2dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/xp_title_bar_close" />
+                </LinearLayout>
+            </RelativeLayout>
         </LinearLayout>
 
         <!-- Content Area with Border (excluding top) -->
@@ -82,18 +116,18 @@
             android:id="@+id/window_border"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@drawable/windows_xp_dialog_border"
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
-            android:paddingBottom="2dp"
-            android:background="@drawable/windows_xp_dialog_border">
+            android:paddingBottom="2dp">
 
-                <LinearLayout
-                    android:id="@+id/dialog_content_area"
-                    android:clickable="true"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:background="#f0f0f0" />
+            <LinearLayout
+                android:id="@+id/dialog_content_area"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#f0f0f0"
+                android:clickable="true"
+                android:orientation="vertical" />
         </FrameLayout>
     </LinearLayout>
 </FrameLayout>
