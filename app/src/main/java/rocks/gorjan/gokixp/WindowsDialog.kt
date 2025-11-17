@@ -1419,6 +1419,9 @@ class WindowsDialog @JvmOverloads constructor(
 
         val identifier = windowIdentifier ?: return
 
+        if(identifier.startsWith("folder:")) return
+
+
         try {
             val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             val gson = com.google.gson.Gson()
