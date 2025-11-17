@@ -2779,10 +2779,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onLongPress(e: MotionEvent) {
                 // Don't show context menu if long press originated from screen edge
                 // (this prevents context menu from appearing during slow back gestures)
-                val edgeThresholdDp = 20 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
+                val edgeThresholdDp = 30 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
                 val edgeThresholdPx = edgeThresholdDp * this@MainActivity.resources.displayMetrics.density
                 val screenWidth = this@MainActivity.resources.displayMetrics.widthPixels
-                val isEdgeTouch = e.rawX <= edgeThresholdPx || e.rawX >= (screenWidth - edgeThresholdPx)
+                val widthMinusEdge = screenWidth - edgeThresholdPx
+                val isEdgeTouchCondition1 = e.rawX <= edgeThresholdPx
+                val isEdgeTouchCondition2 = e.rawX >= widthMinusEdge
+                val isEdgeTouch = isEdgeTouchCondition1 || isEdgeTouchCondition2
 
                 if (!isEdgeTouch) {
                     showContextMenu(e.x, e.y)
@@ -11474,20 +11477,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     // Switch cursor to busy (hourglass) state
     private fun setCursorBusy() {
-        Log.v("GOKII", "BUSY")
         if (::cursorEffect.isInitialized) {
-            Log.v("GOKII", "BUSY YES" )
             cursorEffect.setImageResource(R.drawable.cursor_busy)
         }
     }
 
     // Switch cursor back to normal (pointer) state
     private fun setCursorNormal() {
-        Log.v("GOKII", "NORMAL" )
 
         if (::cursorEffect.isInitialized) {
-            Log.v("GOKII", "NORMAL YES" )
-
             cursorEffect.setImageResource(R.drawable.cursor)
         }
     }
