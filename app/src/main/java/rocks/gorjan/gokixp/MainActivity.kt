@@ -4854,39 +4854,48 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val folderIcon =AppCompatResources.getDrawable(this, folderIconResource)!!
 
-        // Find the nearest available grid position to where the context menu was opened
-        val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
+        // Use the same grid system as icon dragging for consistency
+        val currentOrientation = getCurrentOrientation()
+        val columns = calculateGridColumns(currentOrientation)
+        val rows = calculateGridRows(currentOrientation)
 
-        // Add positions for all existing desktop icons
-        desktopIconViews.forEach { iconView ->
-            val centerX = iconView.x + iconView.width / 2
-            val centerY = iconView.y + iconView.height / 2
-            val (cellWidth, cellHeight) = getGridDimensions()
+        // Get all occupied grid indices (same as snapSingleIconToGrid)
+        val occupiedIndices = mutableSetOf<Int>()
+        desktopIcons.forEach { icon ->
+            // Skip icons in folders
+            if (icon.parentFolderId != null) return@forEach
 
-            // Account for top margin (status bar + padding)
-            val topMarginPx = 60f * resources.displayMetrics.density
-            val adjustedCenterY = centerY - topMarginPx
+            val view = desktopIconViews.find { it.getDesktopIcon() == icon }
+            if (view != null && view.parent != null && view.isVisible) {
+                val gridIndex = when (currentOrientation) {
+                    ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
+                    ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
+                }
 
-            val col = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
-            val row = (adjustedCenterY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
-
-            occupiedPositions.add(Pair(row, col))
+                if (gridIndex != null) {
+                    occupiedIndices.add(gridIndex)
+                }
+            }
         }
 
-        // Find the nearest available position to the menu location
-        val nearestPosition = findNearestAvailableGridPosition(menuX, menuY, occupiedPositions)
+        // Convert menu position to grid index
+        val menuGridIndex = convertXYToGridIndex(menuX, menuY, currentOrientation)
 
-        val (newX, newY) = if (nearestPosition != null) {
-            getGridCoordinates(nearestPosition.first, nearestPosition.second)
-        } else {
-            // Fallback to menu position if no grid position available
-            Pair(menuX, menuY)
+        // Find nearest available index
+        var nearestIndex = menuGridIndex
+        if (occupiedIndices.contains(nearestIndex)) {
+            nearestIndex = findNearestAvailableIndex(menuGridIndex, occupiedIndices, columns, rows)
         }
+
+        // Convert grid index to position (same as snapSingleIconToGrid)
+        val (row, col) = convertIndexToPosition(nearestIndex, currentOrientation)
+        val (newX, newY) = getGridCoordinatesFromIndex(row, col)
+        val gridIndex = nearestIndex
 
         // Generate unique ID for the folder
         val folderId = "folder_${System.currentTimeMillis()}"
 
-        // Create desktop icon for the folder
+        // Create desktop icon for the folder with proper grid index
         val desktopIcon = DesktopIcon(
             name = "New Folder",
             packageName = folderId,
@@ -4894,7 +4903,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             x = newX,
             y = newY,
             id = folderId,
-            type = IconType.FOLDER
+            type = IconType.FOLDER,
+            portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
+            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null
         )
 
         desktopIcons.add(desktopIcon)
@@ -8833,20 +8844,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
-     * Convert (row, col) position to grid index
-     * @param row Row number
-     * @param col Column number
-     * @param orientation Target orientation
-     * @return Linear index
-     */
-    private fun convertPositionToIndex(row: Int, col: Int, orientation: ScreenOrientation? = null): Int {
-        val columns = calculateGridColumns(orientation)
-        val index = row * columns + col
-        Log.d("MainActivity", "convertPositionToIndex: row=$row, col=$col, columns=$columns -> index=$index")
-        return index
-    }
-
-    /**
      * Convert old x/y coordinates to grid index
      * Used for migration from old system
      */
@@ -9215,61 +9212,53 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // No available positions (should never happen)
         return targetIndex
     }
-    
-    private fun snapExistingIconsToGrid() {
-        val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
 
-        // Then snap all desktop icons
-        desktopIcons.forEachIndexed { index, icon ->
-            val iconView = desktopIconViews.getOrNull(index)
-            if (iconView != null && iconView.parent != null && iconView.isVisible) {
-                // Find the nearest available grid position to the icon's current location
-                val nearestPosition = findNearestAvailableGridPosition(icon.x, icon.y, occupiedPositions)
-                
-                if (nearestPosition != null) {
-                    val (row, col) = nearestPosition
-                    val (newX, newY) = getGridCoordinates(row, col)
-                    
-                    icon.x = newX
-                    icon.y = newY
-                    iconView.x = newX
-                    iconView.y = newY
-                    
-                    // Mark this position as occupied
-                    occupiedPositions.add(Pair(row, col))
-                    
-                    Log.d("MainActivity", "Snapped icon ${icon.name} to nearest grid position ($row, $col)")
-                } else {
-                    Log.w("MainActivity", "No available grid position found for icon ${icon.name}")
-                }
+    /**
+     * Helper function to get all currently occupied grid positions
+     * @return Set of (row, col) pairs representing occupied grid cells
+     */
+    private fun getOccupiedGridPositions(): Set<Pair<Int, Int>> {
+        val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
+        val (cellWidth, cellHeight) = getGridDimensions()
+        val topMarginPx = 60f * resources.displayMetrics.density
+
+        desktopIconViews.forEach { iconView ->
+            if (iconView.parent != null && iconView.isVisible) {
+                val centerX = iconView.x + iconView.width / 2
+                val centerY = iconView.y + iconView.height / 2
+                val adjustedCenterY = centerY - topMarginPx
+
+                val col = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
+                val row = (adjustedCenterY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
+
+                occupiedPositions.add(Pair(row, col))
             }
         }
-        saveDesktopIcons()
-        refreshDesktopIcons()
-        Log.d("MainActivity", "Snapped recycle bin and ${desktopIcons.size} icons to nearest available grid positions")
+
+        return occupiedPositions
     }
-    
+
     private fun findNearestAvailableGridPosition(iconX: Float, iconY: Float, occupiedPositions: Set<Pair<Int, Int>>): Pair<Int, Int>? {
         val (cellWidth, cellHeight) = getGridDimensions()
-        
+
         // Calculate which grid cell the icon's center is currently in
         val iconWidthPx = 90f * resources.displayMetrics.density
         val iconHeightPx = 100f * resources.displayMetrics.density
         val centerX = iconX + (iconWidthPx / 2)
         val centerY = iconY + (iconHeightPx / 2)
-        
+
         // Account for top margin when determining grid position
         val topMarginPx = 60 * resources.displayMetrics.density
         val adjustedCenterY = centerY - topMarginPx
-        
+
         val currentCol = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
         val currentRow = (adjustedCenterY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
-        
+
         // Check if the current position is available
         if (!occupiedPositions.contains(Pair(currentRow, currentCol))) {
             return Pair(currentRow, currentCol)
         }
-        
+
         // Search in expanding circles for the nearest available position
         for (radius in 1 until maxOf(GRID_ROWS, GRID_COLUMNS)) {
             for (dRow in -radius..radius) {
@@ -9278,7 +9267,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     if (maxOf(abs(dRow), abs(dCol)) == radius) {
                         val testRow = currentRow + dRow
                         val testCol = currentCol + dCol
-                        
+
                         // Check if position is within grid bounds
                         if (testRow in 0 until GRID_ROWS && testCol in 0 until GRID_COLUMNS) {
                             if (!occupiedPositions.contains(Pair(testRow, testCol))) {
@@ -9289,7 +9278,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
             }
         }
-        
+
         return null // No available positions found
     }
     
