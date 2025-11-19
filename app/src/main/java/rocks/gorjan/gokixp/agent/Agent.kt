@@ -44,7 +44,7 @@ data class Agent(
             greeting.replace("{USER}", userName).replace("{AGENT_NAME}", name)
         } else {
             // Use fallback greeting without user name
-            "Hi, I'm $name, welcome to Windows XP!"
+            "Hi, I'm $name, welcome to Windows!"
         }
     }
 }
