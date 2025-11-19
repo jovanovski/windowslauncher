@@ -1,15 +1,9 @@
 package rocks.gorjan.gokixp
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
-import android.graphics.Paint
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.AttributeSet
 import android.util.Log
 import android.view.LayoutInflater
@@ -287,23 +281,6 @@ open class DesktopIconView : LinearLayout {
         downEvent?.recycle()
         downEvent = null
     }
-    
-    private fun vibrateShort() {
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(50)
-        }
-    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
@@ -333,12 +310,14 @@ open class DesktopIconView : LinearLayout {
                 } else {
                     // Set up long press detection for context menu
                     longPressRunnable = Runnable {
-                        vibrateShort() // Vibrate on long press
                         isLongPressed = true
 
                         // Show context menu on long press (only if not in move mode)
                         if (!isMoveMode) {
                             showIconContextMenu(event.rawX, event.rawY)
+                        }
+                        else{
+                            Helpers.performHapticFeedback(context)
                         }
                     }
                     longPressHandler.postDelayed(longPressRunnable!!, 250) // 250ms for long press
@@ -414,7 +393,7 @@ open class DesktopIconView : LinearLayout {
                         val folderUnder = mainActivity?.isOverFolder(x + width / 2, y + height / 2)
 
                         if (folderUnder != null && !wasOverFolder) {
-                            vibrateShort() // Vibrate when entering folder area
+                            Helpers.performHapticFeedback(context)
                             wasOverFolder = true
                             wasOverRecycleBin = false
                         } else if (folderUnder == null && wasOverFolder) {
@@ -426,7 +405,7 @@ open class DesktopIconView : LinearLayout {
                             val isOverRecycleBin = mainActivity?.isOverRecycleBin(x + width / 2, y + height / 2) == true
 
                             if (isOverRecycleBin && !wasOverRecycleBin) {
-                                vibrateShort() // Vibrate when entering recycle bin area
+                                Helpers.performHapticFeedback(context)
                                 wasOverRecycleBin = true
                             } else if (!isOverRecycleBin && wasOverRecycleBin) {
                                 wasOverRecycleBin = false

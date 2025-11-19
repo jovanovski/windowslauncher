@@ -141,7 +141,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Back gesture tracking
     private var isBackGestureInProgress = false
     private var potentialBackGestureStartTime = 0L
-    private val BACK_GESTURE_EDGE_THRESHOLD_DP = 20 // Touch within 20dp from edge is potential back gesture
+    private val BACK_GESTURE_EDGE_THRESHOLD_DP = 5 // Touch within 20dp from edge is potential back gesture
     private val BACK_GESTURE_TIMEOUT_MS = 300L // If no back gesture confirmed within 300ms, allow touch
 
     // Update checker
@@ -2689,7 +2689,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // Reset the gesture flag when back is completed
-                isBackGestureInProgress = false
 
                 when {
                     isStartMenuVisible -> {
@@ -2726,6 +2725,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         Log.d("MainActivity", "Back pressed (modern): ignored (home screen)")
                     }
                 }
+                Handler(Looper.getMainLooper()).postDelayed({
+                    isBackGestureInProgress = false
+                }, 500)
+
             }
 
             override fun handleOnBackStarted(backEvent: BackEventCompat) {
@@ -2779,15 +2782,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onLongPress(e: MotionEvent) {
                 // Don't show context menu if long press originated from screen edge
                 // (this prevents context menu from appearing during slow back gestures)
-                val edgeThresholdDp = 30 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
-                val edgeThresholdPx = edgeThresholdDp * this@MainActivity.resources.displayMetrics.density
-                val screenWidth = this@MainActivity.resources.displayMetrics.widthPixels
-                val widthMinusEdge = screenWidth - edgeThresholdPx
-                val isEdgeTouchCondition1 = e.rawX <= edgeThresholdPx
-                val isEdgeTouchCondition2 = e.rawX >= widthMinusEdge
-                val isEdgeTouch = isEdgeTouchCondition1 || isEdgeTouchCondition2
-
-                if (!isEdgeTouch) {
+//                val edgeThresholdDp = 100 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
+//                val edgeThresholdPx = edgeThresholdDp * this@MainActivity.resources.displayMetrics.density
+//                val screenWidth = this@MainActivity.resources.displayMetrics.widthPixels
+//                val widthMinusEdge = screenWidth - edgeThresholdPx
+//                val isEdgeTouchCondition1 = e.rawX <= edgeThresholdPx
+//                val isEdgeTouchCondition2 = e.rawX >= widthMinusEdge
+//                val isEdgeTouch = isEdgeTouchCondition1 || isEdgeTouchCondition2
+//
+                if (!isBackGestureInProgress) {
                     showContextMenu(e.x, e.y)
                 }
             }
@@ -3307,6 +3310,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     fun showDesktopIconContextMenu(iconView: DesktopIconView, x: Float, y: Float) {
+        if(isBackGestureInProgress){
+            return
+        }
         Log.d("MainActivity", "showDesktopIconContextMenu called")
         Helpers.performHapticFeedback(this)        
         // Clear any previously selected icon or icon in move mode
