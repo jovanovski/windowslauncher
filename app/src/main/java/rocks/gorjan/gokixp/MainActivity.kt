@@ -77,6 +77,7 @@ import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.apps.dialer.DialerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
+import rocks.gorjan.gokixp.apps.lights.SnowfallManager
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
 import rocks.gorjan.gokixp.apps.msn.MsnApp
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
@@ -131,6 +132,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var cursorEffect: ImageView
     private val cursorHandler = Handler(Looper.getMainLooper())
     private var christmasLightsManager: ChristmasLightsManager? = null
+    private var snowfallManager: SnowfallManager? = null
     private var jingleBellsMediaPlayer: MediaPlayer? = null
     private var cursorRunnable: Runnable? = null
     private lateinit var notificationBubble: RelativeLayout
@@ -1781,7 +1783,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun initializeChristmasLights() {
+        val wrapper = findViewById<RelativeLayout>(R.id.christmas_wrapper)
         val container = findViewById<LinearLayout>(R.id.christmas_lights)
+        val snowContainer = findViewById<RelativeLayout>(R.id.christmas_snow_wrapper)
+
+        // Show the wrapper (contains both lights and snow)
+        wrapper.visibility = View.VISIBLE
 
         // Apply saved margin
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -1790,24 +1797,100 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         layoutParams.topMargin = (marginTop * resources.displayMetrics.density).toInt()
         container.layoutParams = layoutParams
 
+        // Initialize lights
         if (christmasLightsManager == null) {
             christmasLightsManager = ChristmasLightsManager(this, container)
         }
         christmasLightsManager?.initialize()
+
+        // Initialize and start snowfall
+        if (snowfallManager == null) {
+            snowfallManager = SnowfallManager(this, snowContainer)
+        }
+        snowfallManager?.start()
 
         // Set up click listener to toggle jingle bells music
         container.setOnClickListener {
             toggleJingleBellsMusic()
         }
 
-        Log.d("MainActivity", "Christmas lights initialized with margin: ${marginTop}dp")
+        // Set up long press listener for context menu
+        container.setOnTouchListener { view, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                // Store touch coordinates for potential long press
+                view.tag = Pair(event.rawX, event.rawY)
+            }
+            false // Let other touch events process normally
+        }
+
+        container.setOnLongClickListener { view ->
+            // Get stored touch coordinates
+            val coords = view.tag as? Pair<*, *>
+            val x = (coords?.first as? Float) ?: 0f
+            val y = (coords?.second as? Float) ?: 0f
+            showChristmasLightsContextMenu(x, y)
+            true
+        }
+
+        Log.d("MainActivity", "Christmas lights and snowfall initialized with margin: ${marginTop}dp")
+    }
+
+    private fun showChristmasLightsContextMenu(x: Float, y: Float) {
+        if (isBackGestureInProgress) {
+            return
+        }
+        Log.d("MainActivity", "showChristmasLightsContextMenu called")
+        Helpers.performHapticFeedback(this)
+
+        if (::contextMenu.isInitialized) {
+            // Create context menu items
+            val menuItems = listOf(
+                ContextMenuItem(
+                    title = "Hide Christmas Lights",
+                    action = {
+                        // Update SharedPreferences to disable Christmas lights
+                        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                        prefs.edit { putBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false) }
+
+                        // Clean up and hide
+                        cleanupChristmasLights()
+
+                        Log.d("MainActivity", "Christmas lights hidden via context menu")
+                    }
+                )
+            )
+
+            // Show the menu
+            contextMenu.showMenu(menuItems, x, y)
+            isContextMenuVisible = true
+
+            // Hide start menu if visible
+            if (isStartMenuVisible) {
+                hideStartMenu()
+            }
+        } else {
+            Log.d("MainActivity", "Context menu not initialized")
+        }
     }
 
     private fun cleanupChristmasLights() {
+        val wrapper = findViewById<RelativeLayout>(R.id.christmas_wrapper)
+
+        // Hide the wrapper
+        wrapper.visibility = View.GONE
+
+        // Cleanup lights
         christmasLightsManager?.cleanup()
         christmasLightsManager = null
+
+        // Stop and cleanup snowfall
+        snowfallManager?.stop()
+        snowfallManager = null
+
+        // Stop music
         stopJingleBellsMusic()
-        Log.d("MainActivity", "Christmas lights cleaned up")
+
+        Log.d("MainActivity", "Christmas lights and snowfall cleaned up")
     }
 
     private fun toggleJingleBellsMusic() {
@@ -9740,6 +9823,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Stop jingle bells music when app loses focus
         stopJingleBellsMusic()
 
+        // Pause snowfall and save state
+        snowfallManager?.pause()
+
         // Hide safe to turn off splash if visible
         val safeToTurnOffSplash = findViewById<ImageView>(R.id.safe_to_turn_off_splash)
         safeToTurnOffSplash?.visibility = View.GONE
@@ -9760,6 +9846,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::screensaverManager.isInitialized) {
             screensaverManager.resetInactivityTimer()
         }
+
+        // Resume snowfall animation
+        snowfallManager?.resume()
 
         // Update permission error visibility when returning from settings
         updateEmailPermissionError?.invoke()
