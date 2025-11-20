@@ -6,7 +6,10 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
+import android.view.animation.LinearInterpolator
+import android.widget.ImageView
 import android.widget.RelativeLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -19,14 +22,23 @@ class SnowfallManager(
     private val snowflakes = mutableListOf<Snowflake>()
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
-    private val updateInterval = 50L // Update every 50ms
+    private val updateInterval = 10L // Update every 50ms
 
     // Snowflake generation settings
-    private val snowflakeGenerationInterval = 300L // Generate new snowflake every 300ms
+    private val snowflakeGenerationInterval = 50L // Generate new snowflake every 300ms
     private val maxSnowflakes = 100 // Maximum number of snowflakes on screen (50% increase)
 
     private val prefs: SharedPreferences = context.getSharedPreferences("SnowfallState", Context.MODE_PRIVATE)
     private val gson = Gson()
+
+    // Taskbar position for stopping snowflakes
+    private var taskbarTop: Float = 0f
+
+    // Snowplow
+    private var snowplow: ImageView? = null
+    private var snowplowRunning = false
+    private val snowplowInterval = 10000L // 10 seconds
+    private val snowplowDuration = 5000L // 5 seconds
 
     companion object {
         private const val KEY_SNOWFLAKE_STATE = "snowflake_state"
@@ -50,22 +62,177 @@ class SnowfallManager(
         }
     }
 
+    private val snowplowRunnable = object : Runnable {
+        override fun run() {
+            if (isRunning) {
+                startSnowplow()
+                handler.postDelayed(this, snowplowInterval)
+            }
+        }
+    }
+
+    private val snowplowCollisionRunnable = object : Runnable {
+        override fun run() {
+            if (snowplowRunning) {
+                checkSnowplowCollisions()
+                handler.postDelayed(this, 16L) // Check at ~60fps
+            }
+        }
+    }
+
     fun start() {
         if (!isRunning) {
             isRunning = true
+
+            // Calculate taskbar position
+            calculateTaskbarPosition()
+
+            // Setup snowplow
+            setupSnowplow()
 
             // Restore previous state if exists
             restoreState()
 
             handler.post(updateRunnable)
             handler.post(generateRunnable)
+            handler.postDelayed(snowplowRunnable, snowplowInterval) // First snowplow after 10s + 2s delay
+        }
+    }
+
+    private fun setupSnowplow() {
+        val activity = context as? android.app.Activity ?: return
+        snowplow = activity.findViewById(rocks.gorjan.gokixp.R.id.snowplow)
+        snowplow?.visibility = View.GONE
+    }
+
+    private fun startSnowplow() {
+        snowplow?.let { plow ->
+            // Post to ensure all views are laid out and have valid positions
+            plow.post {
+                val screenWidth = context.resources.displayMetrics.widthPixels
+                val screenHeight = context.resources.displayMetrics.heightPixels
+
+                // Get actual layout dimensions (50dp x 30dp from XML converted to pixels)
+                val density = context.resources.displayMetrics.density
+                val plowWidth = (50 * density).toInt() // 50dp from XML
+                val plowHeight = (30 * density).toInt() // 30dp from XML
+
+                Log.v("GOKII", "Plow dimensions: width=$plowWidth, height=$plowHeight")
+
+                // Start from 1px off-screen to the right
+                val startX = screenWidth.toFloat() + 1f
+                // End 1px off-screen to the left
+                val endX = -plowWidth.toFloat() - 1f
+
+                // Get taskbar position directly - must be done after layout
+                val activity = context as? android.app.Activity
+                val taskbar = activity?.findViewById<View>(rocks.gorjan.gokixp.R.id.taskbar_container)
+                val calculatedTaskbarTop = if (taskbar != null) {
+                    val location = IntArray(2)
+                    taskbar.getLocationOnScreen(location)
+                    Log.v("GOKII", "NO PROBLEM! " + location[1].toFloat() )
+
+                    location[1].toFloat()
+
+                } else {
+                    Log.v("GOKII", "PROBLEM!")
+                    // Fallback: estimate based on typical layout
+                    screenHeight - (70 * context.resources.displayMetrics.density)
+                }
+
+                // Update cached value
+                if (calculatedTaskbarTop > 0) {
+                    taskbarTop = calculatedTaskbarTop
+                }
+
+                // Position at taskbar height
+                val yPosition = calculatedTaskbarTop - plowHeight
+
+                Log.v("GOKII", "Y Position: taskbarTop=$calculatedTaskbarTop, plowHeight=$plowHeight, final yPosition=$yPosition")
+
+                // Set initial position
+                plow.x = startX
+                plow.y = yPosition
+                plow.visibility = View.VISIBLE
+                snowplowRunning = true
+
+                Log.v("GOKII", "Snowplow positioned at x=${plow.x}, y=${plow.y}")
+
+                // Start collision detection
+                handler.post(snowplowCollisionRunnable)
+
+                // Animate to left edge
+                plow.animate()
+                    .x(endX)
+                    .setDuration(snowplowDuration)
+                    .setInterpolator(LinearInterpolator())
+                    .withEndAction {
+                        plow.visibility = View.GONE
+                        snowplowRunning = false
+                        handler.removeCallbacks(snowplowCollisionRunnable)
+                    }
+                    .start()
+            }
+        }
+    }
+
+    private fun checkSnowplowCollisions() {
+        snowplow?.let { plow ->
+            val plowLeft = plow.x
+            val plowRight = plow.x + plow.width
+            val plowTop = plow.y
+            val plowBottom = plow.y + plow.height
+
+            val iterator = snowflakes.iterator()
+            while (iterator.hasNext()) {
+                val snowflake = iterator.next()
+
+                // Check if snowflake intersects with snowplow
+                val flakeLeft = snowflake.x
+                val flakeRight = snowflake.x + snowflake.size
+                val flakeTop = snowflake.y
+                val flakeBottom = snowflake.y + snowflake.size
+
+                // AABB collision detection
+                if (flakeRight > plowLeft && flakeLeft < plowRight &&
+                    flakeBottom > plowTop && flakeTop < plowBottom) {
+                    // Remove snowflake
+                    container.removeView(snowflake.view)
+                    iterator.remove()
+                }
+            }
+        }
+    }
+
+    private fun calculateTaskbarPosition() {
+        // Post to ensure layout is complete
+        container.post {
+            val screenHeight = context.resources.displayMetrics.heightPixels
+            // Taskbar is typically at the bottom with 70dp margin from activity_main.xml
+            // We need to find actual taskbar position
+            val activity = context as? android.app.Activity
+            val taskbar = activity?.findViewById<View>(rocks.gorjan.gokixp.R.id.taskbar_container)
+
+            if (taskbar != null) {
+                val location = IntArray(2)
+                taskbar.getLocationOnScreen(location)
+                taskbarTop = location[1].toFloat()
+            } else {
+                // Fallback: estimate based on typical layout
+                taskbarTop = screenHeight - (70 * context.resources.displayMetrics.density)
+            }
         }
     }
 
     fun stop() {
         isRunning = false
+        snowplowRunning = false
         handler.removeCallbacks(updateRunnable)
         handler.removeCallbacks(generateRunnable)
+        handler.removeCallbacks(snowplowRunnable)
+        handler.removeCallbacks(snowplowCollisionRunnable)
+        snowplow?.animate()?.cancel()
+        snowplow?.visibility = View.GONE
         cleanup()
     }
 
@@ -73,8 +240,13 @@ class SnowfallManager(
         // Save state without cleaning up
         if (isRunning) {
             isRunning = false
+            snowplowRunning = false
             handler.removeCallbacks(updateRunnable)
             handler.removeCallbacks(generateRunnable)
+            handler.removeCallbacks(snowplowRunnable)
+            handler.removeCallbacks(snowplowCollisionRunnable)
+            snowplow?.animate()?.cancel()
+            snowplow?.visibility = View.GONE
             saveState()
         }
     }
@@ -84,11 +256,14 @@ class SnowfallManager(
             isRunning = true
             handler.post(updateRunnable)
             handler.post(generateRunnable)
+            handler.postDelayed(snowplowRunnable, snowplowInterval)
         }
     }
 
     private fun generateSnowflake() {
-        if (snowflakes.size >= maxSnowflakes) return
+        // Only count active (non-stopped) snowflakes toward the limit
+        val activeSnowflakes = snowflakes.count { !it.isStopped }
+        if (activeSnowflakes >= maxSnowflakes) return
 
         val screenWidth = context.resources.displayMetrics.widthPixels
 
@@ -114,7 +289,7 @@ class SnowfallManager(
             x = startX.toFloat(),
             y = 0f,
             size = sizePx,
-            fallSpeed = Random.nextInt(4, 10), // Random fall speed in dp (2x faster)
+            fallSpeed = Random.nextInt(1, 3), // Random fall speed in dp (2x faster)
             horizontalDrift = Random.nextInt(-5, 6) // Random drift between -5dp and +5dp
         )
 
@@ -138,6 +313,11 @@ class SnowfallManager(
         while (iterator.hasNext()) {
             val snowflake = iterator.next()
 
+            // Skip if already stopped
+            if (snowflake.isStopped) {
+                continue
+            }
+
             // Update position
             snowflake.y += snowflake.fallSpeed * density
 
@@ -145,16 +325,20 @@ class SnowfallManager(
             val driftPx = (snowflake.horizontalDrift * density) * 0.1f // Subtle drift
             snowflake.x += driftPx
 
-            // Keep within screen bounds
-            if (snowflake.x < 0) snowflake.x = 0f
-            if (snowflake.x > screenWidth - snowflake.size) snowflake.x = (screenWidth - snowflake.size).toFloat()
+            // Check if we hit the taskbar
+            val bottomY = snowflake.y + snowflake.size
+            if (bottomY >= taskbarTop) {
+                // Stop at taskbar
+                snowflake.y = taskbarTop - snowflake.size
+                snowflake.isStopped = true
+            }
 
             // Update view position
             snowflake.view.x = snowflake.x
             snowflake.view.y = snowflake.y
 
-            // Remove if off screen
-            if (snowflake.y > screenHeight) {
+            // Remove if off screen (left or right only, not bottom since they stack)
+            if (snowflake.x < -snowflake.size || snowflake.x > screenWidth) {
                 container.removeView(snowflake.view)
                 iterator.remove()
             }
@@ -179,7 +363,8 @@ class SnowfallManager(
                 y = snowflake.y,
                 size = snowflake.size,
                 fallSpeed = snowflake.fallSpeed,
-                horizontalDrift = snowflake.horizontalDrift
+                horizontalDrift = snowflake.horizontalDrift,
+                isStopped = snowflake.isStopped
             )
         }
 
@@ -211,7 +396,8 @@ class SnowfallManager(
                     y = state.y,
                     size = state.size,
                     fallSpeed = state.fallSpeed,
-                    horizontalDrift = state.horizontalDrift
+                    horizontalDrift = state.horizontalDrift,
+                    isStopped = state.isStopped
                 )
 
                 snowflakes.add(snowflake)
@@ -227,7 +413,8 @@ class SnowfallManager(
         val y: Float,
         val size: Int,
         val fallSpeed: Int,
-        val horizontalDrift: Int
+        val horizontalDrift: Int,
+        val isStopped: Boolean
     )
 
     private data class Snowflake(
@@ -236,6 +423,7 @@ class SnowfallManager(
         var y: Float,
         val size: Int,
         val fallSpeed: Int,
-        val horizontalDrift: Int
+        val horizontalDrift: Int,
+        var isStopped: Boolean = false
     )
 }

@@ -32,6 +32,14 @@
             android:focusable="false"
             android:clickable="false"
             android:layout_height="match_parent"/>
+
+        <ImageView
+            android:id="@+id/snowplow"
+            android:layout_width="50dp"
+            android:layout_height="30dp"
+            android:src="@drawable/snowplow"
+            android:elevation="20dp"
+            android:visibility="gone"/>
     </RelativeLayout>
 
     <View
