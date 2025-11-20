@@ -38,7 +38,8 @@ class SnowfallManager(
     private var snowplow: ImageView? = null
     private var snowplowRunning = false
     private val snowplowInterval = 10000L // 10 seconds
-    private val snowplowDuration = 5000L // 5 seconds
+    private val snowplowDuration = 8000L // 5 seconds
+    private var snowplowGoingLeft = true // Alternates each pass
 
     companion object {
         private const val KEY_SNOWFLAKE_STATE = "snowflake_state"
@@ -119,10 +120,24 @@ class SnowfallManager(
 
                 Log.v("GOKII", "Plow dimensions: width=$plowWidth, height=$plowHeight")
 
-                // Start from 1px off-screen to the right
-                val startX = screenWidth.toFloat() + 1f
-                // End 1px off-screen to the left
-                val endX = -plowWidth.toFloat() - 1f
+                // Determine direction and flip accordingly
+                val startX: Float
+                val endX: Float
+
+                if (snowplowGoingLeft) {
+                    // Going left: start from right, flip normal (scaleX = 1)
+                    startX = screenWidth.toFloat() + 1f
+                    endX = -plowWidth.toFloat() - 1f
+                    plow.scaleX = 1f
+                } else {
+                    // Going right: start from left, flip horizontally (scaleX = -1)
+                    startX = -plowWidth.toFloat() - 1f
+                    endX = screenWidth.toFloat() + 1f
+                    plow.scaleX = -1f
+                }
+
+                // Toggle direction for next pass
+                snowplowGoingLeft = !snowplowGoingLeft
 
                 // Get taskbar position directly - must be done after layout
                 val activity = context as? android.app.Activity
