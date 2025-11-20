@@ -143,52 +143,10 @@ class AgentView @JvmOverloads constructor(
             switchToWaitingState()
         }
     }
-    
-    fun triggerSpeech(message: String) {
-        Log.d("AgentView", "Agent speech triggered with TTS")
-        
-        // Set loading state to prevent multiple taps
-        isLoadingSpeech = true
-        
-        // Start TTS process
-        ttsService.speakText(
-            text = message,
-            agent = currentAgent,
-            onStart = {
-                // Show loading bubble and switch to talking state temporarily
-                onAgentTapped?.invoke(currentAgent, x, y, width, height)
-                Log.d("AgentView", "TTS started, showing loading bubble")
-            },
-            onAudioReady = { audioDurationMs ->
-                // Audio is ready and starting to play, switch to talking state for exact duration
-                switchToTalkingState(audioDurationMs)
-                onAgentSpeakingWithAudio?.invoke(currentAgent, message, x, y, width, height, audioDurationMs)
-                Log.d("AgentView", "Audio ready (${audioDurationMs}ms), switching to talking state")
-            },
-            onComplete = {
-                // Audio finished, return to waiting state
-                switchToWaitingState()
-                Log.d("AgentView", "TTS completed, returning to waiting state")
-            },
-            onError = { exception ->
-                // Error occurred, fallback to text-only speech
-                Log.e("AgentView", "TTS error, falling back to text-only", exception)
-                val wordCount = message.split(" ").size
-                val speechDurationMs = ((wordCount / 140.0) * 60 * 1000).toLong()
-                val minDuration = 2000L
-                val finalDuration = maxOf(speechDurationMs, minDuration)
-                
-                switchToTalkingState(finalDuration)
-                onAgentSpeakingTextOnly?.invoke(currentAgent, message, x, y, width, height)
-            }
-        )
-    }
-    
+
     fun getCurrentAgent(): Agent {
         return currentAgent
     }
-    
-    
     
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {

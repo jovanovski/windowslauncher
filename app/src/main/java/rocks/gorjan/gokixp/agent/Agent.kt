@@ -8,7 +8,7 @@ data class Agent(
     val name: String,
     val waitingDrawableRes: Int,
     val talkingDrawableRes: Int,
-    val greeting: String = "Hi {USER}, I'm {AGENT_NAME}, welcome to Windows XP!",
+    val greeting: String = "Hi {USER}, I'm {AGENT_NAME}, welcome to Windows!",
     val voiceName: String = "Adult Male #2, American English (TruVoice)",
     val pitch: Int = 140,
     val speed: Int = 157

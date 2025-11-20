@@ -243,6 +243,60 @@
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
+
+            <CheckBox
+                android:id="@+id/show_christmas_lights_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show Christmas Lights"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="2dp" />
+
+            <LinearLayout
+                android:id="@+id/christmas_lights_margin_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingLeft="24dp"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Top Margin:"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginEnd="8dp" />
+
+                <SeekBar
+                    android:id="@+id/christmas_lights_margin_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="0" />
+
+                <TextView
+                    android:id="@+id/christmas_lights_margin_value"
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end" />
+
+            </LinearLayout>
+
             <CheckBox
                 android:id="@+id/show_cursor_checkbox"
                 style="@style/Win95.CheckBox"
@@ -325,6 +379,7 @@
                 android:visibility="gone"
                 android:textStyle="bold" />
 
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -336,33 +391,29 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Taskbar Height:"
-                    android:textSize="12sp"
+                    android:textSize="10sp"
                     android:textColor="#000000"
                     android:fontFamily="@font/micross_block"
                     android:layout_marginEnd="8dp" />
 
-                <EditText
-                    android:id="@+id/taskbar_height_input"
-                    android:layout_width="60dp"
-                    android:layout_height="20dp"
-                    android:inputType="numberSigned"
-                    android:textSize="11sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:background="@drawable/win98_edit_text_inverted"
-                    android:paddingStart="4dp"
-                    android:paddingEnd="4dp"
-                    android:gravity="center"
-                    android:text="0" />
+                <SeekBar
+                    android:id="@+id/taskbar_height_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="60"
+                    android:progress="30" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/taskbar_height_value"
+                    android:layout_width="30dp"
                     android:layout_height="wrap_content"
-                    android:text="(-30 to +30)"
+                    android:text="0"
                     android:textSize="10sp"
                     android:textColor="#000000"
                     android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp" />
+                    android:layout_marginStart="8dp"
+                    android:gravity="end" />
 
             </LinearLayout>
 

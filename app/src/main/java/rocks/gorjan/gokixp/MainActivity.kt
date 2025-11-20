@@ -76,6 +76,7 @@ import rocks.gorjan.gokixp.agent.AgentView
 import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.apps.dialer.DialerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
+import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
 import rocks.gorjan.gokixp.apps.msn.MsnApp
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
@@ -129,6 +130,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var quickGlanceWidget: QuickGlanceWidget
     private lateinit var cursorEffect: ImageView
     private val cursorHandler = Handler(Looper.getMainLooper())
+    private var christmasLightsManager: ChristmasLightsManager? = null
+    private var jingleBellsMediaPlayer: MediaPlayer? = null
     private var cursorRunnable: Runnable? = null
     private lateinit var notificationBubble: RelativeLayout
     private lateinit var notificationTitle: TextView
@@ -412,6 +415,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
         private const val KEY_START_BANNER_98 = "start_banner_98"
         private const val KEY_GESTURE_BAR_VISIBLE = "gesture_bar_visible"
+        private const val KEY_CHRISTMAS_LIGHTS_VISIBLE = "christmas_lights_visible"
+        private const val KEY_CHRISTMAS_LIGHTS_MARGIN = "christmas_lights_margin"
         private const val KEY_TASKBAR_HEIGHT_OFFSET = "taskbar_height_offset"
         private const val KEY_SHOWN_WELCOME_FOR_VERSION = "shown_welcome_for_version"
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
@@ -658,6 +663,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up cursor effect
         setupCursorEffect()
 
+        // Set up Christmas lights if enabled
+        val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
+        if (christmasLightsEnabled) {
+            initializeChristmasLights()
+        }
+
         // Set up start menu first
         setupStartMenu()
         
@@ -668,7 +679,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         setupTaskbar()
         
         // Set up Clippy (after handler is initialized)
-        setupClippy()
+        setupDesktopAgent()
         
         // Set up Quick Glance widget
         setupQuickGlanceWidget()
@@ -1767,6 +1778,74 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         prefs.edit { putBoolean(KEY_CURSOR_VISIBLE, newVisibility) }
 
+    }
+
+    private fun initializeChristmasLights() {
+        val container = findViewById<LinearLayout>(R.id.christmas_lights)
+
+        // Apply saved margin
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val marginTop = prefs.getInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
+        val layoutParams = container.layoutParams as RelativeLayout.LayoutParams
+        layoutParams.topMargin = (marginTop * resources.displayMetrics.density).toInt()
+        container.layoutParams = layoutParams
+
+        if (christmasLightsManager == null) {
+            christmasLightsManager = ChristmasLightsManager(this, container)
+        }
+        christmasLightsManager?.initialize()
+
+        // Set up click listener to toggle jingle bells music
+        container.setOnClickListener {
+            toggleJingleBellsMusic()
+        }
+
+        Log.d("MainActivity", "Christmas lights initialized with margin: ${marginTop}dp")
+    }
+
+    private fun cleanupChristmasLights() {
+        christmasLightsManager?.cleanup()
+        christmasLightsManager = null
+        stopJingleBellsMusic()
+        Log.d("MainActivity", "Christmas lights cleaned up")
+    }
+
+    private fun toggleJingleBellsMusic() {
+        if (jingleBellsMediaPlayer?.isPlaying == true) {
+            stopJingleBellsMusic()
+        } else {
+            playJingleBellsMusic()
+        }
+    }
+
+    private fun playJingleBellsMusic() {
+        try {
+            // Stop and release any existing player
+            stopJingleBellsMusic()
+
+            // Create and configure new MediaPlayer
+            jingleBellsMediaPlayer = MediaPlayer.create(this, R.raw.jingle_bells)
+            jingleBellsMediaPlayer?.isLooping = true
+            jingleBellsMediaPlayer?.start()
+            Log.d("MainActivity", "Jingle bells music started")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error playing jingle bells music", e)
+        }
+    }
+
+    private fun stopJingleBellsMusic() {
+        try {
+            jingleBellsMediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.stop()
+                }
+                player.release()
+                jingleBellsMediaPlayer = null
+                Log.d("MainActivity", "Jingle bells music stopped")
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error stopping jingle bells music", e)
+        }
     }
 
     private fun getCurrentThemeWallpaperKeys(): Pair<String, String> {
@@ -2889,12 +2968,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
     }
     
-    private fun setupClippy() {
-        Log.d("MainActivity", "Setting up Clippy...")
+    private fun setupDesktopAgent() {
+        Log.d("MainActivity", "Setting up Desktop Agent...")
         
         // Create and configure ClippyView
         agentView = AgentView(this)
-        Log.d("MainActivity", "ClippyView created")
+        Log.d("MainActivity", "AgentView created")
         
         // Create speech bubble view
         speechBubbleView = SpeechBubbleView(this)
@@ -5231,27 +5310,92 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             updateNotificationDots()
         }
 
-        // Set up Taskbar Height Input
-        val taskbarHeightInput = contentView.findViewById<EditText>(R.id.taskbar_height_input)
+        // Set up Show Christmas Lights checkbox
+        val showChristmasLightsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_christmas_lights_checkbox)
+        val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
+        showChristmasLightsCheckbox.isChecked = christmasLightsEnabled
 
-        // Load current offset from SharedPreferences
+        // Set up Christmas Lights margin slider
+        val christmasLightsMarginContainer = contentView.findViewById<LinearLayout>(R.id.christmas_lights_margin_container)
+        val christmasLightsMarginSlider = contentView.findViewById<android.widget.SeekBar>(R.id.christmas_lights_margin_slider)
+        val christmasLightsMarginValue = contentView.findViewById<TextView>(R.id.christmas_lights_margin_value)
+
+        // Load saved margin value
+        val savedMargin = prefs.getInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
+        christmasLightsMarginSlider.progress = savedMargin
+        christmasLightsMarginValue.text = savedMargin.toString()
+
+        // Show/hide slider based on checkbox state
+        christmasLightsMarginContainer.visibility = if (christmasLightsEnabled) View.VISIBLE else View.GONE
+
+        // Handle slider changes
+        christmasLightsMarginSlider.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                // Update the value display
+                christmasLightsMarginValue.text = progress.toString()
+
+                // Save to SharedPreferences
+                prefs.edit { putInt(KEY_CHRISTMAS_LIGHTS_MARGIN, progress) }
+
+                // Apply margin immediately if lights are visible
+                val container = findViewById<LinearLayout>(R.id.christmas_lights)
+                val layoutParams = container.layoutParams as RelativeLayout.LayoutParams
+                layoutParams.topMargin = (progress * resources.displayMetrics.density).toInt()
+                container.layoutParams = layoutParams
+
+                Log.d("MainActivity", "Christmas lights margin changed to: ${progress}dp")
+            }
+
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        showChristmasLightsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, isChecked) }
+            Log.d("MainActivity", "Show Christmas lights changed to: $isChecked")
+
+            // Show/hide margin slider
+            christmasLightsMarginContainer.visibility = if (isChecked) View.VISIBLE else View.GONE
+
+            // Apply the change immediately
+            if (isChecked) {
+                initializeChristmasLights()
+            } else {
+                cleanupChristmasLights()
+            }
+        }
+
+        // Set up Taskbar Height Slider
+        val taskbarHeightSlider = contentView.findViewById<android.widget.SeekBar>(R.id.taskbar_height_slider)
+        val taskbarHeightValue = contentView.findViewById<TextView>(R.id.taskbar_height_value)
+
+        // Load current offset from SharedPreferences (range -30 to +30, slider range 0-60)
         val currentOffset = prefs.safeGetInt(KEY_TASKBAR_HEIGHT_OFFSET, 0)
-        taskbarHeightInput.setText(currentOffset.toString())
+        taskbarHeightSlider.progress = currentOffset + 30 // Convert from -30..30 to 0..60
+        taskbarHeightValue.text = currentOffset.toString()
 
-        // Track pending offset value (don't apply immediately)
+        // Track pending offset value (for OK/Apply buttons)
         var pendingTaskbarOffset: Int? = null
 
-        taskbarHeightInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                val value = s.toString().toIntOrNull()
-                if (value != null && value in -30..30) {
-                    pendingTaskbarOffset = value
-                } else if (s.toString().isEmpty()) {
-                    pendingTaskbarOffset = 0
-                }
+        // Handle slider changes
+        taskbarHeightSlider.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                // Convert slider value (0-60) to offset (-30 to +30)
+                val offset = progress - 30
+                taskbarHeightValue.text = offset.toString()
+                pendingTaskbarOffset = offset
+
+                // Save to SharedPreferences
+                prefs.edit { putInt(KEY_TASKBAR_HEIGHT_OFFSET, offset) }
+
+                // Apply immediately
+                applyTaskbarHeightOffset(offset)
+
+                Log.d("MainActivity", "Taskbar height offset changed to: $offset")
             }
+
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
 
         // Set up Screensaver Selector
@@ -7037,7 +7181,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         if (shownForVersion != currentVersion) {
             // Welcome not shown for this version yet, show it
-            showWelcomeToWindows(showChangeLog = true)
+            if(shownForVersion == null){
+                showWelcomeToWindows()
+            }
+            else{
+                showWelcomeToWindows(showChangeLog = true)
+            }
+
 
             // Save that we've shown it for this version
             prefs.edit { putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion) }
@@ -9587,6 +9737,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             screensaverManager.stopInactivityTimer()
         }
 
+        // Stop jingle bells music when app loses focus
+        stopJingleBellsMusic()
+
         // Hide safe to turn off splash if visible
         val safeToTurnOffSplash = findViewById<ImageView>(R.id.safe_to_turn_off_splash)
         safeToTurnOffSplash?.visibility = View.GONE
@@ -9730,6 +9883,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             quickGlanceWidget.destroy()
             Log.d("MainActivity", "Quick Glance widget cleaned up")
         }
+
+        // Clean up Christmas lights
+        cleanupChristmasLights()
 
         // Clean up SoundPool
         if (::soundPool.isInitialized) {

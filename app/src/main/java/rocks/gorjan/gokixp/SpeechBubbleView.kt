@@ -138,7 +138,7 @@ class SpeechBubbleView @JvmOverloads constructor(
         // Show speech mode with loading text
         inputContainer.visibility = View.GONE
         speechText.visibility = View.VISIBLE
-        speechText.text = "..."
+        speechText.text = "( loading... )"
         
         // Position the bubble relative to the agent
         positionBubble(agentX, agentY, agentWidth, agentHeight)
@@ -148,8 +148,6 @@ class SpeechBubbleView @JvmOverloads constructor(
         // Cancel any existing hide timer
         hideRunnable?.let { handler.removeCallbacks(it) }
         hideRunnable = null
-        
-        Log.d("SpeechBubbleView", "Showing loading bubble with '...'")
     }
     
     fun setOnSpeechRequestListener(listener: (String) -> Unit) {
@@ -168,9 +166,7 @@ class SpeechBubbleView @JvmOverloads constructor(
         
         // Calculate display time based on audio duration plus a buffer
         val displayTime = audioDurationMs + 1000L // Show for audio duration + 1 second buffer
-        
-        Log.d("SpeechBubbleView", "Updated bubble text: '$message' for ${displayTime}ms")
-        
+
         // Schedule hide after audio completes
         hideRunnable?.let { handler.removeCallbacks(it) }
         hideRunnable = Runnable {
@@ -190,9 +186,7 @@ class SpeechBubbleView @JvmOverloads constructor(
         val readingTimeMs = ((wordCount / 140.0) * 60 * 1000).toLong()
         val minDisplayTime = 2000L // Minimum 2 seconds
         val displayTime = maxOf(readingTimeMs, minDisplayTime)
-        
-        Log.d("SpeechBubbleView", "Updated bubble text: '$message' for ${displayTime}ms (${wordCount} words)")
-        
+
         // Schedule hide after calculated reading time
         hideRunnable?.let { handler.removeCallbacks(it) }
         hideRunnable = Runnable {
