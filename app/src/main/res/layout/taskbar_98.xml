@@ -67,6 +67,7 @@
             android:layout_alignParentRight="true"
             android:background="@drawable/system_tray_98_background"
             android:gravity="center_vertical"
+            android:paddingStart="4dp"
             android:orientation="horizontal">
 
             <!-- Weather Temperature -->
@@ -77,7 +78,7 @@
                 android:fontFamily="@font/micross_block"
                 android:gravity="center"
                 android:minWidth="24dp"
-                android:paddingLeft="8dp"
+                android:paddingLeft="4dp"
                 android:paddingRight="4dp"
                 android:text="?"
                 android:textColor="@color/black"

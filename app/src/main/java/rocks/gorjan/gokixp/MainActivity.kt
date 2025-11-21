@@ -665,21 +665,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up cursor effect
         setupCursorEffect()
 
-        // Set up Christmas lights if enabled
-        val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
-        if (christmasLightsEnabled) {
-            initializeChristmasLights()
-        }
-
         // Set up start menu first
         setupStartMenu()
-        
+
         // Set up keyboard detection for start menu adjustment
         setupKeyboardDetection()
-        
+
         // Set up taskbar interactions
         setupTaskbar()
-        
+
         // Set up Clippy (after handler is initialized)
         setupDesktopAgent()
         
@@ -749,6 +743,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Handler(Looper.getMainLooper()).postDelayed({
             showWelcomeScreenIfNeeded()
             refreshDesktopIcons()
+
+            // Set up Christmas lights if enabled (after taskbar is set up so tray icon can be added)
+            val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
+            if (christmasLightsEnabled) {
+                initializeChristmasLights()
+            }
+
         }, 1000) // Delay to ensure UI is fully loaded
     }
     
@@ -1799,7 +1800,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Initialize lights
         if (christmasLightsManager == null) {
-            christmasLightsManager = ChristmasLightsManager(this, container)
+            christmasLightsManager = ChristmasLightsManager(
+                context = this,
+                container = container,
+                onShowSettings = { createAndShowWallpaperDialog("settings") },
+                onExitLights = {
+                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    prefs.edit { putBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false) }
+                    cleanupChristmasLights()
+                }
+            )
         }
         christmasLightsManager?.initialize()
 
@@ -1879,7 +1889,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Hide the wrapper
         wrapper.visibility = View.GONE
 
-        // Cleanup lights
+        // Cleanup lights (also removes tray icon)
         christmasLightsManager?.cleanup()
         christmasLightsManager = null
 

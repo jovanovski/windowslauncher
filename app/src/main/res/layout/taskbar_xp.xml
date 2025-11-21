@@ -69,6 +69,7 @@
                     android:id="@+id/system_tray_toggle_area"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
+                    android:paddingStart="4dp"
                     android:orientation="horizontal">
                     <!-- Weather Temperature -->
                     <TextView
@@ -79,7 +80,7 @@
                         android:text="?"
                         android:textColor="@color/white"
                         android:textSize="13sp"
-                        android:paddingStart="8dp"
+                        android:paddingStart="4dp"
                         android:paddingEnd="4dp"
                         android:minWidth="24dp"
                         android:fontFamily="@font/tahoma"

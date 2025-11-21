@@ -1,19 +1,32 @@
 package rocks.gorjan.gokixp.apps.lights
 
+import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.core.content.edit
+import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.ContextMenuView
 import rocks.gorjan.gokixp.R
 import kotlin.random.Random
 
 class ChristmasLightsManager(
     private val context: Context,
-    private val container: LinearLayout
+    private val container: LinearLayout,
+    private val onShowSettings: () -> Unit,
+    private val onExitLights: () -> Unit
 ) {
     private val lights = mutableListOf<LightView>()
     private val handlers = mutableListOf<Handler>()
+
+    companion object {
+        private const val TRAY_ICON_TAG = "christmas_lights_tray"
+    }
 
     // Available light colors with their drawable resources
     private val lightColors = listOf(
@@ -63,6 +76,9 @@ class ChristmasLightsManager(
             // Start animation for this light with random delay
             startLightAnimation(lightView)
         }
+
+        // Add tray icon
+        addTrayIcon()
     }
 
     private fun startLightAnimation(lightView: LightView) {
@@ -102,6 +118,90 @@ class ChristmasLightsManager(
         handlers.clear()
         lights.clear()
         container.removeAllViews()
+
+        // Remove tray icon
+        removeTrayIcon()
+    }
+
+    private fun addTrayIcon() {
+        val activity = context as? Activity ?: return
+        val systemTray = activity.findViewById<LinearLayout>(R.id.system_tray) ?: return
+
+        // Check if icon already exists
+        if (systemTray.findViewWithTag<View>(TRAY_ICON_TAG) != null) {
+            return
+        }
+
+        val density = context.resources.displayMetrics.density
+
+        // Create container LinearLayout
+        val iconContainer = LinearLayout(context).apply {
+            tag = TRAY_ICON_TAG
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            gravity = Gravity.CENTER
+            setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+        }
+
+        // Create ImageView
+        val iconView = ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (19 * density).toInt(),
+                (19 * density).toInt()
+            )
+            setImageResource(R.drawable.light_red_on)
+        }
+
+        iconContainer.addView(iconView)
+
+        // Set up touch listener for long press coordinates
+        iconContainer.setOnTouchListener { view, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                view.setTag(R.id.system_tray, Pair(event.rawX, event.rawY))
+            }
+            false
+        }
+
+        // Set up long press for context menu
+        iconContainer.setOnLongClickListener { view ->
+            val coords = view.getTag(R.id.system_tray) as? Pair<*, *>
+            val x = (coords?.first as? Float) ?: 0f
+            val y = (coords?.second as? Float) ?: 0f
+            showTrayContextMenu(x, y)
+            true
+        }
+
+        // Add at the beginning of the system tray
+        systemTray.addView(iconContainer, 0)
+    }
+
+    private fun removeTrayIcon() {
+        val activity = context as? Activity ?: return
+        val systemTray = activity.findViewById<LinearLayout>(R.id.system_tray) ?: return
+        val trayIcon = systemTray.findViewWithTag<View>(TRAY_ICON_TAG)
+        if (trayIcon != null) {
+            systemTray.removeView(trayIcon)
+        }
+    }
+
+    private fun showTrayContextMenu(x: Float, y: Float) {
+        val activity = context as? Activity ?: return
+        val contextMenu = activity.findViewById<ContextMenuView>(R.id.context_menu) ?: return
+
+        val menuItems = listOf(
+            ContextMenuItem(
+                title = "Settings",
+                action = { onShowSettings() }
+            ),
+            ContextMenuItem(
+                title = "Exit Lights95",
+                action = { onExitLights() }
+            )
+        )
+
+        contextMenu.showMenu(menuItems, x, y)
     }
 
     private data class LightColor(
