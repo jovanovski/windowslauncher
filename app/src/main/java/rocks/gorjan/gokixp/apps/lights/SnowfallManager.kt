@@ -13,6 +13,8 @@ import android.widget.ImageView
 import android.widget.RelativeLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import rocks.gorjan.gokixp.theme.AppTheme
+import rocks.gorjan.gokixp.theme.ThemeManager
 import kotlin.random.Random
 
 class SnowfallManager(
@@ -26,7 +28,9 @@ class SnowfallManager(
 
     // Snowflake generation settings
     private val snowflakeGenerationInterval = 50L // Generate new snowflake every 300ms
-    private val maxSnowflakes = 100 // Maximum number of snowflakes on screen (50% increase)
+    private val maxSnowflakes = 100 // Maximum number of active (falling) snowflakes
+    private val maxStoppedSnowflakes = 50 // Maximum number of stopped snowflakes on ground
+    private val stoppedSnowflakes = mutableListOf<Snowflake>() // Track stopped snowflakes in order (FIFO)
 
     private val prefs: SharedPreferences = context.getSharedPreferences("SnowfallState", Context.MODE_PRIVATE)
     private val gson = Gson()
@@ -113,12 +117,11 @@ class SnowfallManager(
                 val screenWidth = context.resources.displayMetrics.widthPixels
                 val screenHeight = context.resources.displayMetrics.heightPixels
 
-                // Get actual layout dimensions (50dp x 30dp from XML converted to pixels)
+                // Get actual layout dimensions (50dp x 26dp from XML converted to pixels)
                 val density = context.resources.displayMetrics.density
                 val plowWidth = (50 * density).toInt() // 50dp from XML
-                val plowHeight = (30 * density).toInt() // 30dp from XML
+                val plowHeight = (26 * density).toInt() // 26dp from XML
 
-                Log.v("GOKII", "Plow dimensions: width=$plowWidth, height=$plowHeight")
 
                 // Determine direction and flip accordingly
                 val startX: Float
@@ -142,17 +145,19 @@ class SnowfallManager(
                 // Get taskbar position directly - must be done after layout
                 val activity = context as? android.app.Activity
                 val taskbar = activity?.findViewById<View>(rocks.gorjan.gokixp.R.id.taskbar_container)
-                val calculatedTaskbarTop = if (taskbar != null) {
+                var calculatedTaskbarTop = if (taskbar != null) {
                     val location = IntArray(2)
                     taskbar.getLocationOnScreen(location)
-                    Log.v("GOKII", "NO PROBLEM! " + location[1].toFloat() )
-
                     location[1].toFloat()
-
                 } else {
-                    Log.v("GOKII", "PROBLEM!")
                     // Fallback: estimate based on typical layout
-                    screenHeight - (70 * context.resources.displayMetrics.density)
+                    screenHeight - (70 * density)
+                }
+
+                // Adjust for Vista theme - taskbar is visually smaller than actual size
+                val themeManager = ThemeManager(context)
+                if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+                    calculatedTaskbarTop += (5 * density)
                 }
 
                 // Update cached value
@@ -211,6 +216,10 @@ class SnowfallManager(
                 // AABB collision detection
                 if (flakeRight > plowLeft && flakeLeft < plowRight &&
                     flakeBottom > plowTop && flakeTop < plowBottom) {
+                    // Remove from stopped list if it was stopped
+                    if (snowflake.isStopped) {
+                        stoppedSnowflakes.remove(snowflake)
+                    }
                     // Remove snowflake
                     container.removeView(snowflake.view)
                     iterator.remove()
@@ -223,6 +232,7 @@ class SnowfallManager(
         // Post to ensure layout is complete
         container.post {
             val screenHeight = context.resources.displayMetrics.heightPixels
+            val density = context.resources.displayMetrics.density
             // Taskbar is typically at the bottom with 70dp margin from activity_main.xml
             // We need to find actual taskbar position
             val activity = context as? android.app.Activity
@@ -234,7 +244,13 @@ class SnowfallManager(
                 taskbarTop = location[1].toFloat()
             } else {
                 // Fallback: estimate based on typical layout
-                taskbarTop = screenHeight - (70 * context.resources.displayMetrics.density)
+                taskbarTop = screenHeight - (70 * density)
+            }
+
+            // Adjust for Vista theme - taskbar is visually smaller than actual size
+            val themeManager = ThemeManager(context)
+            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+                taskbarTop += (5 * density)
             }
         }
     }
@@ -324,6 +340,9 @@ class SnowfallManager(
         val density = context.resources.displayMetrics.density
         val screenWidth = context.resources.displayMetrics.widthPixels
 
+        // Collect snowflakes to remove after iteration to avoid ConcurrentModificationException
+        val toRemove = mutableListOf<Snowflake>()
+
         val iterator = snowflakes.iterator()
         while (iterator.hasNext()) {
             val snowflake = iterator.next()
@@ -346,6 +365,16 @@ class SnowfallManager(
                 // Stop at taskbar
                 snowflake.y = taskbarTop - snowflake.size
                 snowflake.isStopped = true
+
+                // Add to stopped list for FIFO tracking
+                stoppedSnowflakes.add(snowflake)
+
+                // Remove oldest stopped snowflake if we exceed the limit
+                if (stoppedSnowflakes.size > maxStoppedSnowflakes) {
+                    val oldestStopped = stoppedSnowflakes.removeAt(0)
+                    container.removeView(oldestStopped.view)
+                    toRemove.add(oldestStopped)
+                }
             }
 
             // Update view position
@@ -358,6 +387,9 @@ class SnowfallManager(
                 iterator.remove()
             }
         }
+
+        // Remove collected snowflakes after iteration
+        snowflakes.removeAll(toRemove)
     }
 
     private fun cleanup() {
@@ -366,6 +398,7 @@ class SnowfallManager(
             container.removeView(snowflake.view)
         }
         snowflakes.clear()
+        stoppedSnowflakes.clear()
 
         // Clear saved state
         prefs.edit().remove(KEY_SNOWFLAKE_STATE).apply()
