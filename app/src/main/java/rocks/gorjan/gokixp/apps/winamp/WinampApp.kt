@@ -486,6 +486,7 @@ class WinampApp(
             Log.e("WinampApp", "Error loading music tracks", e)
         }
 
+
         // Update "ALL LOCAL FILES" playlist with all tracks
         updateAllLocalFilesPlaylist()
 

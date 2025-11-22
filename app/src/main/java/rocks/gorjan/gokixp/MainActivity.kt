@@ -1044,15 +1044,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         try {
             val soundId = soundIds[soundResourceId]
             if (soundId != null) {
-                Log.d("MainActivity", "Playing sound resource $soundResourceId with soundId $soundId")
                 // Play sound asynchronously to avoid blocking UI
                 Thread {
                     try {
                         val streamId = soundPool.play(soundId, 1f, 1f, 1, 0, 1.0f)
                         if (streamId == 0) {
-                            Log.w("MainActivity", "Failed to play sound resource $soundResourceId (may not be loaded yet)")
-                        } else {
-                            Log.d("MainActivity", "Sound playing with streamId $streamId")
+                            Log.e("MainActivity", "Failed to play sound resource $soundResourceId (may not be loaded yet)")
                         }
                     } catch (e: Exception) {
                         Log.e("MainActivity", "Error in sound playback thread for resource $soundResourceId", e)
@@ -5728,8 +5725,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
 
             // Apply wallpaper if changed
-            if (selectedWallpaper != null && selectedWallpaper!!.filePath != currentWallpaperPath) {
-                showWallpaperTargetDialog(selectedWallpaper!!)
+            if (selectedWallpaper != null) {
+                showWallpaperTargetDialog(selectedWallpaper)
             }
 
             floatingWindowManager.removeWindow(windowsDialog)
@@ -5790,10 +5787,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             // Apply wallpaper if changed
-            if (selectedWallpaper != null && selectedWallpaper!!.filePath != currentWallpaperPath) {
-                showWallpaperTargetDialog(selectedWallpaper!!)
+            if (selectedWallpaper != null) {
+                showWallpaperTargetDialog(selectedWallpaper)
                 // Update current wallpaper path after applying
-                currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
+                selectedWallpaper = null
             }
         }
 
@@ -7058,6 +7055,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set context menu reference and show as floating window
         windowsDialog.setContextMenuView(contextMenu)
         floatingWindowManager.showWindow(windowsDialog)
+
 
         // Set cursor back to normal after window is shown and loaded
         Handler(Looper.getMainLooper()).postDelayed({

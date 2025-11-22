@@ -18,7 +18,8 @@
     <RelativeLayout
         android:id="@+id/christmas_wrapper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:visibility="gone">
         <LinearLayout
             android:id="@+id/christmas_lights"
             android:layout_width="match_parent"
@@ -37,6 +38,7 @@
             android:layout_width="50dp"
             android:layout_height="26dp"
             android:src="@drawable/snowplow"
+            android:visibility="gone"
             android:elevation="20dp"/>
     </RelativeLayout>
 

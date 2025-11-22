@@ -168,15 +168,12 @@ class SnowfallManager(
                 // Position at taskbar height
                 val yPosition = calculatedTaskbarTop - plowHeight
 
-                Log.v("GOKII", "Y Position: taskbarTop=$calculatedTaskbarTop, plowHeight=$plowHeight, final yPosition=$yPosition")
 
                 // Set initial position
                 plow.x = startX
                 plow.y = yPosition
                 plow.visibility = View.VISIBLE
                 snowplowRunning = true
-
-                Log.v("GOKII", "Snowplow positioned at x=${plow.x}, y=${plow.y}")
 
                 // Start collision detection
                 handler.post(snowplowCollisionRunnable)
