@@ -12,7 +12,8 @@ enum class FileType {
     AUDIO,
     VIDEO,
     GENERIC,
-    DRIVE  // Virtual drive entry
+    DRIVE,    // Virtual drive entry
+    SHORTCUT  // System app shortcut
 }
 
 /**
@@ -34,7 +35,10 @@ data class FileSystemItem(
     val size: Long = if (file.isDirectory) 0 else file.length(),
     val lastModified: Long = file.lastModified(),
     val isDrive: Boolean = false,  // True for virtual drive entries
-    val driveType: DriveType? = null  // Type of drive if isDrive is true
+    val driveType: DriveType? = null,  // Type of drive if isDrive is true
+    val isShortcut: Boolean = false,  // True for system app shortcuts
+    val shortcutPackageName: String? = null,  // Package name for system app shortcuts
+    val isVirtualFolder: Boolean = false  // True for virtual folders like WINDOWS
 ) {
     companion object {
         // Known file extensions by type
@@ -84,11 +88,44 @@ data class FileSystemItem(
         }
 
         /**
+         * Creates a virtual folder item (like WINDOWS)
+         */
+        fun createVirtualFolder(name: String, dummyFile: File): FileSystemItem {
+            return FileSystemItem(
+                file = dummyFile,
+                name = name,
+                isDirectory = true,
+                size = 0,
+                lastModified = 0,
+                isVirtualFolder = true
+            )
+        }
+
+        /**
+         * Creates a system app shortcut item
+         */
+        fun createShortcut(name: String, packageName: String, dummyFile: File): FileSystemItem {
+            return FileSystemItem(
+                file = dummyFile,
+                name = name,
+                isDirectory = false,
+                size = 0,
+                lastModified = 0,
+                isShortcut = true,
+                shortcutPackageName = packageName
+            )
+        }
+
+        /**
          * Determine the file type based on extension
          */
         fun getFileType(item: FileSystemItem): FileType {
             if (item.isDrive) {
                 return FileType.DRIVE
+            }
+
+            if (item.isShortcut) {
+                return FileType.SHORTCUT
             }
 
             val file = item.file

@@ -1313,6 +1313,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * Get the icon drawable for a system app by package name
+     */
+    fun getSystemAppIconDrawable(packageName: String): android.graphics.drawable.Drawable? {
+        val systemApps = getSystemAppsList()
+        return systemApps.find { it.packageName == packageName }?.icon
+    }
+
     private fun openClockApp() {
         // Set cursor to busy while loading
         setCursorBusy()
@@ -8675,6 +8683,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onShowConfirmDialog = { title, message, onConfirm ->
                 showConfirmDialog(title, message, onConfirm)
+            },
+            onLaunchSystemApp = { packageName ->
+                launchSystemApp(packageName)
+            },
+            getSystemAppIcon = { packageName ->
+                getSystemAppIconDrawable(packageName)
+            },
+            getSystemAppsList = {
+                getSystemAppsList().map { Pair(it.name, it.packageName) }
             }
         )
 

@@ -23,7 +23,8 @@ class FileSystemAdapter(
     private val themeManager: ThemeManager,
     private val onItemClick: (FileSystemItem, View) -> Unit,
     private val onItemLongClick: ((FileSystemItem, Float, Float) -> Unit)? = null,
-    private val isFileCut: ((File) -> Boolean)? = null
+    private val isFileCut: ((File) -> Boolean)? = null,
+    private val getShortcutIcon: ((String) -> android.graphics.drawable.Drawable?)? = null
 ) : BaseAdapter() {
 
     private var selectedPosition: Int = -1
@@ -67,6 +68,13 @@ class FileSystemAdapter(
                 null -> themeManager.getFolderIconRes(theme) // Fallback
             }
             context.getDrawable(iconResId)
+        } else if (item.isShortcut && item.shortcutPackageName != null) {
+            // Use shortcut icon from callback or fallback to generic
+            getShortcutIcon?.invoke(item.shortcutPackageName)
+                ?: context.getDrawable(themeManager.getFileGenericIcon())
+        } else if (item.isVirtualFolder) {
+            // Use folder icon for virtual folders
+            context.getDrawable(themeManager.getFolderIconRes(theme))
         } else if (item.isDirectory) {
             // Use theme-specific folder icon
             context.getDrawable(themeManager.getFolderIconRes(theme))
@@ -81,6 +89,7 @@ class FileSystemAdapter(
                 FileType.GENERIC -> themeManager.getFileGenericIcon()
                 FileType.DIRECTORY -> themeManager.getFolderIconRes(theme) // Should not happen
                 FileType.DRIVE -> themeManager.getFolderIconRes(theme) // Should not happen
+                FileType.SHORTCUT -> themeManager.getFileGenericIcon() // Should not happen - handled above
             }
             context.getDrawable(iconResId)
         }
@@ -123,8 +132,8 @@ class FileSystemAdapter(
             onItemClick(item, iconView)
         }
 
-        // Set long click handler for files and folders (not drives)
-        if (!item.isDrive && onItemLongClick != null) {
+        // Set long click handler for files and folders (not drives, shortcuts, or virtual folders)
+        if (!item.isDrive && !item.isShortcut && !item.isVirtualFolder && onItemLongClick != null) {
             iconView.setCustomLongClickHandler { x, y ->
                 // Set this item as selected
                 selectedPosition = position
@@ -132,7 +141,7 @@ class FileSystemAdapter(
                 onItemLongClick.invoke(item, x, y)
             }
         } else {
-            // Disable long click for drives only
+            // Disable long click for drives, shortcuts, and virtual folders
             iconView.setCustomLongClickHandler { _, _ -> /* Do nothing */ }
         }
 

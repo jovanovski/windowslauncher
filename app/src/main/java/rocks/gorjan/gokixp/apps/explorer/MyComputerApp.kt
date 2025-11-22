@@ -33,16 +33,28 @@ class MyComputerApp(
     private val onShowDialog: (rocks.gorjan.gokixp.apps.dialogbox.DialogType, String) -> Unit,
     private val onShowContextMenu: (List<rocks.gorjan.gokixp.ContextMenuItem>, Float, Float) -> Unit,
     private val onShowRenameDialog: (File, (String) -> Unit) -> Unit,
-    private val onShowConfirmDialog: (String, String, () -> Unit) -> Unit
+    private val onShowConfirmDialog: (String, String, () -> Unit) -> Unit,
+    private val onLaunchSystemApp: (String) -> Unit,
+    private val getSystemAppIcon: (String) -> android.graphics.drawable.Drawable?,
+    private val getSystemAppsList: () -> List<Pair<String, String>>  // Returns list of (name, packageName)
 ) {
     companion object {
         private const val TAG = "MyComputerApp"
         private const val MY_COMPUTER_ROOT = "MY_COMPUTER_ROOT"  // Virtual root path
+        private const val WINDOWS_FOLDER_NAME = "WINDOWS"  // Virtual Windows folder
     }
 
-    // Navigation state
+    // Track if we're in the virtual WINDOWS folder
+    private var isInWindowsFolder = false
+
+    // Cache system apps list and icons to avoid repeated expensive calls
+    private var cachedSystemApps: List<Pair<String, String>>? = null
+    private val cachedSystemAppIcons = mutableMapOf<String, android.graphics.drawable.Drawable?>()
+
+    // Navigation state - stores path and whether it's the WINDOWS folder
+    private data class HistoryEntry(val path: File?, val isWindowsFolder: Boolean = false)
     private var currentPath: File? = null  // null means we're at My Computer root
-    private val navigationHistory = mutableListOf<File?>()  // null entries represent root
+    private val navigationHistory = mutableListOf<HistoryEntry>()
     private var historyIndex = -1
 
     // Clipboard state for copy/cut/paste
@@ -122,10 +134,11 @@ class MyComputerApp(
                     touchDownY = event.rawY
 
                     // Check if touch is on an empty space (not on a child view)
+                    // Don't show context menu in WINDOWS folder (virtual folder with no file operations)
                     val gridView = view as? GridView
                     if (gridView != null) {
                         val position = gridView.pointToPosition(event.x.toInt(), event.y.toInt())
-                        if (position == GridView.INVALID_POSITION && currentPath != null) {
+                        if (position == GridView.INVALID_POSITION && currentPath != null && !isInWindowsFolder) {
                             // Touch is on empty space, start long-press timer
                             longPressRunnable = Runnable {
                                 rocks.gorjan.gokixp.Helpers.performHapticFeedback(context)
@@ -185,6 +198,8 @@ class MyComputerApp(
             return
         }
 
+        // Reset WINDOWS folder state when navigating to a real directory
+        isInWindowsFolder = false
         currentPath = directory
 
         // Add to navigation history
@@ -193,7 +208,7 @@ class MyComputerApp(
             if (historyIndex < navigationHistory.size - 1) {
                 navigationHistory.subList(historyIndex + 1, navigationHistory.size).clear()
             }
-            navigationHistory.add(directory)
+            navigationHistory.add(HistoryEntry(directory, isWindowsFolder = false))
             historyIndex = navigationHistory.size - 1
         }
 
@@ -208,7 +223,9 @@ class MyComputerApp(
     private fun navigateBack() {
         if (historyIndex > 0) {
             historyIndex--
-            currentPath = navigationHistory[historyIndex]
+            val entry = navigationHistory[historyIndex]
+            currentPath = entry.path
+            isInWindowsFolder = entry.isWindowsFolder
             onSoundPlay("click")
             updateFolderDisplay()
             loadDirectoryContents()
@@ -235,7 +252,9 @@ class MyComputerApp(
     private fun navigateForward() {
         if (historyIndex < navigationHistory.size - 1) {
             historyIndex++
-            currentPath = navigationHistory[historyIndex]
+            val entry = navigationHistory[historyIndex]
+            currentPath = entry.path
+            isInWindowsFolder = entry.isWindowsFolder
             updateFolderDisplay()
             loadDirectoryContents()
         }
@@ -252,6 +271,14 @@ class MyComputerApp(
         }
 
         val rootDirectory = Environment.getExternalStorageDirectory()
+
+        // If in WINDOWS folder, go back to C: drive root
+        if (isInWindowsFolder) {
+            Log.d(TAG, "Navigating up from WINDOWS folder to C: drive")
+            isInWindowsFolder = false
+            navigateToDirectory(rootDirectory, addToHistory = true)
+            return
+        }
 
         // If at internal storage root, go to My Computer root
         if (currentPath == rootDirectory) {
@@ -278,6 +305,7 @@ class MyComputerApp(
     private fun updateFolderDisplay() {
         val displayName = when {
             currentPath == null -> "My Computer"
+            isInWindowsFolder -> WINDOWS_FOLDER_NAME
             currentPath == Environment.getExternalStorageDirectory() -> "Local Disk (C:)"
             else -> currentPath!!.name
         }
@@ -285,6 +313,7 @@ class MyComputerApp(
         // For the small folder name (address bar), show full Windows-style path
         val pathDisplayName = when {
             currentPath == null -> "My Computer"
+            isInWindowsFolder -> "C:\\$WINDOWS_FOLDER_NAME"
             else -> getWindowsStylePath(currentPath!!)
         }
 
@@ -345,6 +374,9 @@ class MyComputerApp(
                         FileSystemItem.createDrive("Local Disk (C:)", DriveType.LOCAL_DISK, dummyFile),
                         FileSystemItem.createDrive("Compact Disc (D:)", DriveType.OPTICAL, dummyFile)
                     )
+                } else if (isInWindowsFolder) {
+                    // In virtual WINDOWS folder - show system app shortcuts
+                    getSystemAppShortcuts()
                 } else {
                     // In a real directory - show files and folders
                     val files = currentPath?.listFiles()?.toList() ?: emptyList()
@@ -356,7 +388,16 @@ class MyComputerApp(
                     val sortedFiles = visibleFiles.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
 
                     // Convert to FileSystemItem
-                    sortedFiles.map { FileSystemItem.from(it) }
+                    val fileItems = sortedFiles.map { FileSystemItem.from(it) }
+
+                    // If at internal storage root, inject WINDOWS virtual folder at the top
+                    val rootDirectory = Environment.getExternalStorageDirectory()
+                    if (currentPath == rootDirectory) {
+                        val windowsFolder = FileSystemItem.createVirtualFolder(WINDOWS_FOLDER_NAME, rootDirectory)
+                        listOf(windowsFolder) + fileItems
+                    } else {
+                        fileItems
+                    }
                 }
 
                 // Update UI on main thread
@@ -376,6 +417,9 @@ class MyComputerApp(
                             },
                             isFileCut = { file ->
                                 isFileCut(file)
+                            },
+                            getShortcutIcon = { packageName ->
+                                getCachedSystemAppIcon(packageName)
                             }
                         )
 
@@ -426,6 +470,7 @@ class MyComputerApp(
             when (item.driveType) {
                 DriveType.LOCAL_DISK -> {
                     // Navigate to internal storage
+                    isInWindowsFolder = false
                     navigateToDirectory(Environment.getExternalStorageDirectory(), addToHistory = true)
                 }
                 DriveType.FLOPPY -> {
@@ -438,8 +483,17 @@ class MyComputerApp(
                 }
                 null -> Log.e(TAG, "Drive item with null drive type")
             }
+        } else if (item.isVirtualFolder && item.name == WINDOWS_FOLDER_NAME) {
+            // Navigate to virtual WINDOWS folder
+            navigateToWindowsFolder()
+        } else if (item.isShortcut) {
+            // Launch system app
+            item.shortcutPackageName?.let { packageName ->
+                onLaunchSystemApp(packageName)
+            }
         } else if (item.isDirectory) {
             // Navigate into directory
+            isInWindowsFolder = false
             navigateToDirectory(item.file, addToHistory = true)
         } else {
             // Open file with default app
@@ -1059,5 +1113,48 @@ class MyComputerApp(
     fun isFileCut(file: File): Boolean {
         return clipboardFile?.absolutePath == file.absolutePath &&
                clipboardOperation == ClipboardOperation.CUT
+    }
+
+    /**
+     * Get cached system app icon (avoids repeated expensive calls to MainActivity)
+     */
+    private fun getCachedSystemAppIcon(packageName: String): android.graphics.drawable.Drawable? {
+        return cachedSystemAppIcons.getOrPut(packageName) {
+            getSystemAppIcon(packageName)
+        }
+    }
+
+    /**
+     * Get system app shortcuts for the WINDOWS folder
+     * Uses the system apps list from MainActivity (cached to avoid expensive repeated calls)
+     */
+    private fun getSystemAppShortcuts(): List<FileSystemItem> {
+        val dummyFile = Environment.getExternalStorageDirectory()
+
+        // Get system apps from cache or fetch once from MainActivity
+        val systemApps = cachedSystemApps ?: getSystemAppsList().also { cachedSystemApps = it }
+
+        return systemApps.map { (name, packageName) ->
+            FileSystemItem.createShortcut("$name.exe", packageName, dummyFile)
+        }
+    }
+
+    /**
+     * Navigate to the virtual WINDOWS folder
+     */
+    private fun navigateToWindowsFolder() {
+        isInWindowsFolder = true
+        currentPath = Environment.getExternalStorageDirectory()  // Use root as base
+
+        // Add to navigation history with WINDOWS folder flag
+        if (historyIndex < navigationHistory.size - 1) {
+            navigationHistory.subList(historyIndex + 1, navigationHistory.size).clear()
+        }
+        navigationHistory.add(HistoryEntry(currentPath, isWindowsFolder = true))
+        historyIndex = navigationHistory.size - 1
+
+        // Update UI
+        updateFolderDisplay()
+        loadDirectoryContents()
     }
 }
