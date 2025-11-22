@@ -37,7 +37,7 @@
 
                     <ImageView
                         android:id="@+id/dialog_xp_title_bar_left"
-                        android:layout_width="5dp"
+                        android:layout_width="15dp"
                         android:layout_height="match_parent"
                         android:background="@drawable/xp_title_bar_corner"/>
                     <ImageView
@@ -48,7 +48,7 @@
                         android:background="@drawable/xp_title_bar_repeat"/>
                     <ImageView
                         android:id="@+id/dialog_xp_title_bar_right"
-                        android:layout_width="5dp"
+                        android:layout_width="15dp"
                         android:layout_height="match_parent"
                         android:background="@drawable/xp_title_bar_corner_end"/>
 
