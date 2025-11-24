@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/midtown_background_2"
+        android:scaleType="centerCrop"
+        />
+    <LinearLayout
+        android:id="@+id/midtown_splash_screen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="100dp"
+            android:src="@drawable/midtown_logo"/>
+
+        <ImageView
+            android:layout_width="230dp"
+            android:layout_height="90dp"
+            android:src="@drawable/midtown_start"/>
+    </LinearLayout>
+
+    <!-- Map container -->
+    <org.osmdroid.views.MapView
+        android:visibility="gone"
+        android:id="@+id/midtown_map"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@id/midtown_controls"
+        android:layout_below="@id/midtown_top_bar" />
+
+    <!-- Top bar with race info -->
+    <LinearLayout
+        android:id="@+id/midtown_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal"
+        android:background="#881c1c7e"
+        android:padding="8dp"
+        android:visibility="gone"
+        android:gravity="center_vertical">
+
+        <!-- Timer -->
+        <TextView
+            android:id="@+id/midtown_timer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="00:00:00.00"
+            android:textColor="#FFD700"
+            android:textSize="20sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold" />
+
+        <!-- Checkpoint counter -->
+        <TextView
+            android:id="@+id/midtown_checkpoints"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Checkpoints: 0/0"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Bottom controls -->
+    <LinearLayout
+        android:visibility="gone"
+        android:id="@+id/midtown_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:orientation="vertical"
+        android:background="#881c1c7e"
+        android:padding="8dp">
+
+        <!-- Transport mode selector -->
+        <LinearLayout
+            android:id="@+id/midtown_mode_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/midtown_mode_car"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Driving"
+                android:textSize="14sp"
+                android:background="#4a4a6a"
+                android:textColor="#FFD700" />
+
+            <Button
+                android:id="@+id/midtown_mode_bike"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:text="Biking"
+                android:textSize="14sp"
+                android:background="#4a4a6a"
+                android:textColor="#FFFFFF" />
+
+            <Button
+                android:id="@+id/midtown_mode_walk"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Walking"
+                android:textSize="14sp"
+                android:background="#4a4a6a"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+        <!-- Start/Reset button -->
+        <ImageView
+            android:id="@+id/midtown_start_button"
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:src="@drawable/midtown_drive"
+            android:scaleType="fitCenter"
+            android:alpha="0.5" />
+
+    </LinearLayout>
+
+    <!-- Status message overlay -->
+    <TextView
+        android:id="@+id/midtown_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_below="@id/midtown_top_bar"
+        android:layout_marginTop="16dp"
+        android:text="Tap on the map to select destination"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:background="#AA000000"
+        android:padding="8dp"
+        android:visibility="gone" />
+
+</RelativeLayout>

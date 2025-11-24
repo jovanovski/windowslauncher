@@ -54,6 +54,9 @@ dependencies {
     // WindowManager for foldable device detection
     implementation("androidx.window:window:1.3.0")
 
+    // OSMDroid for OpenStreetMap
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
     // PDF rendering with PdfBox
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 

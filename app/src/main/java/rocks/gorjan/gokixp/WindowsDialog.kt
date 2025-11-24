@@ -1205,7 +1205,7 @@ class WindowsDialog @JvmOverloads constructor(
     /**
      * Maximizes the window to fill the entire floating windows container
      */
-    private fun maximizeWindow() {
+    fun maximizeWindow() {
         if (!canMaximize || isMaximized) return
 
         // Save current dimensions and position

@@ -221,6 +221,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private var pendingCameraUri: Uri? = null
+    private var pendingMidtown2App: rocks.gorjan.gokixp.apps.midtown2.Midtown2App? = null
 
     // Preferences export/import launchers
     private var pendingExportJson: String? = null
@@ -434,6 +435,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val DEFAULT_SCREENSAVER_TIMEOUT = 30 // Default 30 seconds
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
+        private const val MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE = 1004
 
         // System app package name prefix
         private const val SYSTEM_APP_PREFIX = "system."
@@ -1182,6 +1184,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             createAndShowClockDialog()
         }
 
+        // Register Midtown Madness 2
+        systemAppActions["system.midtown2"] = { appInfo ->
+            showMidtown2Dialog()
+        }
+
         Log.d("MainActivity", "System apps initialized: ${systemAppActions.size} apps")
     }
 
@@ -1290,6 +1297,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ))
         }
 
+        // Midtown Madness 2 - scale icon to match app icon size
+        val midtown2Drawable = AppCompatResources.getDrawable(this, R.drawable.midtown2)
+        if (midtown2Drawable != null) {
+            systemApps.add(AppInfo(
+                name = "Midtown Madness 2",
+                packageName = "system.midtown2",
+                icon = createSquareDrawable(midtown2Drawable),
+                minWindowWidthDp = 360
+            ))
+        }
+
         return systemApps
     }
 
@@ -1371,7 +1389,78 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             setCursorNormal()
         }, 100) // Small delay to ensure window is fully rendered
     }
-    
+
+    private fun showMidtown2Dialog() {
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowMidtown2Dialog()
+        }
+    }
+
+    private fun createAndShowMidtown2Dialog() {
+        // Request location permission if not granted
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE
+            )
+        }
+
+        // Create Windows-style dialog with correct theme from start
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.midtown2"  // Set identifier for tracking
+        windowsDialog.setTitle("Midtown Madness 2")
+        windowsDialog.setTaskbarIcon(R.drawable.midtown2)
+
+        // Inflate the midtown2 content
+        val contentView = layoutInflater.inflate(R.layout.program_midtown2, null)
+
+        // Create Midtown2 app instance
+        val midtown2App = rocks.gorjan.gokixp.apps.midtown2.Midtown2App(
+            context = this,
+            onRequestLocationPermission = {
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                    MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE
+                )
+            },
+            onShowNotification = { title, description, onTap ->
+                showNotification(title, description, onTap)
+            },
+            onSoundPlay = { playClickSound() }
+        )
+
+        // Store reference for permission callback
+        pendingMidtown2App = midtown2App
+
+        // Setup the app
+        midtown2App.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        // Use a good size for the map
+        windowsDialog.setWindowSize(380, 500)
+        windowsDialog.setMaximizable(true)
+
+        // Cleanup on close
+        windowsDialog.setOnCloseListener {
+            midtown2App.cleanup()
+            pendingMidtown2App = null
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Set cursor back to normal after window is shown and loaded
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+            windowsDialog.maximizeWindow()
+        }, 1000) // Small delay to ensure window is fully rendered
+    }
+
     private fun openCalendarApp() {
         try {
             // Try to open the calendar app
@@ -10670,6 +10759,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             } else {
                 Log.d("MainActivity", "Notification permission denied")
                 // Don't show a toast for notification denial as it's optional
+            }
+
+            MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE -> {
+                val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                pendingMidtown2App?.onPermissionResult(granted)
+                if (!granted) {
+                    Log.d("Midtown2", "Location permission denied")
+                }
             }
 
             101 -> {
