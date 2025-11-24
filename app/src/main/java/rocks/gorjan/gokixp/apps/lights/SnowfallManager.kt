@@ -29,7 +29,7 @@ class SnowfallManager(
     // Snowflake generation settings
     private val snowflakeGenerationInterval = 50L // Generate new snowflake every 300ms
     private val maxSnowflakes = 100 // Maximum number of active (falling) snowflakes
-    private val maxStoppedSnowflakes = 50 // Maximum number of stopped snowflakes on ground
+    private val maxStoppedSnowflakes = 150 // Maximum number of stopped snowflakes on ground
     private val stoppedSnowflakes = mutableListOf<Snowflake>() // Track stopped snowflakes in order (FIFO)
 
     private val prefs: SharedPreferences = context.getSharedPreferences("SnowfallState", Context.MODE_PRIVATE)
