@@ -345,10 +345,10 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                 }
             }
         }
-        
+
 //        Log.d("CalendarDataProvider", "No suitable events found out of $eventCount total events")
-        // No events found, return fallback with current date
-        return QuickGlanceDefaults.createDefaultContent(context)
+        // No events found, return null so the widget can show the default panel
+        return null
     }
     
     

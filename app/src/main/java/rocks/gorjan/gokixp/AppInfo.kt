@@ -5,6 +5,7 @@ import android.graphics.drawable.Drawable
 data class AppInfo(
     val name: String,
     val packageName: String,
+    val exeName: String? = null,
     val icon: Drawable,  // Icons loaded when start menu opens, released when it closes
     val minWindowWidthDp: Int = 300,  // Minimum window width in dp when resizing
     val minWindowHeightDp: Int = 250  // Minimum window height in dp when resizing

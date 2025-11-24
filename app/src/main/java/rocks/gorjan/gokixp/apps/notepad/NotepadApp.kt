@@ -370,9 +370,6 @@ class NotepadApp(
      */
     private fun loadNoteImages(note: Note) {
         // Ensure imageUris is initialized (for backward compatibility with old notes)
-        if (note.imageUris == null) {
-            note.imageUris = mutableListOf()
-        }
 
         if (note.imageUris.isEmpty()) {
             // No images - hide gallery
@@ -451,9 +448,6 @@ class NotepadApp(
                 // Add to current note
                 currentNote?.let { note ->
                     // Ensure imageUris is initialized (for backward compatibility)
-                    if (note.imageUris == null) {
-                        note.imageUris = mutableListOf()
-                    }
                     note.imageUris.add(selectedUri.toString())
                     saveNotes()
                     loadNoteImages(note)
@@ -463,9 +457,6 @@ class NotepadApp(
                 // Still add the image even if we can't take persistent permission
                 currentNote?.let { note ->
                     // Ensure imageUris is initialized (for backward compatibility)
-                    if (note.imageUris == null) {
-                        note.imageUris = mutableListOf()
-                    }
                     note.imageUris.add(selectedUri.toString())
                     saveNotes()
                     loadNoteImages(note)

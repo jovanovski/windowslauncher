@@ -36,7 +36,7 @@ class MyComputerApp(
     private val onShowConfirmDialog: (String, String, () -> Unit) -> Unit,
     private val onLaunchSystemApp: (String) -> Unit,
     private val getSystemAppIcon: (String) -> android.graphics.drawable.Drawable?,
-    private val getSystemAppsList: () -> List<Pair<String, String>>  // Returns list of (name, packageName)
+    private val getSystemAppsList: () -> List<Pair<String?, String>>  // Returns list of (name, packageName)
 ) {
     companion object {
         private const val TAG = "MyComputerApp"
@@ -48,7 +48,7 @@ class MyComputerApp(
     private var isInWindowsFolder = false
 
     // Cache system apps list and icons to avoid repeated expensive calls
-    private var cachedSystemApps: List<Pair<String, String>>? = null
+    private var cachedSystemApps: List<Pair<String?, String>>? = null
     private val cachedSystemAppIcons = mutableMapOf<String, android.graphics.drawable.Drawable?>()
 
     // Navigation state - stores path and whether it's the WINDOWS folder
@@ -1134,9 +1134,11 @@ class MyComputerApp(
         // Get system apps from cache or fetch once from MainActivity
         val systemApps = cachedSystemApps ?: getSystemAppsList().also { cachedSystemApps = it }
 
-        return systemApps.map { (name, packageName) ->
-            FileSystemItem.createShortcut("$name.exe", packageName, dummyFile)
-        }
+        return systemApps
+            .sortedBy { it.first?.lowercase() }
+            .map { (exeName, packageName) ->
+                FileSystemItem.createShortcut("$exeName", packageName, dummyFile)
+            }
     }
 
     /**

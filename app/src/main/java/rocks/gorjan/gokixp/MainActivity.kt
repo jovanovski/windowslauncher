@@ -65,6 +65,7 @@ import android.text.Spanned
 import android.text.TextPaint
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
+import android.text.util.Linkify
 import java.io.InputStream
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -1200,6 +1201,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (ieDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Internet Explorer",
+                exeName = "iexplore.exe",
                 packageName = "system.internet_explorer",
                 icon = createSquareDrawable(ieDrawable),
                 minWindowWidthDp = 360
@@ -1211,6 +1213,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (regeditDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Registry Editor",
+                exeName = "regedit.exe",
                 packageName = "system.registry_editor",
                 icon = createSquareDrawable(regeditDrawable)
             ))
@@ -1221,6 +1224,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (dialerDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Phone Dialer",
+                exeName = "dialer.exe",
                 packageName = "system.dialer",
                 icon = createSquareDrawable(dialerDrawable)
             ))
@@ -1231,6 +1235,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (notepadDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Notepad",
+                exeName = "notepad.exe",
                 packageName = "system.notepad",
                 icon = createSquareDrawable(notepadDrawable)
             ))
@@ -1241,6 +1246,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (msnDrawable != null) {
             systemApps.add(AppInfo(
                 name = "MSN Messenger",
+                exeName = "msn.exe",
                 packageName = "system.msn",
                 icon = createSquareDrawable(msnDrawable)
             ))
@@ -1251,6 +1257,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (winampDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Winamp",
+                exeName = "winamp.exe",
                 packageName = "system.winamp",
                 icon = createSquareDrawable(winampDrawable)
             ))
@@ -1261,6 +1268,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (wmpDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Windows Media Player",
+                exeName = "wmplayer.exe",
                 packageName = "system.wmp",
                 icon = createSquareDrawable(wmpDrawable)
             ))
@@ -1271,6 +1279,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (minesweeperDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Minesweeper",
+                exeName = "minesweeper.exe",
                 packageName = "system.minesweeper",
                 icon = createSquareDrawable(minesweeperDrawable)
             ))
@@ -1281,6 +1290,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (solitareDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Solitaire",
+                exeName = "solitare.exe",
                 packageName = "system.solitare",
                 icon = createSquareDrawable(solitareDrawable)
             ))
@@ -1292,6 +1302,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (clockDrawable != null) {
             systemApps.add(AppInfo(
                 name = "Clock",
+                exeName = "clock.exe",
                 packageName = "system.clock",
                 icon = createSquareDrawable(clockDrawable)
             ))
@@ -1302,6 +1313,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (midtown2Drawable != null) {
             systemApps.add(AppInfo(
                 name = "Midtown Madness 2",
+                exeName = "midtown2.exe",
                 packageName = "system.midtown2",
                 icon = createSquareDrawable(midtown2Drawable),
                 minWindowWidthDp = 360
@@ -3046,17 +3058,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up gesture detector for long press and swipe down
         gestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onLongPress(e: MotionEvent) {
-                // Don't show context menu if long press originated from screen edge
-                // (this prevents context menu from appearing during slow back gestures)
-//                val edgeThresholdDp = 100 // Same as BACK_GESTURE_EDGE_THRESHOLD_DP
-//                val edgeThresholdPx = edgeThresholdDp * this@MainActivity.resources.displayMetrics.density
-//                val screenWidth = this@MainActivity.resources.displayMetrics.widthPixels
-//                val widthMinusEdge = screenWidth - edgeThresholdPx
-//                val isEdgeTouchCondition1 = e.rawX <= edgeThresholdPx
-//                val isEdgeTouchCondition2 = e.rawX >= widthMinusEdge
-//                val isEdgeTouch = isEdgeTouchCondition1 || isEdgeTouchCondition2
-//
+
                 if (!isBackGestureInProgress) {
+                    Log.v("GOKII", "OPA1")
                     showContextMenu(e.x, e.y)
                 }
             }
@@ -3576,7 +3580,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     fun showDesktopIconContextMenu(iconView: DesktopIconView, x: Float, y: Float) {
+        Log.v("GOKII", "OPA2")
+
         if(isBackGestureInProgress){
+            Log.v("GOKII", "OPA2 BLOCKED")
             return
         }
         Log.d("MainActivity", "showDesktopIconContextMenu called")
@@ -3713,6 +3720,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     fun showFolderContextMenu(folderView: FolderView, x: Float, y: Float) {
+        if (isBackGestureInProgress) return
+
         Log.d("MainActivity", "showFolderContextMenu called")
         Helpers.performHapticFeedback(this)
 
@@ -3860,6 +3869,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     startActivity(intent)
                                 }
                             }
+
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Error launching app: ${icon.packageName}", e)
                         }
@@ -4066,6 +4076,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     startActivity(intent)
                                 }
                             }
+                            // Close the folder window after launching the app
+                            parentDialog.closeWindow()
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Error launching app: ${icon.packageName}", e)
                         }
@@ -4684,6 +4696,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     startActivity(intent)
                                 }
                             }
+                            // Close the folder window after launching the app
+                            windowsDialog.closeWindow()
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Error launching app: ${icon.packageName}", e)
                         }
@@ -7467,7 +7481,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Set welcome message based on theme
-        val welcomeMessage = "Windows has updated to version $versionName, tap 'Change Log' to see what's new!.\n\nIf you like what I'm building, buy me a coffee here: https://buymeacoffee.com/jovanovski.\n\nThis is a passion project from Gorjan Jovanovski, a developer who grew up with these aesthetics and prefers them over new design any day.\n\nIf you're a 80s or 90s kid, you remember these days fondly, and this is a change to relive them on a modern daily driver, in your pocket!\n\nA few tips:\n1) Tap on things that look tappable, chances are they are.\n2) Swipe back to close the active open window.\n3) Swipe up, down and right on the desktop for different actions.\n4) Long press on the desktop to change wallpapers and themes.\n5) There are multiple Windows apps in the start menu, all with their own purpose.\n\nAll the copyrighted information belongs to their respective authors, the aim here is to just recreate nostalgia for fun.\n\nThe music you're listening to from the legendary Stan LePard, rest in peace!\n\nFor any feature requests, drop me an email at hey@gorjan.rocks\n\nThanks for using Windows!"
+        val welcomeMessage = "Windows has updated to version $versionName, tap 'Change Log' to see what's new!\n\nIf you like what I'm building, buy me a coffee here: https://buymeacoffee.com/jovanovski.\n\nThis is a passion project from Gorjan Jovanovski, a developer who grew up with these aesthetics and prefers them over new design any day.\n\nIf you're a 80s or 90s kid, you remember these days fondly, and this is a change to relive them on a modern daily driver, in your pocket!\n\nA few tips:\n1) Tap on things that look tappable, chances are they are.\n2) Swipe back to close the active open window.\n3) Swipe up, down and right on the desktop for different actions.\n4) Long press on the desktop to change wallpapers and themes.\n5) There are multiple Windows apps in the start menu, all with their own purpose.\n\nAll the copyrighted information belongs to their respective authors, the aim here is to just recreate nostalgia for fun.\n\nThe music you're listening to from the legendary Stan LePard, rest in peace!\n\nFor any feature requests, drop me an email at hey@gorjan.rocks\n\nThanks for using Windows!"
 
         // Function to format changelog text
         fun fetchChangeLogFromGitHub(callback: (String) -> Unit) {
@@ -7524,74 +7538,79 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }.start()
         }
 
-        // Make the text clickable with blue underlined links
-        val spannableString = SpannableString(welcomeMessage)
-
-        // Buy me a coffee link
-        val linkStart = welcomeMessage.indexOf("https://buymeacoffee.com/jovanovski")
-        val linkEnd = linkStart + "https://buymeacoffee.com/jovanovski".length
-
-        val clickableSpan = object : ClickableSpan() {
-            override fun onClick(widget: View) {
-//                val intent = Intent(Intent.ACTION_VIEW,
-//                    "https://buymeacoffee.com/jovanovski".toUri())
-                showInternetExplorerDialog("https://buymeacoffee.com/jovanovski")
-            }
-
-            override fun updateDrawState(ds: TextPaint) {
-                super.updateDrawState(ds)
-                ds.isUnderlineText = true
-                ds.color =  Color.BLUE
-            }
-        }
-
-        // Email link
-        val emailStart = welcomeMessage.indexOf("hey@gorjan.rocks")
-        val emailEnd = emailStart + "hey@gorjan.rocks".length
-
-        val emailClickableSpan = object : ClickableSpan() {
-            override fun onClick(widget: View) {
-                val intent = Intent(Intent.ACTION_SENDTO).apply {
-                    data = "mailto:hey@gorjan.rocks?subject=Windows%20Launcher".toUri()
-                }
-                startActivity(intent)
-            }
-
-            override fun updateDrawState(ds: TextPaint) {
-                super.updateDrawState(ds)
-                ds.isUnderlineText = true
-                ds.color = Color.BLUE
-            }
-        }
-
-        // Gorjan link
-        val gorjanStart = welcomeMessage.indexOf("Gorjan Jovanovski")
-        val gorjanEnd = gorjanStart + "Gorjan Jovanovski".length
-
-        val gorjanClickableSpan = object : ClickableSpan() {
-            override fun onClick(widget: View) {
-//                val intent = Intent(Intent.ACTION_VIEW, "https://gorjan.rocks".toUri())
-//                startActivity(intent)
-                showInternetExplorerDialog("https://gorjan.rocks")
-            }
-
-            override fun updateDrawState(ds: TextPaint) {
-                super.updateDrawState(ds)
-                ds.isUnderlineText = true
-                ds.color = Color.BLUE
-            }
-        }
-
+        // Set welcome message with automatic link detection
         val versionTextView = contentView.findViewById<TextView>(R.id.version)
 
         // Set version text (using the versionName we already retrieved)
         versionTextView?.text = "Version: $versionName"
 
-        spannableString.setSpan(clickableSpan, linkStart, linkEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannableString.setSpan(emailClickableSpan, emailStart, emailEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        spannableString.setSpan(gorjanClickableSpan, gorjanStart, gorjanEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        welcomeTextView.text = spannableString
+        // Set welcome text and auto-linkify URLs and email addresses
+        welcomeTextView.text = welcomeMessage
+        Linkify.addLinks(welcomeTextView, Linkify.WEB_URLS or Linkify.EMAIL_ADDRESSES)
         welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
+        welcomeTextView.setLinkTextColor(Color.parseColor("#0000FF")) // Windows blue
+
+        // Now add custom clickable spans on top of auto-linkified text
+        val spannableString = SpannableString(welcomeTextView.text)
+
+        // Make "Windows" (first word) clickable to open GitHub repo
+        val windowsStart = welcomeMessage.indexOf("Windows")
+        val windowsEnd = windowsStart + "Windows".length
+
+        if (windowsStart != -1) {
+            val windowsClickableSpan = object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    showInternetExplorerDialog("https://github.com/jovanovski/windowslauncher/")
+                }
+
+                override fun updateDrawState(ds: TextPaint) {
+                    super.updateDrawState(ds)
+                    ds.isUnderlineText = true
+                    ds.color = Color.BLUE
+                }
+            }
+            spannableString.setSpan(windowsClickableSpan, windowsStart, windowsEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        // Make "Change Log" clickable
+        val changeLogStart = welcomeMessage.indexOf("Change Log")
+        val changeLogEnd = changeLogStart + "Change Log".length
+
+        if (changeLogStart != -1) {
+            val changeLogClickableSpan = object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    changeLogButton?.performClick()
+                }
+
+                override fun updateDrawState(ds: TextPaint) {
+                    super.updateDrawState(ds)
+                    ds.isUnderlineText = true
+                    ds.color = Color.BLUE
+                }
+            }
+            spannableString.setSpan(changeLogClickableSpan, changeLogStart, changeLogEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        // Make "Gorjan Jovanovski" clickable
+        val gorjanStart = welcomeMessage.indexOf("Gorjan Jovanovski")
+        val gorjanEnd = gorjanStart + "Gorjan Jovanovski".length
+
+        if (gorjanStart != -1) {
+            val gorjanClickableSpan = object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    showInternetExplorerDialog("https://gorjan.rocks")
+                }
+
+                override fun updateDrawState(ds: TextPaint) {
+                    super.updateDrawState(ds)
+                    ds.isUnderlineText = true
+                    ds.color = Color.BLUE
+                }
+            }
+            spannableString.setSpan(gorjanClickableSpan, gorjanStart, gorjanEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        welcomeTextView.text = spannableString
 
         // Set up button click listeners to switch between welcome and changelog
         welcomeButton?.setOnClickListener {
@@ -7601,6 +7620,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Restore welcome text with clickable links
             welcomeTextView.text = spannableString
             welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
+            welcomeTextView.setLinkTextColor(Color.parseColor("#0000FF")) // Windows blue
         }
 
         changeLogButton?.setOnClickListener {
@@ -7615,6 +7635,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             fetchChangeLogFromGitHub { changeLogText ->
                 runOnUiThread {
                     welcomeTextView.text = changeLogText
+                    // Make URLs in the changelog clickable with Windows blue color
+                    Linkify.addLinks(welcomeTextView, Linkify.WEB_URLS)
+                    welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
+                    welcomeTextView.setLinkTextColor(Color.parseColor("#0000FF")) // Windows blue
                 }
             }
         }
@@ -8780,7 +8804,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 getSystemAppIconDrawable(packageName)
             },
             getSystemAppsList = {
-                getSystemAppsList().map { Pair(it.name, it.packageName) }
+                getSystemAppsList().map { Pair(it.exeName, it.packageName) }
             }
         )
 
@@ -9565,76 +9589,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // No available positions (should never happen)
         return targetIndex
     }
-
-    /**
-     * Helper function to get all currently occupied grid positions
-     * @return Set of (row, col) pairs representing occupied grid cells
-     */
-    private fun getOccupiedGridPositions(): Set<Pair<Int, Int>> {
-        val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
-        val (cellWidth, cellHeight) = getGridDimensions()
-        val topMarginPx = 60f * resources.displayMetrics.density
-
-        desktopIconViews.forEach { iconView ->
-            if (iconView.parent != null && iconView.isVisible) {
-                val centerX = iconView.x + iconView.width / 2
-                val centerY = iconView.y + iconView.height / 2
-                val adjustedCenterY = centerY - topMarginPx
-
-                val col = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
-                val row = (adjustedCenterY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
-
-                occupiedPositions.add(Pair(row, col))
-            }
-        }
-
-        return occupiedPositions
-    }
-
-    private fun findNearestAvailableGridPosition(iconX: Float, iconY: Float, occupiedPositions: Set<Pair<Int, Int>>): Pair<Int, Int>? {
-        val (cellWidth, cellHeight) = getGridDimensions()
-
-        // Calculate which grid cell the icon's center is currently in
-        val iconWidthPx = 90f * resources.displayMetrics.density
-        val iconHeightPx = 100f * resources.displayMetrics.density
-        val centerX = iconX + (iconWidthPx / 2)
-        val centerY = iconY + (iconHeightPx / 2)
-
-        // Account for top margin when determining grid position
-        val topMarginPx = 60 * resources.displayMetrics.density
-        val adjustedCenterY = centerY - topMarginPx
-
-        val currentCol = (centerX / cellWidth).coerceIn(0f, (GRID_COLUMNS - 1).toFloat()).toInt()
-        val currentRow = (adjustedCenterY / cellHeight).coerceIn(0f, (GRID_ROWS - 1).toFloat()).toInt()
-
-        // Check if the current position is available
-        if (!occupiedPositions.contains(Pair(currentRow, currentCol))) {
-            return Pair(currentRow, currentCol)
-        }
-
-        // Search in expanding circles for the nearest available position
-        for (radius in 1 until maxOf(GRID_ROWS, GRID_COLUMNS)) {
-            for (dRow in -radius..radius) {
-                for (dCol in -radius..radius) {
-                    // Only check positions at the current radius (edge of the circle)
-                    if (maxOf(abs(dRow), abs(dCol)) == radius) {
-                        val testRow = currentRow + dRow
-                        val testCol = currentCol + dCol
-
-                        // Check if position is within grid bounds
-                        if (testRow in 0 until GRID_ROWS && testCol in 0 until GRID_COLUMNS) {
-                            if (!occupiedPositions.contains(Pair(testRow, testCol))) {
-                                return Pair(testRow, testCol)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return null // No available positions found
-    }
-    
     
     
     private fun isSoundMuted(): Boolean {
