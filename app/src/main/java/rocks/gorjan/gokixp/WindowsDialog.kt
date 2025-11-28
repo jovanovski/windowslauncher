@@ -1417,9 +1417,12 @@ class WindowsDialog @JvmOverloads constructor(
         // Skip restoration if state saving is disabled
         if (!shouldSaveState) return
 
-        val identifier = windowIdentifier ?: return
+        var identifier = windowIdentifier ?: return
 
-        if(identifier.startsWith("folder:")) return
+        // Make all desktop folders on the same location/size
+        if(identifier.startsWith("folder:")) {
+            identifier = "folder:"
+        }
 
 
         try {
