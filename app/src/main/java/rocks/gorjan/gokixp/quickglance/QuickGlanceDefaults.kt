@@ -44,20 +44,28 @@ object QuickGlanceDefaults {
             val mainActivity = MainActivity.getInstance()
             val weatherJson = mainActivity?.getCachedWeatherJson()
 
-            if (weatherJson != null && mainActivity.isWeatherDataFresh(60)) {
+            if (weatherJson != null && mainActivity.isWeatherDataFresh(90)) {
                 val currentWeather = weatherJson.getJSONObject("current")
                 val temperature = currentWeather.getDouble("temperature_2m")
                 val weatherCode = currentWeather.getInt("weather_code")
                 val formattedTemp = mainActivity.formatTemperatureForWidget(temperature)
 
                 val condition = getWeatherCondition(weatherCode)
-                "$formattedTemp and $condition"
+                var subtitle = "$formattedTemp and $condition"
+
+                // Append AQI description if available and fresh
+                val aqi = mainActivity.getCachedAqi()
+                if (aqi != null && mainActivity.isAqiDataFresh(90)) {
+                    subtitle += ", ${getAqiDescription(aqi)}"
+                }
+
+                subtitle
             } else {
-                "your pal, Clippy"
+                "your pal, Clippy 1"
             }
         } catch (e: Exception) {
             Log.e("QuickGlanceDefaults", "Error getting weather subtitle", e)
-            "your pal, Clippy"
+            "your pal, Clippy 2"
         }
     }
 
@@ -77,6 +85,16 @@ object QuickGlanceDefaults {
             95 -> "thunderstorms"
             96, 99 -> "heavy thunderstorms"
             else -> "unknown"
+        }
+    }
+
+    private fun getAqiDescription(aqi: Int): String {
+        return when {
+            aqi <= 26 -> "good air quality"
+            aqi <= 33 -> "moderate air quality"
+            aqi <= 66 -> "moderate air quality"
+            aqi <= 100 -> "bad air quality"
+            else -> "hazardous air quality"
         }
     }
 

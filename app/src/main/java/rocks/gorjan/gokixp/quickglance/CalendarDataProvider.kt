@@ -367,11 +367,11 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                 val condition = getWeatherCondition(weatherCode)
                 "$formattedTemp and $condition"
             } else {
-                "your pal, Clippy"
+                "your pal, Clippy 3"
             }
         } catch (e: Exception) {
             Log.e("CalendarDataProvider", "Error getting weather subtitle", e)
-            "your pal, Clippy"
+            "your pal, Clippy 4"
         }
     }
     

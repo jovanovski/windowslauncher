@@ -8,6 +8,9 @@ import android.content.pm.LauncherApps
 import android.net.Uri
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.view.Gravity
 import android.provider.Settings
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -64,7 +67,10 @@ import android.content.ComponentCallbacks2
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.method.LinkMovementMethod
+import android.text.SpannableStringBuilder
 import android.text.style.ClickableSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.SuperscriptSpan
 import android.text.util.Linkify
 import java.io.InputStream
 import android.view.ContextThemeWrapper
@@ -406,6 +412,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WEATHER_DATA = "weather_data"
         private const val KEY_WEATHER_TIMESTAMP = "weather_timestamp"
         private const val KEY_WEATHER_UNIT = "weather_unit"
+        private const val KEY_AQI_DATA = "aqi_data"
+        private const val KEY_AQI_TIMESTAMP = "aqi_timestamp"
         private const val KEY_QUICK_GLANCE_VISIBLE = "quick_glance_visible"
         private const val KEY_AGENT_X = "agent_x"
         private const val KEY_AGENT_Y = "agent_y"
@@ -839,6 +847,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up weather temperature display
         setupWeatherUpdates()
 
+        // Initialize AQI display from cached data
+        initializeAqiDisplay()
+
         // Note: setupSystemTrayToggle() is called after theme layouts are loaded
     }
 
@@ -944,11 +955,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val timeFormat = SimpleDateFormat(timeFormatPattern, Locale.getDefault())
                 val time = timeFormat.format(currentDate)
 
+                val monthName = SimpleDateFormat("MMM", Locale.getDefault()).format(currentDate)
                 val ordinalSuffix = getOrdinalSuffix(day)
 
+                // Build "Feb 1st" with superscript ordinal
+                val dayStr = day.toString()
+                val fullText = "$monthName $dayStr$ordinalSuffix"
+                val dateSpan = SpannableStringBuilder(fullText)
+                val ordinalStart = monthName.length + 1 + dayStr.length
+                val ordinalEnd = ordinalStart + ordinalSuffix.length
+                dateSpan.setSpan(SuperscriptSpan(), ordinalStart, ordinalEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                dateSpan.setSpan(RelativeSizeSpan(0.7f), ordinalStart, ordinalEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
                 // Update separate date and time displays
-                dateDay.text = day.toString()
-                dateOrdinal.text = ordinalSuffix
+                dateDay.text = dateSpan
+                dateOrdinal.text = ""
                 clockTime.text = time
 
                 // Also refresh QuickGlanceWidget default panel to keep date and weather current
@@ -961,17 +982,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         handler.post(clockRunnable)
     }
-    
+
     private fun getOrdinalSuffix(day: Int): String {
         return when {
             day in 11..13 -> "th" // Special case for 11th, 12th, 13th
             day % 10 == 1 -> "st"
-            day % 10 == 2 -> "nd" 
+            day % 10 == 2 -> "nd"
             day % 10 == 3 -> "rd"
             else -> "th"
         }
     }
-    
+
     private fun initializeSoundPool() {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -1649,13 +1670,25 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     }
                 }
 
-                // Detect backspace on empty search box
+                // Detect backspace on empty search box, and handle search/enter key
                 searchBoxView.setOnKeyListener { _, keyCode, event ->
                     if (event.action == KeyEvent.ACTION_DOWN &&
                         keyCode == KeyEvent.KEYCODE_DEL &&
                         searchBoxView.text.isEmpty() &&
                         isStartMenuShowingApps) {
                         switchToCommands()
+                        true
+                    } else if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
+                        val query = searchBox.text.toString().trim()
+                        if (query.isNotEmpty()) {
+                            if (query == "marti") {
+                                val url = "https://gorjan.rocks/clients/marti/"
+                                showInternetExplorerDialog(url)
+                            } else {
+                                openSearchWithQuery(query)
+                            }
+                            hideStartMenu()
+                        }
                         true
                     } else {
                         false
@@ -8132,6 +8165,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             true
         }
 
+        // Set up AQI click
+        val aqiText = findViewById<TextView>(R.id.aqi_text)
+        aqiText?.setOnClickListener {
+            handleAqiTap()
+        }
+
+        // Long press to refresh AQI data
+        aqiText?.setOnLongClickListener {
+            refreshAqiData()
+            true
+        }
+
         // Initialize volume icon state
         updateVolumeIcon()
 
@@ -10149,12 +10194,109 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             updateWeatherTemperature()
             true
         }
-        
+
         // Initialize weather updates
         updateWeatherTemperature()
-        
+
+
         // Schedule hourly weather updates
         scheduleWeatherUpdates()
+    }
+
+    private fun initializeAqiDisplay() {
+        // Display cached AQI if available (click handlers are in initializeTaskbarElements)
+        val cachedAqi = getCachedAqi()
+        if (cachedAqi != null && isAqiDataFresh(90)) {
+            updateAqiDisplay(cachedAqi)
+        }
+    }
+
+    private fun handleAqiTap() {
+        val aqiAppPackage = "com.gorjan.airquality"
+        try {
+            val intent = packageManager.getLaunchIntentForPackage(aqiAppPackage)
+            if (intent != null) {
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+                startActivity(intent)
+                Log.d("MainActivity", "Launched AQI app: $aqiAppPackage")
+            } else {
+                // App not installed, open Play Store
+                openPlayStoreForAqiApp(aqiAppPackage)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error launching AQI app", e)
+            openPlayStoreForAqiApp(aqiAppPackage)
+        }
+    }
+
+    private fun openPlayStoreForAqiApp(packageName: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=$packageName"))
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Play Store not available, open in browser
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+        }
+    }
+
+    private fun refreshAqiData() {
+        Log.d("MainActivity", "Refreshing AQI data with fresh GPS location...")
+        val locationContext = createAttributionContext("aqi")
+        val locationManager = locationContext.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+
+        try {
+            if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                val locationListener = object : android.location.LocationListener {
+                    override fun onLocationChanged(location: android.location.Location) {
+                        Log.d("MainActivity", "Got fresh location for AQI: ${location.latitude}, ${location.longitude}")
+                        fetchAqiData(location.latitude, location.longitude)
+                        locationManager.removeUpdates(this)
+                    }
+                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                    override fun onProviderEnabled(provider: String) {}
+                    override fun onProviderDisabled(provider: String) {}
+                }
+
+                // Request fresh GPS location first, fall back to network
+                if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                    Log.d("MainActivity", "Requesting fresh GPS location for AQI...")
+                    locationManager.requestLocationUpdates(
+                        android.location.LocationManager.GPS_PROVIDER,
+                        0, 0f, locationListener)
+                } else if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                    Log.d("MainActivity", "GPS not available, using network location for AQI...")
+                    locationManager.requestLocationUpdates(
+                        android.location.LocationManager.NETWORK_PROVIDER,
+                        0, 0f, locationListener)
+                } else {
+                    Log.w("MainActivity", "No location provider available for AQI refresh")
+                }
+
+                // Timeout after 15 seconds - fall back to cached location
+                handler.postDelayed({
+                    locationManager.removeUpdates(locationListener)
+                    // Try cached location as fallback
+                    var cachedLocation: android.location.Location? = null
+                    if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                        cachedLocation = locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    }
+                    if (cachedLocation == null && locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                        cachedLocation = locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                    }
+                    if (cachedLocation != null) {
+                        Log.d("MainActivity", "GPS timeout, using cached location for AQI")
+                        fetchAqiData(cachedLocation.latitude, cachedLocation.longitude)
+                    }
+                }, 15000)
+            }
+        } catch (e: SecurityException) {
+            Log.e("MainActivity", "Location permission denied for AQI refresh", e)
+        }
     }
     
     private fun scheduleWeatherUpdates() {
@@ -10318,7 +10460,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     val currentWeather = cachedData.getJSONObject("current")
                     val temperature = currentWeather.getDouble("temperature_2m")
                     val roundedTemp = kotlin.math.round(temperature).toInt()
-                    weatherTemp?.text = "$roundedTemp°"
+                    val unitTemp = getWeatherUnit()
+                    weatherTemp?.text = "$roundedTemp°$unitTemp"
                     Log.d("MainActivity", "Using cached weather data: $roundedTemp°")
                     return
                 } catch (e: Exception) {
@@ -10441,6 +10584,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     quickGlanceWidget.refreshData()
                                 }
                             }
+                            // Also fetch AQI data
+                            fetchAqiData(latitude, longitude)
                             return@Thread // Success - exit retry loop
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Error parsing weather JSON on attempt ${attempt + 1}", e)
@@ -10570,7 +10715,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun formatTemperature(tempCelsius: Double): String {
         val temp = convertTemperature(tempCelsius)
-        return "$temp°"
+        var unit = getWeatherUnit()
+        return "$temp°$unit"
     }
 
     // Public method for QuickGlance widget to format temperature with unit
@@ -10624,11 +10770,133 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             null
         }
     }
-    
+
+    // AQI (Air Quality Index) methods
+    private fun fetchAqiData(latitude: Double, longitude: Double) {
+        Thread {
+            try {
+                val url = "https://getaircare.com/api/v4/api.php?requestType=point&lat=$latitude&lng=$longitude"
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val jsonObject = org.json.JSONObject(response)
+                    val measurements = jsonObject.getJSONArray("measurements")
+
+                    // Find pid: 7 (EU AQI)
+                    var aqiValue: Int? = null
+                    for (i in 0 until measurements.length()) {
+                        val measurement = measurements.getJSONObject(i)
+                        if (measurement.getInt("pid") == 7) {
+                            aqiValue = measurement.getInt("val")
+                            break
+                        }
+                    }
+
+                    if (aqiValue != null) {
+                        saveAqiData(aqiValue)
+                        runOnUiThread {
+                            updateAqiDisplay(aqiValue)
+                            // Notify QuickGlanceWidget to refresh
+                            if (::quickGlanceWidget.isInitialized) {
+                                quickGlanceWidget.refreshData()
+                            }
+                        }
+                        Log.d("MainActivity", "AQI updated successfully: $aqiValue")
+                    }
+                } else {
+                    Log.e("MainActivity", "AQI API error: $responseCode")
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error fetching AQI data", e)
+            }
+        }.start()
+    }
+
+    private fun saveAqiData(aqi: Int) {
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            prefs.edit().apply {
+                putInt(KEY_AQI_DATA, aqi)
+                putLong(KEY_AQI_TIMESTAMP, System.currentTimeMillis())
+                apply()
+            }
+            Log.d("MainActivity", "AQI data saved: $aqi")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error saving AQI data", e)
+        }
+    }
+
+    fun getCachedAqi(): Int? {
+        return try {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val aqi = prefs.getInt(KEY_AQI_DATA, -1)
+            if (aqi >= 0) aqi else null
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error retrieving cached AQI", e)
+            null
+        }
+    }
+
+    fun isAqiDataFresh(maxAgeMinutes: Int = 60): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val timestamp = prefs.getSafeLong(KEY_AQI_TIMESTAMP, 0L)
+        if (timestamp == 0L) return false
+
+        val ageMinutes = (System.currentTimeMillis() - timestamp) / (1000 * 60)
+        return ageMinutes < maxAgeMinutes
+    }
+
+    private fun updateAqiDisplay(aqi: Int) {
+        val aqiContainer = findViewById<LinearLayout>(R.id.aqi_container)
+        val aqiText = findViewById<TextView>(R.id.aqi_text)
+
+        aqiContainer?.visibility = View.VISIBLE
+        aqiText?.text = aqi.toString()
+
+        // Get underline color based on AQI value
+        val underlineColor = when {
+            aqi <= 26 -> "#4CAF50".toColorInt() // Green
+            aqi <= 33 -> "#FFEB3B".toColorInt() // Yellow
+            aqi <= 66 -> "#FF9800".toColorInt() // Orange
+            aqi <= 100 -> "#F44336".toColorInt() // Red
+            else -> "#9C27B0".toColorInt() // Purple
+        }
+
+        // Clear container background
+        aqiContainer?.setBackgroundColor(Color.TRANSPARENT)
+
+        // Set text color based on theme (black for Classic/98, white for XP/Vista)
+        val textColor = if (themeManager.isClassicTheme()) Color.BLACK else Color.WHITE
+        aqiText?.setTextColor(textColor)
+
+        // Create 2px colored underline as background drawable, offset 2px down
+        aqiText?.let { textView ->
+            val density = resources.displayMetrics.density
+            val underlineHeight = (2 * density).toInt()
+            val underlineOffset = (2 * density).toInt()
+            val underlineDrawable = GradientDrawable().apply {
+                setColor(underlineColor)
+            }
+            val layerDrawable = LayerDrawable(arrayOf(underlineDrawable)).apply {
+                setLayerGravity(0, Gravity.BOTTOM)
+                setLayerHeight(0, underlineHeight)
+                setLayerInsetBottom(0, -underlineOffset)
+            }
+            textView.background = layerDrawable
+        }
+        aqiContainer?.clipToPadding = false
+        aqiContainer?.clipChildren = false
+    }
+
     private fun isNetworkAvailable(): Boolean {
         return try {
             val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-            
+
             // Check if we have the required permission
             // For API 23+, use the modern approach
             val network = connectivityManager.activeNetwork ?: return false
@@ -10645,7 +10913,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             true // Default to assuming network is available
         }
     }
-    
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         
@@ -11626,6 +11894,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setupCursorEffect() {
         cursorEffect = findViewById(R.id.cursor_effect)
+        // Set cursor drawable based on theme
+        if (themeManager.isVistaTheme()) {
+            cursorEffect.setImageResource(R.drawable.cursor_vista)
+        } else {
+            cursorEffect.setImageResource(R.drawable.cursor)
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
@@ -11792,17 +12066,38 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     // Switch cursor to busy (hourglass) state
+    private var busyCursorAnimator: android.animation.ObjectAnimator? = null
+
     private fun setCursorBusy() {
         if (::cursorEffect.isInitialized) {
-            cursorEffect.setImageResource(R.drawable.cursor_busy)
+            if (themeManager.isVistaTheme()) {
+                cursorEffect.setImageResource(R.drawable.cursor_busy_vista)
+                // Rotate the Vista busy cursor continuously
+                busyCursorAnimator = android.animation.ObjectAnimator.ofFloat(cursorEffect, "rotation", 0f, 360f).apply {
+                    duration = 4000
+                    repeatCount = android.animation.ValueAnimator.INFINITE
+                    interpolator = android.view.animation.LinearInterpolator()
+                    start()
+                }
+            } else {
+                cursorEffect.setImageResource(R.drawable.cursor_busy)
+            }
         }
     }
 
     // Switch cursor back to normal (pointer) state
     private fun setCursorNormal() {
-
         if (::cursorEffect.isInitialized) {
-            cursorEffect.setImageResource(R.drawable.cursor)
+            // Stop any busy rotation animation
+            busyCursorAnimator?.cancel()
+            busyCursorAnimator = null
+            cursorEffect.rotation = 0f
+
+            if (themeManager.isVistaTheme()) {
+                cursorEffect.setImageResource(R.drawable.cursor_vista)
+            } else {
+                cursorEffect.setImageResource(R.drawable.cursor)
+            }
         }
     }
 

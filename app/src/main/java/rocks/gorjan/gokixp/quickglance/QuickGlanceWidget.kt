@@ -435,6 +435,8 @@ class QuickGlanceWidget @JvmOverloads constructor(
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 dataManager?.forceRefresh()
+                // Also refresh the default panel to update weather/AQI data
+                refreshDefaultPanel()
                 Log.d("QuickGlanceWidget", "Force refresh completed")
             } catch (e: Exception) {
                 Log.w("QuickGlanceWidget", "Force refresh failed, reinitializing data manager", e)

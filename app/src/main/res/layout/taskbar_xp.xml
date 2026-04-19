@@ -71,6 +71,34 @@
                     android:layout_height="match_parent"
                     android:paddingStart="4dp"
                     android:orientation="horizontal">
+                    <!-- AQI (Air Quality Index) -->
+                    <LinearLayout
+                        android:id="@+id/aqi_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:layout_marginTop="3dp"
+                        android:layout_marginBottom="3dp"
+                        android:layout_marginEnd="2dp"
+                        android:visibility="gone"
+                        android:orientation="horizontal"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <TextView
+                            android:id="@+id/aqi_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:text=""
+                            android:textColor="@color/white"
+                            android:textSize="13sp"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:fontFamily="@font/tahoma" />
+                    </LinearLayout>
+
                     <!-- Weather Temperature -->
                     <TextView
                         android:id="@+id/weather_temp"
@@ -86,6 +114,22 @@
                         android:fontFamily="@font/tahoma"
 
                         />
+
+
+                    <!-- Volume Icon -->
+                    <LinearLayout
+                        android:id="@+id/volume_icon_wrapper"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:gravity="center"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent">
+                        <ImageView
+                            android:id="@+id/volume_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/sound"/>
+                    </LinearLayout>
 
                     <!-- Date Display with superscript ordinal -->
                     <LinearLayout
@@ -108,7 +152,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:gravity="center"
-                            android:text="26"
+                            android:text="Mar 2nd"
                             android:textColor="@color/white"
                             android:textSize="13sp"
                             android:fontFamily="@font/tahoma"
@@ -118,7 +162,7 @@
                             android:id="@+id/date_ordinal"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="th"
+                            android:text=""
                             android:textColor="@color/white"
                             android:textSize="9sp"
                             android:layout_marginBottom="4dp"
@@ -128,20 +172,6 @@
 
                     </LinearLayout>
 
-                    <!-- Volume Icon -->
-                    <LinearLayout
-                        android:id="@+id/volume_icon_wrapper"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="4dp"
-                        android:gravity="center"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent">
-                    <ImageView
-                        android:id="@+id/volume_icon"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/sound"/>
-                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
