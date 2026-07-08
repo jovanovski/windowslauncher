@@ -6,7 +6,8 @@ enum class IconType {
     APP,
     FOLDER,
     RECYCLE_BIN,
-    MY_COMPUTER
+    MY_COMPUTER,
+    URL_SHORTCUT
 }
 
 data class DesktopIcon(
@@ -19,5 +20,6 @@ data class DesktopIcon(
     val type: IconType = IconType.APP,
     var parentFolderId: String? = null,  // ID of parent folder, null if on desktop
     var portraitGridIndex: Int? = null,   // Grid index for portrait orientation (0, 1, 2, 3...)
-    var landscapeGridIndex: Int? = null   // Grid index for landscape orientation (0, 1, 2, 3...)
+    var landscapeGridIndex: Int? = null,   // Grid index for landscape orientation (0, 1, 2, 3...)
+    var targetUrl: String? = null   // For URL_SHORTCUT icons: the web address to open on tap
 )

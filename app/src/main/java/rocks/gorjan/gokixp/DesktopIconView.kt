@@ -71,8 +71,10 @@ open class DesktopIconView : LinearLayout {
         setOnClickListener {
             desktopIcon?.let { icon ->
                 try {
-                    // Check if this is a system app
-                    if (MainActivity.isSystemApp(icon.packageName)) {
+                    // URL shortcut: open the saved web address
+                    if (icon.type == IconType.URL_SHORTCUT) {
+                        (context as? MainActivity)?.openUrlShortcut(icon.targetUrl)
+                    } else if (MainActivity.isSystemApp(icon.packageName)) {
                         // Launch system app
                         val mainActivity = context as? MainActivity
                         mainActivity?.launchSystemApp(icon.packageName)
