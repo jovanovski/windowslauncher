@@ -165,14 +165,15 @@ class AppsAdapter(
     }
 
     fun filter(query: String) {
-        filteredItems = if (query.isEmpty()) {
+        val trimmedQuery = query.trim()
+        filteredItems = if (trimmedQuery.isEmpty()) {
             originalItems
         } else {
             originalItems.filter { item ->
                 when (item) {
                     is AppInfo -> {
                         // Include all apps that match the query, including recent apps
-                        item.name.lowercase().contains(query.lowercase())
+                        item.name.trim().lowercase().contains(trimmedQuery.lowercase())
                     }
                     is String -> false // Hide separators during search
                     else -> false

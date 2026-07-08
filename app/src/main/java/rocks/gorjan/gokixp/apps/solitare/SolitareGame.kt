@@ -688,13 +688,17 @@ class SolitareGame(
         private fun moveCardsTo(targetPile: Pile) {
             // Cards were already removed from source in handleCardSelection
 
-            // Track if a card was used from waste pile - this resets the cycle
+            // Any successful move changes the board and can make a card that is
+            // currently buried in the stock/waste reachable on a fresh pass, so
+            // every move counts as progress and must reset the cycle tracking.
+            // (Previously only waste-sourced moves reset it, which made the game
+            // wrongly declare "no moves left" after tableau/foundation moves.)
             if (sourcePile?.type == PileType.WASTE) {
                 wasteCardUsedThisCycle = true
-                // Reset cycle tracking since progress was made
-                drawPileCardsAtCycleStart = 0
-                cardsDrawnThisCycle = 0
             }
+            // Reset cycle tracking since progress was made
+            drawPileCardsAtCycleStart = 0
+            cardsDrawnThisCycle = 0
 
             // Any valid move means game is not over
             isGameOver = false
