@@ -41,6 +41,11 @@ class FloatingWindowManager(private val context: Context, private val container:
                 .setDuration(150)
                 .start()
         }
+
+        // Retint Classic gray surfaces if a Plus! 95 theme is active
+        themeManager.getActivePlus95()?.let { plus95 ->
+            (context as? MainActivity)?.applyPlus95MenuColor(windowsDialog, plus95.menuColor)
+        }
     }
 
     fun removeWindow(windowsDialog: WindowsDialog) {

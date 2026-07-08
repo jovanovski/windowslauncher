@@ -57,10 +57,27 @@ class MyComputerView : DesktopIconView, ThemeAware {
 
     private fun updateIcon() {
         val mainActivity = context as? MainActivity
+
+        // If a Plus! 95 theme is active, prefer its comp.png asset
+        val plus95 = mainActivity?.themeManager?.getActivePlus95()
+        if (plus95 != null) {
+            try {
+                context.assets.open(mainActivity.themeManager.plus95Path(plus95.slug, "comp.png")).use { stream ->
+                    val d = android.graphics.drawable.Drawable.createFromStream(stream, "comp.png")
+                    if (d != null) {
+                        setIconDrawable(d)
+                        getDesktopIcon()?.icon = d
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MyComputerView", "Failed to load Plus! my computer icon", e)
+            }
+        }
+
         val iconResource = if (mainActivity != null) {
             mainActivity.themeManager.getMyComputerIcon()
         } else {
-            // Fallback
             when (currentTheme) {
                 is AppTheme.WindowsClassic -> R.drawable.my_computer_98_icon
                 is AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
@@ -70,11 +87,7 @@ class MyComputerView : DesktopIconView, ThemeAware {
 
         val drawable = context.getDrawable(iconResource)!!
         setIconDrawable(drawable)
-
-        // Also update the desktop icon data
-        getDesktopIcon()?.let { desktopIcon ->
-            desktopIcon.icon = drawable
-        }
+        getDesktopIcon()?.icon = drawable
     }
 
     // Backward compatible method

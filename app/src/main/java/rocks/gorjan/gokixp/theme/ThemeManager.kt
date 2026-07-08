@@ -71,12 +71,44 @@ class ThemeManager(private val context: Context) {
     /**
      * Sets the selected theme in SharedPreferences.
      * Writes the same key and string values as legacy code.
+     * Also resets the Plus! slug to "default" whenever the theme leaves Classic.
      */
     fun setSelectedTheme(theme: AppTheme) {
         prefs.edit {
             putString(KEY_SELECTED_THEME, theme.toString())
+            if (theme !is AppTheme.WindowsClassic) {
+                putString(KEY_PLUS95_THEME, PLUS95_DEFAULT)
+            }
         }
     }
+
+    // ========== Plus! 95 theme support ==========
+
+    data class Plus95Theme(
+        val slug: String,
+        val displayName: String,
+        val menuColor: Int,
+        val busyAsset: String?,
+        val soundAsset: String?,
+        val startupAsset: String?
+    )
+
+    fun getAllPlus95Themes(): List<Plus95Theme> = PLUS95_THEMES
+
+    fun getPlus95Slug(): String = prefs.getString(KEY_PLUS95_THEME, PLUS95_DEFAULT) ?: PLUS95_DEFAULT
+
+    fun setPlus95Slug(slug: String) {
+        prefs.edit { putString(KEY_PLUS95_THEME, slug) }
+    }
+
+    fun getActivePlus95(): Plus95Theme? {
+        if (getSelectedTheme() !is AppTheme.WindowsClassic) return null
+        val slug = getPlus95Slug()
+        if (slug == PLUS95_DEFAULT) return null
+        return PLUS95_THEMES.firstOrNull { it.slug == slug }
+    }
+
+    fun plus95Path(slug: String, filename: String): String = "plus95/$slug/$filename"
 
     /**
      * Returns true if the current theme is Windows Classic (98).
@@ -418,5 +450,23 @@ class ThemeManager(private val context: Context) {
 
     companion object {
         private const val KEY_SELECTED_THEME = "selected_theme"
+        const val KEY_PLUS95_THEME = "plus95_theme"
+        const val PLUS95_DEFAULT = "default"
+
+        val PLUS95_THEMES: List<Plus95Theme> = listOf(
+            Plus95Theme("dangerous_creatures", "Dangerous Creatures", 0xFF707070.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("inside_your_computer", "Inside your Computer", 0xFFA8C8A8.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("leonardo_da_vinci", "Leonardo da Vinci", 0xFFBFA59F.toInt(), "busy.png", "default.wav", "start.wav"),
+            Plus95Theme("more_windows", "More Windows", 0xFF9098A0.toInt(), null, null, null),
+            Plus95Theme("mystery", "Mystery", 0xFF687868.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("nature", "Nature", 0xFFD8C0A0.toInt(), "busy.png", "default.wav", "start.wav"),
+            Plus95Theme("science", "Science", 0xFF8399B1.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("sports", "Sports", 0xFFB0E0A0.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("the_60s_usa", "The 60's USA", 0xFFD068D8.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("the_golden_era", "The Golden Era", 0xFFB8C8B8.toInt(), null, "default.wav", "start.wav"),
+            Plus95Theme("travel", "Travel", 0xFF908070.toInt(), null, "default.wav", "start.wav"),
+        )
+
+        const val CLASSIC_GRAY: Int = 0xFFD3CEC7.toInt()
     }
 }
