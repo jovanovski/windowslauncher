@@ -60,6 +60,7 @@
             android:clearTaskOnLaunch="false"
             android:stateNotNeeded="true"
             android:alwaysRetainTaskState="true"
+            android:screenOrientation="fullUser"
             android:configChanges="orientation|screenSize|screenLayout">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
