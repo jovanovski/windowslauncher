@@ -133,6 +133,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var gestureDetector: GestureDetectorCompat
     private lateinit var desktopContainer: RelativeLayout
     private lateinit var recycleBin: RecycleBinView
+    private var myComputer: rocks.gorjan.gokixp.apps.explorer.MyComputerView? = null
     private lateinit var agentView: AgentView
     private lateinit var speechBubbleView: SpeechBubbleView
     private lateinit var quickGlanceWidget: QuickGlanceWidget
@@ -174,6 +175,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var selectedIcon: DesktopIconView? = null
     private val desktopIcons = mutableListOf<DesktopIcon>()
     private val desktopIconViews = mutableListOf<DesktopIconView>()
+    private var areDesktopIconsHidden = false // When true, icons are invisible but still tappable
+    private var wallpaperSlideRunnable: Runnable? = null
+    private var wallpaperSlidePositionMs = 0L // elapsed within the slide cycle, so it resumes where it stopped
     private lateinit var floatingWindowManager: FloatingWindowManager
     private var iconInMoveMode: DesktopIconView? = null
     private val customIconMappings = mutableMapOf<String, String>() // packageName -> customIconPath
@@ -205,10 +209,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val VIDEO_PERMISSION_REQUEST_CODE = 201
     private val STORAGE_PERMISSION_REQUEST_CODE = 202
 
+    // When the wallpaper selection dialog is open, its Browse button sets this so the
+    // picked image updates the dialog's live preview instead of jumping to the target dialog.
+    private var onWallpaperImagePicked: ((Uri) -> Unit)? = null
+
     // Image picker launcher for wallpaper selection
     private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { selectedUri ->
-            handleSelectedImage(selectedUri)
+            val previewHandler = onWallpaperImagePicked
+            if (previewHandler != null) {
+                onWallpaperImagePicked = null
+                previewHandler(selectedUri)
+            } else {
+                handleSelectedImage(selectedUri)
+            }
         }
     }
 
@@ -398,6 +412,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"
         private const val KEY_ROVER_VISIBLE = "rover_visible"
         private const val KEY_RECYCLE_BIN_VISIBLE = "recycle_bin_visible"
+        private const val KEY_MY_COMPUTER_VISIBLE = "my_computer_visible"
         private const val KEY_SHORTCUT_ARROW_VISIBLE = "shortcut_arrow_visible"
         private const val KEY_WALLPAPER_XP_PATH = "wallpaper_xp_path"
         private const val KEY_WALLPAPER_XP_URI = "wallpaper_xp_uri"
@@ -405,6 +420,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WALLPAPER_CLASSIC_URI = "wallpaper_classic_uri"
         private const val KEY_WALLPAPER_VISTA_PATH = "wallpaper_vista_path"
         private const val KEY_WALLPAPER_VISTA_URI = "wallpaper_vista_uri"
+        private const val KEY_WALLPAPER_XP_FOCUS_X = "wallpaper_xp_focus_x"
+        private const val KEY_WALLPAPER_CLASSIC_FOCUS_X = "wallpaper_classic_focus_x"
+        private const val KEY_WALLPAPER_VISTA_FOCUS_X = "wallpaper_vista_focus_x"
+        private const val KEY_SLIDE_WALLPAPER_ENABLED = "slide_wallpaper_enabled"
+        private const val KEY_SLIDE_WALLPAPER_DURATION = "slide_wallpaper_duration" // whole 0->max->0 cycle, in seconds
+        private const val DEFAULT_SLIDE_WALLPAPER_DURATION = 10
         private const val KEY_CURSOR_VISIBLE = "cursor_visible"
         private const val KEY_ICON_TEXT_BACKGROUND_VISIBLE = "icon_text_background_visible"
         private const val KEY_USER_NAME = "user_name"
@@ -436,6 +457,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SCREENSAVER_TIMEOUT = "screensaver_timeout"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
         private const val KEY_WINDOW_STATES = "window_states"
+        private const val KEY_TAP_TO_HIDE_ICONS = "tap_to_hide_icons"
+        private const val KEY_OPEN_URLS_IN_IE = "open_urls_in_ie"
 
         // Screensaver types
         private const val SCREENSAVER_NONE = 0
@@ -521,6 +544,98 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         themeAwareComponents.forEach { it.onThemeChanged(theme) }
     }
 
+    /**
+     * Applies a Plus! 95 theme override on top of Windows Classic. Passing "default" clears the override.
+     * Refreshes cursor, recycle bin / my computer icons, wallpaper, and the Classic gray menu tint.
+     */
+    fun applyPlus95Theme(slug: String) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit { putString(ThemeManager.KEY_PLUS95_THEME, slug) }
+
+        // Release any cached click player since the active sound may have changed
+        plus95ClickPlayer?.release()
+        plus95ClickPlayer = null
+        plus95ClickPlayerKey = null
+
+        val plus95 = themeManager.getActivePlus95()
+
+        // Refresh cursor
+        if (::cursorEffect.isInitialized) {
+            applyCursorNormalDrawable()
+        }
+
+        // Refresh desktop theme-aware components (RecycleBinView, MyComputerView, etc.)
+        notifyThemeChanged(themeManager.getSelectedTheme())
+
+        // Wallpaper — write the Plus! asset path (or revert to default) under the Classic keys
+        val classicPath = if (plus95 != null) {
+            themeManager.plus95Path(plus95.slug, "wall.jpg")
+        } else {
+            "wallpapers/Windows ME (m).jpg"
+        }
+        prefs.edit {
+            putString(KEY_WALLPAPER_CLASSIC_PATH, classicPath)
+            remove(KEY_WALLPAPER_CLASSIC_URI)
+        }
+        if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
+            applyCustomWallpaperFromAssets(classicPath)
+        }
+
+        // Menu colour walker — tint or untint the Windows Classic gray
+        val targetColor = plus95?.menuColor ?: ThemeManager.CLASSIC_GRAY
+        val root = findViewById<View>(R.id.main_background)
+        if (root != null) applyPlus95MenuColor(root, targetColor)
+    }
+
+    /**
+     * Walks a view tree and swaps any ColorDrawable / GradientDrawable whose color is the
+     * stock Classic gray (#d3cec7) with `newColor`. Intended to tint taskbar, start menu,
+     * dialog, and system tray gray surfaces without editing each XML.
+     */
+    fun applyPlus95MenuColor(root: View, newColor: Int) {
+        val stack = ArrayDeque<View>()
+        stack.addLast(root)
+        while (stack.isNotEmpty()) {
+            val v = stack.removeLast()
+            tintClassicGrayBackground(v, newColor)
+            if (v is android.view.ViewGroup) {
+                for (i in 0 until v.childCount) stack.addLast(v.getChildAt(i))
+            }
+        }
+    }
+
+    private fun tintClassicGrayBackground(view: View, newColor: Int) {
+        val bg = view.background ?: return
+        when (bg) {
+            is android.graphics.drawable.ColorDrawable -> {
+                if (bg.color == ThemeManager.CLASSIC_GRAY) {
+                    view.setBackgroundColor(newColor)
+                }
+            }
+            is android.graphics.drawable.GradientDrawable -> {
+                if (gradientColorIsClassicGray(bg)) {
+                    bg.mutate()
+                    (bg as android.graphics.drawable.GradientDrawable).setColor(newColor)
+                }
+            }
+            is android.graphics.drawable.LayerDrawable -> {
+                for (i in 0 until bg.numberOfLayers) {
+                    val layer = bg.getDrawable(i)
+                    if (layer is android.graphics.drawable.GradientDrawable && gradientColorIsClassicGray(layer)) {
+                        layer.mutate()
+                        (layer as android.graphics.drawable.GradientDrawable).setColor(newColor)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun gradientColorIsClassicGray(drawable: android.graphics.drawable.GradientDrawable): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return false
+        val stateList = drawable.color ?: return false
+        return stateList.defaultColor == ThemeManager.CLASSIC_GRAY
+    }
+
     // ========== Theme-Specific Resource Helper Methods ==========
 
     /**
@@ -532,6 +647,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> Pair(KEY_WALLPAPER_CLASSIC_PATH, KEY_WALLPAPER_CLASSIC_URI)
             AppTheme.WindowsXP -> Pair(KEY_WALLPAPER_XP_PATH, KEY_WALLPAPER_XP_URI)
             AppTheme.WindowsVista -> Pair(KEY_WALLPAPER_VISTA_PATH, KEY_WALLPAPER_VISTA_URI)
+        }
+    }
+
+    /**
+     * Gets the wallpaper X focus storage key for the current theme.
+     */
+    private fun getCurrentThemeWallpaperFocusXKey(): String {
+        return when (themeManager.getSelectedTheme()) {
+            AppTheme.WindowsClassic -> KEY_WALLPAPER_CLASSIC_FOCUS_X
+            AppTheme.WindowsXP -> KEY_WALLPAPER_XP_FOCUS_X
+            AppTheme.WindowsVista -> KEY_WALLPAPER_VISTA_FOCUS_X
         }
     }
 
@@ -741,6 +867,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Handle pending app installation/removal from broadcast receiver
         handlePendingPackageAction()
+
+        // Handle a URL shared into the launcher on cold start
+        handleSharedUrlIntent(intent)
 
         // Initialize app detection
         initializeAppDetection()
@@ -1200,6 +1329,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showSolitareDialog(appInfo = appInfo)
         }
 
+        // Register Pinball
+        systemAppActions["system.pinball"] = { appInfo ->
+            showPinballDialog(appInfo = appInfo)
+        }
+
 
         // Register Clock
         systemAppActions["system.clock"] = { appInfo ->
@@ -1314,6 +1448,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "solitare.exe",
                 packageName = "system.solitare",
                 icon = createSquareDrawable(solitareDrawable)
+            ))
+        }
+
+        // Pinball - scale icon to match app icon size
+        val pinballDrawable = AppCompatResources.getDrawable(this, R.drawable.pinball)
+        if (pinballDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "Pinball",
+                exeName = "pinball.exe",
+                packageName = "system.pinball",
+                icon = createSquareDrawable(pinballDrawable)
             ))
         }
 
@@ -1759,6 +1904,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.clock" ->AppCompatResources.getDrawable(this, themeManager.getClockIcon())
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
+                "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
                 "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
@@ -1896,7 +2042,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_RECYCLE_BIN_VISIBLE, true) // Default to visible
     }
-    
+
+    private fun isMyComputerVisible(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_MY_COMPUTER_VISIBLE, true) // Default to visible
+    }
+
     private fun isQuickGlanceVisible(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_QUICK_GLANCE_VISIBLE, true) // Default to visible
@@ -1910,6 +2061,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun isCursorVisible(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_CURSOR_VISIBLE, true) // Default to visible
+    }
+
+    private fun isTapToHideIconsEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_TAP_TO_HIDE_ICONS, false) // Default to off
+    }
+
+    private fun isOpenUrlsInIeEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_OPEN_URLS_IN_IE, false) // Default to the system default browser
     }
 
     private fun toggleCursorVisibility() {
@@ -2528,7 +2689,70 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "Recycle Bin hidden and removed from desktop")
         }
     }
-    
+
+    private fun toggleMyComputer() {
+        val isCurrentlyVisible = isMyComputerVisible()
+        val newVisibility = !isCurrentlyVisible
+
+        // Save new state
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit { putBoolean(KEY_MY_COMPUTER_VISIBLE, newVisibility) }
+
+        if (newVisibility) {
+            // Show My Computer - add it to the first available grid space
+            showMyComputer()
+        } else {
+            // Hide My Computer - remove it from desktop and free up grid space
+            hideMyComputer()
+        }
+
+        Log.d("MainActivity", "My Computer visibility changed to: ${if (newVisibility) "VISIBLE" else "GONE"}")
+    }
+
+    private fun showMyComputer() {
+        val myComputer = this.myComputer ?: return
+        if (myComputer.parent == null) {
+            // Find first available grid position
+            val position = findFirstAvailableGridPosition()
+            // Add to desktop at the calculated position
+            val layoutParams = RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.WRAP_CONTENT,
+                RelativeLayout.LayoutParams.WRAP_CONTENT
+            )
+            layoutParams.leftMargin = position.first
+            layoutParams.topMargin = position.second
+
+            desktopContainer.addView(myComputer, layoutParams)
+            myComputer.visibility = View.VISIBLE
+
+            // Set My Computer to the calculated grid position
+            myComputer.x = position.first.toFloat()
+            myComputer.y = position.second.toFloat()
+
+            // Update desktop icon position and save
+            val desktopIcon = myComputer.getDesktopIcon()
+            if (desktopIcon != null) {
+                desktopIcon.x = position.first.toFloat()
+                desktopIcon.y = position.second.toFloat()
+                saveDesktopIconPosition(desktopIcon)
+            } else {
+                Log.d("MainActivity", "My Computer added to grid at position: ${position.first}, ${position.second}")
+            }
+        } else {
+            // Just make it visible if already in layout
+            myComputer.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideMyComputer() {
+        val myComputer = this.myComputer ?: return
+        myComputer.visibility = View.GONE
+        // Optionally remove from parent to truly free up space
+        val parent = myComputer.parent as? RelativeLayout
+        parent?.removeView(myComputer)
+        Log.d("MainActivity", "My Computer hidden and removed from desktop")
+    }
+
     private fun findFirstAvailableGridPosition(): Pair<Int, Int> {
         val iconSize = (90 * resources.displayMetrics.density).toInt()
         val margin = (12 * resources.displayMetrics.density).toInt()
@@ -2853,6 +3077,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             startMenu.visibility = View.VISIBLE
             isStartMenuVisible = true
 
+            themeManager.getActivePlus95()?.let { applyPlus95MenuColor(startMenu, it.menuColor) }
+
             // For Windows Classic theme, keep app list invisible when opened via Start button
             val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
             appList98?.visibility = View.INVISIBLE
@@ -3103,6 +3329,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 hideContextMenu()
                 if (isStartMenuVisible) {
                     hideStartMenu()
+                } else if (isTapToHideIconsEnabled()) {
+                    // Tapping empty desktop space toggles icon visibility.
+                    // Icons stay clickable so they can be tapped from memory.
+                    toggleDesktopIconsVisibility()
                 }
                 return true
             }
@@ -3541,6 +3771,29 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Recycle bin move mode is now handled by the same system as regular icons
     }
     
+    private fun toggleDesktopIconsVisibility() {
+        areDesktopIconsHidden = !areDesktopIconsHidden
+        // Vista fades; XP and 9x (Classic) toggle instantly.
+        val duration = if (themeManager.isVistaTheme()) 150L else 0L
+        desktopIconViews.forEach { iconView ->
+            if (areDesktopIconsHidden) {
+                // Fade out, then fully hide (INVISIBLE) so hidden icons can't be tapped.
+                iconView.animate()
+                    .alpha(0f)
+                    .setDuration(duration)
+                    .withEndAction { iconView.visibility = View.INVISIBLE }
+                    .start()
+            } else {
+                // Make visible (and tappable) again, then fade in.
+                iconView.visibility = View.VISIBLE
+                iconView.animate()
+                    .alpha(1f)
+                    .setDuration(duration)
+                    .start()
+            }
+        }
+    }
+
     private fun showStartMenuAppContextMenu(appInfo: AppInfo, x: Float, y: Float) {
         Log.d("MainActivity", "showStartMenuAppContextMenu called for ${appInfo.name}")
         Helpers.performHapticFeedback(this)
@@ -3636,14 +3889,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // Check if this is a system app
             val isSystemApp = icon?.let { isSystemApp(it.packageName) } ?: false
+            val isUrlShortcut = icon?.type == IconType.URL_SHORTCUT
 
             // Create desktop icon context menu items
             val menuItems = ContextMenuItems.getDesktopIconMenuItems(
                 onOpen = {
                     icon?.let { desktopIcon ->
                         try {
-                            // Check if this is a system app
-                            if (isSystemApp(desktopIcon.packageName)) {
+                            if (desktopIcon.type == IconType.URL_SHORTCUT) {
+                                openUrlShortcut(desktopIcon.targetUrl)
+                            } else if (isSystemApp(desktopIcon.packageName)) {
                                 launchSystemApp(desktopIcon.packageName)
                             } else {
                                 val launchIntent = packageManager.getLaunchIntentForPackage(desktopIcon.packageName)
@@ -3695,7 +3950,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         setWeatherApp(appInfo)
                     }
                 },
-                isSystemApp = isSystemApp
+                isSystemApp = isSystemApp,
+                isUrlShortcut = isUrlShortcut
             )
             
             // Show the menu
@@ -3815,6 +4071,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 },
                 onMove = {
                     startIconMoveMode(myComputerView)
+                },
+                onHideMyComputer = {
+                    toggleMyComputer() // Hide My Computer
                 },
                 onProperties = {
                     createAndShowWallpaperDialog("settings")
@@ -4117,6 +4376,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     }
                     IconType.FOLDER -> {
                         showFolderWindow(iconView as FolderView)
+                    }
+                    IconType.URL_SHORTCUT -> {
+                        openUrlShortcut(icon.targetUrl)
                     }
                     else -> {}
                 }
@@ -4737,6 +4999,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     }
                     IconType.FOLDER -> {
                         showFolderWindow(iconView as FolderView)
+                    }
+                    IconType.URL_SHORTCUT -> {
+                        openUrlShortcut(icon.targetUrl)
                     }
                     else -> {}
                 }
@@ -5360,7 +5625,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
         val showQuickGlanceCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_quick_glance_checkbox)
         val showRecycleBinCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_recycle_bin_checkbox)
+        val showMyComputerCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_my_computer_checkbox)
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
+        val tapToHideIconsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.tap_to_hide_icons_checkbox)
+        val openUrlsInIeCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.open_urls_in_ie_checkbox)
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
         val playEmailSoundCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.play_email_sound_checkbox)
         val showNotificationDotsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_notification_dots_checkbox)
@@ -5406,20 +5674,52 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             flavourSpinner.setSelection(flavourIndex)
         }
 
-        // Show/hide flavour spinner based on current theme
+        // Set up Plus! theme spinner
+        val plusThemeLabel = contentView.findViewById<TextView>(R.id.plus_theme_label)
+        val plusThemeSpinner = contentView.findViewById<android.widget.Spinner>(R.id.plus_theme_spinner)
+        val plusThemeDefaults = arrayOf("Default") + themeManager.getAllPlus95Themes().map { it.displayName }.toTypedArray()
+        val plusSlugByName = mapOf(
+            "Default" to ThemeManager.PLUS95_DEFAULT
+        ) + themeManager.getAllPlus95Themes().associate { it.displayName to it.slug }
+        val plusSpinnerAdapter = android.widget.ArrayAdapter(this, spinnerLayoutId, plusThemeDefaults)
+        plusSpinnerAdapter.setDropDownViewResource(dropdownLayoutId)
+        plusThemeSpinner.adapter = plusSpinnerAdapter
+
+        val currentPlusSlug = themeManager.getPlus95Slug()
+        val currentPlusName = plusSlugByName.entries.find { it.value == currentPlusSlug }?.key ?: "Default"
+        val plusIndex = plusThemeDefaults.indexOf(currentPlusName)
+        if (plusIndex != -1) {
+            plusThemeSpinner.setSelection(plusIndex)
+        }
+
+        // Show/hide flavour + plus spinners based on current theme
         var flavourVisibility = if (shouldShowFlavourSpinner()) View.VISIBLE else View.GONE
         flavourLabel.visibility = flavourVisibility
         flavourSpinner.visibility = flavourVisibility
+        plusThemeLabel.visibility = flavourVisibility
+        plusThemeSpinner.visibility = flavourVisibility
 
         // Track pending theme and flavour selections (don't apply immediately)
         var pendingTheme: String? = null
         var pendingFlavour: String? = null
+        var pendingPlus95: String? = null
 
         // Handle flavour selection - just track it, don't apply
         flavourSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
                 val selectedFlavour = flavours[position]
                 pendingFlavour = flavourValues[selectedFlavour]
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>) {
+                // Do nothing
+            }
+        }
+
+        // Handle Plus! theme selection - just track it, don't apply
+        plusThemeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
+                pendingPlus95 = plusSlugByName[plusThemeDefaults[position]] ?: ThemeManager.PLUS95_DEFAULT
             }
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>) {
@@ -5466,12 +5766,38 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
+        // Set up Show My Computer checkbox
+        showMyComputerCheckbox.isChecked = isMyComputerVisible()
+        showMyComputerCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked != isMyComputerVisible()) {
+                toggleMyComputer()
+            }
+        }
+
         // Set up Show Shortcut Arrow checkbox
         showShortcutArrowOnIcons.isChecked = isShortcutArrowVisible()
         showShortcutArrowOnIcons.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != isShortcutArrowVisible()) {
                 toggleShortcutArrow()
             }
+        }
+
+        // Set up Tap Desktop To Hide Icons checkbox
+        tapToHideIconsCheckbox.isChecked = isTapToHideIconsEnabled()
+        tapToHideIconsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_TAP_TO_HIDE_ICONS, isChecked) }
+            Log.d("MainActivity", "Tap to hide icons changed to: $isChecked")
+            // If disabling while icons are hidden, restore them so the user isn't stuck.
+            if (!isChecked && areDesktopIconsHidden) {
+                toggleDesktopIconsVisibility()
+            }
+        }
+
+        // Set up Open Desktop URLs In Internet Explorer checkbox
+        openUrlsInIeCheckbox.isChecked = isOpenUrlsInIeEnabled()
+        openUrlsInIeCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_OPEN_URLS_IN_IE, isChecked) }
+            Log.d("MainActivity", "Open URLs in IE changed to: $isChecked")
         }
 
         // Set up Show Cursor checkbox
@@ -5632,6 +5958,40 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
 
+        // Set up Slide Desktop Wallpaper checkbox + duration slider
+        val slideWallpaperCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.slide_wallpaper_checkbox)
+        val slideWallpaperDurationContainer = contentView.findViewById<LinearLayout>(R.id.slide_wallpaper_duration_container)
+        val slideWallpaperDurationSlider = contentView.findViewById<android.widget.SeekBar>(R.id.slide_wallpaper_duration_slider)
+        val slideWallpaperDurationValue = contentView.findViewById<TextView>(R.id.slide_wallpaper_duration_value)
+
+        val slideWallpaperEnabled = prefs.getBoolean(KEY_SLIDE_WALLPAPER_ENABLED, false)
+        val slideWallpaperDuration = prefs.safeGetInt(KEY_SLIDE_WALLPAPER_DURATION, DEFAULT_SLIDE_WALLPAPER_DURATION)
+        slideWallpaperCheckbox.isChecked = slideWallpaperEnabled
+        slideWallpaperDurationSlider.progress = slideWallpaperDuration
+        slideWallpaperDurationValue.text = "${slideWallpaperDuration}s"
+        slideWallpaperDurationContainer.visibility = if (slideWallpaperEnabled) View.VISIBLE else View.GONE
+
+        slideWallpaperCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_SLIDE_WALLPAPER_ENABLED, isChecked) }
+            slideWallpaperDurationContainer.visibility = if (isChecked) View.VISIBLE else View.GONE
+            if (isChecked) startWallpaperSlideIfEnabled() else stopWallpaperSlide()
+            Log.d("MainActivity", "Slide desktop wallpaper changed to: $isChecked")
+        }
+
+        slideWallpaperDurationSlider.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val seconds = progress.coerceIn(10, 60) // slider range 10s–60s
+                slideWallpaperDurationValue.text = "${seconds}s"
+                prefs.edit { putInt(KEY_SLIDE_WALLPAPER_DURATION, seconds) }
+                // Restart with the new duration if the slide is currently running
+                if (wallpaperSlideRunnable != null) startWallpaperSlideIfEnabled()
+                Log.d("MainActivity", "Slide wallpaper duration changed to: ${seconds}s")
+            }
+
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
         // Set up Screensaver Selector
         val screensaverOptions = resources.getStringArray(R.array.screensaver_options)
         val screensaverAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_screensaver, screensaverOptions)
@@ -5722,9 +6082,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         })
 
-        customWallpaperButton.setOnClickListener {
-                imagePickerLauncher.launch("image/*")
-        }
+        // Note: the Browse (custom wallpaper) button handler is set up later, after the
+        // preview ImageView exists, so a picked image can update the live preview.
 
         // Apply fonts based on selected theme
         applyThemeFontsToDialog(contentView)
@@ -5740,6 +6099,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Update flavour spinner visibility based on selected theme
                 flavourLabel.visibility = flavourVisibility
                 flavourSpinner.visibility = flavourVisibility
+                plusThemeLabel.visibility = flavourVisibility
+                plusThemeSpinner.visibility = flavourVisibility
             }
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>) {
@@ -5764,6 +6125,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Track selected wallpaper for preview
         var selectedWallpaper: WallpaperItem? = null
 
+        // Track a custom image picked via Browse (mutually exclusive with selectedWallpaper)
+        var pickedCustomUri: Uri? = null
+
+        // Clear any stale picker callback from a previous dialog instance
+        onWallpaperImagePicked = null
+
         // Get wallpaper preview ImageView
         val wallpaperPreview = contentView.findViewById<ImageView>(R.id.wallpaper_preview)
 
@@ -5771,40 +6138,90 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val (pathKey, uriKey) = getCurrentThemeWallpaperKeys()
         var currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
 
+        // Track the horizontal focus point [0,1] used to pan the wallpaper.
+        // 0.5 == centered (CENTER_CROP). Lower => show more left, higher => show more right.
+        val focusXKey = getCurrentThemeWallpaperFocusXKey()
+        var currentFocusX = prefs.getFloat(focusXKey, 0.5f)
+
+        // Sets the preview scaleType and applies the current focus when appropriate.
+        // "(m)" wallpapers stay FIT_CENTER (no cropping, dragging is disabled for them).
+        fun configurePreviewForCurrent(isMinimized: Boolean) {
+            if (isMinimized) {
+                wallpaperPreview.scaleType = ImageView.ScaleType.FIT_CENTER
+            } else {
+                applyWallpaperFocusXToImageView(wallpaperPreview, currentFocusX)
+            }
+        }
+
         // Check if there's a custom wallpaper URI first
         val customWallpaperUri = prefs.getString(uriKey, null)
         if (customWallpaperUri != null) {
-            // Load custom wallpaper from URI
+            // Load custom wallpaper from URI (downsampled to preview size to avoid huge bitmaps)
             try {
                 val uri = customWallpaperUri.toUri()
-                val inputStream = contentResolver.openInputStream(uri)
-                val customDrawable = Drawable.createFromStream(inputStream, customWallpaperUri)
-                inputStream?.close()
-                if (customDrawable != null) {
-                    wallpaperPreview.scaleType = ImageView.ScaleType.CENTER_CROP
-                    wallpaperPreview.setImageDrawable(customDrawable)
+                val previewPx = (160 * resources.displayMetrics.density).toInt()
+                val bitmap = decodeSampledBitmapFromUri(uri, previewPx, previewPx)
+                if (bitmap != null) {
+                    wallpaperPreview.setImageDrawable(bitmap.toDrawable(resources))
+                    configurePreviewForCurrent(isMinimized = false)
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Failed to load custom wallpaper for preview: $customWallpaperUri", e)
             }
         } else {
             // Load built-in wallpaper from assets
-            // Set scaleType based on whether path contains "(m)"
-            if (currentWallpaperPath.contains("(m)")) {
-                wallpaperPreview.scaleType = ImageView.ScaleType.FIT_CENTER
-            } else {
-                wallpaperPreview.scaleType = ImageView.ScaleType.CENTER_CROP
-            }
-
             try {
                 val inputStream = assets.open(currentWallpaperPath)
                 val currentDrawable = Drawable.createFromStream(inputStream, currentWallpaperPath)
                 inputStream.close()
                 if (currentDrawable != null) {
                     wallpaperPreview.setImageDrawable(currentDrawable)
+                    configurePreviewForCurrent(isMinimized = currentWallpaperPath.contains("(m)"))
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Failed to load current wallpaper for preview: $currentWallpaperPath", e)
+            }
+        }
+
+        // Horizontal drag on the preview pans the wallpaper live (preview + launcher).
+        var dragStartRawX = 0f
+        var dragStartFocusX = 0.5f
+        var dragScaledImgWidthPx = 0f
+        wallpaperPreview.setOnTouchListener { v, event ->
+            if (wallpaperPreview.scaleType != ImageView.ScaleType.MATRIX) return@setOnTouchListener false
+            val drawable = wallpaperPreview.drawable ?: return@setOnTouchListener false
+            val imgW = drawable.intrinsicWidth.toFloat()
+            val imgH = drawable.intrinsicHeight.toFloat()
+            val vw = wallpaperPreview.width.toFloat()
+            val vh = wallpaperPreview.height.toFloat()
+            if (imgW <= 0f || imgH <= 0f || vw <= 0f || vh <= 0f) return@setOnTouchListener false
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragStartRawX = event.rawX
+                    dragStartFocusX = currentFocusX
+                    dragScaledImgWidthPx = maxOf(vw / imgW, vh / imgH) * imgW
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (dragScaledImgWidthPx > 0f) {
+                        val dx = event.rawX - dragStartRawX
+                        val focusDelta = -dx / dragScaledImgWidthPx
+                        currentFocusX = (dragStartFocusX + focusDelta).coerceIn(0f, 1f)
+                        applyWallpaperFocusXToImageView(wallpaperPreview, currentFocusX)
+                        val launcherWallpaper = findViewById<RelativeLayout>(R.id.main_background)
+                            ?.findViewWithTag<ImageView>("wallpaper")
+                        if (launcherWallpaper != null) {
+                            applyWallpaperFocusXToImageView(launcherWallpaper, currentFocusX)
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    prefs.edit { putFloat(focusXKey, currentFocusX) }
+                    true
+                }
+                else -> false
             }
         }
 
@@ -5816,24 +6233,52 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val adapter = WallpaperAdapter(wallpapers) { wallpaper ->
             // Preview the wallpaper instead of showing target dialog immediately
             selectedWallpaper = wallpaper
-            if (wallpaper.name.contains("(m)")) {
-                wallpaperPreview.scaleType = ImageView.ScaleType.FIT_CENTER
-            } else {
-                wallpaperPreview.scaleType = ImageView.ScaleType.CENTER_CROP
-            }
+            pickedCustomUri = null
             wallpaperPreview.setImageDrawable(wallpaper.drawable)
+            configurePreviewForCurrent(isMinimized = wallpaper.name.contains("(m)"))
             playClickSound()
         }
         recyclerView.adapter = adapter
+
+        // Browse button: pick a custom image and show it in the live preview immediately.
+        customWallpaperButton.setOnClickListener {
+            playClickSound()
+            onWallpaperImagePicked = { uri ->
+                try {
+                    val previewPx = (160 * resources.displayMetrics.density).toInt()
+                    val bitmap = decodeSampledBitmapFromUri(uri, previewPx, previewPx)
+                    if (bitmap != null) {
+                        selectedWallpaper = null
+                        pickedCustomUri = uri
+                        currentFocusX = 0.5f
+                        wallpaperPreview.setImageDrawable(bitmap.toDrawable(resources))
+                        // Custom images support panning/cropping like built-in ones
+                        configurePreviewForCurrent(isMinimized = false)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Failed to load picked wallpaper for preview: $uri", e)
+                }
+            }
+            imagePickerLauncher.launch("image/*")
+        }
 
         // Set up OK button - apply theme/flavour changes, show target dialog if wallpaper changed, then close
         okButton.setOnClickListener {
             playClickSound()
 
+            // Apply pending Plus! theme first so wallpaper/cursor/sound pick up its overrides
+            if (pendingPlus95 != null && pendingPlus95 != currentPlusSlug) {
+                applyPlus95Theme(pendingPlus95!!)
+            }
+
             // Apply pending theme changes
             if (pendingTheme != null && pendingTheme != currentTheme.toString()) {
                 prefs.edit {
                     putString("selected_theme", pendingTheme)
+                    // Switching away from Classic resets the Plus! slug to "default"
+                    if (AppTheme.fromString(pendingTheme) !is AppTheme.WindowsClassic) {
+                        putString(ThemeManager.KEY_PLUS95_THEME, ThemeManager.PLUS95_DEFAULT)
+                    }
                 }
                 applyTheme(pendingTheme!!)
             }
@@ -5869,7 +6314,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             currentWallpaperPath = prefs.getString(pathKey, null) ?: getDefaultWallpaperForTheme()
 
             // Apply wallpaper if changed
-            if (selectedWallpaper != null) {
+            if (pickedCustomUri != null) {
+                handleSelectedImage(pickedCustomUri!!)
+            } else if (selectedWallpaper != null) {
                 showWallpaperTargetDialog(selectedWallpaper)
             }
 
@@ -5891,10 +6338,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         applyButton.setOnClickListener {
             playClickSound()
 
+            // Apply pending Plus! theme first
+            if (pendingPlus95 != null && pendingPlus95 != currentPlusSlug) {
+                applyPlus95Theme(pendingPlus95!!)
+                pendingPlus95 = null
+            }
+
             // Apply pending theme changes
             if (pendingTheme != null && pendingTheme != currentTheme.toString()) {
                 prefs.edit {
                     putString("selected_theme", pendingTheme)
+                    if (AppTheme.fromString(pendingTheme) !is AppTheme.WindowsClassic) {
+                        putString(ThemeManager.KEY_PLUS95_THEME, ThemeManager.PLUS95_DEFAULT)
+                    }
                 }
                 applyTheme(pendingTheme!!)
                 pendingTheme = null // Clear after applying
@@ -5931,7 +6387,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             // Apply wallpaper if changed
-            if (selectedWallpaper != null) {
+            if (pickedCustomUri != null) {
+                handleSelectedImage(pickedCustomUri!!)
+                pickedCustomUri = null
+            } else if (selectedWallpaper != null) {
                 showWallpaperTargetDialog(selectedWallpaper)
                 // Update current wallpaper path after applying
                 selectedWallpaper = null
@@ -7097,6 +7556,43 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
+    private fun showPinballDialog(appInfo: AppInfo? = null) {
+        // Create Windows-style dialog
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.pinball"  // Set identifier for tracking
+        windowsDialog.setTitle("Pinball")
+        windowsDialog.setTaskbarIcon(R.drawable.pinball)
+
+        // Inflate the pinball layout (a full-bleed WebView)
+        val contentView = layoutInflater.inflate(R.layout.program_pinball, null)
+
+        // Create Pinball app instance and load the bundled web game
+        val pinballApp = rocks.gorjan.gokixp.apps.pinball.PinballApp(this)
+        pinballApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSizePercentage(90f, 60f)  // Restore size when un-maximized
+        windowsDialog.setMaximizable(true)
+
+        // Cleanup on close
+        windowsDialog.setOnCloseListener {
+            pinballApp.cleanup()
+        }
+        // Cleanup on minimize
+        windowsDialog.setOnMinimizeListener {
+            // Game continues running when minimized
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // Always open maximized (after the window is added and laid out)
+        Handler(Looper.getMainLooper()).postDelayed({
+            windowsDialog.maximizeWindow()
+        }, 100)
+    }
+
     /**
      * Public API to open Winamp with optional file to play
      */
@@ -7767,6 +8263,164 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * Pans an ImageView's image horizontally using a focusX in [0,1] (0.5 == CENTER_CROP).
+     * Uses MATRIX scaleType and clamps so the image always covers the view.
+     */
+    private fun applyWallpaperFocusXToImageView(imageView: ImageView, focusX: Float) {
+        val drawable = imageView.drawable ?: return
+        val imgWidth = drawable.intrinsicWidth.toFloat()
+        val imgHeight = drawable.intrinsicHeight.toFloat()
+        if (imgWidth <= 0f || imgHeight <= 0f) return
+
+        val viewWidth = imageView.width.toFloat()
+        val viewHeight = imageView.height.toFloat()
+        if (viewWidth <= 0f || viewHeight <= 0f) {
+            imageView.post { applyWallpaperFocusXToImageView(imageView, focusX) }
+            return
+        }
+
+        val scale = maxOf(viewWidth / imgWidth, viewHeight / imgHeight)
+        val scaledImgWidth = imgWidth * scale
+        val scaledImgHeight = imgHeight * scale
+
+        val clampedFocusX = focusX.coerceIn(0f, 1f)
+        var translateX = viewWidth / 2f - clampedFocusX * scaledImgWidth
+        val minTranslateX = minOf(viewWidth - scaledImgWidth, 0f)
+        translateX = translateX.coerceIn(minTranslateX, 0f)
+        val translateY = (viewHeight - scaledImgHeight) / 2f
+
+        val matrix = android.graphics.Matrix()
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(translateX, translateY)
+
+        imageView.scaleType = ImageView.ScaleType.MATRIX
+        imageView.imageMatrix = matrix
+    }
+
+    private fun getWallpaperImageView(): ImageView? {
+        return findViewById<RelativeLayout>(R.id.main_background)?.findViewWithTag<ImageView>("wallpaper")
+    }
+
+    /**
+     * Starts (or restarts) the wallpaper slide animation if the setting is enabled.
+     * The wallpaper slowly pans from X offset 0 to the max X offset and back, looping.
+     * The configured duration covers the whole 0 -> max -> 0 cycle.
+     */
+    private fun startWallpaperSlideIfEnabled() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_SLIDE_WALLPAPER_ENABLED, false)) return
+
+        val wallpaperImageView = getWallpaperImageView() ?: return
+        val drawable = wallpaperImageView.drawable ?: return
+        val imgWidth = drawable.intrinsicWidth.toFloat()
+        val imgHeight = drawable.intrinsicHeight.toFloat()
+        val viewWidth = wallpaperImageView.width.toFloat()
+        val viewHeight = wallpaperImageView.height.toFloat()
+
+        // Cancel any running loop (don't restore the manual offset; we're about to drive it).
+        wallpaperSlideRunnable?.let { wallpaperImageView.removeCallbacks(it) }
+        wallpaperSlideRunnable = null
+
+        // Wait until the view is laid out and the drawable has real dimensions.
+        if (imgWidth <= 0f || imgHeight <= 0f || viewWidth <= 0f || viewHeight <= 0f) {
+            wallpaperImageView.post { startWallpaperSlideIfEnabled() }
+            return
+        }
+
+        // The image is scaled to cover the view (center-crop). Work out exactly how many pixels
+        // of horizontal slack there are: that's the full distance we can pan.
+        val scale = maxOf(viewWidth / imgWidth, viewHeight / imgHeight)
+        val scaledImgWidth = imgWidth * scale
+        val scaledImgHeight = imgHeight * scale
+        val panRangePx = scaledImgWidth - viewWidth // >= 0; total horizontal travel
+        val translateY = (viewHeight - scaledImgHeight) / 2f
+
+        Log.d("WPSLIDE", "START img=${imgWidth}x${imgHeight} view=${viewWidth}x${viewHeight} scale=$scale scaledW=$scaledImgWidth panRangePx=$panRangePx")
+
+        // Nothing to slide if the image isn't wider than the view.
+        if (panRangePx < 1f) {
+            applyWallpaperFocusXToImageView(wallpaperImageView, 0.5f)
+            return
+        }
+
+        val durationSeconds = prefs.getInt(KEY_SLIDE_WALLPAPER_DURATION, DEFAULT_SLIDE_WALLPAPER_DURATION)
+        // durationSeconds is the ONE-WAY time (left edge -> right edge); round trip is 2x.
+        val cycleMs = durationSeconds * 2 * 1000L
+        // Easing should total ~2s per leg: 1s ramping up + 1s ramping down, with the rest of the
+        // leg at constant speed. The ramp covers (1s / leg duration) of each end.
+        val rampFraction = (1f / durationSeconds).coerceIn(0.01f, 0.5f)
+
+        // Drive from REAL elapsed time via a per-frame Choreographer callback (postOnAnimation),
+        // which ignores the system "Animator duration scale" developer setting, so the configured
+        // duration is honored exactly. Translate X goes 0 -> -panRangePx -> 0, eased in/out.
+        // Offset the start so we resume from where the slide last stopped (e.g. after backgrounding).
+        val startTime = android.os.SystemClock.uptimeMillis() - (wallpaperSlidePositionMs % cycleMs)
+        var frameCount = 0
+        val runnable = object : Runnable {
+            override fun run() {
+                if (wallpaperSlideRunnable !== this) return // superseded/stopped
+                val elapsed = (android.os.SystemClock.uptimeMillis() - startTime) % cycleMs
+                wallpaperSlidePositionMs = elapsed // remember where we are so we can resume later
+                val phase = elapsed.toFloat() / cycleMs.toFloat()
+                // Linear progress of the current leg: 0->1 going out, 1->0 coming back.
+                val legProgress = if (phase < 0.5f) phase * 2f else 2f - phase * 2f
+                // Ease in/out so it accelerates from and decelerates to rest at each end (~1s each),
+                // with a constant-speed glide through the middle.
+                val eased = easeWithRamp(legProgress, rampFraction)
+                val translateX = -panRangePx * eased
+
+                val matrix = android.graphics.Matrix()
+                matrix.setScale(scale, scale)
+                matrix.postTranslate(translateX, translateY)
+                wallpaperImageView.scaleType = ImageView.ScaleType.MATRIX
+                wallpaperImageView.imageMatrix = matrix
+
+                if (frameCount % 30 == 0) {
+                    Log.d("WPSLIDE", "elapsedMs=$elapsed legProgress=$legProgress eased=$eased translateX=$translateX")
+                }
+                frameCount++
+                wallpaperImageView.postOnAnimation(this)
+            }
+        }
+        wallpaperSlideRunnable = runnable
+        wallpaperImageView.postOnAnimation(runnable)
+    }
+
+    /**
+     * Eases progress t in [0,1] -> [0,1] with smooth (cosine) acceleration over the first [ramp]
+     * fraction, a constant-speed glide through the middle, and symmetric deceleration over the
+     * last [ramp] fraction. Velocity starts and ends at zero. ramp=0.5 eases the whole leg;
+     * smaller values make the ease shorter (0.25 = half as long, longer constant-speed middle).
+     */
+    private fun easeWithRamp(t: Float, ramp: Float): Float {
+        val x = t.coerceIn(0f, 1f)
+        val r = ramp.coerceIn(0.001f, 0.5f)
+        val vMax = 1f / (1f - r) // peak speed so total travel is exactly 1
+        val pi = Math.PI.toFloat()
+        return when {
+            x < r -> vMax / 2f * (x - (r / pi) * kotlin.math.sin(pi * x / r))
+            x <= 1f - r -> vMax * r / 2f + vMax * (x - r)
+            else -> {
+                val s = 1f - x
+                1f - vMax / 2f * (s - (r / pi) * kotlin.math.sin(pi * s / r))
+            }
+        }
+    }
+
+    /**
+     * Stops the wallpaper slide animation and restores the saved (manual) focus X offset.
+     */
+    private fun stopWallpaperSlide() {
+        val running = wallpaperSlideRunnable
+        wallpaperSlideRunnable = null
+        val wallpaperImageView = getWallpaperImageView() ?: return
+        running?.let { wallpaperImageView.removeCallbacks(it) }
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val focusX = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+        applyWallpaperFocusXToImageView(wallpaperImageView, focusX)
+    }
+
     private fun applyWallpaperDrawable(drawable: Drawable, uri: Uri? = null) {
         val mainBackground = findViewById<RelativeLayout>(R.id.main_background)
 
@@ -7777,7 +8431,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Create new ImageView for wallpaper
             wallpaperImageView = ImageView(this)
             wallpaperImageView.tag = "wallpaper"
-            wallpaperImageView.scaleType = ImageView.ScaleType.CENTER_CROP
+            wallpaperImageView.scaleType = ImageView.ScaleType.MATRIX
             wallpaperImageView.adjustViewBounds = false
 
             // Add as first child (behind everything else)
@@ -7790,6 +8444,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set the wallpaper image
         wallpaperImageView.setImageDrawable(drawable)
+
+        // Apply the saved horizontal focus offset for the current theme
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val focusX = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+        applyWallpaperFocusXToImageView(wallpaperImageView, focusX)
+
+        // Resume sliding the wallpaper if the setting is enabled (new ImageView/drawable).
+        startWallpaperSlideIfEnabled()
 
         // Remove any background from the RelativeLayout
         mainBackground.background = null
@@ -8187,6 +8849,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun playStartupSound() {
 
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+
+        // Plus! 95 theme overrides the Classic startup sound
+        val plus95 = themeManager.getActivePlus95()
+        if (plus95 != null && plus95.startupAsset != null) {
+            if (playPlus95StartupSound(plus95.slug, plus95.startupAsset)) return
+        }
+
         if(themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
             val currentBanner = prefs.getString(KEY_START_BANNER_98, "start_banner_98") ?: "start_banner_98"
             when (currentBanner) {
@@ -8206,6 +8875,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         else{
             playSound(R.raw.startup)
+        }
+    }
+
+    private fun playPlus95StartupSound(slug: String, startupAsset: String): Boolean {
+        if (isSoundMuted()) return true
+        return try {
+            val afd = assets.openFd(themeManager.plus95Path(slug, startupAsset))
+            val mp = android.media.MediaPlayer()
+            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            mp.setOnCompletionListener { it.release() }
+            mp.prepare()
+            mp.start()
+            true
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Plus! startup sound failed for $slug/$startupAsset", e)
+            false
         }
     }
     
@@ -8344,20 +9030,53 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    private fun decodeSampledBitmapFromUri(uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sampleSize = 1
+        while (bounds.outWidth / (sampleSize * 2) >= reqWidth &&
+               bounds.outHeight / (sampleSize * 2) >= reqHeight) {
+            sampleSize *= 2
+        }
+
+        val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        return contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        }
+    }
+
     private fun applyCustomWallpaperFromUri(uri: Uri) {
         try {
-            val inputStream: InputStream? = contentResolver.openInputStream(uri)
-            inputStream?.let { stream ->
-                val bitmap = BitmapFactory.decodeStream(stream)
-                stream.close()
-                if (bitmap != null) {
-                    val drawable = bitmap.toDrawable(resources)
-                    applyWallpaperDrawable(drawable)
-                    Log.d("MainActivity", "Applied custom wallpaper from URI: $uri")
-                } else {
-                    throw Exception("Failed to decode bitmap from URI")
-                }
-            } ?: throw Exception("Failed to open input stream")
+            val metrics = resources.displayMetrics
+            val targetW = metrics.widthPixels
+            val targetH = metrics.heightPixels
+            val decoded = decodeSampledBitmapFromUri(uri, targetW, targetH)
+            if (decoded != null) {
+                // Cap final bitmap to fit within screen bounds (preserve aspect ratio).
+                // Sampling alone can leave the bitmap up to 2x the target; this keeps
+                // memory well under Canvas's hardware-bitmap limit.
+                val scale = minOf(
+                    targetW.toFloat() / decoded.width,
+                    targetH.toFloat() / decoded.height,
+                    1f
+                )
+                val bitmap = if (scale < 1f) {
+                    val scaled = Bitmap.createScaledBitmap(
+                        decoded,
+                        (decoded.width * scale).toInt().coerceAtLeast(1),
+                        (decoded.height * scale).toInt().coerceAtLeast(1),
+                        true
+                    )
+                    if (scaled !== decoded) decoded.recycle()
+                    scaled
+                } else decoded
+                applyWallpaperDrawable(bitmap.toDrawable(resources))
+                Log.d("MainActivity", "Applied custom wallpaper from URI: $uri")
+            } else {
+                throw Exception("Failed to decode bitmap from URI")
+            }
         } catch (e: Exception) {
             Log.e("MainActivity", "Failed to apply custom wallpaper from URI: $uri", e)
             // Remove invalid URI
@@ -8381,7 +9100,43 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     fun playClickSound() {
+        val plus95 = themeManager.getActivePlus95()
+        if (plus95 != null && plus95.soundAsset != null) {
+            playPlus95ClickSound(plus95.slug, plus95.soundAsset)
+            return
+        }
         playSound(R.raw.click)
+    }
+
+    // MediaPlayer pool for Plus! click sound (kept short, reused across taps)
+    private var plus95ClickPlayer: android.media.MediaPlayer? = null
+    private var plus95ClickPlayerKey: String? = null
+
+    private fun playPlus95ClickSound(slug: String, soundAsset: String) {
+        if (isSoundMuted()) return
+        val key = "$slug/$soundAsset"
+        try {
+            if (plus95ClickPlayerKey != key) {
+                plus95ClickPlayer?.release()
+                val afd = assets.openFd(themeManager.plus95Path(slug, soundAsset))
+                plus95ClickPlayer = android.media.MediaPlayer().apply {
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    prepare()
+                }
+                afd.close()
+                plus95ClickPlayerKey = key
+            }
+            plus95ClickPlayer?.let {
+                if (it.isPlaying) {
+                    it.seekTo(0)
+                } else {
+                    it.start()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Plus! click sound failed for $key, falling back", e)
+            playSound(R.raw.click)
+        }
     }
 
     fun playEmailSound() {
@@ -8403,7 +9158,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     }
 
-    private fun addDesktopIcon(appInfo: AppInfo, x: Float = 100f, y: Float = 100f) {
+    private fun addDesktopIcon(appInfo: AppInfo, x: Float = 100f, y: Float = 100f, iconTypeOverride: IconType? = null, targetUrl: String? = null) {
 
         // Use custom icon if available, otherwise use app icon
         val iconToUse = getAppIcon(appInfo.packageName) ?: appInfo.icon
@@ -8417,7 +9172,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Determine icon type based on package name
-        val iconType = when (appInfo.packageName) {
+        val iconType = iconTypeOverride ?: when (appInfo.packageName) {
             "recycle.bin" -> IconType.RECYCLE_BIN
             "my.computer" -> IconType.MY_COMPUTER
             else -> IconType.APP
@@ -8431,7 +9186,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             y = y,
             type = iconType,
             portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
-            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null
+            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null,
+            targetUrl = targetUrl
         )
 
         desktopIcons.add(desktopIcon)
@@ -8485,8 +9241,127 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         saveDesktopIcons()
     }
-    
-    
+
+    // ===== URL shortcuts (shared via the Android share sheet) =====
+
+    /**
+     * Handles an incoming ACTION_SEND intent carrying shared text/URL.
+     * Called from onCreate (cold start) and onNewIntent (warm start).
+     */
+    private fun handleSharedUrlIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        if (intent.type != "text/plain") return
+
+        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        val url = extractUrl(sharedText)
+        if (url == null) {
+            Log.w("MainActivity", "Shared text contained no usable URL: $sharedText")
+            return
+        }
+
+        // Clear the extra so the same URL isn't handled again on rotation / re-entry
+        intent.removeExtra(Intent.EXTRA_TEXT)
+
+        // Delay so the UI (window manager + desktop container) is ready, mirroring
+        // handlePendingPackageAction() which does the same for cold-start actions.
+        Handler(Looper.getMainLooper()).postDelayed({
+            promptCreateUrlShortcut(url)
+        }, 500)
+    }
+
+    /**
+     * Pulls the first web URL out of shared text (browsers sometimes prepend a title)
+     * and ensures it has a scheme. Returns null if there's nothing usable.
+     */
+    private fun extractUrl(text: String): String? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return null
+
+        val matcher = android.util.Patterns.WEB_URL.matcher(trimmed)
+        val candidate = if (matcher.find()) {
+            trimmed.substring(matcher.start(), matcher.end())
+        } else {
+            trimmed
+        }
+
+        return if (candidate.startsWith("http://", ignoreCase = true) ||
+            candidate.startsWith("https://", ignoreCase = true)) {
+            candidate
+        } else {
+            "https://$candidate"
+        }
+    }
+
+    /** Suggests a friendly default name (the host) for a URL shortcut. */
+    private fun suggestShortcutName(url: String): String {
+        return try {
+            val host = android.net.Uri.parse(url).host
+            if (host.isNullOrEmpty()) url else host.removePrefix("www.")
+        } catch (e: Exception) {
+            url
+        }
+    }
+
+    /** Prompts the user for a name (reusing the rename dialog), then creates the shortcut. */
+    private fun promptCreateUrlShortcut(url: String) {
+        showRenameDialog(
+            title = "Add to Desktop",
+            initialText = suggestShortcutName(url),
+            hint = "Shortcut name"
+        ) { name ->
+            createUrlShortcutOnDesktop(name, url)
+        }
+    }
+
+    /** Creates a URL shortcut desktop icon and places it in the first free grid slot. */
+    private fun createUrlShortcutOnDesktop(name: String, url: String) {
+        val urlIcon = AppCompatResources.getDrawable(this, R.drawable.url_shortcut)!!
+        // Unique, stable packageName (like folders) so rename/custom-icon mappings key off it
+        val packageName = "url_${System.currentTimeMillis()}"
+        val appInfo = AppInfo(name = name, packageName = packageName, icon = urlIcon)
+
+        val firstAvailablePosition = findFirstAvailableGridSlot()
+        if (firstAvailablePosition != null) {
+            val (newX, newY) = getGridCoordinates(firstAvailablePosition.first, firstAvailablePosition.second)
+            addDesktopIcon(appInfo, newX, newY, IconType.URL_SHORTCUT, url)
+        } else {
+            addDesktopIcon(appInfo, 100f, 100f, IconType.URL_SHORTCUT, url)
+        }
+
+        showNotification("Shortcut Added", "\"$name\" was added to your desktop")
+    }
+
+    /**
+     * Opens a URL shortcut's target. Honors the "open in Internet Explorer" setting:
+     * when enabled, opens in the built-in IE window; otherwise (the default) opens in
+     * the system default browser.
+     */
+    fun openUrlShortcut(url: String?) {
+        val target = url?.trim()
+        if (target.isNullOrEmpty()) {
+            Log.w("MainActivity", "URL shortcut has no target URL")
+            return
+        }
+
+        if (isOpenUrlsInIeEnabled()) {
+            showInternetExplorerDialog(target)
+            return
+        }
+
+        // Default: open in the system default browser
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error opening URL in default browser: $target", e)
+            // Fall back to the built-in browser if no external handler is available
+            showInternetExplorerDialog(target)
+        }
+    }
+
+
     fun saveDesktopIconPosition(desktopIcon: DesktopIcon?) {
         desktopIcon?.let {
 
@@ -8519,7 +9394,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "type" to icon.type.name,
                 "parentFolderId" to icon.parentFolderId,
                 "portraitGridIndex" to icon.portraitGridIndex,
-                "landscapeGridIndex" to icon.landscapeGridIndex
+                "landscapeGridIndex" to icon.landscapeGridIndex,
+                "targetUrl" to icon.targetUrl
             )
         }
 
@@ -8557,6 +9433,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val id = iconData["id"] as String
                 val parentFolderId = iconData["parentFolderId"] as? String
                 val typeStr = iconData["type"] as? String
+                val targetUrl = iconData["targetUrl"] as? String
 
                 // Read grid indices (may be null for old data)
                 val portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
@@ -8598,6 +9475,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
                             }
                         }
+                        IconType.URL_SHORTCUT -> {
+                            // URL shortcut: use custom icon if set, otherwise the URL icon
+                            getAppIcon(packageName) ?: AppCompatResources.getDrawable(this, R.drawable.url_shortcut)!!
+                        }
                         IconType.APP -> {
                             // Check if this is a system app first
                             if (isSystemApp(packageName)) {
@@ -8614,7 +9495,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         }
                     }
 
-                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex)
+                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex, targetUrl)
                     desktopIcons.add(desktopIcon)
 
                     // Skip icons that are inside folders - they shouldn't be shown on desktop
@@ -8652,6 +9533,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     setThemeIcon(themeManager.getSelectedTheme())
                                 }
                             }
+                        }
+                        IconType.URL_SHORTCUT -> {
+                            DesktopIconView(this).apply { setDesktopIcon(desktopIcon) }
                         }
                         IconType.APP -> {
                             DesktopIconView(this).apply { setDesktopIcon(desktopIcon) }
@@ -8777,7 +9661,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             saveDesktopIcons() // Save immediately
         }
 
+        // Update myComputer reference to point to the MyComputerView (after all icons are loaded)
+        Handler(Looper.getMainLooper()).post { updateMyComputerReference() }
+
         Log.d("MainActivity", "My Computer ensured in desktop icons")
+    }
+
+    private fun updateMyComputerReference() {
+        // Find the MyComputerView in desktopIconViews
+        myComputer = desktopIconViews.find {
+            it is rocks.gorjan.gokixp.apps.explorer.MyComputerView
+        } as? rocks.gorjan.gokixp.apps.explorer.MyComputerView
+        // Restore visibility state - if hidden, remove from desktop
+        if (!isMyComputerVisible()) {
+            hideMyComputer()
+        }
     }
 
     fun openMyComputer(myComputerView: rocks.gorjan.gokixp.apps.explorer.MyComputerView) {
@@ -9939,6 +10837,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Pause snowfall and save state
         snowfallManager?.pause()
 
+        // Stop sliding the wallpaper while backgrounded (restarts on return via reloadWallpaperBitmap)
+        wallpaperSlideRunnable?.let { getWallpaperImageView()?.removeCallbacks(it) }
+        wallpaperSlideRunnable = null
+
         // Hide safe to turn off splash if visible
         val safeToTurnOffSplash = findViewById<ImageView>(R.id.safe_to_turn_off_splash)
         safeToTurnOffSplash?.visibility = View.GONE
@@ -9962,6 +10864,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Resume snowfall animation
         snowfallManager?.resume()
+
+        // Resume the wallpaper slide from where it stopped. Covered here (not just onStart) so it
+        // also restarts when the activity stays visible (e.g. tapping Home while already on the
+        // launcher), where onStop/onStart don't fire.
+        startWallpaperSlideIfEnabled()
 
         // Update permission error visibility when returning from settings
         updateEmailPermissionError?.invoke()
@@ -10034,11 +10941,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Update intent for activity
         setIntent(intent)
+
+        // Handle a URL shared into the launcher while it's already running (the common path)
+        handleSharedUrlIntent(intent)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(clockRunnable)
+
+        // Release Plus! 95 click sound MediaPlayer
+        plus95ClickPlayer?.release()
+        plus95ClickPlayer = null
+        plus95ClickPlayerKey = null
 
         // Stop update checker
         stopUpdateChecker()
@@ -11847,6 +12762,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Mark theme as applied to prevent future unnecessary applications
         lastAppliedTheme = selectedTheme
 
+        // Apply Plus! 95 menu-colour tint over the freshly inflated Classic layouts
+        themeManager.getActivePlus95()?.let { plus95 ->
+            val root = findViewById<View>(R.id.main_background)
+            if (root != null) applyPlus95MenuColor(root, plus95.menuColor)
+        }
+
         refreshWeatherIfNeeded()
     }
 
@@ -11894,11 +12815,33 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setupCursorEffect() {
         cursorEffect = findViewById(R.id.cursor_effect)
-        // Set cursor drawable based on theme
+        applyCursorNormalDrawable()
+    }
+
+    private fun applyCursorNormalDrawable() {
+        val plus95 = themeManager.getActivePlus95()
+        if (plus95 != null) {
+            val d = loadPlus95Drawable(plus95.slug, "arrow.png")
+            if (d != null) {
+                cursorEffect.setImageDrawable(d)
+                return
+            }
+        }
         if (themeManager.isVistaTheme()) {
             cursorEffect.setImageResource(R.drawable.cursor_vista)
         } else {
             cursorEffect.setImageResource(R.drawable.cursor)
+        }
+    }
+
+    private fun loadPlus95Drawable(slug: String, filename: String): android.graphics.drawable.Drawable? {
+        return try {
+            assets.open(themeManager.plus95Path(slug, filename)).use { stream ->
+                android.graphics.drawable.Drawable.createFromStream(stream, filename)
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Plus! asset missing: $slug/$filename", e)
+            null
         }
     }
 
@@ -11989,7 +12932,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         var currentView: View? = touchedView
         while (currentView != null) {
             val id = currentView.id
-            if (id == R.id.solitare_game_area || id == R.id.mine_grid) {
+            if (id == R.id.solitare_game_area || id == R.id.mine_grid || id == R.id.pinball_web_view) {
                 return true
             }
             currentView = currentView.parent as? View
@@ -12070,6 +13013,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setCursorBusy() {
         if (::cursorEffect.isInitialized) {
+            val plus95 = themeManager.getActivePlus95()
+            if (plus95 != null && plus95.busyAsset != null) {
+                val d = loadPlus95Drawable(plus95.slug, plus95.busyAsset)
+                if (d != null) {
+                    cursorEffect.setImageDrawable(d)
+                    return
+                }
+            }
             if (themeManager.isVistaTheme()) {
                 cursorEffect.setImageResource(R.drawable.cursor_busy_vista)
                 // Rotate the Vista busy cursor continuously
@@ -12092,12 +13043,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             busyCursorAnimator?.cancel()
             busyCursorAnimator = null
             cursorEffect.rotation = 0f
-
-            if (themeManager.isVistaTheme()) {
-                cursorEffect.setImageResource(R.drawable.cursor_vista)
-            } else {
-                cursorEffect.setImageResource(R.drawable.cursor)
-            }
+            applyCursorNormalDrawable()
         }
     }
 

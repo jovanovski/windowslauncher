@@ -42,22 +42,28 @@ object ContextMenuItems {
         onProperties: () -> Unit,
         onSetSwipeRightApp: () -> Unit,
         onSetWeatherApp: () -> Unit,
-        isSystemApp: Boolean = false
+        isSystemApp: Boolean = false,
+        isUrlShortcut: Boolean = false
     ): List<ContextMenuItem> {
         val items = mutableListOf(
             ContextMenuItem("Open", isEnabled = true, action = onOpen),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Move Icon", isEnabled = true, action = onMoveIcon),
-            ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon),
-            ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp),
-            ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp),
-            ContextMenuItem("", isEnabled = false), // Divider
-            ContextMenuItem("Delete", isEnabled = true, action = onDelete),
-            ContextMenuItem("Rename", isEnabled = true, action = onRename)
+            ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon)
         )
 
-        // Only add Properties for non-system apps
-        if (!isSystemApp) {
+        // "Set as Swipe/Weather App" only make sense for launchable apps, not URL shortcuts
+        if (!isUrlShortcut) {
+            items.add(ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp))
+            items.add(ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp))
+        }
+
+        items.add(ContextMenuItem("", isEnabled = false)) // Divider
+        items.add(ContextMenuItem("Delete", isEnabled = true, action = onDelete))
+        items.add(ContextMenuItem("Rename", isEnabled = true, action = onRename))
+
+        // Only add Properties for non-system apps (and not URL shortcuts, which have no app info)
+        if (!isSystemApp && !isUrlShortcut) {
             items.add(ContextMenuItem("", isEnabled = false)) // Divider
             items.add(ContextMenuItem("Properties", isEnabled = true, action = onProperties))
         }
@@ -218,12 +224,14 @@ object ContextMenuItems {
     fun getMyComputerMenuItems(
         onOpen: () -> Unit,
         onMove: () -> Unit,
+        onHideMyComputer: () -> Unit,
         onProperties: () -> Unit
     ): List<ContextMenuItem> {
         return listOf(
             ContextMenuItem("Open", isEnabled = true, action = onOpen),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Move Icon", isEnabled = true, action = onMove),
+            ContextMenuItem("Hide My Computer", isEnabled = true, action = onHideMyComputer),
             ContextMenuItem("Properties", isEnabled = true, action = onProperties)
         )
     }

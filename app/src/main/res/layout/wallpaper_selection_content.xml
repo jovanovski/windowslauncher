@@ -167,6 +167,27 @@
                 android:padding="2dp"
                 android:visibility="gone" />
 
+            <TextView
+                android:id="@+id/plus_theme_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Plus! theme"
+                android:textSize="12sp"
+                android:textColor="#000000"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="4dp"
+                android:fontFamily="?attr/primaryFontFamily"
+                android:visibility="gone" />
+
+            <Spinner
+                android:id="@+id/plus_theme_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp"
+                android:visibility="gone" />
+
         </LinearLayout>
     </RelativeLayout>
 <!-- Settings -->
@@ -180,14 +201,26 @@
             android:layout_width="359dp"
             android:layout_height="380dp"
             android:src="@drawable/wallpaper_settings"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="305dp"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginTop="35dp"
+            android:paddingEnd="20dp"
+            android:scrollbars="vertical"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
+            android:scrollbarThumbVertical="@drawable/scrollbar_thumb_98"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:fadeScrollbars="false"
+            >
         <LinearLayout
             android:id="@+id/view_options_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-
-            android:layout_marginStart="15dp"
-            android:layout_marginEnd="15dp"
-            android:layout_marginTop="35dp"
             android:orientation="vertical">
 
             <CheckBox
@@ -236,6 +269,19 @@
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
                 android:text="Show Recycle Bin"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_my_computer_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show My Computer"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -320,6 +366,32 @@
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
                 android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/tap_to_hide_icons_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Tap desktop to hide icons"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/open_urls_in_ie_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Open desktop URLs in Internet Explorer"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
@@ -417,7 +489,61 @@
 
             </LinearLayout>
 
+            <CheckBox
+                android:id="@+id/slide_wallpaper_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Slide desktop wallpaper"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:id="@+id/slide_wallpaper_duration_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Duration:"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginEnd="8dp" />
+
+                <SeekBar
+                    android:id="@+id/slide_wallpaper_duration_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:min="10"
+                    android:max="60"
+                    android:progress="10" />
+
+                <TextView
+                    android:id="@+id/slide_wallpaper_duration_value"
+                    android:layout_width="34dp"
+                    android:layout_height="wrap_content"
+                    android:text="10s"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end" />
+
+            </LinearLayout>
+
         </LinearLayout>
+        </ScrollView>
     </RelativeLayout>
 
 
