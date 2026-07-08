@@ -459,6 +459,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WINDOW_STATES = "window_states"
         private const val KEY_TAP_TO_HIDE_ICONS = "tap_to_hide_icons"
         private const val KEY_OPEN_URLS_IN_IE = "open_urls_in_ie"
+        private const val KEY_SHOW_AQI = "show_aqi"
+        private const val AIRCARE_URL = "https://getaircare.com"
 
         // Screensaver types
         private const val SCREENSAVER_NONE = 0
@@ -2071,6 +2073,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun isOpenUrlsInIeEnabled(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_OPEN_URLS_IN_IE, false) // Default to the system default browser
+    }
+
+    fun isShowAqiEnabled(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_SHOW_AQI, false) // Default to off (opt-in)
     }
 
     private fun toggleCursorVisibility() {
@@ -5629,6 +5636,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
         val tapToHideIconsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.tap_to_hide_icons_checkbox)
         val openUrlsInIeCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.open_urls_in_ie_checkbox)
+        val showAirQualityCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_air_quality_checkbox)
+        val airQualityAttribution = contentView.findViewById<TextView>(R.id.air_quality_attribution)
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
         val playEmailSoundCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.play_email_sound_checkbox)
         val showNotificationDotsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_notification_dots_checkbox)
@@ -5798,6 +5807,56 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         openUrlsInIeCheckbox.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_OPEN_URLS_IN_IE, isChecked) }
             Log.d("MainActivity", "Open URLs in IE changed to: $isChecked")
+        }
+
+        // Set up Show Air Quality checkbox (opt-in; default off)
+        showAirQualityCheckbox.isChecked = isShowAqiEnabled()
+        showAirQualityCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_SHOW_AQI, isChecked) }
+            Log.d("MainActivity", "Show air quality changed to: $isChecked")
+            val aqiContainer = findViewById<LinearLayout>(R.id.aqi_container)
+            if (isChecked) {
+                // Turned on: show cached value now and pull fresh data.
+                aqiContainer?.visibility = View.VISIBLE
+                getCachedAqi()?.let { if (isAqiDataFresh(90)) updateAqiDisplay(it) }
+                refreshAqiData()
+            } else {
+                // Turned off: hide the taskbar indicator immediately.
+                aqiContainer?.visibility = View.GONE
+            }
+            // Keep the Quick Glance tile in sync.
+            if (::quickGlanceWidget.isInitialized) {
+                quickGlanceWidget.refreshData()
+            }
+        }
+
+        // Make "AirCare" in the attribution a link to the AirCare website.
+        airQualityAttribution?.let { attribution ->
+            val fullText = "(provided by AirCare)"
+            val linkStart = fullText.indexOf("AirCare")
+            val spannable = android.text.SpannableString(fullText)
+            if (linkStart >= 0) {
+                val clickable = object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(AIRCARE_URL)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error opening AirCare link", e)
+                        }
+                    }
+
+                    override fun updateDrawState(ds: android.text.TextPaint) {
+                        super.updateDrawState(ds)
+                        ds.color = "#0000EE".toColorInt()
+                        ds.isUnderlineText = true
+                    }
+                }
+                spannable.setSpan(clickable, linkStart, linkStart + "AirCare".length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            attribution.text = spannable
+            attribution.movementMethod = android.text.method.LinkMovementMethod.getInstance()
         }
 
         // Set up Show Cursor checkbox
@@ -8839,6 +8898,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             true
         }
 
+        // Apply AQI visibility for the (re-inflated) taskbar so a disabled
+        // indicator never lingers as "?" after a theme change.
+        initializeAqiDisplay()
+
         // Initialize volume icon state
         updateVolumeIcon()
 
@@ -11119,6 +11182,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun initializeAqiDisplay() {
+        // The taskbar AQI indicator is opt-in (Settings > "Show air quality").
+        val aqiContainer = findViewById<LinearLayout>(R.id.aqi_container)
+        if (!isShowAqiEnabled()) {
+            aqiContainer?.visibility = View.GONE
+            return
+        }
+        aqiContainer?.visibility = View.VISIBLE
+
         // Display cached AQI if available (click handlers are in initializeTaskbarElements)
         val cachedAqi = getCachedAqi()
         if (cachedAqi != null && isAqiDataFresh(90)) {
@@ -11688,6 +11759,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     // AQI (Air Quality Index) methods
     private fun fetchAqiData(latitude: Double, longitude: Double) {
+        // Don't hit the AirCare API at all when the indicator is disabled.
+        if (!isShowAqiEnabled()) return
         Thread {
             try {
                 val url = "https://getaircare.com/api/v4/api.php?requestType=point&lat=$latitude&lng=$longitude"
@@ -11769,6 +11842,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun updateAqiDisplay(aqi: Int) {
         val aqiContainer = findViewById<LinearLayout>(R.id.aqi_container)
         val aqiText = findViewById<TextView>(R.id.aqi_text)
+
+        // Respect the opt-in setting: never surface AQI when it's disabled.
+        if (!isShowAqiEnabled()) {
+            aqiContainer?.visibility = View.GONE
+            return
+        }
 
         aqiContainer?.visibility = View.VISIBLE
         aqiText?.text = aqi.toString()

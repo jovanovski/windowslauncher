@@ -395,6 +395,38 @@
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <CheckBox
+                    android:id="@+id/show_air_quality_checkbox"
+                    style="@style/Win95.CheckBox"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:text="Show air quality"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:textSize="11dp"
+                    android:checked="false"
+                    android:paddingLeft="4dp" />
+
+                <TextView
+                    android:id="@+id/air_quality_attribution"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="(provided by AirCare)"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:textSize="11dp" />
+
+            </LinearLayout>
+
             <CheckBox
                 android:id="@+id/play_email_sound_checkbox"
                 style="@style/Win95.CheckBox"

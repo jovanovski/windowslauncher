@@ -53,9 +53,9 @@ object QuickGlanceDefaults {
                 val condition = getWeatherCondition(weatherCode)
                 var subtitle = "$formattedTemp and $condition"
 
-                // Append AQI description if available and fresh
+                // Append AQI description only when the opt-in setting is enabled
                 val aqi = mainActivity.getCachedAqi()
-                if (aqi != null && mainActivity.isAqiDataFresh(90)) {
+                if (mainActivity.isShowAqiEnabled() && aqi != null && mainActivity.isAqiDataFresh(90)) {
                     subtitle += ", ${getAqiDescription(aqi)}"
                 }
 
