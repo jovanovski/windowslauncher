@@ -567,6 +567,9 @@ class Midtown2App(
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 10000
                 connection.readTimeout = 10000
+                // The OSRM demo server rejects the default Android "Dalvik/..." user agent
+                // with a 403, so set an explicit one identifying the app.
+                connection.setRequestProperty("User-Agent", "gokixp-midtown2/1.0 (Android)")
 
                 val response = BufferedReader(InputStreamReader(connection.inputStream)).use {
                     it.readText()
