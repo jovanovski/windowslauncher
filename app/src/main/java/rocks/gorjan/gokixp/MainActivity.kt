@@ -8493,6 +8493,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             wallpaperImageView.scaleType = ImageView.ScaleType.MATRIX
             wallpaperImageView.adjustViewBounds = false
 
+            // The wallpaper uses a MATRIX scale type whose crop/pan is computed from the view's
+            // size. When that size changes (e.g. an orientation change), recompute the matrix so
+            // the wallpaper re-fits the new dimensions instead of keeping a stale transform.
+            wallpaperImageView.addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                val sizeChanged = (right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)
+                if (sizeChanged) {
+                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    if (prefs.getBoolean(KEY_SLIDE_WALLPAPER_ENABLED, false)) {
+                        // Restart the slide so it recomputes its pan range for the new size.
+                        startWallpaperSlideIfEnabled()
+                    } else {
+                        val fx = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+                        applyWallpaperFocusXToImageView(view as ImageView, fx)
+                    }
+                }
+            }
+
             // Add as first child (behind everything else)
             val layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT,
@@ -10943,6 +10960,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val newOrientation = getCurrentOrientation()
         Log.d("MainActivity", "Configuration changed to: $newOrientation")
+
+        // The wallpaper and any open floating windows re-fit themselves via OnLayoutChangeListeners
+        // (see applyWallpaperDrawable and WindowsDialog.setupDialogLayout) once their views are
+        // re-laid-out for the new size, so neither needs handling here.
 
         // Post to ensure container has updated dimensions
         desktopContainer.post {

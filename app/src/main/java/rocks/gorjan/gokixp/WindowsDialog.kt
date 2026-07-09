@@ -117,6 +117,15 @@ class WindowsDialog @JvmOverloads constructor(
     private var minWindowWidthDp: Int = 300
     private var minWindowHeightDp: Int = 250
 
+    // How this window wants to be sized (its "natural" size), so we can re-derive it after a
+    // screen rotation instead of only ever shrinking it. Either the dp values or the percent
+    // values are set per axis (percent scales with the screen; dp stays fixed); a user resize
+    // records fixed dp. If none are set, the window keeps its current size (clamped to fit).
+    private var naturalWidthDp: Int? = null
+    private var naturalHeightDp: Int? = null
+    private var naturalWidthPercent: Float? = null
+    private var naturalHeightPercent: Float? = null
+
     // Current window position (for shake animation)
     private var currentWindowX = 0f
     private var currentWindowY = 0f
@@ -167,6 +176,20 @@ class WindowsDialog @JvmOverloads constructor(
         // Bind overlay and inner window frame
         overlayRoot = findViewById(R.id.dialog_overlay)
         windowFrame = findViewById(R.id.window_frame)
+
+        // Re-fit the window whenever the overlay's size actually changes (e.g. a screen rotation),
+        // so it can never end up partly off-screen or larger than the available space. Reacting to
+        // the real layout change (rather than onConfigurationChanged) guarantees we use the new
+        // dimensions. Guard on old size > 0 so the initial layout doesn't fight window centering.
+        overlayRoot.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val oldW = oldRight - oldLeft
+            val oldH = oldBottom - oldTop
+            val newW = right - left
+            val newH = bottom - top
+            if (oldW > 0 && oldH > 0 && (newW != oldW || newH != oldH)) {
+                refitToOverlay(newW, newH)
+            }
+        }
 
         // Core parts
         titleBar = findViewById(R.id.dialog_title_bar)
@@ -288,9 +311,11 @@ class WindowsDialog @JvmOverloads constructor(
                         var newX = initialX + dx
                         var newY = initialY + dy
 
-                        // Clamp to overlay bounds
-                        val maxX = overlayRoot.width - windowFrame.width
-                        val maxY = overlayRoot.height - windowFrame.height
+                        // Clamp to overlay bounds. coerceAtLeast(0) guards against the
+                        // window being larger than the overlay (e.g. right after a rotation),
+                        // which would make max < 0 and crash coerceIn.
+                        val maxX = (overlayRoot.width - windowFrame.width).coerceAtLeast(0)
+                        val maxY = (overlayRoot.height - windowFrame.height).coerceAtLeast(0)
 
                         newX = newX.coerceIn(0f, maxX.toFloat())
                         newY = newY.coerceIn(0f, maxY.toFloat())
@@ -409,6 +434,78 @@ class WindowsDialog @JvmOverloads constructor(
         currentWindowY = y
     }
 
+    /**
+     * Re-fits the window inside the overlay after the available space changes (e.g. a screen
+     * rotation). Re-derives the window's natural size for the new screen from its sizing intent
+     * (so it grows back when there's room again, not just shrinks), clamps that size to fit, and
+     * clamps its position so it stays on-screen. Without this, a window that is now taller/wider
+     * than the overlay would sit partly off-screen and crash the drag handlers (max bound < 0 in
+     * coerceIn), and a window shrunk in landscape would stay shrunk after rotating back to portrait.
+     *
+     * Driven by an OnLayoutChangeListener on overlayRoot (see setupDialogLayout) so it runs with
+     * the overlay's real new dimensions — reacting from onConfigurationChanged instead would read
+     * the stale pre-rotation size, which is why the window used to stay off-screen until dragged.
+     */
+    private fun refitToOverlay(overlayW: Int, overlayH: Int) {
+        if (!::windowFrame.isInitialized) return
+        if (overlayW <= 0 || overlayH <= 0) return
+
+        if (isMaximized) {
+            // A maximized window fills the overlay via MATCH_PARENT, so it needs no clamping.
+            // But its saved restore geometry might no longer fit the new size — clamp it so
+            // restoring later doesn't produce an oversized/off-screen window.
+            savedWidth = savedWidth.coerceAtMost(overlayW)
+            savedHeight = savedHeight.coerceAtMost(overlayH)
+            savedX = savedX.coerceIn(0f, (overlayW - savedWidth).coerceAtLeast(0).toFloat())
+            savedY = savedY.coerceIn(0f, (overlayH - savedHeight).coerceAtLeast(0).toFloat())
+            saveWindowState()
+            return
+        }
+
+        // Re-derive the window's natural size for the NEW screen from its sizing intent, then clamp
+        // it to fit. This grows the window back when there's room again (e.g. rotating back to
+        // portrait) instead of leaving it stuck at the smaller size it was shrunk to in landscape.
+        val density = resources.displayMetrics.density
+        val naturalW = when {
+            naturalWidthPercent != null -> (overlayW * (naturalWidthPercent!! / 100f)).toInt()
+            naturalWidthDp != null -> (naturalWidthDp!! * density).toInt()
+            else -> windowFrame.width // no spec: keep current size (shrink-to-fit only)
+        }
+        val naturalH = when {
+            naturalHeightPercent != null -> (overlayH * (naturalHeightPercent!! / 100f)).toInt()
+            naturalHeightDp != null -> (naturalHeightDp!! * density).toInt()
+            else -> windowFrame.height
+        }
+
+        val w = naturalW.coerceIn(1, overlayW)
+        val h = naturalH.coerceIn(1, overlayH)
+        if (w != windowFrame.width || h != windowFrame.height) {
+            windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
+                width = w
+                height = h
+            }
+            windowBorder?.updateLayoutParams<LayoutParams> {
+                height = LayoutParams.MATCH_PARENT
+            }
+            contentArea.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = FrameLayout.LayoutParams.MATCH_PARENT
+            }
+        }
+
+        // Clamp the position so the (resized) window stays fully on-screen.
+        val maxX = (overlayW - w).coerceAtLeast(0)
+        val maxY = (overlayH - h).coerceAtLeast(0)
+        val clampedX = windowFrame.x.coerceIn(0f, maxX.toFloat())
+        val clampedY = windowFrame.y.coerceIn(0f, maxY.toFloat())
+        windowFrame.x = clampedX
+        windowFrame.y = clampedY
+        currentWindowX = clampedX
+        currentWindowY = clampedY
+
+        // Persist the adjusted geometry.
+        saveWindowState()
+    }
+
     // ——— Public API ———
 
     fun setTitle(title: String) {
@@ -455,6 +552,10 @@ class WindowsDialog @JvmOverloads constructor(
                 height = FrameLayout.LayoutParams.MATCH_PARENT
             }
         }
+
+        // Record the sizing intent (fixed dp) so a rotation can re-derive it (see refitToOverlay).
+        if (widthDp != null) { naturalWidthDp = widthDp; naturalWidthPercent = null }
+        if (heightDp != null) { naturalHeightDp = heightDp; naturalHeightPercent = null }
     }
 
     fun setWindowSizePercentage(widthPercent: Float? = null, heightPercent: Float? = null) {
@@ -477,6 +578,11 @@ class WindowsDialog @JvmOverloads constructor(
                 height = FrameLayout.LayoutParams.MATCH_PARENT
             }
         }
+
+        // Record the sizing intent (screen percentage) so a rotation re-derives it for the new
+        // orientation instead of leaving the window stuck at the old orientation's pixel size.
+        if (widthPercent != null) { naturalWidthPercent = widthPercent; naturalWidthDp = null }
+        if (heightPercent != null) { naturalHeightPercent = heightPercent; naturalHeightDp = null }
     }
 
     fun setContentView(layoutResId: Int) {
@@ -639,9 +745,11 @@ class WindowsDialog @JvmOverloads constructor(
                         val newWidth = (initialWidth + dx).toInt().coerceAtLeast(minSizeWidthPx)
                         val newHeight = (initialHeight + dy).toInt().coerceAtLeast(minSizeHeightPx)
 
-                        // Ensure window doesn't exceed overlay bounds
-                        val maxWidth = (overlayRoot.width - windowFrame.x).toInt()
-                        val maxHeight = (overlayRoot.height - windowFrame.y).toInt()
+                        // Ensure window doesn't exceed overlay bounds, but never shrink
+                        // below the minimum size (a window dragged off-screen could otherwise
+                        // yield a negative max here).
+                        val maxWidth = (overlayRoot.width - windowFrame.x).toInt().coerceAtLeast(minSizeWidthPx)
+                        val maxHeight = (overlayRoot.height - windowFrame.y).toInt().coerceAtLeast(minSizeHeightPx)
 
                         val finalWidth = newWidth.coerceAtMost(maxWidth)
                         val finalHeight = newHeight.coerceAtMost(maxHeight)
@@ -668,6 +776,12 @@ class WindowsDialog @JvmOverloads constructor(
                     isResizing = false
                     // Save size after resizing
                     if (wasResizing) {
+                        // The user's chosen size becomes the new sizing intent (as fixed dp), so a
+                        // later rotation re-derives from it instead of the original percentage/dp.
+                        naturalWidthDp = (windowFrame.width / density).toInt()
+                        naturalHeightDp = (windowFrame.height / density).toInt()
+                        naturalWidthPercent = null
+                        naturalHeightPercent = null
                         saveWindowState()
                     }
                     true
@@ -753,7 +867,7 @@ class WindowsDialog @JvmOverloads constructor(
 
         // Ensure window stays within bounds
         val overlayH = overlayRoot.height
-        val maxY = overlayH - windowFrame.height
+        val maxY = (overlayH - windowFrame.height).coerceAtLeast(0)
         val finalY = newY.coerceIn(0f, maxY.toFloat())
         windowFrame.y = finalY
         currentWindowY = finalY
@@ -923,9 +1037,11 @@ class WindowsDialog @JvmOverloads constructor(
                         var newX = initialX + dx
                         var newY = initialY + dy
 
-                        // Clamp to overlay bounds
-                        val maxX = overlayRoot.width - windowFrame.width
-                        val maxY = overlayRoot.height - windowFrame.height
+                        // Clamp to overlay bounds. coerceAtLeast(0) guards against the
+                        // window being larger than the overlay (e.g. right after a rotation),
+                        // which would make max < 0 and crash coerceIn.
+                        val maxX = (overlayRoot.width - windowFrame.width).coerceAtLeast(0)
+                        val maxY = (overlayRoot.height - windowFrame.height).coerceAtLeast(0)
 
                         newX = newX.coerceIn(0f, maxX.toFloat())
                         newY = newY.coerceIn(0f, maxY.toFloat())
