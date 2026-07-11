@@ -5682,6 +5682,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val gestureBarCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_under_taskbar_checkbox)
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
         val showQuickGlanceCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_quick_glance_checkbox)
+        val showClippyImageCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_clippy_image_checkbox)
+        val alignRightCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.quick_glance_align_right_checkbox)
         val showRecycleBinCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_recycle_bin_checkbox)
         val showMyComputerCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_my_computer_checkbox)
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
@@ -5815,6 +5817,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         showQuickGlanceCheckbox.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != isQuickGlanceVisible()) {
                 toggleQuickGlance()
+            }
+        }
+
+        // Set up Show Clippy image checkbox (Quick Glance)
+        showClippyImageCheckbox.isChecked =
+            if (::quickGlanceWidget.isInitialized) quickGlanceWidget.isShowClippyImageEnabled() else true
+        showClippyImageCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            if (::quickGlanceWidget.isInitialized && isChecked != quickGlanceWidget.isShowClippyImageEnabled()) {
+                quickGlanceWidget.setShowClippyImage(isChecked)
+            }
+        }
+
+        // Set up Align right checkbox (Quick Glance)
+        alignRightCheckbox.isChecked =
+            if (::quickGlanceWidget.isInitialized) quickGlanceWidget.isAlignRightEnabled() else false
+        alignRightCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            if (::quickGlanceWidget.isInitialized && isChecked != quickGlanceWidget.isAlignRightEnabled()) {
+                quickGlanceWidget.setAlignRight(isChecked)
             }
         }
 

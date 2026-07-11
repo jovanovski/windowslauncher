@@ -223,39 +223,19 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- ==================== Desktop Icons ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:layout_marginTop="0dp"
+                android:text="Desktop Icons" />
+            <View style="@style/Win95.SectionDivider" />
+
             <CheckBox
-                android:id="@+id/show_under_taskbar_checkbox"
+                android:id="@+id/show_my_computer_checkbox"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show Black Under Taskbar"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/show_agent_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show Desktop Agent"
-                android:textColor="#000000"
-
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/show_quick_glance_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show Quick Glance"
+                android:text="Show 'My Computer'"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -268,7 +248,7 @@
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show Recycle Bin"
+                android:text="Show 'Recycle Bin'"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -277,11 +257,11 @@
                 android:layout_marginBottom="4dp" />
 
             <CheckBox
-                android:id="@+id/show_my_computer_checkbox"
+                android:id="@+id/show_shortcut_arrow"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show My Computer"
+                android:text="Show shortcut arrow on icons"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -289,13 +269,76 @@
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
+            <!-- ==================== Desktop ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Desktop" />
+            <View style="@style/Win95.SectionDivider" />
+
+            <CheckBox
+                android:id="@+id/show_cursor_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show mouse cursor"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/show_agent_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show 'Desktop Agent'"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <CheckBox
+                    android:id="@+id/show_air_quality_checkbox"
+                    style="@style/Win95.CheckBox"
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:text="Show air quality"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:textSize="11dp"
+                    android:checked="false"
+                    android:paddingLeft="4dp" />
+
+                <TextView
+                    android:id="@+id/air_quality_attribution"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="(provided by AirCare)"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:textSize="11dp" />
+
+            </LinearLayout>
 
             <CheckBox
                 android:id="@+id/show_christmas_lights_checkbox"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show Christmas Lights"
+                android:text="Show 'Christmas Lights'"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -343,12 +386,18 @@
 
             </LinearLayout>
 
+            <!-- ==================== Quick Glance ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Quick Glance" />
+            <View style="@style/Win95.SectionDivider" />
+
             <CheckBox
-                android:id="@+id/show_cursor_checkbox"
+                android:id="@+id/show_quick_glance_checkbox"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show Cursor"
+                android:text="Show 'Quick Glance'"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
@@ -357,17 +406,150 @@
                 android:layout_marginBottom="4dp" />
 
             <CheckBox
-                android:id="@+id/show_shortcut_arrow"
+                android:id="@+id/show_clippy_image_checkbox"
                 style="@style/Win95.CheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="20dp"
-                android:text="Show Icon Shortcut Arrow"
+                android:text="Show Clippy image"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
                 android:textSize="11dp"
                 android:checked="true"
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/quick_glance_align_right_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Align right"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <!-- ==================== Taskbar ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Taskbar" />
+            <View style="@style/Win95.SectionDivider" />
+
+            <CheckBox
+                android:id="@+id/show_under_taskbar_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show black under taskbar"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="true"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Taskbar Height:"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginEnd="8dp" />
+
+                <SeekBar
+                    android:id="@+id/taskbar_height_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="60"
+                    android:progress="30" />
+
+                <TextView
+                    android:id="@+id/taskbar_height_value"
+                    android:layout_width="30dp"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end" />
+
+            </LinearLayout>
+
+            <!-- ==================== Wallpaper ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Wallpaper" />
+            <View style="@style/Win95.SectionDivider" />
+
+            <CheckBox
+                android:id="@+id/slide_wallpaper_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Slide desktop wallpaper"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:id="@+id/slide_wallpaper_duration_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Duration:"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginEnd="8dp" />
+
+                <SeekBar
+                    android:id="@+id/slide_wallpaper_duration_slider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:min="10"
+                    android:max="60"
+                    android:progress="10" />
+
+                <TextView
+                    android:id="@+id/slide_wallpaper_duration_value"
+                    android:layout_width="34dp"
+                    android:layout_height="wrap_content"
+                    android:text="10s"
+                    android:textSize="10sp"
+                    android:textColor="#000000"
+                    android:fontFamily="@font/micross_block"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end" />
+
+            </LinearLayout>
+
+            <!-- ==================== Behavior ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Behavior" />
+            <View style="@style/Win95.SectionDivider" />
 
             <CheckBox
                 android:id="@+id/tap_to_hide_icons_checkbox"
@@ -395,37 +577,11 @@
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="4dp">
-
-                <CheckBox
-                    android:id="@+id/show_air_quality_checkbox"
-                    style="@style/Win95.CheckBox"
-                    android:layout_width="wrap_content"
-                    android:layout_height="20dp"
-                    android:text="Show air quality"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:textSize="11dp"
-                    android:checked="false"
-                    android:paddingLeft="4dp" />
-
-                <TextView
-                    android:id="@+id/air_quality_attribution"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:text="(provided by AirCare)"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:textSize="11dp" />
-
-            </LinearLayout>
+            <!-- ==================== Notifications ==================== -->
+            <TextView
+                style="@style/Win95.SectionHeader"
+                android:text="Notifications" />
+            <View style="@style/Win95.SectionDivider" />
 
             <CheckBox
                 android:id="@+id/play_email_sound_checkbox"
@@ -482,97 +638,6 @@
                 android:focusable="true"
                 android:visibility="gone"
                 android:textStyle="bold" />
-
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Taskbar Height:"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginEnd="8dp" />
-
-                <SeekBar
-                    android:id="@+id/taskbar_height_slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="60"
-                    android:progress="30" />
-
-                <TextView
-                    android:id="@+id/taskbar_height_value"
-                    android:layout_width="30dp"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end" />
-
-            </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/slide_wallpaper_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Slide desktop wallpaper"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="4dp" />
-
-            <LinearLayout
-                android:id="@+id/slide_wallpaper_duration_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Duration:"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginEnd="8dp" />
-
-                <SeekBar
-                    android:id="@+id/slide_wallpaper_duration_slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:min="10"
-                    android:max="60"
-                    android:progress="10" />
-
-                <TextView
-                    android:id="@+id/slide_wallpaper_duration_value"
-                    android:layout_width="34dp"
-                    android:layout_height="wrap_content"
-                    android:text="10s"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end" />
-
-            </LinearLayout>
 
         </LinearLayout>
         </ScrollView>

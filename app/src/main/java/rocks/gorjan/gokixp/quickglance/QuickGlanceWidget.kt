@@ -42,9 +42,13 @@ class QuickGlanceWidget @JvmOverloads constructor(
     private val KEY_WIDGET_X = "widget_x"
     private val KEY_WIDGET_Y = "widget_y"
     private val KEY_SHOW_CALENDAR_EVENTS = "show_calendar_events"
-    
+    private val KEY_SHOW_CLIPPY_IMAGE = "quick_glance_show_clippy"
+    private val KEY_ALIGN_RIGHT = "quick_glance_align_right"
+
     // UI components
     private lateinit var iconView: ImageView
+    private lateinit var horizontalContainer: LinearLayout
+    private lateinit var contentContainer: LinearLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var dotsIndicator: LinearLayout
     private lateinit var panelAdapter: QuickGlancePanelAdapter
@@ -81,7 +85,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
         layoutParams = LayoutParams(widgetWidth, LayoutParams.WRAP_CONTENT)
 
         // Create horizontal container for icon and content
-        val horizontalContainer = LinearLayout(context).apply {
+        horizontalContainer = LinearLayout(context).apply {
             orientation = HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
@@ -97,15 +101,12 @@ class QuickGlanceWidget @JvmOverloads constructor(
         }
         horizontalContainer.addView(iconView)
 
-        // Create content container (ViewPager2 for swiping)
-        val contentContainer = LinearLayout(context).apply {
+        // Create content container (ViewPager2 for swiping).
+        // Uses layout weight so it fills whatever space the icon leaves — this keeps
+        // things correct whether the icon is shown/hidden or moved to the right.
+        contentContainer = LinearLayout(context).apply {
             orientation = VERTICAL
-            // Fill remaining space after icon and margins
-            val iconSize = (48 * context.resources.displayMetrics.density).toInt()
-            val padding = (16 * context.resources.displayMetrics.density).toInt() * 2 // Left and right padding
-            val iconMargin = (12 * context.resources.displayMetrics.density).toInt()
-            val availableWidth = widgetWidth - iconSize - iconMargin - padding
-            layoutParams = LayoutParams(availableWidth, LayoutParams.WRAP_CONTENT)
+            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
         }
 
         // Create ViewPager2 for swipeable panels
@@ -142,6 +143,56 @@ class QuickGlanceWidget @JvmOverloads constructor(
 
         // Set up initial panels
         initializePanels()
+
+        // Apply persisted appearance settings (Clippy image visibility, alignment)
+        applyLayoutConfig()
+    }
+
+    /**
+     * Applies the "Show Clippy image" and "Align right" settings to the live layout.
+     * Safe to call repeatedly — it fully reconfigures the icon/content arrangement.
+     */
+    private fun applyLayoutConfig() {
+        val showClippy = isShowClippyImageEnabled()
+        val alignRight = isAlignRightEnabled()
+
+        // Toggle the Clippy image
+        iconView.visibility = if (showClippy) View.VISIBLE else View.GONE
+
+        // Icon spacing sits on whichever side faces the content
+        (iconView.layoutParams as LayoutParams).apply {
+            if (alignRight) setMargins(12, 0, 0, 0) else setMargins(0, 0, 12, 0)
+            iconView.layoutParams = this
+        }
+
+        // Reorder icon and content so Clippy sits on the right when aligned right
+        horizontalContainer.removeAllViews()
+        if (alignRight) {
+            horizontalContainer.addView(contentContainer)
+            horizontalContainer.addView(iconView)
+        } else {
+            horizontalContainer.addView(iconView)
+            horizontalContainer.addView(contentContainer)
+        }
+
+        // Right-align the panel text to match
+        panelAdapter.setTextGravity(
+            if (alignRight) android.view.Gravity.END else android.view.Gravity.START
+        )
+
+        // Keep the dots indicator aligned with the content column
+        dotsIndicator.gravity = if (alignRight) android.view.Gravity.END else android.view.Gravity.START
+        (dotsIndicator.layoutParams as LayoutParams).apply {
+            val offset = (48 * context.resources.displayMetrics.density).toInt()
+            if (alignRight) {
+                leftMargin = 0
+                rightMargin = offset
+            } else {
+                leftMargin = offset
+                rightMargin = 0
+            }
+            dotsIndicator.layoutParams = this
+        }
     }
 
     private fun initializePanels() {
@@ -590,6 +641,32 @@ class QuickGlanceWidget @JvmOverloads constructor(
         Log.d("QuickGlanceWidget", "Calendar events setting changed to: $enabled")
     }
 
+    // "Show Clippy image" setting management
+    fun isShowClippyImageEnabled(): Boolean {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_SHOW_CLIPPY_IMAGE, true) // Default to true (shown)
+    }
+
+    fun setShowClippyImage(enabled: Boolean) {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_SHOW_CLIPPY_IMAGE, enabled).apply()
+        applyLayoutConfig()
+        Log.d("QuickGlanceWidget", "Show Clippy image setting changed to: $enabled")
+    }
+
+    // "Align right" setting management
+    fun isAlignRightEnabled(): Boolean {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_ALIGN_RIGHT, false) // Default to false (left aligned)
+    }
+
+    fun setAlignRight(enabled: Boolean) {
+        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_ALIGN_RIGHT, enabled).apply()
+        applyLayoutConfig()
+        Log.d("QuickGlanceWidget", "Align right setting changed to: $enabled")
+    }
+
     fun handleCalendarPermissionGranted() {
         // Called when calendar permission is granted - reinitialize data manager
         if (isShowCalendarEventsEnabled()) {
@@ -627,6 +704,13 @@ class QuickGlancePanelAdapter : RecyclerView.Adapter<QuickGlancePanelAdapter.Pan
     private var onPanelTap: ((QuickGlancePanel) -> Unit)? = null
     private var currentFont: android.graphics.Typeface? = null
     private var onPanelLongPress: (() -> Unit)? = null
+    private var currentGravity: Int = android.view.Gravity.START
+
+    fun setTextGravity(gravity: Int) {
+        if (currentGravity == gravity) return
+        currentGravity = gravity
+        notifyDataSetChanged()
+    }
 
     fun updatePanels(newPanels: List<QuickGlancePanel>) {
         panels = newPanels.sortedBy { it.priority }
@@ -686,6 +770,8 @@ class QuickGlancePanelAdapter : RecyclerView.Adapter<QuickGlancePanelAdapter.Pan
         val panel = panels[position]
         holder.titleView.text = panel.title
         holder.subtitleView.text = panel.subtitle
+        holder.titleView.gravity = currentGravity
+        holder.subtitleView.gravity = currentGravity
 
         holder.itemView.setOnClickListener {
             onPanelTap?.invoke(panel)
