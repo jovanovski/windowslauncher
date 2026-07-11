@@ -51,27 +51,27 @@ class MyComputerView : DesktopIconView, ThemeAware {
 
     // Implement ThemeAware interface
     override fun onThemeChanged(theme: AppTheme) {
+        super.onThemeChanged(theme) // font
         currentTheme = theme
-        updateIcon()
+        // Don't overwrite a user's custom My Computer icon (updateAllCustomIcons restores it);
+        // only swap in the themed/Plus! icon when none is set.
+        val packageName = getDesktopIcon()?.packageName
+        val hasCustomIcon = packageName != null && (context as? MainActivity)?.hasCustomIcon(packageName) == true
+        if (!hasCustomIcon) updateIcon()
     }
 
     private fun updateIcon() {
         val mainActivity = context as? MainActivity
 
-        // If a Plus! 95 theme is active, prefer its comp.png asset
+        // If a Plus! 95 theme is active, prefer its comp.png asset (density-corrected so it
+        // fills the icon slot instead of rendering at raw pixel size on hi-dpi screens).
         val plus95 = mainActivity?.themeManager?.getActivePlus95()
         if (plus95 != null) {
-            try {
-                context.assets.open(mainActivity.themeManager.plus95Path(plus95.slug, "comp.png")).use { stream ->
-                    val d = android.graphics.drawable.Drawable.createFromStream(stream, "comp.png")
-                    if (d != null) {
-                        setIconDrawable(d)
-                        getDesktopIcon()?.icon = d
-                        return
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("MyComputerView", "Failed to load Plus! my computer icon", e)
+            val d = mainActivity.loadPlus95Drawable(plus95.slug, "comp.png")
+            if (d != null) {
+                setIconDrawable(d)
+                getDesktopIcon()?.icon = d
+                return
             }
         }
 

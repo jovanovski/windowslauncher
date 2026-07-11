@@ -1165,6 +1165,8 @@ class WindowsDialog @JvmOverloads constructor(
         taskbarButton?.findViewById<ImageView>(R.id.taskbar_button_icon)?.setImageResource(taskbarIconResId)
         taskbarButton?.findViewById<TextView>(R.id.taskbar_button_text)?.text = titleText.text
 
+        applyPlus95TintToTaskbarButton()
+
         // Regular click - minimize/restore/focus
         taskbarButton?.setOnClickListener {
             // Toggle behavior based on window state
@@ -1199,6 +1201,8 @@ class WindowsDialog @JvmOverloads constructor(
         taskbarButton?.findViewById<ImageView>(R.id.taskbar_button_icon)?.setImageResource(taskbarIconResId)
         taskbarButton?.findViewById<TextView>(R.id.taskbar_button_text)?.text = titleText.text
 
+        applyPlus95TintToTaskbarButton()
+
         // Regular click - minimize/restore/focus
         taskbarButton?.setOnClickListener {
             // Toggle behavior based on window state
@@ -1228,6 +1232,32 @@ class WindowsDialog @JvmOverloads constructor(
         }
 
         taskbarContainer?.addView(taskbarButton)
+    }
+
+    /**
+     * Recolours the taskbar button to the active Plus! menu colour. The button is inflated when
+     * a window opens — after the theme-wide tint walk has already run — so without this it would
+     * keep the default Classic gray instead of the theme colour. No-op for non-Plus! themes.
+     */
+    private fun applyPlus95TintToTaskbarButton() {
+        val mainActivity = context as? MainActivity ?: return
+        val plus95 = mainActivity.themeManager.getActivePlus95() ?: return
+        val button = taskbarButton ?: return
+        // The Win98 button background (win98_start_menu_border) is a LayerDrawable shared across
+        // many views via a common ConstantState. mutate() gives this button its own copy, then we
+        // recolour each layer's solid fill directly to the Plus! menu colour. Doing the recolour
+        // explicitly (rather than via the color-matching tint walk) guarantees it takes; the
+        // border strokes are left untouched, so the 3D bevel is preserved.
+        val bg = button.background?.mutate() ?: return
+        button.background = bg
+        when (bg) {
+            is android.graphics.drawable.LayerDrawable ->
+                for (i in 0 until bg.numberOfLayers) {
+                    (bg.getDrawable(i) as? android.graphics.drawable.GradientDrawable)?.setColor(plus95.menuColor)
+                }
+            is android.graphics.drawable.GradientDrawable -> bg.setColor(plus95.menuColor)
+            is android.graphics.drawable.ColorDrawable -> bg.color = plus95.menuColor
+        }
     }
 
     fun unregisterFromTaskbar() {

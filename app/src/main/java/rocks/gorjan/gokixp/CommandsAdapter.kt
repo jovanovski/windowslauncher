@@ -192,8 +192,14 @@ class CommandsAdapter(
                     programsHolder.name.setTextColor(android.graphics.Color.WHITE)
                     programsHolder.arrow.setTextColor(android.graphics.Color.WHITE)
                 } else {
-                    // Normal state - gray background, black text
-                    programsHolder.itemView.setBackgroundColor(android.graphics.Color.parseColor("#d3cec7"))
+                    // Normal state - Classic gray, tinted to the active Plus! menu colour if any.
+                    // This item is re-bound on every notifyDataSetChanged() (including one fired
+                    // right after showStartMenu tints the tree), so setting the colour here — not
+                    // relying on the one-time tree walk — is what keeps it from reverting to gray.
+                    val plus95 = mainActivity?.themeManager?.getActivePlus95()
+                    programsHolder.itemView.setBackgroundColor(
+                        plus95?.menuColor ?: android.graphics.Color.parseColor("#d3cec7")
+                    )
                     programsHolder.name.setTextColor(android.graphics.Color.BLACK)
                     programsHolder.arrow.setTextColor(android.graphics.Color.BLACK)
                 }

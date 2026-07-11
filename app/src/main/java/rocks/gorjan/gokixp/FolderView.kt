@@ -66,8 +66,14 @@ class FolderView : DesktopIconView, ThemeAware {
 
     // Phase 3: Implement ThemeAware interface
     override fun onThemeChanged(theme: AppTheme) {
+        super.onThemeChanged(theme) // font
         currentTheme = theme
-        updateIcon()
+        // Only swap in the themed folder icon when the user hasn't set a custom icon for it —
+        // otherwise notifyThemeChanged() would clobber custom folder icons (updateAllCustomIcons
+        // restores those separately).
+        val packageName = getDesktopIcon()?.packageName
+        val hasCustomIcon = packageName != null && (context as? MainActivity)?.hasCustomIcon(packageName) == true
+        if (!hasCustomIcon) updateIcon()
     }
 
     private fun updateIcon() {

@@ -14,8 +14,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import rocks.gorjan.gokixp.theme.AppTheme
+import rocks.gorjan.gokixp.theme.ThemeAware
 
-open class DesktopIconView : LinearLayout {
+open class DesktopIconView : LinearLayout, ThemeAware {
 
     private val iconImage: ImageView
     private val iconText: TextView
@@ -168,6 +169,27 @@ open class DesktopIconView : LinearLayout {
         // Position will be set by the caller after adding to container
     }
     
+    // Every desktop icon registers for theme-change notifications while attached to the window, so
+    // notifyThemeChanged() reaches exactly the icons currently on screen — and never a removed one.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        (context as? MainActivity)?.registerThemeAware(this)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        (context as? MainActivity)?.unregisterThemeAware(this)
+    }
+
+    /**
+     * Base behaviour: keep the label font in sync with the theme. Subclasses that own a themed icon
+     * (recycle bin, my computer, folders) override this, call super, then refresh their icon — so a
+     * single notifyThemeChanged() fully re-themes every icon.
+     */
+    override fun onThemeChanged(theme: AppTheme) {
+        setThemeFont(theme is AppTheme.WindowsClassic)
+    }
+
     fun getDesktopIcon(): DesktopIcon? = desktopIcon
     
     fun setIconDrawable(drawable: android.graphics.drawable.Drawable) {

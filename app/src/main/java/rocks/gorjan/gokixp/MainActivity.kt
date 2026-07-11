@@ -124,8 +124,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var searchBox: EditText
     private var isKeyboardOpen = false
     private var originalStartMenuLayoutParams: RelativeLayout.LayoutParams? = null
+    // Adapters auto-(un)register for theme notifications as they're replaced, so a stale adapter
+    // is never left in themeAwareComponents. (The `= null` initializer skips the setter.)
     private var appsAdapter: AppsAdapter? = null
+        set(value) {
+            field?.let { unregisterThemeAware(it) }
+            field = value
+            value?.let { registerThemeAware(it) }
+        }
     private var commandsAdapter: CommandsAdapter? = null
+        set(value) {
+            field?.let { unregisterThemeAware(it) }
+            field = value
+            value?.let { registerThemeAware(it) }
+        }
     private var cachedAppList: List<AppInfo>? = null
     private var isAppListLoading = false
     private var isCommandsListLoading = false
@@ -543,7 +555,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Notifies all registered components that the theme has changed.
      */
     private fun notifyThemeChanged(theme: AppTheme) {
-        themeAwareComponents.forEach { it.onThemeChanged(theme) }
+        // Iterate a copy: a component's onThemeChanged() may add/remove views (and thus mutate
+        // the list via attach/detach) while we're notifying.
+        themeAwareComponents.toList().forEach { it.onThemeChanged(theme) }
+    }
+
+    /**
+     * Registers a component to receive theme-change notifications via [notifyThemeChanged].
+     * Idempotent. Desktop icon views and the context menu call this from onAttachedToWindow();
+     * adapters register through their field setters. Pair every register with [unregisterThemeAware].
+     */
+    fun registerThemeAware(component: ThemeAware) {
+        if (component !in themeAwareComponents) themeAwareComponents.add(component)
+    }
+
+    /** Removes a component previously registered with [registerThemeAware]. */
+    fun unregisterThemeAware(component: ThemeAware) {
+        themeAwareComponents.remove(component)
     }
 
     /**
@@ -566,7 +594,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             applyCursorNormalDrawable()
         }
 
-        // Refresh desktop theme-aware components (RecycleBinView, MyComputerView, etc.)
+        // Refresh all registered theme-aware components (desktop icons, context menu, start-menu
+        // adapters) so their icons/colours reload from the newly selected Plus! slug.
         notifyThemeChanged(themeManager.getSelectedTheme())
 
         // Wallpaper — write the Plus! asset path (or revert to default) under the Classic keys
@@ -587,6 +616,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val targetColor = plus95?.menuColor ?: ThemeManager.CLASSIC_GRAY
         val root = findViewById<View>(R.id.main_background)
         if (root != null) applyPlus95MenuColor(root, targetColor)
+
+        // Announce the newly applied theme with its startup sound (start.ogg), if it ships one.
+        if (plus95 != null && plus95.startupAsset != null) {
+            playPlus95StartupSound(plus95.slug, plus95.startupAsset)
+        }
     }
 
     /**
@@ -606,16 +640,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * Colours that count as a repaintable "Classic gray" surface: the stock gray plus every
+     * Plus! menu colour. Matching all of them — not just the stock gray — lets us re-tint
+     * surfaces that a previous Plus! theme already painted. Otherwise switching between Plus!
+     * themes, or reverting to Default, left stale colours behind until an app restart
+     * re-inflated the layouts fresh (the reported "needs a restart to take effect" bug).
+     */
+    private val plus95RepaintableColors: Set<Int> by lazy {
+        ThemeManager.PLUS95_THEMES.mapTo(mutableSetOf(ThemeManager.CLASSIC_GRAY)) { it.menuColor }
+    }
+
     private fun tintClassicGrayBackground(view: View, newColor: Int) {
         val bg = view.background ?: return
         when (bg) {
             is android.graphics.drawable.ColorDrawable -> {
-                if (bg.color == ThemeManager.CLASSIC_GRAY) {
+                if (bg.color in plus95RepaintableColors) {
                     view.setBackgroundColor(newColor)
                 }
             }
             is android.graphics.drawable.GradientDrawable -> {
-                if (gradientColorIsClassicGray(bg)) {
+                if (gradientColorIsRepaintable(bg)) {
                     bg.mutate()
                     (bg as android.graphics.drawable.GradientDrawable).setColor(newColor)
                 }
@@ -623,7 +668,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             is android.graphics.drawable.LayerDrawable -> {
                 for (i in 0 until bg.numberOfLayers) {
                     val layer = bg.getDrawable(i)
-                    if (layer is android.graphics.drawable.GradientDrawable && gradientColorIsClassicGray(layer)) {
+                    if (layer is android.graphics.drawable.GradientDrawable && gradientColorIsRepaintable(layer)) {
                         layer.mutate()
                         (layer as android.graphics.drawable.GradientDrawable).setColor(newColor)
                     }
@@ -632,10 +677,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun gradientColorIsClassicGray(drawable: android.graphics.drawable.GradientDrawable): Boolean {
+    private fun gradientColorIsRepaintable(drawable: android.graphics.drawable.GradientDrawable): Boolean {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return false
         val stateList = drawable.color ?: return false
-        return stateList.defaultColor == ThemeManager.CLASSIC_GRAY
+        return stateList.defaultColor in plus95RepaintableColors
     }
 
     // ========== Theme-Specific Resource Helper Methods ==========
@@ -3084,7 +3129,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             startMenu.visibility = View.VISIBLE
             isStartMenuVisible = true
 
-            themeManager.getActivePlus95()?.let { applyPlus95MenuColor(startMenu, it.menuColor) }
+            // The start menu lives outside main_background, so applyPlus95Theme's walk never
+            // reaches it — tint (or reset) it here every time it opens. Passing CLASSIC_GRAY when
+            // no Plus! theme is active clears any stale tint left over from a previous selection.
+            if (themeManager.isClassicTheme()) {
+                val menuColor = themeManager.getActivePlus95()?.menuColor ?: ThemeManager.CLASSIC_GRAY
+                applyPlus95MenuColor(startMenu, menuColor)
+            }
 
             // For Windows Classic theme, keep app list invisible when opened via Start button
             val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
@@ -6326,7 +6377,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playClickSound()
 
             // Apply pending Plus! theme first so wallpaper/cursor/sound pick up its overrides
-            if (pendingPlus95 != null && pendingPlus95 != currentPlusSlug) {
+            if (pendingPlus95 != null && pendingPlus95 != themeManager.getPlus95Slug()) {
                 applyPlus95Theme(pendingPlus95!!)
             }
 
@@ -6398,7 +6449,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playClickSound()
 
             // Apply pending Plus! theme first
-            if (pendingPlus95 != null && pendingPlus95 != currentPlusSlug) {
+            if (pendingPlus95 != null && pendingPlus95 != themeManager.getPlus95Slug()) {
                 applyPlus95Theme(pendingPlus95!!)
                 pendingPlus95 = null
             }
@@ -12446,15 +12497,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Reload start menu with Windows 98 layout
         setupStartMenu("Windows Classic")
 
-        // Set context menu background to Windows 98 style
-        contextMenu.setThemeBackground(true)
-
-
-        // Update desktop icons font to Microsoft Sans Serif
-        desktopIconViews.forEach { iconView ->
-            iconView.setThemeFont(true)
-        }
-
         // Reload custom icon mappings for Windows Classic theme and update all icons
         loadCustomIconMappings()
         updateAllCustomIcons()
@@ -12466,24 +12508,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             quickGlanceWidget.refreshData()
         }
 
-        // Update start menu adapters font to Microsoft Sans Serif
-        appsAdapter?.setTheme(true)
-        commandsAdapter?.setTheme(true)
-
-        // Update recycle bin icon to Windows 98 version
-        if (::recycleBin.isInitialized) {
-            recycleBin.setThemeIcon(true)
-        }
-
-        // Update folder icons to Windows 98 version (only if no custom icon)
-        desktopIconViews.forEach { iconView ->
-            if (iconView is FolderView) {
-                val packageName = iconView.getDesktopIcon()?.packageName
-                if (packageName != null && !customIconMappings.containsKey(packageName)) {
-                    iconView.setThemeIcon(true)
-                }
-            }
-        }
+        // One hub for every registered theme-aware component: desktop-icon fonts + system icons
+        // (recycle bin, my computer, non-custom folders), start-menu adapters, and the context menu.
+        // Runs after updateAllCustomIcons() so custom folder icons are preserved.
+        notifyThemeChanged(AppTheme.WindowsClassic)
 
         // Set up start banner cycling for Windows 98 theme
         setupStartBannerCycling()
@@ -12513,15 +12541,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Reload start menu with Windows XP layout
         setupStartMenu("Windows XP")
 
-        // Restore context menu background to Windows XP style
-        contextMenu.setThemeBackground(false)
-
-
-        // Restore desktop icons font to Tahoma
-        desktopIconViews.forEach { iconView ->
-            iconView.setThemeFont(false)
-        }
-
         // Reload custom icon mappings for Windows XP theme and update all icons
         loadCustomIconMappings()
         updateAllCustomIcons()
@@ -12533,24 +12552,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             quickGlanceWidget.refreshData()
         }
 
-        // Restore start menu adapters font to Tahoma
-        appsAdapter?.setTheme(false)
-        commandsAdapter?.setTheme(false)
-
-        // Restore recycle bin icon to Windows XP version
-        if (::recycleBin.isInitialized) {
-            recycleBin.setThemeIcon(false)
-        }
-
-        // Update folder icons to Windows XP version (only if no custom icon)
-        desktopIconViews.forEach { iconView ->
-            if (iconView is FolderView) {
-                val packageName = iconView.getDesktopIcon()?.packageName
-                if (packageName != null && !customIconMappings.containsKey(packageName)) {
-                    iconView.setThemeIcon(false)
-                }
-            }
-        }
+        // One hub for every registered theme-aware component (see applyWindows98Theme).
+        notifyThemeChanged(AppTheme.WindowsXP)
 
         // Update dialog backgrounds for future dialogs - store theme preference
         // Dialogs will check this when they're created
@@ -12587,15 +12590,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Reload start menu with Windows Vista layout
         setupStartMenu("Windows Vista")
 
-        // Restore context menu background to Windows Vista style (same as XP for now)
-        contextMenu.setThemeBackground(false)
-
-
-        // Restore desktop icons font to Tahoma
-        desktopIconViews.forEach { iconView ->
-            iconView.setThemeFont(false)
-        }
-
         // Reload custom icon mappings for Windows Vista theme and update all icons
         loadCustomIconMappings()
         updateAllCustomIcons()
@@ -12607,24 +12601,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             quickGlanceWidget.refreshData()
         }
 
-        // Restore start menu adapters font to Tahoma
-        appsAdapter?.onThemeChanged(AppTheme.WindowsVista)
-        commandsAdapter?.onThemeChanged(AppTheme.WindowsVista)
-
-        // Restore recycle bin icon to Windows Vista version
-        if (::recycleBin.isInitialized) {
-            recycleBin.setThemeIcon(false)
-        }
-
-        // Update folder icons to Windows Vista version (only if no custom icon)
-        desktopIconViews.forEach { iconView ->
-            if (iconView is FolderView) {
-                val packageName = iconView.getDesktopIcon()?.packageName
-                if (packageName != null && !customIconMappings.containsKey(packageName)) {
-                    iconView.setThemeIcon(false)
-                }
-            }
-        }
+        // One hub for every registered theme-aware component (see applyWindows98Theme).
+        notifyThemeChanged(AppTheme.WindowsVista)
 
         // Update dialog backgrounds for future dialogs - store theme preference
         // Dialogs will check this when they're created
@@ -12875,6 +12853,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return getCustomIconKeyForCurrentTheme()
     }
 
+    /** True if the user has set a custom icon for this package (folders check this before re-theming). */
+    fun hasCustomIcon(packageName: String): Boolean = customIconMappings.containsKey(packageName)
+
     private fun updateAllCustomIcons() {
         Log.d("MainActivity", "updateAllCustomIcons called with ${customIconMappings.size} mappings")
 
@@ -12921,7 +12902,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun applyCursorNormalDrawable() {
         val plus95 = themeManager.getActivePlus95()
         if (plus95 != null) {
-            val d = loadPlus95Drawable(plus95.slug, "arrow.png")
+            val d = loadPlus95Drawable(plus95.slug, "arrow.png", trimTransparent = true)
             if (d != null) {
                 cursorEffect.setImageDrawable(d)
                 return
@@ -12934,15 +12915,68 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun loadPlus95Drawable(slug: String, filename: String): android.graphics.drawable.Drawable? {
+    /**
+     * Loads a Plus! 95 PNG asset as a density-correct drawable.
+     *
+     * Assets are not density-scaled the way res/drawable resources are, so decoding one with
+     * Drawable.createFromStream() yields a bitmap stamped at the device density — it then
+     * renders at its raw pixel size (tiny on hi-dpi screens) inside a dp-sized slot. We stamp
+     * the bitmap as mdpi so the BitmapDrawable scales up to the device density, matching how
+     * the built-in drawables render (fixes the shrunken My Computer / Recycle Bin icons).
+     *
+     * @param trimTransparent when true, crops fully-transparent margins first. Plus! cursors
+     *        ship as 32x32 canvases with the pointer tucked into one corner; trimming makes the
+     *        pointer fill the fitXY cursor view — and sit at the touch point — the way the
+     *        built-in cursor.png does, instead of appearing as a tiny arrow.
+     */
+    fun loadPlus95Drawable(
+        slug: String,
+        filename: String,
+        trimTransparent: Boolean = false
+    ): android.graphics.drawable.Drawable? {
         return try {
             assets.open(themeManager.plus95Path(slug, filename)).use { stream ->
-                android.graphics.drawable.Drawable.createFromStream(stream, filename)
+                val decoded = android.graphics.BitmapFactory.decodeStream(stream)
+                if (decoded == null) {
+                    null
+                } else {
+                    val bitmap = if (trimTransparent) trimTransparentBorder(decoded) else decoded
+                    bitmap.density = android.util.DisplayMetrics.DENSITY_DEFAULT
+                    android.graphics.drawable.BitmapDrawable(resources, bitmap)
+                }
             }
         } catch (e: Exception) {
             Log.w("MainActivity", "Plus! asset missing: $slug/$filename", e)
             null
         }
+    }
+
+    /** Crops fully-transparent rows/columns from the edges of a bitmap. */
+    private fun trimTransparentBorder(src: android.graphics.Bitmap): android.graphics.Bitmap {
+        val width = src.width
+        val height = src.height
+        val pixels = IntArray(width * height)
+        src.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        var top = height
+        var bottom = -1
+        var left = width
+        var right = -1
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if ((pixels[y * width + x] ushr 24) != 0) {
+                    if (x < left) left = x
+                    if (x > right) right = x
+                    if (y < top) top = y
+                    if (y > bottom) bottom = y
+                }
+            }
+        }
+
+        // Fully transparent, or already edge-to-edge → nothing to crop.
+        if (right < left || bottom < top) return src
+        if (left == 0 && top == 0 && right == width - 1 && bottom == height - 1) return src
+        return android.graphics.Bitmap.createBitmap(src, left, top, right - left + 1, bottom - top + 1)
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
@@ -13115,7 +13149,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::cursorEffect.isInitialized) {
             val plus95 = themeManager.getActivePlus95()
             if (plus95 != null && plus95.busyAsset != null) {
-                val d = loadPlus95Drawable(plus95.slug, plus95.busyAsset)
+                val d = loadPlus95Drawable(plus95.slug, plus95.busyAsset, trimTransparent = true)
                 if (d != null) {
                     cursorEffect.setImageDrawable(d)
                     return

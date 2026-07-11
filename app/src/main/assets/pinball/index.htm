@@ -274,10 +274,48 @@
 		elZoom.classList.toggle("active", zoomed);
 	}
 
+	// ---- Forward central taps to the canvas as mouse clicks ----
+	// The game's end-of-game "High Scores" dialog (Rank / Name / Score with
+	// Ok / Cancel / Clear buttons) is drawn *inside* the WebAssembly module and
+	// can only be dismissed by clicking one of its buttons. The touch overlay
+	// otherwise only synthesizes flipper/launch keystrokes, so on a phone that
+	// dialog is impossible to close. We mirror a tap on the central play area
+	// (flippers + dead zones, i.e. everywhere the dialog is drawn) as a real
+	// mouse press on the canvas so those buttons become tappable. Only one
+	// finger drives the pointer at a time; mouse input has no effect on play in
+	// this build (verified: it does not nudge, tilt or launch), so this is inert
+	// during a game and only matters when a dialog is on screen.
+	var mouseOwner = null; // identifier of the touch currently driving the pointer
+	function fireMouse(type, x, y, buttons){
+		canvas.dispatchEvent(new MouseEvent(type, {
+			clientX: x, clientY: y, button: 0, buttons: buttons,
+			bubbles: true, cancelable: true, view: window
+		}));
+	}
+	function forwardPress(id, x, y){
+		if (mouseOwner !== null) { return; }
+		mouseOwner = id;
+		fireMouse("mousemove", x, y, 0);
+		fireMouse("mousedown", x, y, 1);
+	}
+	function forwardRelease(id, x, y){
+		if (mouseOwner !== id) { return; }
+		mouseOwner = null;
+		fireMouse("mousemove", x, y, 1);
+		fireMouse("mouseup", x, y, 0);
+		fireMouse("click", x, y, 0);
+	}
+
 	function onTouchStart(e){
 		for (var i = 0; i < e.changedTouches.length; i++){
 			var t = e.changedTouches[i];
 			var name = controlAt(t.clientX, t.clientY);
+			// Flipper halves and dead zones double as a canvas click so any
+			// in-game dialog drawn there can be tapped; the top-bar buttons and
+			// launch pad stay pure UI.
+			if (name === null || name === "LEFT" || name === "RIGHT") {
+				forwardPress(t.identifier, t.clientX, t.clientY);
+			}
 			if (!name) { continue; }
 			if (name === "ZOOM") { toggleZoom(); continue; }
 			touches[t.identifier] = name;
@@ -289,6 +327,7 @@
 	function onTouchEnd(e){
 		for (var i = 0; i < e.changedTouches.length; i++){
 			var t = e.changedTouches[i];
+			forwardRelease(t.identifier, t.clientX, t.clientY);
 			var name = touches[t.identifier];
 			if (name){
 				release(name);
@@ -309,6 +348,7 @@
 		for (var name in counts){
 			if (counts[name] > 0){ counts[name] = 0; dispatchKey("keyup", KEYS[name]); }
 		}
+		if (mouseOwner !== null){ mouseOwner = null; fireMouse("mouseup", 0, 0, 0); }
 		touches = {};
 		refreshPressedClasses();
 	}

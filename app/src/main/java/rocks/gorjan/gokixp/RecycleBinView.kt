@@ -45,6 +45,7 @@ class RecycleBinView : DesktopIconView, ThemeAware {
 
     // Phase 3: Implement ThemeAware interface
     override fun onThemeChanged(theme: AppTheme) {
+        super.onThemeChanged(theme) // font
         currentTheme = theme
         updateIcon()
     }
@@ -52,20 +53,15 @@ class RecycleBinView : DesktopIconView, ThemeAware {
     private fun updateIcon() {
         val mainActivity = context as? MainActivity
 
-        // If a Plus! 95 theme is active, prefer its recye.png asset
+        // If a Plus! 95 theme is active, prefer its recye.png asset (density-corrected so it
+        // fills the icon slot instead of rendering at raw pixel size on hi-dpi screens).
         val plus95 = mainActivity?.themeManager?.getActivePlus95()
         if (plus95 != null) {
-            try {
-                context.assets.open(mainActivity.themeManager.plus95Path(plus95.slug, "recye.png")).use { stream ->
-                    val d = android.graphics.drawable.Drawable.createFromStream(stream, "recye.png")
-                    if (d != null) {
-                        setIconDrawable(d)
-                        getDesktopIcon()?.icon = d
-                        return
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("RecycleBinView", "Failed to load Plus! recycle bin icon", e)
+            val d = mainActivity.loadPlus95Drawable(plus95.slug, "recye.png")
+            if (d != null) {
+                setIconDrawable(d)
+                getDesktopIcon()?.icon = d
+                return
             }
         }
 

@@ -32,6 +32,16 @@ class ContextMenuView @JvmOverloads constructor(
         visibility = GONE
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        (context as? MainActivity)?.registerThemeAware(this)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        (context as? MainActivity)?.unregisterThemeAware(this)
+    }
+
     fun showMenu(items: List<ContextMenuItem>, x: Float, y: Float) {
         // Trigger haptic feedback when opening context menu
         Helpers.performHapticFeedback(context)
@@ -43,7 +53,11 @@ class ContextMenuView @JvmOverloads constructor(
         items.forEach { item ->
             addMenuItem(item)
         }
-        
+
+        // Re-apply the background each time so a Plus! 95 theme's menu colour is picked up
+        // (the menu lives outside main_background, so the theme-wide tint walk never reaches it).
+        refreshThemedBackground()
+
         // Position the menu
         positionMenu(x, y)
         
@@ -354,6 +368,23 @@ class ContextMenuView @JvmOverloads constructor(
         currentTheme = theme
         updateBackground()
         updateExistingMenuItemFonts(currentTheme is AppTheme.WindowsClassic)
+    }
+
+    /**
+     * For the Windows Classic theme, rebuilds the gray Win98 border using the active Plus! 95
+     * menu colour (falling back to the stock gray when no Plus! theme is active, which also
+     * clears any stale tint left by a previous selection). No-op for XP/Vista, whose backgrounds
+     * are set by [updateBackground]. The menu items themselves are transparent, so tinting the
+     * container is enough. Called on every open so it always reflects the current theme.
+     */
+    private fun refreshThemedBackground() {
+        val mainActivity = context as? MainActivity ?: return
+        if (!mainActivity.themeManager.isClassicTheme()) return
+        val fill = mainActivity.themeManager.getActivePlus95()?.menuColor
+            ?: androidx.core.content.ContextCompat.getColor(context, R.color.window_98_background)
+        val topLeft = androidx.core.content.ContextCompat.getColor(context, R.color.border_white)
+        val bottomRight = androidx.core.content.ContextCompat.getColor(context, R.color.border_black)
+        background = mainActivity.drawableManager.createWindows98Border(fill, topLeft, bottomRight)
     }
 
     private fun updateBackground() {
