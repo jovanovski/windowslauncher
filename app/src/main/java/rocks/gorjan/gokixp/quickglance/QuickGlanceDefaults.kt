@@ -61,11 +61,11 @@ object QuickGlanceDefaults {
 
                 subtitle
             } else {
-                "your pal, Clippy 1"
+                "your pal, Clippy"
             }
         } catch (e: Exception) {
             Log.e("QuickGlanceDefaults", "Error getting weather subtitle", e)
-            "your pal, Clippy 2"
+            "your pal, Clippy"
         }
     }
 
