@@ -119,11 +119,8 @@ class SolitareGame(
     private val DEAL_ANIMATION_DURATION = 250L // Total animation time in ms
     private val CARD_STAGGER_DELAY = DEAL_ANIMATION_DURATION / 3 // Delay between each card (500ms / 3 cards ≈ 166ms)
 
-    // Draw pile cycle tracking for game over detection
-    private var drawPileCardsAtCycleStart = 0  // Number of cards in stock+waste when cycle started
-    private var cardsDrawnThisCycle = 0        // How many cards drawn from stock this cycle
-    private var wasteCardUsedThisCycle = false // Whether any waste card was used this cycle
-    private var isGameOver = false             // True when game is definitively over (stays until new game)
+    // True when the game is definitively over (stays shown until a new game)
+    private var isGameOver = false
 
     // Store captured slot positions
     private var tableauSlotPositions = mutableListOf<Pair<Float, Float>>()
@@ -688,19 +685,7 @@ class SolitareGame(
         private fun moveCardsTo(targetPile: Pile) {
             // Cards were already removed from source in handleCardSelection
 
-            // Any successful move changes the board and can make a card that is
-            // currently buried in the stock/waste reachable on a fresh pass, so
-            // every move counts as progress and must reset the cycle tracking.
-            // (Previously only waste-sourced moves reset it, which made the game
-            // wrongly declare "no moves left" after tableau/foundation moves.)
-            if (sourcePile?.type == PileType.WASTE) {
-                wasteCardUsedThisCycle = true
-            }
-            // Reset cycle tracking since progress was made
-            drawPileCardsAtCycleStart = 0
-            cardsDrawnThisCycle = 0
-
-            // Any valid move means game is not over
+            // Any valid move means the game is not over
             isGameOver = false
 
             // Flip top card of source tableau if it's face down
@@ -791,9 +776,6 @@ class SolitareGame(
                 // Add all cards to waste pile immediately but mark them for animation
                 wastePile.cards.addAll(cardsBeingDealt)
 
-                // Track cards drawn for cycle detection
-                cardsDrawnThisCycle += cardsToDraw
-
                 // Start animation
                 isDealingCards = true
                 dealAnimationStartTime = System.currentTimeMillis()
@@ -868,10 +850,7 @@ class SolitareGame(
         // Reset waste group tracking
         wasteGroupStartIndex = 0
 
-        // Reset draw pile cycle tracking
-        drawPileCardsAtCycleStart = 0
-        cardsDrawnThisCycle = 0
-        wasteCardUsedThisCycle = false
+        // Clear any game-over state
         isGameOver = false
 
         // Position piles - call recalculate to ensure responsive positioning
@@ -1235,49 +1214,34 @@ class SolitareGame(
             }
         }
 
-        // If no visible moves, check if we can draw or if game is truly over
-        // Game is only over if: stock is empty AND (waste is empty OR we've cycled through everything)
-        if (stockPile.cards.isEmpty() && wastePile.cards.isEmpty()) {
-            // No cards left anywhere - game is definitely over
-            return false
+        // No move is available on the current board. The only remaining escape
+        // is a card coming out of the stock/waste. Because the player can freely
+        // draw and recycle the deck, every stock and waste card will eventually
+        // come back up on top, so if ANY of them can go to a foundation or
+        // tableau there is still a move to be made - even if the player already
+        // skipped past that card on an earlier pass without playing it.
+        //
+        // This deterministic check replaces an older "full cycle" counter
+        // heuristic that declared the game over whenever the player drew through
+        // the whole deck without playing a card, which wrongly triggered when
+        // playable cards were simply left unplayed. Drawing never changes the
+        // tableaus or foundations, so if no draw-pile card is playable now,
+        // drawing or recycling more cards cannot create a new move either.
+        for (card in stockPile.cards + wastePile.cards) {
+            for (foundation in foundations) {
+                if (canPlaceOnFoundation(listOf(card), foundation)) {
+                    return true
+                }
+            }
+            for (tableau in tableaus) {
+                if (canPlaceOnTableau(listOf(card), tableau)) {
+                    return true
+                }
+            }
         }
 
-        if (stockPile.cards.isNotEmpty()) {
-            // Can still draw cards - suggest "Draw" by hiding "no moves" message
-            return true
-        }
-
-        // Stock is empty but waste has cards - can recycle
-        // Check if we've completed a full cycle without using any waste cards
-        if (hasCompletedFullCycle()) {
-            // Completed full cycle with no moves - game is over
-            return false
-        }
-
-        // Haven't completed full cycle yet - can still recycle and try
-        return true
-    }
-
-    /**
-     * Check if we've completed a full cycle through the draw pile without making progress
-     */
-    private fun hasCompletedFullCycle(): Boolean {
-        // A full cycle means:
-        // 1. We've drawn through all cards in stock+waste pile at least once
-        // 2. No waste cards were used during this cycle
-
-        val totalDrawPileCards = stockPile.cards.size + wastePile.cards.size
-
-        // If we haven't started tracking a cycle yet, start now
-        if (drawPileCardsAtCycleStart == 0 && totalDrawPileCards > 0) {
-            drawPileCardsAtCycleStart = totalDrawPileCards
-            // Don't reset cardsDrawnThisCycle - it may have already been incremented
-            wasteCardUsedThisCycle = false
-            return false
-        }
-
-        // Check if we've drawn all cards and cycled back
-        return cardsDrawnThisCycle >= drawPileCardsAtCycleStart && !wasteCardUsedThisCycle
+        // Nothing on the board and nothing in the draw pile can be played.
+        return false
     }
 
     private fun canPlaceOnFoundation(cards: List<Card>, foundation: Pile): Boolean {
