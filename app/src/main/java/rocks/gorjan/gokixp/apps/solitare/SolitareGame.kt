@@ -1,6 +1,7 @@
 package rocks.gorjan.gokixp.apps.solitare
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -13,6 +14,7 @@ import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 import kotlin.math.abs
+import kotlin.random.Random
 
 /**
  * Classic Windows 98/2000 Solitaire (Klondike) game
@@ -24,7 +26,22 @@ class SolitareGame(
         private const val PREFS_NAME = "SolitarePrefs"
         private const val PREF_CARD_BACK = "cardBack"
         private const val PREF_LARGE_CARDS = "largeCards"
+
+        // Win-cascade animation tuning (velocities are in dp/frame, scaled by density)
+        private const val WIN_FRAME_MS = 16L          // ~60 FPS
+        private const val WIN_LAUNCH_INTERVAL = 4     // frames between successive card launches
+        private const val WIN_GRAVITY = 0.6f          // downward acceleration per frame
+        private const val WIN_RESTITUTION = 0.82f     // fraction of vertical speed kept per bounce
     }
+
+    /** A single card flying across the screen during the win cascade. */
+    private class FlyingCard(
+        val card: Card,
+        var x: Float,
+        var y: Float,
+        var vx: Float,
+        var vy: Float
+    )
 
     // Card dimensions in dp - will be converted to pixels
     private val density = context.resources.displayMetrics.density
@@ -251,6 +268,20 @@ class SolitareGame(
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
+            // During (and after) the win cascade we simply blit the accumulated
+            // trail bitmap, which already holds the board plus every card position
+            // drawn so far. Leaving previous frames un-erased is what produces the
+            // classic streaking-cards effect.
+            val trail = winTrailBitmap
+            if (trail != null) {
+                canvas.drawBitmap(trail, 0f, 0f, null)
+                return
+            }
+
+            drawBoard(canvas)
+        }
+
+        private fun drawBoard(canvas: Canvas) {
             // Draw empty slots
             drawEmptySlots(canvas)
 
@@ -450,6 +481,15 @@ class SolitareGame(
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
+            // While the win cascade is on screen, swallow touches. Once it has
+            // finished playing, a tap clears the streaks and restores the board.
+            if (winTrailBitmap != null) {
+                if (event.action == MotionEvent.ACTION_DOWN && !isWinAnimating) {
+                    clearWinAnimation()
+                }
+                return true
+            }
+
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.x
@@ -808,6 +848,147 @@ class SolitareGame(
             handler.post(runnable)
         }
 
+        // ---------------------------------------------------------------------
+        // Win animation - the classic Windows Solitaire bouncing-cards cascade
+        // ---------------------------------------------------------------------
+
+        private var winTrailBitmap: Bitmap? = null
+        private var winTrailCanvas: Canvas? = null
+        private val winFlyingCards = mutableListOf<FlyingCard>()
+        private val winLaunchQueue = ArrayDeque<Pair<Card, Int>>()
+        private var isWinAnimating = false
+        private var winFrame = 0
+        private var winHandler: android.os.Handler? = null
+        private var winRunnable: Runnable? = null
+
+        /**
+         * Kick off the winning cascade: cards launch one-by-one from the
+         * foundations, bounce off the bottom of the screen, and streak off the
+         * sides, leaving a trail of card images behind them.
+         */
+        fun startWinAnimation() {
+            if (isWinAnimating) return
+
+            val w = width
+            val h = height
+            if (w <= 0 || h <= 0) {
+                // View not laid out yet - retry once it is.
+                post { startWinAnimation() }
+                return
+            }
+
+            // Build the launch order: take the top card of each foundation in
+            // round-robin (Kings first, then Queens, ...) so the suits interleave.
+            // Remember which foundation each card came from so it launches from
+            // that slot. The lists are copied, so the real piles are left intact -
+            // the animation runs over a static snapshot of the board.
+            winLaunchQueue.clear()
+            val stacks = foundations.map { it.cards.toMutableList() }
+            var launched = true
+            while (launched) {
+                launched = false
+                stacks.forEachIndexed { index, stack ->
+                    if (stack.isNotEmpty()) {
+                        winLaunchQueue.add(stack.removeAt(stack.size - 1) to index)
+                        launched = true
+                    }
+                }
+            }
+            if (winLaunchQueue.isEmpty()) return
+
+            // Snapshot the current board as the animation background so the green
+            // table and full foundations stay visible beneath the streaks.
+            winTrailBitmap?.recycle()
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val bmpCanvas = Canvas(bmp)
+            drawBoard(bmpCanvas)
+            winTrailBitmap = bmp
+            winTrailCanvas = bmpCanvas
+
+            winFlyingCards.clear()
+            winFrame = 0
+            isWinAnimating = true
+
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            winHandler = handler
+            winRunnable = object : Runnable {
+                override fun run() {
+                    if (!isWinAnimating) return
+                    stepWinAnimation()
+                    invalidate()
+                    if (winFlyingCards.isNotEmpty() || winLaunchQueue.isNotEmpty()) {
+                        handler.postDelayed(this, WIN_FRAME_MS)
+                    } else {
+                        // Done - leave the streaks on screen until a new game or a
+                        // tap dismisses them.
+                        isWinAnimating = false
+                    }
+                }
+            }
+            handler.post(winRunnable!!)
+        }
+
+        /** Advance the cascade physics by one frame and bake it into the trail. */
+        private fun stepWinAnimation() {
+            val canvas = winTrailCanvas ?: return
+            val w = width.toFloat()
+            val h = height.toFloat()
+
+            // Launch a fresh card every few frames.
+            if (winFrame % WIN_LAUNCH_INTERVAL == 0 && winLaunchQueue.isNotEmpty()) {
+                val (card, foundationIndex) = winLaunchQueue.removeFirst()
+                card.faceUp = true
+                val origin = foundations[foundationIndex]
+                // Launch each card in a random horizontal direction so they fan
+                // out across the whole table - some sweep left, some right -
+                // rather than all streaking the same way. Gravity then pulls the
+                // card down into its first bounce.
+                val direction = if (Random.nextBoolean()) 1f else -1f
+                val vx = direction * (2f + Random.nextFloat() * 5f) * density
+                val vy = (Random.nextFloat() * 8f - 6f) * density
+                winFlyingCards.add(FlyingCard(card, origin.x, origin.y, vx, vy))
+            }
+            winFrame++
+
+            val gravity = WIN_GRAVITY * density
+            val floor = h - CARD_HEIGHT
+            val iterator = winFlyingCards.iterator()
+            while (iterator.hasNext()) {
+                val fc = iterator.next()
+                fc.vy += gravity
+                fc.x += fc.vx
+                fc.y += fc.vy
+
+                // Bounce off the bottom edge, losing a little energy each time.
+                if (fc.y >= floor) {
+                    fc.y = floor
+                    fc.vy = -fc.vy * WIN_RESTITUTION
+                }
+
+                // Bake this position into the trail bitmap (never erased).
+                drawCard(canvas, fc.card, fc.x, fc.y)
+
+                // Retire the card once it has fully left either side.
+                if (fc.x + CARD_WIDTH < 0f || fc.x > w) {
+                    iterator.remove()
+                }
+            }
+        }
+
+        /** Stop the cascade (if running) and clear the streaks from the screen. */
+        fun clearWinAnimation() {
+            isWinAnimating = false
+            winRunnable?.let { winHandler?.removeCallbacks(it) }
+            winRunnable = null
+            winHandler = null
+            winFlyingCards.clear()
+            winLaunchQueue.clear()
+            winTrailCanvas = null
+            winTrailBitmap?.recycle()
+            winTrailBitmap = null
+            invalidate()
+        }
+
     }
 
     /**
@@ -844,6 +1025,9 @@ class SolitareGame(
      * Reset and start a new game
      */
     private fun resetGame() {
+        // Stop any running win cascade and clear its streaks
+        gameView?.clearWinAnimation()
+
         // Create and shuffle deck
         shuffleDeck()
 
@@ -951,7 +1135,8 @@ class SolitareGame(
      * Cleanup when game is closed
      */
     fun cleanup() {
-        // Nothing to clean up for now
+        // Stop the win cascade handler and free its bitmap
+        gameView?.clearWinAnimation()
     }
 
     /**
@@ -1083,6 +1268,7 @@ class SolitareGame(
             noMovesLeftTextView?.visibility = View.VISIBLE
             isGameOver = true
             Helpers.performHapticFeedback(context)
+            gameView?.startWinAnimation()
             return
         }
 
