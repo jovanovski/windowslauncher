@@ -905,7 +905,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set up gesture bar toggle after theme initialization
         setupGestureBarToggle()
-        
+
+        // Inset the whole launcher up to the system navigation bar (e.g. 3-button navigation),
+        // so the desktop fills up to the nav bar instead of drawing under it.
+        setupNavigationBarInsets()
+
         // Request notification permission on first launch (Android 13+)
         requestNotificationPermissionIfNeeded()
         
@@ -9244,10 +9248,61 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         try {
             // Android 11 and above - extend behind system bars but keep them visible
             window.setDecorFitsSystemWindows(false)
-            // Don't hide the system bars, just allow content to draw behind them
+            // Don't hide the system bars, just allow content to draw behind them.
+            // Keep the navigation bar transparent (and disable the system's translucent
+            // scrim) so the black backdrop we draw behind it shows cleanly. This matters for
+            // button/3-button navigation, where setupNavigationBarInsets() pads the content up
+            // to the bar and the space behind the buttons is filled by root_container's black.
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+            }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error enabling edge-to-edge", e)
         }
+    }
+
+    /**
+     * Inset the entire launcher so it stops at the system navigation bar instead of drawing
+     * behind it. This matters for button/3-button (and 2-button) navigation, whose bar is
+     * either a tall strip at the bottom (portrait) or a strip down one side (landscape).
+     *
+     * The base layout already reserves a 30dp strip at the bottom (the gesture bar) for the
+     * navigation area, so we only pad the root by the *extra* nav bar height beyond that: with
+     * gesture navigation the bottom inset is <= 30dp, so nothing changes; with a taller button
+     * nav bar the content is lifted to clear it. Left/right insets (a side nav bar in landscape)
+     * are applied in full. The space freed up behind the bar is filled by root_container's black
+     * background, matching the app's black gesture-bar look.
+     */
+    private fun setupNavigationBarInsets() {
+        val root = findViewById<View>(R.id.root_container)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+
+            // 30dp already reserved at the bottom by the gesture bar / taskbar margins.
+            val reservedBottomPx = (30 * resources.displayMetrics.density).toInt()
+            val padLeft = navBars.left
+            val padRight = navBars.right
+            val padBottom = maxOf(0, navBars.bottom - reservedBottomPx)
+
+            if (view.paddingLeft != padLeft || view.paddingRight != padRight ||
+                view.paddingBottom != padBottom || view.paddingTop != 0) {
+                view.setPadding(padLeft, 0, padRight, padBottom)
+
+                // The usable desktop area changed (narrower in landscape, shorter in portrait),
+                // so re-place the icons for the new bounds — same reflow used on rotation.
+                if (::desktopContainer.isInitialized) {
+                    desktopContainer.post {
+                        positionIconsFromGridIndices()
+                        reflowIconsWithoutPosition()
+                        refreshDesktopIcons()
+                    }
+                }
+            }
+
+            insets
+        }
+        androidx.core.view.ViewCompat.requestApplyInsets(root)
     }
 
     fun playClickSound() {
