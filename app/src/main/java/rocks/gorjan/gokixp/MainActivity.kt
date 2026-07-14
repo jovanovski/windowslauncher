@@ -598,12 +598,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // adapters) so their icons/colours reload from the newly selected Plus! slug.
         notifyThemeChanged(themeManager.getSelectedTheme())
 
-        // Wallpaper — write the Plus! asset path (or revert to default) under the Classic keys
-        val classicPath = if (plus95 != null) {
-            themeManager.plus95Path(plus95.slug, "wall.jpg")
-        } else {
-            "wallpapers/Windows ME (m).jpg"
-        }
+        // Wallpaper — write the Plus! theme's own wallpaper (or the default) under the Classic
+        // keys. Resolve from the slug + asset existence, NOT getActivePlus95(): this method also
+        // runs while switching XP→Classic *before* the base theme flips, so getActivePlus95()
+        // would still be null and we'd wrongly stage the default wallpaper. Themes that don't
+        // ship a wall.jpg (e.g. the Plus! 98 set) fall back to the default Classic wallpaper.
+        val classicPath = plus95WallpaperPath(slug) ?: "wallpapers/Windows ME (m).jpg"
         prefs.edit {
             putString(KEY_WALLPAPER_CLASSIC_PATH, classicPath)
             remove(KEY_WALLPAPER_CLASSIC_URI)
@@ -8380,6 +8380,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    /** True if a bundled asset exists at [path] under assets/. */
+    private fun assetExists(path: String): Boolean = try {
+        assets.open(path).close(); true
+    } catch (e: Exception) { false }
+
+    /**
+     * The Plus! theme's bundled wallpaper asset path (plus95/<slug>/wall.jpg) if it ships one,
+     * else null. Themes without a wall.jpg (e.g. the Plus! 98 set) return null so callers fall
+     * back to the default Classic wallpaper.
+     */
+    private fun plus95WallpaperPath(slug: String): String? {
+        if (slug == ThemeManager.PLUS95_DEFAULT) return null
+        val path = themeManager.plus95Path(slug, "wall.jpg")
+        return if (assetExists(path)) path else null
+    }
+
     private fun applyCustomWallpaperFromAssets(filePath: String) {
         try {
             val inputStream = assets.open(filePath)
@@ -9158,6 +9174,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun loadSavedWallpaper() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val (pathKey, uriKey) = getCurrentThemeWallpaperKeys()
+
+        // A Plus! theme's bundled wallpaper is the source of truth for the Classic desktop.
+        // Apply it up front so that switching the base theme to Classic (which recreates the
+        // activity and lands here) shows the theme's own wallpaper immediately, instead of the
+        // previously-saved Classic wallpaper until the theme is manually re-applied. A user
+        // picked custom image (uriKey) still takes precedence if one has been set.
+        val plus95 = themeManager.getActivePlus95()
+        if (plus95 != null && prefs.getString(uriKey, null) == null) {
+            val plusWall = plus95WallpaperPath(plus95.slug)
+            if (plusWall != null) {
+                prefs.edit { putString(pathKey, plusWall) }
+                applyCustomWallpaperFromAssets(plusWall)
+                return
+            }
+        }
 
         // Check for custom URI first (from image picker)
         val customWallpaperUri = prefs.getString(uriKey, null)

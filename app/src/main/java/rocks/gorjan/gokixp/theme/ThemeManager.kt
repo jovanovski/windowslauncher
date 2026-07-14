@@ -456,16 +456,31 @@ class ThemeManager(private val context: Context) {
         const val PLUS95_DEFAULT = "default"
 
         val PLUS95_THEMES: List<Plus95Theme> = listOf(
+            Plus95Theme("architecture", "Architecture", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("baseball", "Baseball", 0xFFD0A870.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("cityscape", "Cityscape", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("dangerous_creatures", "Dangerous Creatures", 0xFF707070.toInt(), null, "menu.ogg", "start.ogg"),
+            Plus95Theme("falling_leaves", "Falling Leaves", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("fashion", "Fashion", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("garfield", "Garfield", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("geometry", "Geometry", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("golf", "Golf", 0xFFE0C8A0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("inside_your_computer", "Inside your Computer", 0xFFA8C8A8.toInt(), null, "menu.ogg", "start.ogg"),
+            Plus95Theme("jazz", "Jazz", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("jungle", "Jungle", 0xFFB8A068.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("leonardo_da_vinci", "Leonardo da Vinci", 0xFFBFA59F.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("mystery", "Mystery", 0xFF687868.toInt(), null, "menu.ogg", "start.ogg"),
             Plus95Theme("nature", "Nature", 0xFFD8C0A0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("rock_n_roll", "Rock 'n' Roll", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("sci_fi", "Sci-Fi", 0xFFC0C0C0.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("science", "Science", 0xFF8399B1.toInt(), null, "menu.ogg", "start.ogg"),
+            Plus95Theme("space", "Space", 0xFF809098.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("sports", "Sports", 0xFFB0E0A0.toInt(), null, "menu.ogg", "start.ogg"),
             Plus95Theme("the_60s_usa", "The 60's USA", 0xFFD068D8.toInt(), null, "menu.ogg", "start.ogg"),
             Plus95Theme("the_golden_era", "The Golden Era", 0xFFB8C8B8.toInt(), null, "menu.ogg", "start.ogg"),
             Plus95Theme("travel", "Travel", 0xFF908070.toInt(), null, "menu.ogg", "start.ogg"),
+            Plus95Theme("tropical_interlude", "Tropical Interlude", 0xFFB0A888.toInt(), "busy.png", "menu.ogg", "start.ogg"),
+            Plus95Theme("underwater", "Underwater", 0xFF3868C8.toInt(), "busy.png", "menu.ogg", "start.ogg"),
         )
 
         const val CLASSIC_GRAY: Int = 0xFFD3CEC7.toInt()
