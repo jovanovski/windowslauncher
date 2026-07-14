@@ -9049,16 +9049,32 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * Strong reference to the currently-playing startup jingle. Required: several Plus! 98
+     * themes ship 10–12s startup sounds, and without a field holding the MediaPlayer the GC
+     * finalizes the local instance mid-playback and the clip cuts off partway through. (Older
+     * themes' ~3s clips finished before a GC ever ran, which is why only the new ones cut off.)
+     */
+    private var plus95StartupPlayer: android.media.MediaPlayer? = null
+
     private fun playPlus95StartupSound(slug: String, startupAsset: String): Boolean {
         if (isSoundMuted()) return true
         return try {
+            // Stop any startup jingle still playing from a previous apply
+            plus95StartupPlayer?.release()
+            plus95StartupPlayer = null
             val afd = assets.openFd(themeManager.plus95Path(slug, startupAsset))
             val mp = android.media.MediaPlayer()
             mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
-            mp.setOnCompletionListener { it.release() }
+            mp.setOnCompletionListener {
+                it.release()
+                if (plus95StartupPlayer === it) plus95StartupPlayer = null
+            }
             mp.prepare()
             mp.start()
+            // Keep a strong reference for the whole clip so the GC can't finalize it early.
+            plus95StartupPlayer = mp
             true
         } catch (e: Exception) {
             Log.e("MainActivity", "Plus! startup sound failed for $slug/$startupAsset", e)
