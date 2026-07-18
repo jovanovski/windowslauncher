@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "rocks.gorjan.gokixp"
-        minSdk = 30
+        minSdk = 29
         targetSdk = 36
         versionCode = 18
         versionName = "1.8.9"

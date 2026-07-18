@@ -43,6 +43,7 @@ import androidx.activity.BackEventCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
+import androidx.core.view.WindowCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -394,9 +395,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var updateEmailPermissionError: (() -> Unit)? = null
     private var updateNotificationDotsPermissionError: (() -> Unit)? = null
 
+    /**
+     * Attribution tags are an API 30 diagnostics feature. On Android 10 there is no
+     * equivalent, so fall back to the plain context.
+     */
+    private fun Context.attributionContext(tag: String): Context =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) createAttributionContext(tag) else this
+
     private fun getMediaDuration(resourceId: Int): Long {
         return try {
-            val audioContext = createAttributionContext("system")
+            val audioContext = attributionContext("system")
             val mediaPlayer = MediaPlayer.create(audioContext, resourceId)
             val duration = mediaPlayer?.duration?.toLong() ?: 3000L
             mediaPlayer?.release()
@@ -1193,7 +1201,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Create attributed context for audio loading
         val audioContext =
-            createAttributionContext("system")
+            attributionContext("system")
 
         // Preload all sounds
         soundIds[R.raw.startup] = soundPool.load(audioContext, R.raw.startup, 1)
@@ -1273,7 +1281,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         try {
             // Create MediaPlayer with attributed context for longer sounds
             val audioContext =
-                createAttributionContext("system")
+                attributionContext("system")
 
             Thread {
                 try {
@@ -1967,7 +1975,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return try {
             try {
                 val launcherContext =
-                    createAttributionContext("system")
+                    attributionContext("system")
                 val launcherApps = launcherContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
                 val user = android.os.Process.myUserHandle()
                 val activities = launcherApps.getActivityList(packageName, user)
@@ -3201,7 +3209,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (::searchBox.isInitialized) {
                 // Hide keyboard
                 val inputContext =
-                    createAttributionContext("system")
+                    attributionContext("system")
                 val imm = inputContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.hideSoftInputFromWindow(searchBox.windowToken, 0)
 
@@ -3263,7 +3271,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (::searchBox.isInitialized) {
                 searchBox.requestFocus()
                 val inputContext =
-                    createAttributionContext("system")
+                    attributionContext("system")
                 val imm = inputContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.showSoftInput(searchBox, InputMethodManager.SHOW_IMPLICIT)
             }
@@ -9293,8 +9301,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun enableEdgeToEdge() {
         try {
-            // Android 11 and above - extend behind system bars but keep them visible
-            window.setDecorFitsSystemWindows(false)
+            // Extend behind system bars but keep them visible
+            WindowCompat.setDecorFitsSystemWindows(window, false)
             // Don't hide the system bars, just allow content to draw behind them.
             // Keep the navigation bar transparent (and disable the system's translucent
             // scrim) so the black backdrop we draw behind it shows cleanly. This matters for
@@ -10825,7 +10833,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Method 1: Try the standard StatusBarManager approach
             Log.d("MainActivity", "Trying StatusBarManager approach...")
             val statusContext =
-                createAttributionContext("system")
+                attributionContext("system")
             val statusBarManager = statusContext.getSystemService(Context.STATUS_BAR_SERVICE)
             val expandMethod = statusBarManager?.javaClass?.getMethod("expandNotificationsPanel")
             expandMethod?.invoke(statusBarManager)
@@ -10840,7 +10848,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Method 2: Try legacy approach with different service name
             Log.d("MainActivity", "Trying legacy statusbar service approach...")
             val statusContext2 =
-                createAttributionContext("system")
+                attributionContext("system")
             val statusBarService = statusContext2.getSystemService(Context.STATUS_BAR_SERVICE)
             val expandMethod = statusBarService?.javaClass?.getMethod("expandNotificationsPanel")
             expandMethod?.invoke(statusBarService)
@@ -10855,7 +10863,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Method 3: Try expanding settings panel instead
             Log.d("MainActivity", "Trying settings panel approach...")
             val statusContext3 =
-                createAttributionContext("system")
+                attributionContext("system")
             val statusBarManager = statusContext3.getSystemService(Context.STATUS_BAR_SERVICE)
             val expandMethod = statusBarManager?.javaClass?.getMethod("expandSettingsPanel")
             expandMethod?.invoke(statusBarManager)
@@ -11424,7 +11432,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun refreshAqiData() {
         Log.d("MainActivity", "Refreshing AQI data with fresh GPS location...")
-        val locationContext = createAttributionContext("aqi")
+        val locationContext = attributionContext("aqi")
         val locationManager = locationContext.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
 
         try {
@@ -11661,7 +11669,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         weatherTemp?.text = "..."
         
         val locationContext =
-            createAttributionContext("weather")
+            attributionContext("weather")
         val locationManager = locationContext.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
         
         try {
