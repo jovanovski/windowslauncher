@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -30,9 +29,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    // Kotlin jvmTarget follows compileOptions.targetCompatibility (AGP built-in Kotlin)
     buildFeatures {
         viewBinding = true
     }
