@@ -1,5 +1,6 @@
 package rocks.gorjan.gokixp
 
+import android.annotation.SuppressLint
 import android.app.SearchManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -56,6 +57,7 @@ import androidx.core.net.toUri
 import androidx.core.content.edit
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toDrawable
+import androidx.core.graphics.scale
 import androidx.core.view.isNotEmpty
 import kotlin.math.abs
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,6 +75,7 @@ import android.text.style.ClickableSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.SuperscriptSpan
 import android.text.util.Linkify
+import java.io.File
 import java.io.InputStream
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -235,6 +238,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 previewHandler(selectedUri)
             } else {
                 handleSelectedImage(selectedUri)
+            }
+        }
+    }
+
+    // When the Change Icon dialog's Browse button is used, this receives the path of the
+    // image the user picked, after it has been imported into the app's own icon storage.
+    private var onCustomIconImagePicked: ((String) -> Unit)? = null
+
+    // Image picker launcher for importing an icon from the device (keeps PNG transparency)
+    private val customIconPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        val pickedHandler = onCustomIconImagePicked
+        onCustomIconImagePicked = null
+        if (uri != null && pickedHandler != null) {
+            val importedPath = importCustomIconFromUri(uri)
+            if (importedPath != null) {
+                pickedHandler(importedPath)
+            } else {
+                showNotification("Change Icon", "That image could not be used as an icon")
             }
         }
     }
@@ -493,6 +514,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // System app package name prefix
         private const val SYSTEM_APP_PREFIX = "system."
+
+        // Icons the user imported from their device live here, under filesDir.
+        // Icon mappings store them as "imported_icons/<file>.png" so they're told apart from asset icons.
+        private const val IMPORTED_ICONS_DIR = "imported_icons"
+
+        // Standard size icons are rendered at
+        private const val ICON_SIZE_PX = 288
 
         private var instance: MainActivity? = null
 
@@ -4569,6 +4597,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val btnWindowsXP = contentView.findViewById<TextView>(R.id.btn_windows_xp)
         val btnWindowsVista = contentView.findViewById<TextView>(R.id.btn_windows_vista)
         val btnPrograms = contentView.findViewById<TextView>(R.id.btn_programs)
+        val browseRow = contentView.findViewById<LinearLayout>(R.id.browse_icon_row)
+        val btnBrowseIcon = contentView.findViewById<TextView>(R.id.btn_browse_icon)
 
         // Show icon type buttons for desktop icon selection
         iconTypeButtons.visibility = View.VISIBLE
@@ -4605,9 +4635,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
-        // Create adapter that can be updated dynamically
-        val adapter = CustomIconAdapter(initialIcons) { chosenIcon ->
-            val iconPath = chosenIcon.filePath ?: "default"
+        // Applies an icon path ("default", a bundled asset, or an imported image) and closes the window
+        fun applyChosenIcon(iconPath: String) {
             val packageName = desktopIcon?.packageName ?: ""
 
             // Apply the custom icon immediately
@@ -4616,11 +4645,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             // Use default app icon
                             loadAppIcon(packageName)
                         } else {
-                            // Load custom icon from assets
-                            val inputStream = assets.open(iconPath)
-                            val drawable = Drawable.createFromStream(inputStream, iconPath)
-                            inputStream.close()
-                            drawable
+                            loadIconFromPath(iconPath)
                         }
 
                         if (customDrawable != null) {
@@ -4633,6 +4658,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 Log.d("MainActivity", "Saving custom icon mapping: $packageName -> $iconPath")
                             }
                             saveCustomIconMappings()
+
+                            // Drop any imported image the mappings no longer point at
+                            pruneUnusedImportedIcons()
 
                             // Clear cached app list so it reloads with new icon
                             cachedAppList = null
@@ -4682,7 +4710,26 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // Close the window immediately
             floatingWindowManager.removeWindow(windowsDialog)
         }
+
+        // Create adapter that can be updated dynamically
+        val adapter = CustomIconAdapter(initialIcons) { chosenIcon ->
+            applyChosenIcon(chosenIcon.filePath ?: "default")
+        }
         recyclerView.adapter = adapter
+
+        // Browse: use any image on the device as the icon (PNG transparency is kept)
+        browseRow.visibility = View.VISIBLE
+        btnBrowseIcon.setOnClickListener {
+            playClickSound()
+            onCustomIconImagePicked = { importedPath -> applyChosenIcon(importedPath) }
+            try {
+                customIconPickerLauncher.launch("image/*")
+            } catch (e: Exception) {
+                onCustomIconImagePicked = null
+                Log.e("MainActivity", "No app available to pick an icon image", e)
+                showNotification("Change Icon", "No app available to pick an image")
+            }
+        }
 
         // Track current icon type and loading thread
         var currentLoadingThread: Thread? = null
@@ -4795,6 +4842,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Hide icon type buttons for user profile selection (keep them hidden)
         iconTypeButtons.visibility = View.GONE
+
+        // Browsing for an image only applies to app icons, not the user picture
+        contentView.findViewById<LinearLayout>(R.id.browse_icon_row).visibility = View.GONE
 
         // Set up window control handlers
         windowsDialog.setOnMinimizeListener {
@@ -5357,6 +5407,93 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     /**
+     * Loads an icon referenced by an icon mapping. Paths either point into the bundled assets
+     * or, for icons the user imported from their device, into [IMPORTED_ICONS_DIR] under filesDir.
+     */
+    private fun loadIconFromPath(iconPath: String): Drawable? {
+        val stream = if (iconPath.startsWith("$IMPORTED_ICONS_DIR/")) {
+            File(filesDir, iconPath).inputStream()
+        } else {
+            assets.open(iconPath)
+        }
+        return stream.use { Drawable.createFromStream(it, iconPath) }
+    }
+
+    /**
+     * Copies an image the user picked from their device into the app's own icon storage,
+     * downsampled to icon size and re-encoded as PNG so transparency is preserved.
+     * Returns the path to store in the icon mappings, or null if the image couldn't be read.
+     */
+    private fun importCustomIconFromUri(uri: Uri): String? {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            options.inSampleSize = calculateInSampleSize(options, ICON_SIZE_PX, ICON_SIZE_PX)
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888 // keep the alpha channel
+
+            val decoded = contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            } ?: return null
+
+            // Fit inside the icon size without upscaling; createSquareDrawable pads the rest
+            val scale = minOf(
+                ICON_SIZE_PX.toFloat() / decoded.width,
+                ICON_SIZE_PX.toFloat() / decoded.height,
+                1f
+            )
+            val bitmap = if (scale < 1f) {
+                decoded.scale(
+                    (decoded.width * scale).toInt().coerceAtLeast(1),
+                    (decoded.height * scale).toInt().coerceAtLeast(1)
+                )
+            } else {
+                decoded
+            }
+
+            val iconsDir = File(filesDir, IMPORTED_ICONS_DIR).apply { mkdirs() }
+            val iconFile = File(iconsDir, "icon_${System.currentTimeMillis()}.png")
+            iconFile.outputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+
+            if (bitmap !== decoded) bitmap.recycle()
+            decoded.recycle()
+
+            Log.d("MainActivity", "Imported custom icon from $uri to ${iconFile.name}")
+            "$IMPORTED_ICONS_DIR/${iconFile.name}"
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to import custom icon from $uri", e)
+            null
+        }
+    }
+
+    /**
+     * Deletes imported icon files that no theme's icon mappings reference any more,
+     * so replacing a custom icon doesn't leave the old image behind forever.
+     */
+    private fun pruneUnusedImportedIcons() {
+        val iconsDir = File(filesDir, IMPORTED_ICONS_DIR)
+        val files = iconsDir.listFiles() ?: return
+
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val inUse = listOf(KEY_CUSTOM_ICONS_XP, KEY_CUSTOM_ICONS_98, KEY_CUSTOM_ICONS_VISTA)
+            .flatMap { key -> (prefs.getString(key, "") ?: "").split(";") }
+            .mapNotNull { entry -> entry.substringAfter(":", "").takeIf { it.isNotEmpty() } }
+            .toSet()
+
+        files.forEach { file ->
+            if ("$IMPORTED_ICONS_DIR/${file.name}" !in inUse) {
+                if (file.delete()) Log.d("MainActivity", "Removed unused imported icon: ${file.name}")
+            }
+        }
+    }
+
+    /**
      * Central function to get app icon - returns custom icon if available, otherwise default icon
      * This function handles theme awareness and should be used from all places (desktop, command list, app list)
      */
@@ -5367,9 +5504,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val customIconPath = customIconMappings[packageName]
             if (customIconPath != null) {
                 try {
-                    val inputStream = assets.open(customIconPath)
-                    val drawable = Drawable.createFromStream(inputStream, customIconPath)
-                    inputStream.close()
+                    val drawable = loadIconFromPath(customIconPath)
                     if (drawable != null) {
                         // Create a square drawable with consistent sizing and cache it
                         val cacheKey = "custom_${packageName}_${customIconPath}"
@@ -5396,7 +5531,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun createSquareDrawable(originalDrawable: Drawable, cacheKey: String? = null): Drawable {
-        val iconSize = 288 // Standard size for desktop icons
+        val iconSize = ICON_SIZE_PX // Standard size for desktop icons
 
         // Check cache first if we have a cache key
         if (cacheKey != null) {
@@ -10826,6 +10961,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         volumeIcon?.setImageResource(iconResource)
     }
     
+    // "statusbar" is not in getSystemService's @ServiceName allow-list because it is not
+    // reachable by normal apps; every call below is best-effort and guarded by try/catch.
+    @SuppressLint("WrongConstant")
     fun expandNotificationShade() {
         Log.d("MainActivity", "🔥 expandNotificationShade() called")
         

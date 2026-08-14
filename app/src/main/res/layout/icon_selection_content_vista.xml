@@ -95,4 +95,30 @@
         android:fadeScrollbars="false"
         />
 
+    <!-- Pick an icon from an image on the device -->
+    <LinearLayout
+        android:id="@+id/browse_icon_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:id="@+id/btn_browse_icon"
+            style="@android:style/Widget.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="Browse..."
+            android:textSize="12sp"
+            android:fontFamily="@font/segoeui_font_family"
+            android:background="@drawable/button_xp_background"
+            android:backgroundTint="@null" />
+
+    </LinearLayout>
+
 </LinearLayout>
