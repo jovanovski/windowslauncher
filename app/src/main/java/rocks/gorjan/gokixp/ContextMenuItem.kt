@@ -81,12 +81,16 @@ object ContextMenuItems {
         onSetSwipeRightApp: () -> Unit,
         onSetWeatherApp: () -> Unit,
         onChangeIcon: () -> Unit,
+        onHideToggle: () -> Unit,
+        isHidden: Boolean = false,
         isSystemApp: Boolean = false
     ): List<ContextMenuItem> {
         val pinText = if (isPinned) "Unpin from Start" else "Pin to Start"
+        val hideText = if (isHidden) "Unhide app" else "Hide app"
         val items = mutableListOf(
             ContextMenuItem("Send to Desktop", isEnabled = true, action = onCreateShortcut),
             ContextMenuItem(pinText, isEnabled = true, action = onPinToggle),
+            ContextMenuItem(hideText, isEnabled = true, action = onHideToggle),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp),
             ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp),
@@ -148,12 +152,15 @@ object ContextMenuItems {
     // Start menu context menu items (for long press on start menu itself)
     fun getStartMenuMenuItems(
         onOpenSettings: () -> Unit,
-        onRefreshAppList: () -> Unit
+        onRefreshAppList: () -> Unit,
+        onOpenWithHiddenApps: () -> Unit
     ): List<ContextMenuItem> {
         return listOf(
             ContextMenuItem("Settings", isEnabled = true, action = onOpenSettings),
             ContextMenuItem("", isEnabled = false), // Divider
-            ContextMenuItem("Refresh App List", isEnabled = true, action = onRefreshAppList)
+            ContextMenuItem("Refresh App List", isEnabled = true, action = onRefreshAppList),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Open with hidden apps", isEnabled = true, action = onOpenWithHiddenApps)
         )
     }
 

@@ -30,7 +30,10 @@ class CommandsAdapter(
     private val items: List<CommandListItem>,
     private val onAppLaunched: ((AppInfo) -> Unit)? = null,
     private val onItemClicked: (() -> Unit)? = null,
-    private val onAppLongClicked: ((AppInfo, Float, Float) -> Unit)? = null
+    private val onAppLongClicked: ((AppInfo, Float, Float) -> Unit)? = null,
+    // Pinned apps the user chose to hide - only listed when the menu was opened via
+    // "Open Start with hidden apps", where they're drawn dimmed.
+    private val hiddenApps: Set<String> = emptySet()
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ThemeAware {
 
     private var currentTheme: AppTheme = AppTheme.WindowsXP
@@ -166,6 +169,10 @@ class CommandsAdapter(
                 val recentAppHolder = holder as RecentAppViewHolder
                 val appInfo = item.appInfo
                 recentAppHolder.name.text = appInfo.name
+
+                // Hidden apps show through at half opacity so they read as "not normally here"
+                recentAppHolder.itemView.alpha =
+                    if (hiddenApps.contains(appInfo.packageName)) 0.5f else 1f
 
                 // Use central icon function with custom icon support
                 val mainActivity = context as? MainActivity

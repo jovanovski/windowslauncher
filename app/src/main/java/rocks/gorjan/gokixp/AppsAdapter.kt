@@ -22,7 +22,10 @@ class AppsAdapter(
     private val onAppLongClick: ((AppInfo, Float, Float) -> Unit)? = null,
     private val pinnedApps: Set<String> = emptySet(),
     private val onAppLaunched: ((AppInfo) -> Unit)? = null,
-    private val recentApps: Set<String> = emptySet()
+    private val recentApps: Set<String> = emptySet(),
+    // Apps the user chose to hide. They only reach this adapter at all when the menu was
+    // opened via "Open Start with hidden apps", where they're drawn dimmed.
+    private val hiddenApps: Set<String> = emptySet()
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ThemeAware {
 
     private var filteredItems: List<Any> = originalItems
@@ -148,6 +151,9 @@ class AppsAdapter(
         // Use pre-loaded icon from AppInfo (icons loaded when start menu opened)
         holder.appIcon.setImageDrawable(app.icon)
         holder.appName.text = app.name
+
+        // Hidden apps show through at half opacity so they read as "not normally here"
+        holder.itemView.alpha = if (hiddenApps.contains(app.packageName)) 0.5f else 1f
 
         // Both are no-ops when the value hasn't changed, so this only costs anything
         // on the bind right after a theme switch.

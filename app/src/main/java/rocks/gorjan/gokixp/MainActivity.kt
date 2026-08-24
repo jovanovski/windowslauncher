@@ -187,6 +187,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var isContextMenuVisible = false
     private var isProgramsMenuExpanded = false
     private var isStartMenuShowingApps = false // Track Vista start menu state
+    // Set by "Open Start with hidden apps"; hidden apps are listed (dimmed) for as long as
+    // that session of the start menu stays open, and reset when it closes.
+    private var isShowingHiddenApps = false
     private var lastAppliedTheme: String? = null
     private var selectedIcon: DesktopIconView? = null
     private val desktopIcons = mutableListOf<DesktopIcon>()
@@ -411,6 +414,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         const val PREFS_NAME = "taskbar_widget_prefs"  // Public constant for shared preferences name
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
         private const val KEY_PINNED_APPS = "pinned_apps"
+        private const val KEY_HIDDEN_APPS = "hidden_apps"
         private const val KEY_SOUND_MUTED = "sound_muted"
         private const val KEY_PLAY_EMAIL_SOUND = "play_email_sound"
         private const val KEY_SHOW_NOTIFICATION_DOTS = "show_notification_dots"
@@ -1934,6 +1938,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onRefreshAppList = {
                 refreshAppListManually()
+            },
+            onOpenWithHiddenApps = {
+                showStartMenuWithHiddenApps()
             }
         )
         
@@ -2012,8 +2019,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun loadCommandsInBackground(): List<CommandListItem> {
-        // Get pinned apps
-        val pinnedApps = getPinnedApps()
+        // Get pinned apps, minus any the user hid (unless hidden apps were asked for)
+        val hiddenApps = getHiddenApps()
+        val pinnedApps = getPinnedApps().let { pinned ->
+            if (isShowingHiddenApps) pinned else pinned.filterNot { hiddenApps.contains(it) }
+        }
         val packageManager = packageManager
 
         // Build the commands list items
@@ -2078,7 +2088,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             },
             onAppLongClicked = { appInfo, x, y ->
                 showStartMenuAppContextMenu(appInfo, x, y)
-            }
+            },
+            hiddenApps = getHiddenApps()
         )
         commandsRecyclerView.adapter = commandsAdapter
 
@@ -3002,12 +3013,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun setupAppsAdapterFromList(appList: List<AppInfo>) {
         // Get pinned apps for the commands panel
         val pinnedApps = getPinnedApps()
+        val hiddenApps = getHiddenApps()
+
+        // Hidden apps are only listed when the menu was opened with them explicitly requested
+        val visibleApps = if (isShowingHiddenApps) {
+            appList
+        } else {
+            appList.filterNot { hiddenApps.contains(it.packageName) }
+        }
 
         // Create final list with all apps
         val finalAppsList = mutableListOf<Any>()
-        finalAppsList.addAll(appList)
+        finalAppsList.addAll(visibleApps)
 
-        Log.d("MainActivity", "Setting up apps adapter with ${appList.size} apps (${pinnedApps.size} pinned)")
+        Log.d("MainActivity", "Setting up apps adapter with ${visibleApps.size} apps (${pinnedApps.size} pinned, ${hiddenApps.size} hidden)")
 
         appsAdapter = AppsAdapter(this, finalAppsList,
             onAppClick = { hideStartMenu() },
@@ -3018,7 +3037,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onAppLaunched = {
                 // No automatic tracking - apps must be manually pinned
             },
-            recentApps = pinnedApps.toSet()
+            recentApps = pinnedApps.toSet(),
+            hiddenApps = hiddenApps
         )
         appsRecyclerView.adapter = appsAdapter
 
@@ -3234,12 +3254,58 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Reset saved params so they get re-saved fresh next time
             originalStartMenuLayoutParams = null
 
+            // Showing hidden apps lasts only for one opening of the menu. Rebuild both lists
+            // now (while the app cache is still warm) so the next open starts clean.
+            if (isShowingHiddenApps) {
+                isShowingHiddenApps = false
+                refreshCommandsList()
+                loadInstalledApps()
+            }
+
             // MEMORY OPTIMIZATION: Clear cached app list to release icon memory when menu closes
             // Icons will be reloaded (from cache) next time menu opens
             cachedAppList = null
         }
     }
     
+    /**
+     * Opens the start menu on its full app list with hidden apps included, drawn at half
+     * opacity. Long pressing one of them offers "Unhide app".
+     */
+    private fun showStartMenuWithHiddenApps() {
+        if (!::startMenu.isInitialized) {
+            Log.d("MainActivity", "Start menu not initialized")
+            return
+        }
+
+        isShowingHiddenApps = true
+        refreshCommandsList()
+        loadInstalledApps()
+
+        // showStartMenu resets the menu to its command list, so switch to apps afterwards
+        showStartMenu()
+        showAppList()
+    }
+
+    /**
+     * Switches the open start menu to its app list - the same state the "All Programs" /
+     * "Programs" entry puts it in, minus the click.
+     */
+    private fun showAppList() {
+        if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
+            val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
+            appList98?.visibility = View.VISIBLE
+            isProgramsMenuExpanded = true
+            commandsAdapter?.setProgramsExpanded(true)
+        } else {
+            isStartMenuShowingApps = true
+            findViewById<LinearLayout>(R.id.app_list_wrapper)?.visibility = View.VISIBLE
+            findViewById<LinearLayout>(R.id.command_list_wrapper)?.visibility = View.GONE
+            findViewById<TextView>(R.id.all_programs_text)?.text = "Back to Pinned"
+            findViewById<ImageView>(R.id.all_programs_arrow)?.rotation = 180f
+        }
+    }
+
     fun showStartMenuWithSearch() {
         if (::startMenu.isInitialized) {
             startMenu.visibility = View.VISIBLE
@@ -3886,6 +3952,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // Create start menu app context menu items
             val isPinned = isAppPinned(appInfo.packageName)
+            val isHidden = isAppHidden(appInfo.packageName)
             val menuItems = ContextMenuItems.getStartMenuAppMenuItems(
                 onCreateShortcut = {
                     createDesktopShortcut(appInfo)
@@ -3932,6 +3999,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     showIconSelectionDialog(tempIconView)
                     hideStartMenu()
                 },
+                onHideToggle = {
+                    toggleHiddenApp(appInfo.packageName)
+                    // Same refresh dance as pinning: commands immediately, apps just after the
+                    // context menu has closed. The menu stays open so several apps can be
+                    // hidden in a row.
+                    refreshCommandsList()
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        loadInstalledApps()
+                    }, 50)
+                },
+                isHidden = isHidden,
                 isSystemApp = isSystemApp
             )
             
@@ -10337,6 +10415,36 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun isAppPinned(packageName: String): Boolean {
         return getPinnedApps().contains(packageName)
+    }
+
+    private fun getHiddenApps(): Set<String> {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return try {
+            val hiddenAppsString = prefs.getString(KEY_HIDDEN_APPS, "") ?: ""
+            if (hiddenAppsString.isEmpty()) emptySet()
+            else hiddenAppsString.split(",").filter { it.isNotEmpty() }.toSet()
+        } catch (e: ClassCastException) {
+            Log.w("MainActivity", "Unexpected hidden apps format, ignoring", e)
+            emptySet()
+        }
+    }
+
+    private fun toggleHiddenApp(packageName: String) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val hidden = getHiddenApps().toMutableSet()
+
+        if (!hidden.remove(packageName)) {
+            hidden.add(packageName)
+            Log.d("MainActivity", "Hid app: $packageName")
+        } else {
+            Log.d("MainActivity", "Unhid app: $packageName")
+        }
+
+        prefs.edit { putString(KEY_HIDDEN_APPS, hidden.joinToString(",")) }
+    }
+
+    private fun isAppHidden(packageName: String): Boolean {
+        return getHiddenApps().contains(packageName)
     }
 
     private fun refreshDesktopIcons() {
