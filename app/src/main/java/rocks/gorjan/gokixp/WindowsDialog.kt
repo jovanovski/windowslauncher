@@ -43,9 +43,10 @@ class WindowsDialog @JvmOverloads constructor(
 
     // Title bar + content
     private lateinit var titleBar: LinearLayout
-    private lateinit var xpTitleBarLeft: ImageView
-    private lateinit var xpTitleBarRight: ImageView
-    private lateinit var xpTitleBarMiddle: ImageView
+    // XP-only title bar pieces - the Classic and Vista dialog layouts don't have them
+    private var xpTitleBarLeft: ImageView? = null
+    private var xpTitleBarRight: ImageView? = null
+    private var xpTitleBarMiddle: ImageView? = null
     private lateinit var titleText: TextView
     private lateinit var closeButton: ImageView
     private lateinit var minimizeButton: ImageView
@@ -1480,9 +1481,9 @@ class WindowsDialog @JvmOverloads constructor(
 
             if (currentTheme is AppTheme.WindowsXP) {
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border)
-                xpTitleBarLeft.setBackgroundResource(R.drawable.xp_title_bar_corner)
-                xpTitleBarMiddle.setBackgroundResource(R.drawable.xp_title_bar_repeat)
-                xpTitleBarRight.setBackgroundResource(R.drawable.xp_title_bar_corner_end)
+                xpTitleBarLeft?.setBackgroundResource(R.drawable.xp_title_bar_corner)
+                xpTitleBarMiddle?.setBackgroundResource(R.drawable.xp_title_bar_repeat)
+                xpTitleBarRight?.setBackgroundResource(R.drawable.xp_title_bar_corner_end)
                 minimizeButton.setImageResource(R.drawable.xp_title_bar_minimize)
                 maximizeButton?.setImageResource(R.drawable.xp_title_bar_maximize)
                 closeButton.setImageResource(R.drawable.xp_title_bar_close)
@@ -1503,9 +1504,9 @@ class WindowsDialog @JvmOverloads constructor(
             }
             else if (currentTheme is AppTheme.WindowsXP){
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border_inactive)
-                xpTitleBarLeft.setBackgroundResource(R.drawable.xp_title_bar_corner_gray)
-                xpTitleBarMiddle.setBackgroundResource(R.drawable.xp_title_bar_repeat_gray)
-                xpTitleBarRight.setBackgroundResource(R.drawable.xp_title_bar_corner_end_gray)
+                xpTitleBarLeft?.setBackgroundResource(R.drawable.xp_title_bar_corner_gray)
+                xpTitleBarMiddle?.setBackgroundResource(R.drawable.xp_title_bar_repeat_gray)
+                xpTitleBarRight?.setBackgroundResource(R.drawable.xp_title_bar_corner_end_gray)
                 minimizeButton.setImageResource(R.drawable.xp_title_bar_minimize_gray)
                 maximizeButton?.setImageResource(R.drawable.xp_title_bar_maximize_gray)
                 closeButton.setImageResource(R.drawable.xp_title_bar_close_gray)
