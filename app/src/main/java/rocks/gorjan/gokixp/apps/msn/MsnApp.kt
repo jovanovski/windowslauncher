@@ -28,6 +28,7 @@ import android.widget.TextView
 import androidx.core.view.marginTop
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.getSafeLong
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 import java.io.InputStream
@@ -1159,7 +1160,7 @@ class MsnApp(
      * Get the last time a thread was opened/read
      */
     private fun getLastReadTime(address: String): Long {
-        return prefs.getLong("last_read_$address", 0L)
+        return prefs.getSafeLong("last_read_$address", 0L)
     }
 
     /**

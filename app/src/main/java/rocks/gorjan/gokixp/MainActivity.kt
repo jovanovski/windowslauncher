@@ -310,39 +310,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 if (jsonString != null) {
-                    val gson = Gson()
-                    val importedPrefs = gson.fromJson(jsonString, Map::class.java) as Map<String, *>
-
-                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    prefs.edit {
-                        // Clear all existing preferences
-                        clear()
-
-                        // Import all preferences
-                        importedPrefs.forEach { (key, value) ->
-                            when (value) {
-                                is String -> putString(key, value)
-                                is Boolean -> putBoolean(key, value)
-                                is Double -> {
-                                    // Gson deserializes all numbers as Double
-                                    // Check if it's a whole number to store as Int, otherwise as Float
-                                    if (value == value.toLong().toDouble()) {
-                                        putInt(key, value.toInt())
-                                    } else {
-                                        putFloat(key, value.toFloat())
-                                    }
-                                }
-                                is Int -> putInt(key, value)
-                                is Long -> putInt(key, value.toInt())
-                                is Float -> putFloat(key, value)
-                                else -> Log.w(
-                                    "MainActivity",
-                                    "Unknown preference type for key $key: ${value?.javaClass?.name}"
-                                )
-                            }
-                        }
-
-                    }
+                    PrefsBackup.restore(getSharedPreferences(PREFS_NAME, MODE_PRIVATE), jsonString)
                     recreate()
                 }
             } catch (e: Exception) {
@@ -1803,7 +1771,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             appsRecyclerView = recyclerView
             searchBox = searchBoxView
             
-            appsRecyclerView.layoutManager = LinearLayoutManager(this)
+            // stackFromEnd keeps the list pinned to the bottom of its box, so a short
+            // filtered result still grows upward from the search box like the real Start menu.
+            // It replaces the old wrap_content + alignParentBottom trick, which forced a full
+            // RecyclerView layout pass inside every onMeasure.
+            appsRecyclerView.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
+            // The list box is a fixed size now, so adapter updates can never change our
+            // bounds - this skips the requestLayout that walked all the way to root_container
+            // (re-measuring the whole desktop) on every keystroke.
+            appsRecyclerView.setHasFixedSize(true)
 
             // Setup commands RecyclerView
             commandsRecyclerView.layoutManager = LinearLayoutManager(this)
@@ -2185,7 +2161,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Apply saved margin
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val marginTop = prefs.getInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
+        val marginTop = prefs.getSafeInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
         val layoutParams = container.layoutParams as RelativeLayout.LayoutParams
         layoutParams.topMargin = (marginTop * resources.displayMetrics.density).toInt()
         container.layoutParams = layoutParams
@@ -3069,7 +3045,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val query = s?.toString() ?: ""
-                appsAdapter?.filter(query)
+                // filter() reports whether the visible set actually changed, so we only pay
+                // for a scroll when the results moved.
+                if (appsAdapter?.filter(query) == true && ::appsRecyclerView.isInitialized) {
+                    appsRecyclerView.scrollToPosition(0)
+                }
             }
         })
 
@@ -3629,8 +3609,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         handler.post {
             // Use the same preference system as ClippyView for consistency
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val savedX = prefs.getFloat(KEY_AGENT_X, -1f)
-            val savedY = prefs.getFloat(KEY_AGENT_Y, -1f)
+            val savedX = prefs.getSafeFloat(KEY_AGENT_X, -1f)
+            val savedY = prefs.getSafeFloat(KEY_AGENT_Y, -1f)
 
             if (savedX >= 0 && savedY >= 0) {
                 // Restore saved position using ClippyView's restore method
@@ -3682,8 +3662,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Restore saved position or set default position after adding to layout
         handler.post {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val savedX = prefs.getFloat(KEY_WIDGET_X, -1f)
-            val savedY = prefs.getFloat(KEY_WIDGET_Y, -1f)
+            val savedX = prefs.getSafeFloat(KEY_WIDGET_X, -1f)
+            val savedY = prefs.getSafeFloat(KEY_WIDGET_Y, -1f)
             
             if (savedX >= 0 && savedY >= 0) {
                 // Restore saved position
@@ -6158,7 +6138,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val christmasLightsMarginValue = contentView.findViewById<TextView>(R.id.christmas_lights_margin_value)
 
         // Load saved margin value
-        val savedMargin = prefs.getInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
+        val savedMargin = prefs.getSafeInt(KEY_CHRISTMAS_LIGHTS_MARGIN, 0)
         christmasLightsMarginSlider.progress = savedMargin
         christmasLightsMarginValue.text = savedMargin.toString()
 
@@ -6418,7 +6398,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Track the horizontal focus point [0,1] used to pan the wallpaper.
         // 0.5 == centered (CENTER_CROP). Lower => show more left, higher => show more right.
         val focusXKey = getCurrentThemeWallpaperFocusXKey()
-        var currentFocusX = prefs.getFloat(focusXKey, 0.5f)
+        var currentFocusX = prefs.getSafeFloat(focusXKey, 0.5f)
 
         // Sets the preview scaleType and applies the current focus when appropriate.
         // "(m)" wallpapers stay FIT_CENTER (no cropping, dragging is disabled for them).
@@ -7030,15 +7010,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun exportToLocalFile(prefs: android.content.SharedPreferences) {
         try {
-            val allPrefs = prefs.all
-            val prefsMap = mutableMapOf<String, Any?>()
-            allPrefs.forEach { (key, value) -> prefsMap[key] = value }
-
-            val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
-            val jsonString = gson.toJson(prefsMap)
-
             // Store the JSON temporarily for the launcher callback
-            pendingExportJson = jsonString
+            pendingExportJson = PrefsBackup.toJson(prefs)
 
             // Launch file picker with suggested filename
             exportPrefsLauncher.launch("windows_launcher_settings_export.json")
@@ -7077,12 +7050,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Export to Google Drive
         try {
             Log.d("MainActivity", "Starting export to Google Drive")
-            val allPrefs = prefs.all
-            val prefsMap = mutableMapOf<String, Any?>()
-            allPrefs.forEach { (key, value) -> prefsMap[key] = value }
-
-            val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
-            val jsonString = gson.toJson(prefsMap)
+            val jsonString = PrefsBackup.toJson(prefs)
 
             Log.d("MainActivity", "JSON prepared, size=${jsonString.length} bytes")
 
@@ -7137,32 +7105,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 result.onSuccess { jsonString ->
                     try {
                         Log.d("MainActivity", "Import successful, parsing JSON (${jsonString.length} bytes)")
-                        val gson = Gson()
-                        val importedPrefs = gson.fromJson(jsonString, Map::class.java) as Map<String, Any>
-
-                        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                        prefs.edit {
-
-                            // Clear all existing preferences
-                            clear()
-
-                            // Import all preferences
-                            importedPrefs.forEach { (key, value) ->
-                                when (value) {
-                                    is String -> putString(key, value)
-                                    is Boolean -> putBoolean(key, value)
-                                    is Int -> putInt(key, value.toInt())
-                                    is Long -> putLong(key, value.toLong())
-                                    is Float -> putFloat(key, value.toFloat())
-                                    is Double -> putFloat(key, value.toFloat())
-                                    else -> Log.w(
-                                        "MainActivity",
-                                        "Unknown preference type for key $key"
-                                    )
-                                }
-                            }
-
-                        }
+                        PrefsBackup.restore(getSharedPreferences(PREFS_NAME, MODE_PRIVATE), jsonString)
                         Log.d("MainActivity", "Preferences imported successfully")
                         showNotification("Registry Editor", "Settings imported successfully from Google Drive")
                         recreate()
@@ -8637,7 +8580,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        val durationSeconds = prefs.getInt(KEY_SLIDE_WALLPAPER_DURATION, DEFAULT_SLIDE_WALLPAPER_DURATION)
+        val durationSeconds = prefs.getSafeInt(KEY_SLIDE_WALLPAPER_DURATION, DEFAULT_SLIDE_WALLPAPER_DURATION)
         // durationSeconds is the ONE-WAY time (left edge -> right edge); round trip is 2x.
         val cycleMs = durationSeconds * 2 * 1000L
         // Easing should total ~2s per leg: 1s ramping up + 1s ramping down, with the rest of the
@@ -8710,7 +8653,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val wallpaperImageView = getWallpaperImageView() ?: return
         running?.let { wallpaperImageView.removeCallbacks(it) }
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val focusX = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+        val focusX = prefs.getSafeFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
         applyWallpaperFocusXToImageView(wallpaperImageView, focusX)
     }
 
@@ -8738,7 +8681,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         // Restart the slide so it recomputes its pan range for the new size.
                         startWallpaperSlideIfEnabled()
                     } else {
-                        val fx = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+                        val fx = prefs.getSafeFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
                         applyWallpaperFocusXToImageView(view as ImageView, fx)
                     }
                 }
@@ -8757,7 +8700,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Apply the saved horizontal focus offset for the current theme
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val focusX = prefs.getFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
+        val focusX = prefs.getSafeFloat(getCurrentThemeWallpaperFocusXKey(), 0.5f)
         applyWallpaperFocusXToImageView(wallpaperImageView, focusX)
 
         // Resume sliding the wallpaper if the setting is enabled (new ImageView/drawable).
@@ -12063,19 +12006,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
-    // Helper function to safely get Long values from SharedPreferences
-    // Handles migration from Integer to Long by removing old values
-    private fun android.content.SharedPreferences.getSafeLong(key: String, defaultValue: Long): Long {
-        return try {
-            getLong(key, defaultValue)
-        } catch (e: ClassCastException) {
-            // Handle migration from Integer to Long - remove old value
-            edit { remove(key) }
-            Log.w("MainActivity", "Migrated $key from Integer to Long")
-            defaultValue
-        }
-    }
-
     private fun isCachedWeatherDataOld(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val timestamp = prefs.getSafeLong(KEY_WEATHER_TIMESTAMP, 0L)
@@ -12162,7 +12092,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun getCachedAqi(): Int? {
         return try {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val aqi = prefs.getInt(KEY_AQI_DATA, -1)
+            val aqi = prefs.getSafeInt(KEY_AQI_DATA, -1)
             if (aqi >= 0) aqi else null
         } catch (e: Exception) {
             Log.e("MainActivity", "Error retrieving cached AQI", e)

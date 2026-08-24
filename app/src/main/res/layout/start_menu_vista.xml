@@ -117,13 +117,12 @@ android:orientation="vertical">
                     android:id="@+id/app_list_wrapper"
                     android:visibility="gone"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentBottom="true">
-                    <!-- Apps List -->
+                    android:layout_height="match_parent">
+                    <!-- Apps List. Fixed height, not wrap_content - see start_menu_xp.xml. -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/apps_recycler_view"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="match_parent" />
                 </LinearLayout>
 
 

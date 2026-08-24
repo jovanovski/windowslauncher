@@ -15,6 +15,7 @@ import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.agent.Agent
 import kotlin.math.abs
+import rocks.gorjan.gokixp.getSafeFloat
 
 class AgentView @JvmOverloads constructor(
     context: Context,
@@ -227,8 +228,8 @@ class AgentView @JvmOverloads constructor(
     
     fun restorePosition() {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedX = prefs.getFloat(KEY_AGENT_X, -1f)
-        val savedY = prefs.getFloat(KEY_AGENT_Y, -1f)
+        val savedX = prefs.getSafeFloat(KEY_AGENT_X, -1f)
+        val savedY = prefs.getSafeFloat(KEY_AGENT_Y, -1f)
         
         if (savedX >= 0 && savedY >= 0) {
             x = savedX

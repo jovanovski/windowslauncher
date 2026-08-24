@@ -2,12 +2,15 @@ package rocks.gorjan.gokixp
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeAware
@@ -25,6 +28,17 @@ class AppsAdapter(
     private var filteredItems: List<Any> = originalItems
     private var currentTheme: AppTheme = AppTheme.WindowsXP
 
+    // Lowercased names, aligned with originalItems, so filtering doesn't allocate two
+    // strings per app on every keystroke. Null for non-app entries (separators).
+    private val searchKeys: List<String?> = originalItems.map {
+        (it as? AppInfo)?.name?.trim()?.lowercase()
+    }
+
+    // Resolved once instead of per bind - looking these up in onBindViewHolder meant a
+    // resource lookup and a font resolution for every row, every frame.
+    private var textColors: ColorStateList = context.getColorStateList(R.color.context_menu_text_selector)
+    private var themeTypeface: Typeface? = (context as? MainActivity)?.getThemePrimaryFont()
+
     // Backward compatible property
     private var isWindows98Theme = false
         get() = currentTheme is AppTheme.WindowsClassic
@@ -34,11 +48,51 @@ class AppsAdapter(
         private const val TYPE_SEPARATOR = 1
     }
 
-    class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appIcon: ImageView = itemView.findViewById(R.id.app_icon)
         val appName: TextView = itemView.findViewById(R.id.app_name)
+
+        init {
+            // Listeners are attached once per holder rather than on every bind; they read
+            // the app back out of the list by position when they actually fire.
+            itemView.setOnClickListener {
+                val app = boundApp() ?: return@setOnClickListener
+                if (MainActivity.isSystemApp(app.packageName)) {
+                    (context as? MainActivity)?.launchSystemApp(app.packageName)
+                } else {
+                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                    intent?.let {
+                        it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(it)
+                        // Track as recently used app
+                        onAppLaunched?.invoke(app)
+                    }
+                }
+                // Close the start menu
+                onAppClick()
+            }
+
+            itemView.setOnLongClickListener {
+                val app = boundApp() ?: return@setOnLongClickListener false
+
+                // Disable default haptic feedback to avoid double vibration
+                // (Our ContextMenuView will handle the vibration)
+                itemView.isHapticFeedbackEnabled = false
+
+                // Get touch position (simplified - just use view center for now)
+                val location = IntArray(2)
+                itemView.getLocationOnScreen(location)
+                val screenX = location[0] + itemView.width / 2f
+                val screenY = location[1] + itemView.height / 2f
+
+                onAppLongClick?.invoke(app, screenX, screenY)
+                true
+            }
+        }
+
+        private fun boundApp(): AppInfo? = filteredItems.getOrNull(bindingAdapterPosition) as? AppInfo
     }
-    
+
     class SeparatorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 
     override fun getItemViewType(position: Int): Int {
@@ -61,7 +115,7 @@ class AppsAdapter(
                     )
                     setPadding(0, 8, 0, 8) // Add vertical padding around the separator
                 }
-                
+
                 // Create the actual separator line
                 val separatorLine = View(parent.context).apply {
                     layoutParams = LinearLayout.LayoutParams(
@@ -74,7 +128,7 @@ class AppsAdapter(
                     }
                     setBackgroundColor(context.getColor(R.color.context_menu_divider))
                 }
-                
+
                 containerView.addView(separatorLine)
                 SeparatorViewHolder(containerView)
             }
@@ -87,111 +141,83 @@ class AppsAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        when (holder) {
-            is AppViewHolder -> {
-                val app = filteredItems[position] as AppInfo
+        if (holder !is AppViewHolder) return // Separators need no binding
 
-                // Use pre-loaded icon from AppInfo (icons loaded when start menu opened)
-                holder.appIcon.setImageDrawable(app.icon)
-                holder.appName.text = app.name
+        val app = filteredItems[position] as AppInfo
 
-                // Set text color using ColorStateList to support pressed states
-                holder.appName.setTextColor(context.getColorStateList(R.color.context_menu_text_selector))
+        // Use pre-loaded icon from AppInfo (icons loaded when start menu opened)
+        holder.appIcon.setImageDrawable(app.icon)
+        holder.appName.text = app.name
 
-                // Apply theme font
-                val mainActivity = context as? MainActivity
-                mainActivity?.applyThemeFontToTextView(holder.appName)
-                
-                // Set background based on whether app is in the recent section (before separator)
-                val isInRecentSection = isAppInRecentSection(position)
-                if (isInRecentSection) {
-                    // For recent apps (at top of list), create a layered drawable with pinned background and pressed state
-                    val pinnedBackground = context.getDrawable(R.drawable.start_menu_item_background_pinned)
-                    holder.itemView.background = pinnedBackground
-                } else {
-                    // For regular apps, use the standard background with pressed state
-                    holder.itemView.setBackgroundResource(R.drawable.start_menu_item_background)
-                }
-                
-                holder.itemView.setOnClickListener {
-                    // Check if this is a system app
-                    if (MainActivity.isSystemApp(app.packageName)) {
-                        // Launch system app
-                        val mainActivity = context as? MainActivity
-                        mainActivity?.launchSystemApp(app.packageName)
-                    } else {
-                        // Launch regular app
-                        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                        intent?.let {
-                            it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            context.startActivity(it)
-                            // Track as recently used app
-                            onAppLaunched?.invoke(app)
-                        }
-                    }
-                    // Close the start menu
-                    onAppClick()
-                }
-                
-                // Add long press listener for desktop icon creation
-                holder.itemView.setOnLongClickListener {
-                    // Disable default haptic feedback to avoid double vibration
-                    // (Our ContextMenuView will handle the vibration)
-                    holder.itemView.isHapticFeedbackEnabled = false
-                    
-                    // Get touch position (simplified - just use view center for now)
-                    val location = IntArray(2)
-                    holder.itemView.getLocationOnScreen(location)
-                    val screenX = location[0] + holder.itemView.width / 2f
-                    val screenY = location[1] + holder.itemView.height / 2f
-                    
-                    onAppLongClick?.invoke(app, screenX, screenY)
-                    true
-                }
-            }
-            is SeparatorViewHolder -> {
-                // No binding needed for separator
-            }
-        }
+        // Both are no-ops when the value hasn't changed, so this only costs anything
+        // on the bind right after a theme switch.
+        holder.appName.setTextColor(textColors)
+        holder.appName.typeface = themeTypeface
     }
 
     override fun getItemCount(): Int = filteredItems.size
 
-    private fun isAppInRecentSection(position: Int): Boolean {
-        // With the new pinned apps system, no apps in the main list should have blue background
-        // Blue background was only for recent apps that were at the top of the list
-        // Now all apps are treated equally in the main list
-        return false
-    }
-
-    fun filter(query: String) {
-        val trimmedQuery = query.trim()
-        filteredItems = if (trimmedQuery.isEmpty()) {
+    /**
+     * Narrows the list to apps matching [query]. Returns true if the visible set actually
+     * changed, so the caller can decide whether to scroll back to the top.
+     */
+    fun filter(query: String): Boolean {
+        val trimmedQuery = query.trim().lowercase()
+        val previous = filteredItems
+        val updated = if (trimmedQuery.isEmpty()) {
             originalItems
         } else {
-            originalItems.filter { item ->
-                when (item) {
-                    is AppInfo -> {
-                        // Include all apps that match the query, including recent apps
-                        item.name.trim().lowercase().contains(trimmedQuery.lowercase())
-                    }
-                    is String -> false // Hide separators during search
-                    else -> false
-                }
+            originalItems.filterIndexed { index, _ ->
+                searchKeys[index]?.contains(trimmedQuery) == true
             }
         }
-        notifyDataSetChanged()
+
+        if (previous.size == updated.size && previous.indices.all { previous[it] === updated[it] }) {
+            return false
+        }
+
+        // A diff instead of notifyDataSetChanged: rows that survive the keystroke keep their
+        // views and never get rebound, which is most of them for a typical query.
+        val diff = DiffUtil.calculateDiff(FilterDiffCallback(previous, updated), false)
+        filteredItems = updated
+        diff.dispatchUpdatesTo(this)
+        return true
+    }
+
+    private class FilterDiffCallback(
+        private val old: List<Any>,
+        private val new: List<Any>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize(): Int = old.size
+        override fun getNewListSize(): Int = new.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val oldItem = old[oldItemPosition]
+            val newItem = new[newItemPosition]
+            // AppInfo.equals already compares by packageName only
+            return if (oldItem is AppInfo && newItem is AppInfo) oldItem == newItem
+            else oldItem === newItem
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val oldItem = old[oldItemPosition]
+            val newItem = new[newItemPosition]
+            return if (oldItem is AppInfo && newItem is AppInfo) {
+                oldItem.name == newItem.name && oldItem.icon === newItem.icon
+            } else true
+        }
     }
 
     // Phase 3: Implement ThemeAware interface
     override fun onThemeChanged(theme: AppTheme) {
         currentTheme = theme
+        textColors = context.getColorStateList(R.color.context_menu_text_selector)
+        themeTypeface = (context as? MainActivity)?.getThemePrimaryFont()
         notifyDataSetChanged()
     }
 
     // Backward compatible method
     fun setTheme(isWindows98: Boolean) {
-        currentTheme = if (isWindows98) AppTheme.WindowsClassic else AppTheme.WindowsXP
-        notifyDataSetChanged()
+        onThemeChanged(if (isWindows98) AppTheme.WindowsClassic else AppTheme.WindowsXP)
     }
 }

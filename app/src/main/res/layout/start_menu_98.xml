@@ -246,12 +246,12 @@
             android:visibility="invisible"
             android:padding="2dp">
 
-            <!-- Apps List -->
+            <!-- Apps List. Fixed height, not wrap_content - see start_menu_xp.xml.
+                 The 48dp bottom margin leaves room for the search box below. -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/apps_recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
+                android:layout_height="match_parent"
                 android:layout_marginBottom="48dp"
                 android:background="#d3cec7" />
 

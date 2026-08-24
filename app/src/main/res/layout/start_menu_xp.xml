@@ -87,16 +87,14 @@
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
-                <RelativeLayout
+                <!-- Fixed height, not wrap_content: a wrap_content RecyclerView runs a full
+                     layout pass inside every onMeasure, and the weight chain above makes that
+                     happen ~16x per keystroke. stackFromEnd on the LayoutManager keeps short
+                     (filtered) lists hugging the bottom edge the way this used to look. -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/apps_recycler_view"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1">
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/apps_recycler_view"
-                        android:layout_alignParentBottom="true"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"/>
-                </RelativeLayout>
+                    android:layout_height="match_parent"/>
 
             </LinearLayout>
             <!-- All Programs -->

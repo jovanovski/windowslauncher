@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.getSafeFloat
 
 class QuickGlanceWidget @JvmOverloads constructor(
     context: Context,
@@ -426,8 +427,8 @@ class QuickGlanceWidget @JvmOverloads constructor(
     
     fun restorePosition() {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedX = prefs.getFloat(KEY_WIDGET_X, -1f)
-        val savedY = prefs.getFloat(KEY_WIDGET_Y, -1f)
+        val savedX = prefs.getSafeFloat(KEY_WIDGET_X, -1f)
+        val savedY = prefs.getSafeFloat(KEY_WIDGET_Y, -1f)
         
         if (savedX >= 0 && savedY >= 0) {
             x = savedX

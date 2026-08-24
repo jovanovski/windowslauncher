@@ -1,6 +1,8 @@
 package rocks.gorjan.gokixp
 
+import android.app.NotificationManager
 import android.service.notification.NotificationListenerService
+import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
 import android.util.Log
 
@@ -72,8 +74,8 @@ class NotificationListenerService : NotificationListenerService() {
             } else {
                 Log.w(TAG, "MainActivity instance is null, cannot play email sound")
             }
-            // Only add non-ongoing email notifications
-            if (!isOngoing) {
+            // Only add non-ongoing, non-silent email notifications
+            if (!isOngoing && !isSilentNotification(sbn)) {
                 activeNotificationPackages.add(packageName)
                 notifyMainActivity()
             }
@@ -163,7 +165,34 @@ class NotificationListenerService : NotificationListenerService() {
             return false
         }
 
+        // Skip silent notifications (low/min importance channels, no sound or vibration)
+        if (isSilentNotification(sbn)) {
+            return false
+        }
+
         return true
+    }
+
+    /**
+     * A notification is considered silent when it is posted at an importance below
+     * IMPORTANCE_DEFAULT, i.e. it never makes a sound, vibrates or peeks.
+     */
+    private fun isSilentNotification(sbn: StatusBarNotification): Boolean {
+        try {
+            val ranking = Ranking()
+            if (currentRanking?.getRanking(sbn.key, ranking) == true) {
+                val importance = ranking.importance
+                if (importance != NotificationManager.IMPORTANCE_UNSPECIFIED) {
+                    return importance < NotificationManager.IMPORTANCE_DEFAULT
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading ranking for ${sbn.packageName}", e)
+        }
+
+        // Fall back to the legacy priority for notifications posted without a channel
+        @Suppress("DEPRECATION")
+        return sbn.notification.priority < android.app.Notification.PRIORITY_DEFAULT
     }
     
     private fun notifyMainActivity() {
