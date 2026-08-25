@@ -248,7 +248,7 @@
 
             <!-- Apps List. Fixed height, not wrap_content - see start_menu_xp.xml.
                  The 48dp bottom margin leaves room for the search box below. -->
-            <androidx.recyclerview.widget.RecyclerView
+            <rocks.gorjan.gokixp.BoundedHeightRecyclerView
                 android:id="@+id/apps_recycler_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
