@@ -72,7 +72,7 @@ class SolitareGame(
         fun isBlack(): Boolean = !isRed()
 
         fun getDrawableId(context: Context, cardBackIndex: Int): Int {
-            val postfix = if (ThemeManager(context).getSelectedTheme() is AppTheme.WindowsVista) "_vista" else ""
+            val postfix = if (ThemeManager(context).isVistaChrome()) "_vista" else ""
 
             if (!faceUp) {
                 val backName = "solitare_card_back_$cardBackIndex"

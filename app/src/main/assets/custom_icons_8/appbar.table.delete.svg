@@ -1,0 +1,5 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" width="76" height="76" viewBox="0 0 76.00 76.00" enable-background="new 0 0 76.00 76.00" xml:space="preserve">
+	<path fill="#000000" fill-opacity="1" stroke-width="0.2" stroke-linejoin="round" d="M 42.3542,33.6458L 38,29.2917L 33.6458,33.6458L 31.2708,31.2708L 35.625,26.9167L 31.2708,22.5625L 33.6458,20.1875L 38,24.5417L 42.3542,20.1875L 44.7292,22.5625L 40.375,26.9167L 44.7292,31.2708L 42.3542,33.6458 Z M 32,43L 40,43L 40,40L 32,40L 32,43 Z M 44,43L 52,43L 52,40L 44,40L 44,43 Z M 20,40L 20,43L 28,43L 28,40L 20,40 Z M 16,36L 60,36L 60,40L 56,40L 56,43L 60,43L 60,47L 56,47L 56,50L 60,50L 60,54L 56,54L 56,57L 52,57L 52,54L 44,54L 44,57L 40,57L 40,54L 32,54L 32,57L 28,57L 28,54L 20,54L 20,57L 16,57L 16,36 Z M 20,47L 20,50L 28,50L 28,47L 20,47 Z M 32,47L 32,50L 40,50L 40,47L 32,47 Z M 44,47L 44,50L 52,50L 52,47L 44,47 Z "/>
+</svg>

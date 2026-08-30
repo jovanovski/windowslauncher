@@ -6,6 +6,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
+import rocks.gorjan.gokixp.theme.DesktopChrome
 import rocks.gorjan.gokixp.theme.ThemeManager
 
 /**
@@ -103,20 +104,20 @@ class DialogBoxApp(
      */
     private fun getDialogIcon(type: DialogType, theme: AppTheme): Int {
         return when (type) {
-            DialogType.INFORMATION -> when (theme) {
-                AppTheme.WindowsClassic -> R.drawable.dialog_info_98
-                AppTheme.WindowsXP -> R.drawable.dialog_info_xp
-                AppTheme.WindowsVista -> R.drawable.dialog_info_vista
+            DialogType.INFORMATION -> when (theme.chrome) {
+                DesktopChrome.CLASSIC -> R.drawable.dialog_info_98
+                DesktopChrome.XP -> R.drawable.dialog_info_xp
+                DesktopChrome.VISTA -> R.drawable.dialog_info_vista
             }
-            DialogType.WARNING -> when (theme) {
-                AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
-                AppTheme.WindowsXP -> R.drawable.dialog_warning_xp
-                AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
+            DialogType.WARNING -> when (theme.chrome) {
+                DesktopChrome.CLASSIC -> R.drawable.dialog_warning_98
+                DesktopChrome.XP -> R.drawable.dialog_warning_xp
+                DesktopChrome.VISTA -> R.drawable.dialog_warning_vista
             }
-            DialogType.ERROR -> when (theme) {
-                AppTheme.WindowsClassic -> R.drawable.dialog_error_98
-                AppTheme.WindowsXP -> R.drawable.dialog_error_xp
-                AppTheme.WindowsVista -> R.drawable.dialog_error_vista
+            DialogType.ERROR -> when (theme.chrome) {
+                DesktopChrome.CLASSIC -> R.drawable.dialog_error_98
+                DesktopChrome.XP -> R.drawable.dialog_error_xp
+                DesktopChrome.VISTA -> R.drawable.dialog_error_vista
             }
         }
     }

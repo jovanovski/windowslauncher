@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_status_battery_2
+
+  Derived from Templarian/WindowsIcons (Modern UI Icons), CC BY 3.0.
+  Source: WindowsPhone/svg/appbar.battery.2.svg
+  Emitted white so callers can tint per accent / light-dark theme.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 59,34L 59,42L 56,42L 56,48L 20,48L 20,28L 56,28L 56,34L 59,34 Z M 24,32L 24,44L 52,44L 52,32L 24,32 Z M 25,43L 25,33L 30,33L 35,43L 25,43 Z M 31.5,33L 39.5,33L 44.5,43L 36.5,43L 31.5,33 Z" />
+</vector>

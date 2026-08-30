@@ -188,6 +188,14 @@
                 android:padding="2dp"
                 android:visibility="gone" />
 
+            <!--
+              Windows Phone 8.1 only. Sits in the space the Classic-only Flavour and Plus!
+              rows leave free, and is shown by the same gating that hides those.
+            -->
+
+
+
+
         </LinearLayout>
     </RelativeLayout>
 <!-- Settings -->

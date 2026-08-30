@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_handle_menu - top-left tile handle.
+  Hand-authored. The ellipsis WP8.1 used throughout for "more commands".
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 19,38 A 5,5 0 1 0 29,38 A 5,5 0 1 0 19,38 Z
+                          M 33,38 A 5,5 0 1 0 43,38 A 5,5 0 1 0 33,38 Z
+                          M 47,38 A 5,5 0 1 0 57,38 A 5,5 0 1 0 47,38 Z" />
+</vector>

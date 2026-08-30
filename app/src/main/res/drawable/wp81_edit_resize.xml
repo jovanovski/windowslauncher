@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_edit_resize
+
+  Hand-authored. The resize affordance WP8.1 shows in a tile's bottom-right corner
+  while the Start screen is in edit mode: a downward chevron.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 29,26 L 38,35.5 L 47,26 L 53,32 L 38,47.5 L 23,32 Z" />
+</vector>

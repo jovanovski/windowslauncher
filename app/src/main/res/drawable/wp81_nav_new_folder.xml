@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_nav_new_folder - the "new folder" command in edit mode.
+
+  Composed here rather than sourced: Templarian has an open folder and a plus, but no
+  folder-with-plus. The folder is scaled down into the top-left and a plus badge sits in
+  the corner, which is the conventional way this reads.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <group android:scaleX="0.82" android:scaleY="0.82"
+        android:pivotX="38" android:pivotY="38"
+        android:translateX="-5" android:translateY="-5">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 19,50L 28,34L 63,34L 54,50L 19,50 Z M 19,28.0001L 35,28C 36,25 37.4999,24.0001 37.4999,24.0001L 48.75,24C 49.3023,24 50,24.6977 50,25.25L 50,28L 53.9999,28.0001L 53.9999,32L 27,32L 19,46.4L 19,28.0001 Z" />
+    </group>
+    <!-- plus badge, bottom-right -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 52,44 L 60,44 L 60,52 L 68,52 L 68,60 L 60,60 L 60,68 L 52,68 L 52,60 L 44,60 L 44,52 L 52,52 Z" />
+</vector>

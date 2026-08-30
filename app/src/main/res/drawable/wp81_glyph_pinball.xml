@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_glyph_pinball
+
+  Hand-authored: the Templarian set has no pinball glyph.
+  Reads as a table - straight side rails, ball in play, and a pair of flippers.
+  A domed top was tried first and read as a head wearing headphones.
+  Rails and flippers are round-capped strokes so the weight matches the sourced
+  glyphs without hand-building tapered outlines.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <!-- side rails -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M 15,16 L 15,48 M 61,16 L 61,48" />
+    <!-- ball in play -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 30,28 A 8,8 0 1 0 46,28 A 8,8 0 1 0 30,28 Z" />
+    <!-- flippers -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M 22,54 L 33,61 M 54,54 L 43,61" />
+</vector>

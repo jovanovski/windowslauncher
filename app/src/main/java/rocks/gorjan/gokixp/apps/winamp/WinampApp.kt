@@ -1349,16 +1349,11 @@ class WinampApp(
      */
     private fun loadPlaylists() {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val gson = Gson()
 
-        // Load playlists
-        val playlistsJson = prefs.getString(KEY_PLAYLISTS, null)
-        if (playlistsJson != null) {
-            val type = object : TypeToken<List<Playlist>>() {}.type
-            val loadedPlaylists = gson.fromJson<List<Playlist>>(playlistsJson, type)
-            playlists.clear()
-            playlists.addAll(loadedPlaylists)
-        }
+        // Read through the shared store: these playlists are the launcher's, not this
+        // program's, and Zune writes to the same place.
+        playlists.clear()
+        playlists.addAll(PlaylistStore.load(context))
 
         // Ensure "ALL LOCAL FILES" playlist exists at index 0
         if (playlists.isEmpty() || playlists[0].name != ALL_LOCAL_FILES) {
@@ -1380,20 +1375,12 @@ class WinampApp(
      * Save playlists to SharedPreferences
      */
     private fun savePlaylists() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val gson = Gson()
-
-        // Save playlists (excluding ALL LOCAL FILES which is auto-generated)
-        val playlistsToSave = playlists.filter { it.name != ALL_LOCAL_FILES }
-        val playlistsJson = gson.toJson(playlistsToSave)
-
-        prefs.edit().apply {
-            putString(KEY_PLAYLISTS, playlistsJson)
-            putInt(KEY_CURRENT_PLAYLIST, currentPlaylistIndex)
-            apply()
-        }
-
-        Log.d("WinampApp", "Saved ${playlistsToSave.size} playlists")
+        // The playlists themselves go through the shared store; which one Winamp happens
+        // to be looking at is Winamp's own business and stays in its preferences.
+        PlaylistStore.save(context, playlists)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_CURRENT_PLAYLIST, currentPlaylistIndex)
+            .apply()
     }
 
     /**

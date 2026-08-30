@@ -18,4 +18,13 @@
     <attr name="notificationBubble" format="reference"/>
     <attr name="notificationBubbleTitleColor" format="color" />
 
+    <!-- Windows Phone 8.1 shell.
+         Defined on the base theme too, so wp81_* drawables and layouts still resolve
+         if they are ever inflated under another theme. Live accent and Light/Dark
+         switching is applied programmatically, not through these attributes. -->
+    <attr name="wpAccent" format="color" />
+    <attr name="wpBackground" format="color" />
+    <attr name="wpForeground" format="color" />
+    <attr name="wpForegroundSubtle" format="color" />
+
 </resources>

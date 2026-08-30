@@ -178,7 +178,7 @@ class WmpApp(
             // Video name
             val videoNameView = TextView(context).apply {
                 text = "${index + 1}. ${video.title}"
-                setTextColor(if (ThemeManager(context).isVistaTheme()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
+                setTextColor(if (ThemeManager(context).isVistaChrome()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
                 textSize = 10f
                 maxLines = 1
                 setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
@@ -198,7 +198,7 @@ class WmpApp(
             // Duration
             val durationView = TextView(context).apply {
                 text = durationStr
-                setTextColor(if (ThemeManager(context).isVistaTheme()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
+                setTextColor(if (ThemeManager(context).isVistaChrome()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
                 textSize = 10f
                 gravity = android.view.Gravity.END
                 setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())

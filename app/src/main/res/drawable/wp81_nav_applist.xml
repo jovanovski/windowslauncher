@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_nav_applist - the arrow under the wall that goes to the app list.
+
+  appbar.arrow.right, traced verbatim from assets/custom_icons_8/appbar.arrow.right.svg
+  (Templarian/WindowsIcons, Modern UI Icons, CC BY 3.0). Rightwards because that is the
+  direction the app list arrives from: the arrow and the swipe say the same thing.
+
+  Emitted white, on the same black disc the edit handles use.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 19.0002,34L 19.0002,42L 43.7502,42L 33.7502,52L 44.2502,52L 58.2502,38L 44.2502,24L 33.7502,24L 43.7502,34L 19.0002,34 Z " />
+</vector>

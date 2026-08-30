@@ -78,6 +78,16 @@ class WindowsDialog @JvmOverloads constructor(
     private var canMaximize = false
     private var canMinimize = true
     private var isMaximized = false
+
+    /**
+     * Locks the window maximized with no way back.
+     *
+     * Windows Phone 8.1 has no notion of a floating window, so under that theme every
+     * window that *can* maximize opens maximized and stays there: the maximize/restore
+     * button is hidden, double-tapping the title bar does nothing, and the title bar
+     * cannot be dragged. Set automatically from [setMaximizable]; see [setForceMaximized].
+     */
+    private var forceMaximized = false
     private var savedWidth = 0
     private var savedHeight = 0
     private var savedX = 0f
@@ -358,11 +368,13 @@ class WindowsDialog @JvmOverloads constructor(
                 // Try to restore saved state first, fallback to centering
                 if (windowIdentifier != null) {
                     restoreWindowState()
-                    // Only center if no saved state was found
-                    if (windowFrame.x == 0f && windowFrame.y == 0f) {
+                    // Only center if no saved state was found - and never a maximized
+                    // window, which is already exactly where it belongs. Its x and y are
+                    // legitimately 0, which the test below reads as "never positioned".
+                    if (!isMaximized && windowFrame.x == 0f && windowFrame.y == 0f) {
                         centerWindowFrame()
                     }
-                } else {
+                } else if (!isMaximized) {
                     centerWindowFrame()
                 }
                 windowFrame.visibility = View.VISIBLE
@@ -374,11 +386,12 @@ class WindowsDialog @JvmOverloads constructor(
                         // Try to restore saved state first, fallback to centering
                         if (windowIdentifier != null) {
                             restoreWindowState()
-                            // Only center if no saved state was found
-                            if (windowFrame.x == 0f && windowFrame.y == 0f) {
+                            // Only center if no saved state was found, and never a
+                            // maximized window - see the branch above.
+                            if (!isMaximized && windowFrame.x == 0f && windowFrame.y == 0f) {
                                 centerWindowFrame()
                             }
-                        } else {
+                        } else if (!isMaximized) {
                             centerWindowFrame()
                         }
                         windowFrame.visibility = View.VISIBLE
@@ -800,6 +813,27 @@ class WindowsDialog @JvmOverloads constructor(
         canMaximize = enabled
         // Show or hide maximize button based on enabled state
         maximizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
+
+        // Under Windows Phone 8.1 a maximizable window is *always* maximized. Hooked here
+        // rather than at each of the dozen call sites so Solitaire, Internet Explorer and
+        // every other maximizable program behave alike without touching them individually.
+        if (enabled && ThemeManager(context).isWindowsPhone81()) {
+            setForceMaximized(true)
+        }
+    }
+
+    /**
+     * Opens the window maximized and prevents it being restored.
+     * See [forceMaximized].
+     */
+    fun setForceMaximized(enabled: Boolean) {
+        forceMaximized = enabled
+        if (!enabled) return
+        canMaximize = true
+        maximizeButton?.visibility = View.GONE
+        // Deferred: the frame has no measured size until it has been laid out, and
+        // maximizeWindow() stashes those dimensions as the restore target.
+        post { if (!isMaximized) maximizeWindow() }
     }
 
 
@@ -1333,6 +1367,9 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = true
             windowFrame.visibility = View.GONE
             onMinimizeListener?.invoke()
+            // Whatever is drawn behind windows needs to know one has gone off screen; the
+            // count only ever changed when a window opened or closed.
+            windowManager?.notifyWindowVisibilityChanged()
         }
     }
 
@@ -1344,6 +1381,7 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = false
             windowFrame.visibility = View.VISIBLE
             windowManager?.bringToFront(this)
+            windowManager?.notifyWindowVisibilityChanged()
         }
     }
 
@@ -1398,6 +1436,8 @@ class WindowsDialog @JvmOverloads constructor(
      */
     private fun restoreWindow() {
         if (!isMaximized) return
+        // Locked maximized: there is no restored state to go back to.
+        if (forceMaximized) return
 
         // Reset keyboard state
         isKeyboardVisible = false
@@ -1539,7 +1579,9 @@ class WindowsDialog @JvmOverloads constructor(
                 y = if (isMaximized) savedY else windowFrame.y,
                 width = if (isMaximized) savedWidth else windowFrame.width,
                 height = if (isMaximized) savedHeight else windowFrame.height,
-                isMaximized = isMaximized
+                // Never persist "restored" for a locked window - otherwise leaving the
+                // WP8.1 theme would leave the window remembering a state it never had.
+                isMaximized = isMaximized || forceMaximized
             )
 
             // Update state for this window

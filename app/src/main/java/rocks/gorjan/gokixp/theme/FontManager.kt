@@ -31,6 +31,8 @@ class FontManager(private val context: Context) {
         val fontRes = when {
             theme is AppTheme.WindowsClassic && style == FontStyle.Bold -> R.font.micross_block_bold
             theme is AppTheme.WindowsClassic -> R.font.micross_block
+            theme is AppTheme.WindowsPhone81 && style == FontStyle.Bold -> R.font.segoeui_semibold
+            theme is AppTheme.WindowsPhone81 -> R.font.segoeui_regular
             theme is AppTheme.WindowsXP && style == FontStyle.Bold -> R.font.tahoma  // No separate bold
             theme is AppTheme.WindowsXP -> R.font.tahoma
             else -> R.font.tahoma  // Default fallback
@@ -45,10 +47,13 @@ class FontManager(private val context: Context) {
      * @param theme The theme to get the font family for
      * @return The font family resource ID
      */
+    // Keyed on the theme rather than the chrome: fonts are the one place WP8.1 must not
+    // inherit from Vista. Vista deliberately keeps Tahoma here, unchanged.
     fun getFontFamilyRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.font.micross_font_family
         AppTheme.WindowsXP -> R.font.tahoma_font_family
         AppTheme.WindowsVista -> R.font.tahoma_font_family
+        AppTheme.WindowsPhone81 -> R.font.segoe_wp_family
     }
 
     /**

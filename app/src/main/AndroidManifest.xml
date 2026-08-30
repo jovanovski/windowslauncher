@@ -30,6 +30,13 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!--
+      Android 14's partial photo access. Declared so the permission dialog the Photos tile
+      raises offers "select photos" alongside "allow all": a tile that shows one picture at
+      a time is perfectly happy with a chosen few, and asking for the whole library when a
+      handful would do is not a trade the user should have to make. See PhotoFeed.
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

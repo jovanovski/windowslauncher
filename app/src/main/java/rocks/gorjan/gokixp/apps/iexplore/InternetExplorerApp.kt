@@ -41,8 +41,10 @@ class InternetExplorerApp(
     private val onShowContextMenu: (List<ContextMenuItem>, Float, Float) -> Unit
 ) {
     companion object {
-        private const val KEY_FAVOURITES = "ie_favourites"
-        private const val KEY_LAST_URL = "ie_last_url"
+        // Internal rather than private: the phone shell's browser is a different view of
+        // the same browser, and it reads and writes the same list and the same last page.
+        internal const val KEY_FAVOURITES = "ie_favourites"
+        internal const val KEY_LAST_URL = "ie_last_url"
         private const val DEFAULT_FAVOURITE_NAME = "Windows Launcher"
         private const val DEFAULT_FAVOURITE_URL = "https://github.com/jovanovski/windowslauncher/"
         private const val SOUND_THROTTLE_MS = 2000L // Only allow one sound per second

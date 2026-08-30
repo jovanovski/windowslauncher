@@ -26,18 +26,18 @@ class DrawableManager(private val context: Context) {
      * @return The appropriate Drawable for the theme
      */
     fun getContextMenuBackground(theme: AppTheme): Drawable {
-        return when (theme) {
-            AppTheme.WindowsClassic -> {
+        return when (theme.chrome) {
+            DesktopChrome.CLASSIC -> {
                 val bgColor = ContextCompat.getColor(context, R.color.window_98_background)
                 val topLeftColor = ContextCompat.getColor(context, R.color.border_white)
                 val bottomRightColor = ContextCompat.getColor(context, R.color.border_black)
                 createWindows98Border(bgColor, topLeftColor, bottomRightColor)
             }
-            AppTheme.WindowsXP -> {
+            DesktopChrome.XP -> {
                 ContextCompat.getDrawable(context, R.drawable.context_menu_background)
                     ?: ColorDrawable(Color.WHITE)
             }
-            AppTheme.WindowsVista -> {
+            DesktopChrome.VISTA -> {
                 ContextCompat.getDrawable(context, R.drawable.context_menu_background)
                     ?: ColorDrawable(Color.WHITE)
             }
@@ -147,10 +147,10 @@ class DrawableManager(private val context: Context) {
      * @param theme The theme to get the scrollbar track for
      * @return The scrollbar track drawable resource ID
      */
-    fun getScrollbarTrackRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98
-        AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp
-        AppTheme.WindowsVista -> R.drawable.scrollbar_track_xp
+    fun getScrollbarTrackRes(theme: AppTheme): Int = when (theme.chrome) {
+        DesktopChrome.CLASSIC -> R.drawable.scrollbar_track_98
+        DesktopChrome.XP -> R.drawable.scrollbar_track_xp
+        DesktopChrome.VISTA -> R.drawable.scrollbar_track_xp
     }
 
     /**
@@ -159,9 +159,9 @@ class DrawableManager(private val context: Context) {
      * @param theme The theme to get the scrollbar thumb for
      * @return The scrollbar thumb drawable resource ID
      */
-    fun getScrollbarThumbRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
-        AppTheme.WindowsXP -> R.drawable.scrollbar_thumb_xp
-        AppTheme.WindowsVista -> R.drawable.scrollbar_thumb_xp
+    fun getScrollbarThumbRes(theme: AppTheme): Int = when (theme.chrome) {
+        DesktopChrome.CLASSIC -> R.drawable.win98_start_menu_border
+        DesktopChrome.XP -> R.drawable.scrollbar_thumb_xp
+        DesktopChrome.VISTA -> R.drawable.scrollbar_thumb_xp
     }
 }

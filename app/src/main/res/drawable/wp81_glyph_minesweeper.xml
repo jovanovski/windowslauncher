@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_glyph_minesweeper
+
+  Hand-authored: the Templarian set has no mine/bomb glyph.
+  Classic Minesweeper mine - a heavy ball with eight short radiating spikes, drawn in the
+  same 76x76 box and optical weight as the sourced appbar glyphs. Single path with
+  the default nonZero fill so the spikes union with the ball instead of punching holes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 7.0,40.5 L 69.0,40.5 L 69.0,35.5 L 7.0,35.5 Z
+                          M 14.3,17.8 L 58.2,61.7 L 61.7,58.2 L 17.8,14.3 Z
+                          M 35.5,7.0 L 35.5,69.0 L 40.5,69.0 L 40.5,7.0 Z
+                          M 58.2,14.3 L 14.3,58.2 L 17.8,61.7 L 61.7,17.8 Z
+                          M 18,38 A 20,20 0 1 0 58,38 A 20,20 0 1 0 18,38 Z" />
+</vector>

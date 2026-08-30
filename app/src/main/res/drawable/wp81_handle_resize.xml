@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_handle_resize - bottom-right tile handle, dragged to resize.
+  Hand-authored: a diagonal double arrow along the corner it sits in.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 21.5,26.5 L 26.5,21.5 L 54.5,49.5 L 49.5,54.5 Z
+                          M 18,18 L 36,18 L 18,36 Z
+                          M 58,58 L 40,58 L 58,40 Z" />
+</vector>

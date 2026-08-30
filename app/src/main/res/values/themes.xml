@@ -27,6 +27,11 @@
         <item name="solitareGreen">@color/solitare_green</item>
         <item name="notificationBubble">@drawable/bubble</item>
         <item name="notificationBubbleTitleColor">#000000</item>
+        <!-- Windows Phone 8.1 defaults, so wp81_* resources resolve under any theme. -->
+        <item name="wpAccent">#1BA1E2</item>
+        <item name="wpBackground">#000000</item>
+        <item name="wpForeground">#FFFFFF</item>
+        <item name="wpForegroundSubtle">#99FFFFFF</item>
 
 
     </style>
@@ -46,6 +51,24 @@
         <item name="notificationBubbleTitleColor">#4C54C7</item>
 
 
+    </style>
+
+    <!--
+      Windows Phone 8.1.
+
+      Inherits the Vista style on purpose: WP8.1 has no desktop of its own, and its
+      windows are Vista windows (see AppTheme.chrome / DesktopChrome.VISTA). Only the
+      typography and the phone-shell palette differ. The accent and Light/Dark values
+      here are the out-of-box defaults; the live values come from ThemeManager and are
+      applied programmatically so they can change without recreating the activity.
+    -->
+    <style name="Theme.GokiXP.WP81" parent="Theme.GokiXP.Vista">
+        <item name="primaryFontFamily">@font/segoe_wp_family</item>
+        <item name="secondaryFontFamily">@font/segoe_wp_family</item>
+        <item name="wpAccent">#1BA1E2</item>
+        <item name="wpBackground">#000000</item>
+        <item name="wpForeground">#FFFFFF</item>
+        <item name="wpForegroundSubtle">#99FFFFFF</item>
     </style>
 
     <!-- Windows Classic Theme -->

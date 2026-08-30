@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Disc behind an edit-mode tile handle.
+
+  Black with a white edge, and fixed rather than taken from the palette: the handle sits
+  half on the tile and half on the page behind it, so it has to read against an accent, a
+  photograph and a black or white background all at once. Nothing that follows one of them
+  can do that; a black disc outlined in white reads against all of them.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FF000000" />
+    <stroke
+        android:width="2dp"
+        android:color="#FFFFFFFF" />
+</shape>

@@ -23,6 +23,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.UserHandle
 import android.util.Log
 import android.view.GestureDetector
 import android.view.KeyEvent
@@ -179,11 +180,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val UPDATE_CHECK_INTERVAL = 3600000L // 1 hour in milliseconds
     private lateinit var updateIcon: LinearLayout
     private var updateDownloadLink: String? = null
+
+    /** The version waiting to be installed, or null. Shown on the Welcome tile. */
+    private var updateAvailableVersion: String? = null
     
     // App detection
     private var lastKnownAppCount = 0
     private var appCheckRunnable: Runnable? = null
     private val APP_CHECK_INTERVAL = 30000L // 30 seconds
+    private val ICON_REFRESH_DEBOUNCE_MS = 250L // Coalesces bursts of package-change callbacks
     private var isContextMenuVisible = false
     private var isProgramsMenuExpanded = false
     private var isStartMenuShowingApps = false // Track Vista start menu state
@@ -219,6 +224,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    // Watches for apps being added, removed or updated while the launcher is running
+    private var launcherAppsCallback: LauncherApps.Callback? = null
+
+    // Packages whose icons changed, waiting for the coalesced refresh in refreshIconsForPackage
+    private val pendingIconRefreshes = mutableSetOf<String>()
+    private var iconRefreshRunnable: Runnable? = null
+
     // System apps configuration
     private val systemAppActions = mutableMapOf<String, (AppInfo?) -> Unit>() // packageName -> action function with optional AppInfo
 
@@ -235,12 +247,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Image picker launcher for wallpaper selection
     private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { selectedUri ->
-            val previewHandler = onWallpaperImagePicked
-            if (previewHandler != null) {
-                onWallpaperImagePicked = null
-                previewHandler(selectedUri)
-            } else {
-                handleSelectedImage(selectedUri)
+            // What the pick was *for* is recorded in SharedPreferences rather than held in
+            // a lambda. The system picker is another activity, and this one can be
+            // recreated behind it; an in-memory handler is then gone by the time the result
+            // arrives, and the pick silently falls through to the wallpaper flow - which is
+            // how choosing a tile icon ended up asking where to apply a wallpaper.
+            when (val target = consumePendingImagePick()) {
+                null -> {
+                    val previewHandler = onWallpaperImagePicked
+                    if (previewHandler != null) {
+                        onWallpaperImagePicked = null
+                        previewHandler(selectedUri)
+                    } else {
+                        handleSelectedImage(selectedUri)
+                    }
+                }
+                PICK_TARGET_WP81_BACKGROUND -> applyPickedWP81Background(selectedUri)
+                else -> {
+                    if (target.startsWith(PICK_TARGET_WP81_ICON_PREFIX)) {
+                        applyPickedWP81Icon(
+                            target.removePrefix(PICK_TARGET_WP81_ICON_PREFIX), selectedUri)
+                    } else {
+                        handleSelectedImage(selectedUri)
+                    }
+                }
             }
         }
     }
@@ -413,6 +443,60 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     companion object {
         const val PREFS_NAME = "taskbar_widget_prefs"  // Public constant for shared preferences name
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
+
+        /** How often the Windows Phone 8.1 Start screen refreshes and flips its live tiles. */
+        private const val WP81_LIVE_TILE_INTERVAL_MS = 12_000L
+
+        // Stable ids for the built-in live widgets, so they never collide with a real
+        // package name or a desktop icon id.
+        /**
+         * Whether Start has played its entrance in this process.
+         *
+         * Deliberately not per-activity: an activity recreated behind a window the user is
+         * already looking at is not an arrival, and treating it as one is what made coming
+         * home flash.
+         */
+        private var wp81EntrancePlayed = false
+
+        /**
+         * Whether a windowed program was covering the shell last time the count changed.
+         *
+         * Per-process for the same reason: what matters is whether the program the user
+         * just closed was there, not which activity was underneath it.
+         */
+        private var wp81ProgramOnScreen = false
+
+        /** The icons offered when a Windows Phone tile is being given a new one. */
+        private const val WP81_ICON_FOLDER = "custom_icons_8"
+
+        /** Inside this, an appointment is said as a countdown. See wp81EventWhen. */
+        private const val RELATIVE_EVENT_MINUTES = 120L
+
+        private const val WP81_WIDGET_CLOCK = "wp81.widget.clock"
+        private const val WP81_WIDGET_CALENDAR = "wp81.widget.calendar"
+        private const val WP81_WIDGET_NEWS = "wp81.widget.news"
+        private const val WP81_WIDGET_PHOTOS = "wp81.widget.photos"
+        private const val WP81_WIDGET_AQI = "wp81.widget.aqi"
+        private const val WP81_WIDGET_WEATHER = "wp81.widget.weather"
+        private const val WP81_WIDGET_SETTINGS = "wp81.widget.settings"
+        private const val KEY_WP81_BUILTIN_TILES = "wp81_builtin_tiles"
+
+        /** The same, for the phone on its side. See wp81Landscape. */
+        private const val KEY_WP81_BUILTIN_TILES_LANDSCAPE = "wp81_builtin_tiles_landscape"
+
+        /** What the in-flight system image pick is for; see imagePickerLauncher. */
+        private const val KEY_PENDING_IMAGE_PICK = "pending_image_pick"
+        private const val PICK_TARGET_WP81_BACKGROUND = "wp81_background"
+        private const val PICK_TARGET_WP81_ICON_PREFIX = "wp81_icon:"
+
+        /** How long an in-app notification stays on screen. */
+        private const val NOTIFICATION_DURATION_MS = 7000L
+
+        /** Icons handed to the picker per batch, so the grid fills as it decodes. */
+        private const val WP81_ICON_BATCH = 40
+
+        /** Slider movement smaller than this reuses the cached blur rather than re-scaling. */
+        private const val BLUR_QUANTISATION = 0.02f
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_HIDDEN_APPS = "hidden_apps"
         private const val KEY_SOUND_MUTED = "sound_muted"
@@ -483,6 +567,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
         private const val MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE = 1004
+
+        /** Asked for by the Photos tile, the first time it is tapped. */
+        private const val PHOTOS_PERMISSION_REQUEST_CODE = 1005
+
+        /** What the Photos tile opens. */
+        private const val WP81_PHOTOS_PACKAGE = "com.google.android.apps.photos"
+
+        /**
+         * How long the camera roll is trusted before it is read again.
+         *
+         * Long enough that returning to Start does not re-query MediaStore every time,
+         * short enough that a picture taken a few minutes ago turns up on the tile.
+         */
+        private const val WP81_PHOTOS_MAX_AGE_MS = 5 * 60 * 1000L
 
         // System app package name prefix
         private const val SYSTEM_APP_PREFIX = "system."
@@ -698,10 +796,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Returns Pair(path_key, uri_key)
      */
     private fun getCurrentThemeWallpaperKeysTypeSafe(): Pair<String, String> {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> Pair(KEY_WALLPAPER_CLASSIC_PATH, KEY_WALLPAPER_CLASSIC_URI)
-            AppTheme.WindowsXP -> Pair(KEY_WALLPAPER_XP_PATH, KEY_WALLPAPER_XP_URI)
-            AppTheme.WindowsVista -> Pair(KEY_WALLPAPER_VISTA_PATH, KEY_WALLPAPER_VISTA_URI)
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> Pair(KEY_WALLPAPER_CLASSIC_PATH, KEY_WALLPAPER_CLASSIC_URI)
+            DesktopChrome.XP -> Pair(KEY_WALLPAPER_XP_PATH, KEY_WALLPAPER_XP_URI)
+            DesktopChrome.VISTA -> Pair(KEY_WALLPAPER_VISTA_PATH, KEY_WALLPAPER_VISTA_URI)
         }
     }
 
@@ -709,10 +807,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the wallpaper X focus storage key for the current theme.
      */
     private fun getCurrentThemeWallpaperFocusXKey(): String {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> KEY_WALLPAPER_CLASSIC_FOCUS_X
-            AppTheme.WindowsXP -> KEY_WALLPAPER_XP_FOCUS_X
-            AppTheme.WindowsVista -> KEY_WALLPAPER_VISTA_FOCUS_X
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> KEY_WALLPAPER_CLASSIC_FOCUS_X
+            DesktopChrome.XP -> KEY_WALLPAPER_XP_FOCUS_X
+            DesktopChrome.VISTA -> KEY_WALLPAPER_VISTA_FOCUS_X
         }
     }
 
@@ -720,10 +818,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the default wallpaper path for the current theme.
      */
     private fun getDefaultWallpaperForCurrentTheme(): String {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> "wallpapers/Windows ME (m).jpg"
-            AppTheme.WindowsXP -> "wallpapers/Bliss (m).jpg"
-            AppTheme.WindowsVista -> "wallpapers/Windows Vista (m).jpg" // Can be changed to Vista default later
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> "wallpapers/Windows ME (m).jpg"
+            DesktopChrome.XP -> "wallpapers/Bliss (m).jpg"
+            DesktopChrome.VISTA -> "wallpapers/Windows Vista (m).jpg" // Can be changed to Vista default later
         }
     }
 
@@ -731,10 +829,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the custom icon storage key for the current theme.
      */
     private fun getCustomIconKeyForCurrentTheme(): String {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> "custom_icons_98"
-            AppTheme.WindowsXP -> "custom_icons"
-            AppTheme.WindowsVista -> "custom_icons_vista"
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> "custom_icons_98"
+            DesktopChrome.XP -> "custom_icons"
+            DesktopChrome.VISTA -> "custom_icons_vista"
         }
     }
 
@@ -742,10 +840,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the button background drawable resource for the current theme.
      */
     private fun getButtonBackgroundForCurrentTheme(): Int {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
-            AppTheme.WindowsXP -> R.drawable.button_xp_background
-            AppTheme.WindowsVista -> R.drawable.button_xp_background // Can be changed to Vista button later
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> R.drawable.win98_start_menu_border
+            DesktopChrome.XP -> R.drawable.button_xp_background
+            DesktopChrome.VISTA -> R.drawable.button_xp_background // Can be changed to Vista button later
         }
     }
 
@@ -753,10 +851,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the display properties icon for the current theme.
      */
     private fun getDisplayPropertiesIconForCurrentTheme(): Int {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> R.drawable.display_98
-            AppTheme.WindowsXP -> R.drawable.display_xp
-            AppTheme.WindowsVista -> R.drawable.display_xp // Can be changed to Vista icon later
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> R.drawable.display_98
+            DesktopChrome.XP -> R.drawable.display_xp
+            DesktopChrome.VISTA -> R.drawable.display_xp // Can be changed to Vista icon later
         }
     }
 
@@ -764,10 +862,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the volume icon based on theme and mute state.
      */
     private fun getVolumeIconForCurrentTheme(isMuted: Boolean): Int {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> if (isMuted) R.drawable.mute_98 else R.drawable.sound_98
-            AppTheme.WindowsXP -> if (isMuted) R.drawable.mute else R.drawable.sound
-            AppTheme.WindowsVista -> if (isMuted) R.drawable.mute_vista else R.drawable.sound_vista
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> if (isMuted) R.drawable.mute_98 else R.drawable.sound_98
+            DesktopChrome.XP -> if (isMuted) R.drawable.mute else R.drawable.sound
+            DesktopChrome.VISTA -> if (isMuted) R.drawable.mute_vista else R.drawable.sound_vista
         }
     }
 
@@ -923,6 +1021,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Set up app install/uninstall listener
         AppInstallReceiver.setListener(this)
+
+        // Set up the LauncherApps callback that also catches in-place app updates
+        registerLauncherAppsCallback()
         
         // Handle pending app installation/removal from broadcast receiver
         handlePendingPackageAction()
@@ -967,11 +1068,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         updateIcon.setOnClickListener {
             updateDownloadLink?.let { link ->
                 try {
-//                    val intent = Intent(Intent.ACTION_VIEW)
-//                    intent.data = link.toUri()
-//                    startActivity(intent)
-                    showInternetExplorerDialog(link)
-//                    playClickSound()
+                    openUrlShortcut(link)
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error opening update link", e)
                 }
@@ -1378,6 +1475,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showWmpDialog(appInfo = appInfo)
         }
 
+        // Register Zune. Offered only under Windows Phone 8.1 - see getSystemAppsList -
+        // but registered unconditionally, so a tile pinned before a theme switch still
+        // opens rather than doing nothing.
+        systemAppActions["system.zune"] = { _ ->
+            showZuneDialog()
+        }
+
+        // And News, on the same terms.
+        systemAppActions["system.news"] = { _ ->
+            showNewsDialog()
+        }
+
+        // Welcome. Tapping it while an update is waiting goes to the update instead: the
+        // tile is showing the update, and what a tile shows is what tapping it should be
+        // about.
+        systemAppActions["system.welcome"] = { _ ->
+            val update = updateDownloadLink
+            if (!update.isNullOrEmpty()) openUrlShortcut(update)
+            else showWelcomeDialogWP81()
+        }
+
         // Register Minesweeper
         systemAppActions["system.minesweeper"] = { appInfo ->
             showMinesweeperDialog(appInfo = appInfo)
@@ -1486,6 +1604,57 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 packageName = "system.wmp",
                 icon = createSquareDrawable(wmpDrawable)
             ))
+        }
+
+        // Music - the phone's music player, and the one program here with no desktop
+        // counterpart: it is a Windows Phone app through and through, and on a Windows 98
+        // desktop it would be an anachronism sitting next to Winamp doing the same job.
+        // Kept under its old id: what it is called is a label, and the id is what every
+        // pinned tile and saved arrangement on the phone refers to it by.
+        if (themeManager.isWindowsPhone81()) {
+            AppCompatResources.getDrawable(this, R.drawable.zune_icon)?.let { zuneDrawable ->
+                systemApps.add(AppInfo(
+                    name = "Music",
+                    exeName = "zune.exe",
+                    packageName = "system.zune",
+                    icon = createSquareDrawable(zuneDrawable)
+                ))
+            }
+        }
+
+        // Welcome, which the desktop themes show as a window after an update. Windows
+        // Phone only: the desktop has its own, in its own chrome.
+        if (themeManager.isWindowsPhone81()) {
+            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_welcome)?.let { glyph ->
+                val tinted = glyph.mutate()
+                androidx.core.graphics.drawable.DrawableCompat.setTint(
+                    tinted, themeManager.getWP81Accent())
+                systemApps.add(AppInfo(
+                    name = "Welcome",
+                    exeName = "welcome.exe",
+                    packageName = "system.welcome",
+                    icon = createSquareDrawable(tinted)
+                ))
+            }
+        }
+
+        // News, the reader behind the News tile. Windows Phone only, for the same reason
+        // Zune is: it is built out of this shell's own furniture and would be an
+        // anachronism on a desktop that already has Internet Explorer.
+        if (themeManager.isWindowsPhone81()) {
+            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_news)?.let { glyph ->
+                // The glyph is drawn white for tiles; the app list is not always dark, so
+                // it takes the accent here rather than vanishing on a Light theme.
+                val tinted = glyph.mutate()
+                androidx.core.graphics.drawable.DrawableCompat.setTint(
+                    tinted, themeManager.getWP81Accent())
+                systemApps.add(AppInfo(
+                    name = "News",
+                    exeName = "news.exe",
+                    packageName = "system.news",
+                    icon = createSquareDrawable(tinted)
+                ))
+            }
         }
 
         // Minesweeper - scale icon to match app icon size
@@ -1895,7 +2064,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         if (query.isNotEmpty()) {
                             if (query == "marti") {
                                 val url = "https://gorjan.rocks/clients/marti/"
-                                showInternetExplorerDialog(url)
+                                openUrlShortcut(url)
                             } else {
                                 openSearchWithQuery(query)
                             }
@@ -1977,6 +2146,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
                 "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
+                "system.zune" -> AppCompatResources.getDrawable(this, R.drawable.zune_icon)
+                "system.news" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_news)
+                "system.welcome" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_welcome)
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
                 "system.msn" ->AppCompatResources.getDrawable(this, themeManager.getMsnIcon())
                 else -> null
@@ -3080,7 +3252,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 if (query.isNotEmpty()) {
                     if(query == "marti"){
                         val url = "https://gorjan.rocks/clients/marti/"
-                        showInternetExplorerDialog(url)
+                        openUrlShortcut(url)
                     }
                     else {
                         openSearchWithQuery(query)
@@ -3097,8 +3269,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun openSearchWithQuery(query: String) {
         // Open Internet Explorer floating window with Google search
         val searchUrl = "https://www.google.com/search?q=${Uri.encode(query)}"
-        showInternetExplorerDialog(searchUrl)
-        Log.d("MainActivity", "Opened IE window with search query: '$query'")
+        openUrlShortcut(searchUrl)
+        Log.d("MainActivity", "Searched the web for '$query'")
     }
 
     private fun setupProfilePictureClickListener() {
@@ -3372,17 +3544,34 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Reset the gesture flag when back is completed
 
                 when {
+                    // WP8.1 shell, but only when nothing is open on top of it: dismiss the
+                    // jump list, leave tile edit mode, or page back from the app list to
+                    // Start. A window on screen owns back before the shell does.
+                    floatingWindowManager.getFrontVisibleWindow() == null &&
+                        wp81Shell?.handleBack() == true -> {
+                        Log.d("MainActivity", "Back pressed (modern): handled by WP8.1 shell")
+                    }
                     isStartMenuVisible -> {
                         // If start menu is open, close it
                         Log.d("MainActivity", "Back pressed (modern): closing start menu")
                         hideStartMenu()
                     }
-                    floatingWindowManager.getFrontWindow() != null -> {
-                        val frontWindow = floatingWindowManager.getFrontWindow()
+                    floatingWindowManager.getFrontVisibleWindow() != null -> {
+                        val frontWindow = floatingWindowManager.getFrontVisibleWindow()
+
+                        // The phone's browser answers first: back there closes the app
+                        // bar menu, drops out of the address field, or steps back through
+                        // the pages, and only leaves the window when none of those apply.
+                        val metroIE =
+                            if (frontWindow?.windowIdentifier == "system.internet_explorer")
+                                metroIEAppInstance
+                            else null
 
                         // Check if front window is Internet Explorer with navigation history
                         val ieApp = frontWindow?.internetExplorerApp as? InternetExplorerApp
-                        if (ieApp != null && ieApp.canNavigateBack()) {
+                        if (metroIE != null && metroIE.handleBack()) {
+                            Log.d("MainActivity", "Back pressed (modern): handled by IE (phone)")
+                        } else if (ieApp != null && ieApp.canNavigateBack()) {
                             // Navigate back in browser history
                             Log.d("MainActivity", "Back pressed (modern): navigating back in IE")
                             ieApp.navigateBack()
@@ -3393,6 +3582,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // Navigate back in folder history
                                 Log.d("MainActivity", "Back pressed (modern): navigating back in My Computer")
                                 mcApp.navigateBackPublic()
+                            } else if (frontWindow?.windowIdentifier == "system.news" &&
+                                newsAppInstance?.handleBack() == true
+                            ) {
+                                Log.d("MainActivity", "Back pressed (modern): handled by News")
+                            } else if (frontWindow?.windowIdentifier == "system.zune" &&
+                            zuneAppInstance?.handleBack() == true
+                        ) {
+                            // A record, a sheet or the play queue was open over the player.
+                            // Backing out of one of those is a step inside the app rather
+                            // than a way out of it.
+                            Log.d("MainActivity", "Back pressed (modern): handled by Zune")
+                        } else if (frontWindow?.windowIdentifier == "system.zune") {
+                                // Zune keeps playing when you leave it, so backing out of
+                                // it means what it means everywhere else on a phone: put
+                                // it away, do not shut it down. Its window stays, and the
+                                // tile on Start opens it again where it left off.
+                                Log.d("MainActivity", "Back pressed (modern): minimising Zune")
+                                frontWindow.minimize()
                             } else {
                                 // Close the front-most window
                                 Log.d("MainActivity", "Back pressed (modern): closing front window")
@@ -4624,7 +4831,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showIconSelectionDialog(
         iconView: DesktopIconView? = null,
         folderIcon: DesktopIcon? = null,
-        folderDialog: WindowsDialog? = null
+        folderDialog: WindowsDialog? = null,
+        /** Invoked once a new icon has been applied and saved, so callers can repaint. */
+        onApplied: (() -> Unit)? = null
     ) {
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
@@ -4632,7 +4841,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Get current theme for content layout selection
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        // Chrome string, not the raw pref: this picks in-window art, and Windows Phone 8.1
+        // draws its windows in Vista chrome. Reading the pref directly would silently
+        // fall through the `else` arm to XP assets.
+        val selectedTheme = themeManager.chromeThemeString()
 
         // Create and set the content with theme-appropriate layout
         val contentLayoutResId = when (selectedTheme) {
@@ -4720,11 +4932,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             // Drop any imported image the mappings no longer point at
                             pruneUnusedImportedIcons()
 
-                            // Clear cached app list so it reloads with new icon
-                            cachedAppList = null
+                            // Drop this package's cached bitmaps (and the cached app list) so the
+                            // icon is re-read rather than served from the pre-update cache
+                            invalidateIconCache(packageName)
 
                             // Now use the same loading process as refresh to get properly sized icon
                             val properlyScaledIcon = getAppIcon(packageName) ?: customDrawable
+
+                            onApplied?.invoke()
 
                             // Update based on which type of icon this is
                             if (iconView != null) {
@@ -5090,7 +5305,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Get current theme
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        // Chrome string, not the raw pref: this picks in-window art, and Windows Phone 8.1
+        // draws its windows in Vista chrome. Reading the pref directly would silently
+        // fall through the `else` arm to XP assets.
+        val selectedTheme = themeManager.chromeThemeString()
 
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
@@ -5469,6 +5687,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * or, for icons the user imported from their device, into [IMPORTED_ICONS_DIR] under filesDir.
      */
     private fun loadIconFromPath(iconPath: String): Drawable? {
+        // The Windows Phone set is SVG, which nothing in the platform will decode - but
+        // its path data is something the platform can draw. See SvgIcon.
+        if (iconPath.endsWith(".svg", ignoreCase = true) &&
+            !iconPath.startsWith("$IMPORTED_ICONS_DIR/")
+        ) {
+            return rocks.gorjan.gokixp.wp81.SvgIcon.fromAsset(this, iconPath)
+        }
         val stream = if (iconPath.startsWith("$IMPORTED_ICONS_DIR/")) {
             File(filesDir, iconPath).inputStream()
         } else {
@@ -5634,7 +5859,131 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create drawable from bitmap
         return bitmap.toDrawable(resources)
     }
-    
+
+    /**
+     * Drops every cached bitmap belonging to a package so the next getAppIcon() call re-reads it
+     * from the system. An in-place app update keeps the same package name, so without this the
+     * LruCache keeps handing back the icon the app shipped with before the update - including
+     * when the user picks "Default" in the Change Icon dialog.
+     */
+    private fun invalidateIconCache(packageName: String) {
+        val staleKeys = iconBitmapCache.snapshot().keys.filter { key ->
+            key == "app_$packageName" || key.startsWith("custom_${packageName}_")
+        }
+        staleKeys.forEach { iconBitmapCache.remove(it) }
+
+        // The cached app list holds the old drawables too, so it has to be rebuilt
+        cachedAppList = null
+
+        Log.d("MainActivity", "Invalidated ${staleKeys.size} cached icons for $packageName")
+    }
+
+    /**
+     * Repaints the desktop shortcuts (and folder contents, which have no view while the folder is
+     * closed) that show a package, using the icon it currently has.
+     */
+    private fun repaintDesktopIconsFor(packageName: String) {
+        val freshIcon = getAppIcon(packageName) ?: return
+
+        desktopIcons.filter { it.packageName == packageName }.forEach { it.icon = freshIcon }
+
+        desktopIconViews.forEach { iconView ->
+            if (iconView.getDesktopIcon()?.packageName == packageName) {
+                iconView.setIconDrawable(freshIcon)
+            }
+        }
+    }
+
+    /**
+     * Repaints every place a package's icon is shown (desktop shortcuts, folder contents, start
+     * menu and the pinned commands list) with the icon it currently has.
+     *
+     * The cache is dropped straight away so nothing can read a stale icon in the meantime, but the
+     * repaint itself is coalesced: onPackageChanged also fires for component enable/disable, which
+     * some apps do in bursts, and rebuilding the app list on each one would be wasteful.
+     */
+    private fun refreshIconsForPackage(packageName: String) {
+        invalidateIconCache(packageName)
+        pendingIconRefreshes.add(packageName)
+
+        iconRefreshRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            iconRefreshRunnable = null
+            val packages = pendingIconRefreshes.toList()
+            pendingIconRefreshes.clear()
+
+            packages.forEach { repaintDesktopIconsFor(it) }
+            loadInstalledApps()
+            refreshCommandsList()
+        }
+        iconRefreshRunnable = runnable
+        handler.postDelayed(runnable, ICON_REFRESH_DEBOUNCE_MS)
+    }
+
+    /**
+     * Package changes arrive through LauncherApps rather than the manifest receiver alone:
+     * PACKAGE_ADDED/REPLACED broadcasts are unreliable for manifest receivers on modern Android,
+     * and an in-place update leaves the app count unchanged so the periodic checker never notices
+     * it either. Registered for the activity's lifetime, which is also the icon cache's lifetime.
+     */
+    private fun registerLauncherAppsCallback() {
+        try {
+            val launcherApps = attributionContext("system")
+                .getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+
+            val callback = object : LauncherApps.Callback() {
+                override fun onPackageAdded(packageName: String, user: UserHandle) {
+                    onAppInstalled(packageName)
+                }
+
+                override fun onPackageRemoved(packageName: String, user: UserHandle) {
+                    onAppRemoved(packageName)
+                }
+
+                override fun onPackageChanged(packageName: String, user: UserHandle) {
+                    // Fired when an app is updated in place - its icon may have changed
+                    onAppReplaced(packageName)
+                }
+
+                override fun onPackagesAvailable(
+                    packageNames: Array<out String>,
+                    user: UserHandle,
+                    replacing: Boolean
+                ) {
+                    packageNames.forEach { refreshIconsForPackage(it) }
+                }
+
+                override fun onPackagesUnavailable(
+                    packageNames: Array<out String>,
+                    user: UserHandle,
+                    replacing: Boolean
+                ) {
+                    packageNames.forEach { invalidateIconCache(it) }
+                }
+            }
+
+            // Own handler rather than the shared `handler` field, which isn't created until
+            // later in onCreate - callbacks are delivered on the main thread either way
+            launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
+            launcherAppsCallback = callback
+            Log.d("MainActivity", "LauncherApps package callback registered")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Could not register LauncherApps callback", e)
+        }
+    }
+
+    private fun unregisterLauncherAppsCallback() {
+        val callback = launcherAppsCallback ?: return
+        launcherAppsCallback = null
+        try {
+            val launcherApps = attributionContext("system")
+                .getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+            launcherApps.unregisterCallback(callback)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not unregister LauncherApps callback", e)
+        }
+    }
+
     private fun createDesktopShortcut(appInfo: AppInfo) {
         // Find the first available grid slot (ignoring tap location)
         val firstAvailablePosition = findFirstAvailableGridSlot()
@@ -5686,7 +6035,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Get theme to determine which folder icon to use
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        // Chrome string, not the raw pref: this picks in-window art, and Windows Phone 8.1
+        // draws its windows in Vista chrome. Reading the pref directly would silently
+        // fall through the `else` arm to XP assets.
+        val selectedTheme = themeManager.chromeThemeString()
         val isWindows98 = selectedTheme == "Windows Classic"
 
         // Get the appropriate folder icon
@@ -5905,7 +6257,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
 
         // Set up theme spinner with appropriate layouts based on current theme
-        val themes = arrayOf("Windows Classic", "Windows XP", "Windows Vista")
+        val themes = arrayOf("Windows Classic", "Windows XP", "Windows Vista", "Windows Phone 8")
         val spinnerLayoutId = themeManager.getSpinnerItemLayoutRes(currentTheme)
         val dropdownLayoutId = themeManager.getSpinnerDropdownLayoutRes(currentTheme)
 
@@ -5970,6 +6322,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         var pendingTheme: String? = null
         var pendingFlavour: String? = null
         var pendingPlus95: String? = null
+
+        // The phone's accent and its Light/Dark setting used to be offered here too,
+        // hidden behind a theme check. They are Windows Phone settings and Windows Phone
+        // has a settings page of its own, reached from its own key strip - which is where
+        // anyone looking for them goes, and where changing one shows immediately rather
+        // than after a dialog is dismissed.
+
 
         // Handle flavour selection - just track it, don't apply
         flavourSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
@@ -6606,6 +6965,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 applyPlus95Theme(pendingPlus95!!)
             }
 
+            // Persist the WP8.1 accent and background before any theme switch: applyTheme()
+            // recreates the activity, and the rebuilt shell reads these on the way up.
+
             // Apply pending theme changes
             if (pendingTheme != null && pendingTheme != currentTheme.toString()) {
                 prefs.edit {
@@ -6678,6 +7040,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 applyPlus95Theme(pendingPlus95!!)
                 pendingPlus95 = null
             }
+
+            // Persist the WP8.1 accent and background before any theme switch: applyTheme()
+            // recreates the activity, and the rebuilt shell reads these on the way up.
 
             // Apply pending theme changes
             if (pendingTheme != null && pendingTheme != currentTheme.toString()) {
@@ -6817,6 +7182,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun showInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
+        // The phone has its own browser: the same engine and the same favourites, with the
+        // page given the whole screen and one dark strip along the bottom instead of a
+        // toolbar. A window with a title bar and eight buttons across the top would be the
+        // one thing in this shell that still looked like a desktop.
+        if (themeManager.isWindowsPhone81()) {
+            showMetroIEDialog(initialUrl)
+            return
+        }
+
         // Check if an IE window is already open
         val existingIEWindow = findExistingInternetExplorerWindow()
 
@@ -7584,10 +7958,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Gets the button background drawable resource for the current theme
      */
     private fun getThemedButtonBackground(): Int {
-        return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
-            AppTheme.WindowsXP -> R.drawable.button_xp_background
-            AppTheme.WindowsVista -> R.drawable.button_xp_background
+        return when (themeManager.getSelectedTheme().chrome) {
+            DesktopChrome.CLASSIC -> R.drawable.win98_start_menu_border
+            DesktopChrome.XP -> R.drawable.button_xp_background
+            DesktopChrome.VISTA -> R.drawable.button_xp_background
         }
     }
 
@@ -8001,6 +8375,274 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
+    private var zuneAppInstance: rocks.gorjan.gokixp.apps.zune.ZuneApp? = null
+
+    /**
+     * Opens Zune.
+     *
+     * Borderless, and maximised because every maximisable window is under this theme, so
+     * what appears is a full-screen phone app rather than a program in a frame. That is
+     * not decoration: the whole design is built on having the screen to itself, and in a
+     * 358x420 window with a title bar it would look like a mistake.
+     */
+    private fun showZuneDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.zune")) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.zune"
+
+        val zuneApp = rocks.gorjan.gokixp.apps.zune.ZuneApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            onRequestPermissions = {
+                val permission =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                        android.Manifest.permission.READ_MEDIA_AUDIO
+                    else android.Manifest.permission.READ_EXTERNAL_STORAGE
+                requestPermissions(arrayOf(permission), AUDIO_PERMISSION_REQUEST_CODE)
+            },
+            hasAudioPermission = {
+                val permission =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                        android.Manifest.permission.READ_MEDIA_AUDIO
+                    else android.Manifest.permission.READ_EXTERNAL_STORAGE
+                checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+            }
+        )
+        zuneAppInstance = zuneApp
+
+        val zuneView = zuneApp.createView()
+        windowsDialog.setContentView(zuneView)
+        windowsDialog.setBorderless()
+        // No size of its own: the forced maximise fills the container, which is the screen
+        // minus the navigation keys. Stating a size in screen percent instead made the
+        // frame taller than the space it lives in, and a window bigger than its overlay is
+        // centred rather than clamped - so it hung off the top and the bottom at once.
+        //
+        // Nothing about its geometry is worth remembering either: it is always full-screen,
+        // and a saved position could only ever be wrong.
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.zune_icon)
+        windowsDialog.setTitle("Music")
+        windowsDialog.setOnCloseListener {
+            zuneApp.cleanup()
+            zuneAppInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(zuneView)
+    }
+
+    private var newsAppInstance: rocks.gorjan.gokixp.apps.news.NewsApp? = null
+
+    /**
+     * Opens Welcome, the phone's version of the window the desktop themes show after an
+     * update.
+     */
+    private fun showWelcomeDialogWP81() {
+        if (floatingWindowManager.findAndFocusWindow("system.welcome")) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.welcome"
+
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+        } catch (e: Exception) {
+            "unknown"
+        }
+
+        val welcomeApp = rocks.gorjan.gokixp.apps.welcome.WelcomeApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            versionName = version,
+            onOpenLink = { url ->
+                if (url.startsWith("mailto:")) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "No mail app for $url", e)
+                    }
+                } else {
+                    openUrlShortcut(url)
+                }
+            },
+            loadReleaseNotes = { onReady -> fetchWP81ReleaseNotes(onReady) }
+        )
+
+        val view = welcomeApp.createView()
+        windowsDialog.setContentView(view)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_welcome)
+        windowsDialog.setTitle("Welcome")
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(view)
+    }
+
+    /**
+     * The release notes, from the same GitHub releases the desktop welcome reads.
+     *
+     * One list of what changed, fetched rather than bundled, so it is never a build behind
+     * what is actually out.
+     */
+    private fun fetchWP81ReleaseNotes(onReady: (String) -> Unit) {
+        Thread {
+            val text = try {
+                val url = URL("https://api.github.com/repos/jovanovski/windowslauncher/releases")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    connection.disconnect()
+                    "Could not reach GitHub for the release notes."
+                } else {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    connection.disconnect()
+                    val releases = Gson().fromJson(response, com.google.gson.JsonArray::class.java)
+                    if (releases == null || releases.size() == 0) {
+                        "No release notes yet."
+                    } else {
+                        buildString {
+                            for (i in 0 until releases.size()) {
+                                val release = releases[i].asJsonObject
+                                val name = release.get("name")?.asString
+                                    ?: release.get("tag_name")?.asString ?: "Unknown version"
+                                val body = release.get("body")?.asString.orEmpty()
+                                append(name).append("\n")
+                                if (body.isNotEmpty()) append(body).append("\n")
+                                if (i < releases.size() - 1) append("\n")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Could not read the release notes", e)
+                "Could not load the release notes."
+            }
+            runOnUiThread { onReady(text) }
+        }.start()
+    }
+
+    /**
+     * Turns a full-screen program in the way the shell's own pages turn.
+     *
+     * These are pages as far as the user is concerned - they fill the screen, they are
+     * reached from Start and left with back - so they arrive the same way the settings and
+     * folder pages do rather than simply being there. Deferred a frame: the window sizes
+     * itself on the next pass, and a turn measured against a view with no height yet
+     * pivots around the wrong place.
+     */
+    private fun turnWP81PageIn(view: View) {
+        if (wp81Shell == null) return
+        view.post { rocks.gorjan.gokixp.wp81.MetroPageTransition(view).playIn() }
+    }
+
+    private var metroIEAppInstance: rocks.gorjan.gokixp.apps.iexplore.MetroIEApp? = null
+
+    /**
+     * Opens the phone's Internet Explorer.
+     *
+     * Full-screen and chromeless like Zune and News. One window only: a phone browser is a
+     * place rather than a document, so a second address arriving while it is open is a
+     * navigation in the browser that is already there, not another copy of it.
+     */
+    private fun showMetroIEDialog(initialUrl: String? = null) {
+        val open = floatingWindowManager.findWindowByIdentifier("system.internet_explorer")
+        if (open != null) {
+            floatingWindowManager.findAndFocusWindow("system.internet_explorer")
+            if (initialUrl != null) metroIEAppInstance?.navigateToUrl(initialUrl)
+            return
+        }
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.internet_explorer"
+
+        val ieApp = rocks.gorjan.gokixp.apps.iexplore.MetroIEApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            onShowNotification = { title, message -> showNotification(title, message) },
+            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) }
+        )
+        metroIEAppInstance = ieApp
+
+        val ieView = ieApp.createView(initialUrl)
+        windowsDialog.setContentView(ieView)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_ie)
+        windowsDialog.setTitle("Internet Explorer")
+        windowsDialog.setOnCloseListener {
+            ieApp.cleanup()
+            metroIEAppInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(ieView)
+    }
+
+    /**
+     * Opens the News reader.
+     *
+     * Full-screen and chromeless like Zune - it is a phone app, and the panorama it is
+     * built on needs the screen to itself.
+     */
+    private fun showNewsDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.news")) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.news"
+
+        val newsApp = rocks.gorjan.gokixp.apps.news.NewsApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            feed = wp81NewsFeed,
+            onOpenStory = { story ->
+                if (story.link.isBlank()) showNotification("News", "That story has no link")
+                else openUrlShortcut(story.link)
+            },
+            onRefresh = {
+                wp81NewsFeed.refreshIfStale(
+                    themeManager.getWP81NewsFeeds().toList().sorted(), force = true)
+            },
+            enabledFeeds = { themeManager.getWP81NewsFeeds() },
+            onFeedsChanged = { ids ->
+                themeManager.setWP81NewsFeeds(ids)
+                // Forced: the answer has changed, whatever the last fetch was and whenever
+                // it happened. The tile is told straight away too, so it says what it is
+                // doing rather than sitting on the old stories until the new ones land.
+                refreshWP81News()
+                refreshWP81NewsFeeds(force = true)
+            }
+        )
+        newsAppInstance = newsApp
+
+        val newsView = newsApp.createView()
+        windowsDialog.setContentView(newsView)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_news)
+        windowsDialog.setTitle("News")
+        windowsDialog.setOnCloseListener { newsAppInstance = null }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(newsView)
+
+        // Asked for on the way in, whatever the tile has been doing: opening a reader is a
+        // request for what is current, and forced so it does not sit on half-hour-old
+        // stories because the tile happened to fetch them recently.
+        wp81NewsFeed.refreshIfStale(
+            themeManager.getWP81NewsFeeds().toList().sorted(), force = true)
+    }
+
     /**
      * Public API to open Windows Media Player with optional file to play
      */
@@ -8104,7 +8746,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             themeManager.isXPTheme() -> {
                 windowsDialog.setWindowSize(384, 262)
             }
-            themeManager.isVistaTheme() -> {
+            themeManager.isVistaChrome() -> {
                 windowsDialog.setWindowSize(384, 284)
             }
             else -> {
@@ -8210,7 +8852,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         if (shownForVersion != currentVersion) {
             // Welcome not shown for this version yet, show it
-            if(shownForVersion == null){
+            if (themeManager.isWindowsPhone81()) {
+                // The same moment, in this theme's own program: a Vista dialog with a
+                // picture and two buttons over a Start screen would be a window from
+                // another operating system.
+                showWelcomeDialogWP81()
+            } else if(shownForVersion == null){
                 showWelcomeToWindows()
             }
             else{
@@ -8226,7 +8873,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showWelcomeToWindows(showChangeLog: Boolean = false) {
         // Get theme preferences
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        // Chrome string, not the raw pref: this picks in-window art, and Windows Phone 8.1
+        // draws its windows in Vista chrome. Reading the pref directly would silently
+        // fall through the `else` arm to XP assets.
+        val selectedTheme = themeManager.chromeThemeString()
 
         // Determine the layout based on theme and flavor
         val layoutRes = when (selectedTheme) {
@@ -8387,7 +9037,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (windowsStart != -1) {
             val windowsClickableSpan = object : ClickableSpan() {
                 override fun onClick(widget: View) {
-                    showInternetExplorerDialog("https://github.com/jovanovski/windowslauncher/")
+                    openUrlShortcut("https://github.com/jovanovski/windowslauncher/")
                 }
 
                 override fun updateDrawState(ds: TextPaint) {
@@ -8425,7 +9075,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (gorjanStart != -1) {
             val gorjanClickableSpan = object : ClickableSpan() {
                 override fun onClick(widget: View) {
-                    showInternetExplorerDialog("https://gorjan.rocks")
+                    openUrlShortcut("https://gorjan.rocks")
                 }
 
                 override fun updateDrawState(ds: TextPaint) {
@@ -8736,6 +9386,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun applyWallpaperDrawable(drawable: Drawable, uri: Uri? = null) {
+        if (themeManager.isWindowsPhone81()) return
+
         val mainBackground = findViewById<RelativeLayout>(R.id.main_background)
 
         // Create or find existing wallpaper ImageView
@@ -9078,7 +9730,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 //                    intent.data = link.toUri()
 //                    startActivity(intent)
 //                    playClickSound()
-                    showInternetExplorerDialog(link)
+                    openUrlShortcut(link)
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Error opening update link", e)
                 }
@@ -9352,6 +10004,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun loadSavedWallpaper() {
+        // The Windows Phone 8.1 shell draws its own flat background; there is no desktop
+        // to paper. Loading one anyway would put a full-bleed ImageView into
+        // main_background that the shell then has to fight for z-order.
+        if (themeManager.isWindowsPhone81()) return
+
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val (pathKey, uriKey) = getCurrentThemeWallpaperKeys()
 
@@ -9489,16 +10146,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val root = findViewById<View>(R.id.root_container)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val statusBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
 
-            // 30dp already reserved at the bottom by the gesture bar / taskbar margins.
-            val reservedBottomPx = (30 * resources.displayMetrics.density).toInt()
+            // The desktop themes leave the top alone - nothing sits up there but wallpaper -
+            // and already reserve 30dp at the bottom via the gesture bar / taskbar margins.
+            //
+            // The WP8.1 shell has neither: its status bar sits hard against the top edge and
+            // its navigation bar against the bottom. Padding root_container (rather than the
+            // shell itself) means floating windows, which are siblings of the shell, clear
+            // the system bars too.
+            val isPhoneShell = themeManager.isWindowsPhone81()
+            val reservedBottomPx =
+                if (isPhoneShell) 0
+                else (30 * resources.displayMetrics.density).toInt()
             val padLeft = navBars.left
             val padRight = navBars.right
             val padBottom = maxOf(0, navBars.bottom - reservedBottomPx)
+            val padTop = if (isPhoneShell) statusBars.top else 0
 
             if (view.paddingLeft != padLeft || view.paddingRight != padRight ||
-                view.paddingBottom != padBottom || view.paddingTop != 0) {
-                view.setPadding(padLeft, 0, padRight, padBottom)
+                view.paddingBottom != padBottom || view.paddingTop != padTop) {
+                view.setPadding(padLeft, padTop, padRight, padBottom)
 
                 // The usable desktop area changed (narrower in landscape, shorter in portrait),
                 // so re-place the icons for the new bounds — same reflow used on rotation.
@@ -9753,6 +10421,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * when enabled, opens in the built-in IE window; otherwise (the default) opens in
      * the system default browser.
      */
+    /**
+     * Opens a link, wherever the user has said links should open.
+     *
+     * The one way in for every address this launcher follows - a shortcut tile, a story in
+     * the news reader, the update, a link in Welcome - rather than each of them deciding
+     * for itself. Internet Explorer is a program here, and opening one to follow a link
+     * meant leaving the user inside a toy browser they did not ask for; it is offered
+     * behind a setting instead, and used as the fallback when nothing on the phone will
+     * take an http intent at all.
+     */
     fun openUrlShortcut(url: String?) {
         val target = url?.trim()
         if (target.isNullOrEmpty()) {
@@ -9812,7 +10490,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "parentFolderId" to icon.parentFolderId,
                 "portraitGridIndex" to icon.portraitGridIndex,
                 "landscapeGridIndex" to icon.landscapeGridIndex,
-                "targetUrl" to icon.targetUrl
+                "targetUrl" to icon.targetUrl,
+                "tileSize" to icon.tileSize,
+                "tileIndex" to icon.tileIndex,
+                "tileSizeLandscape" to icon.tileSizeLandscape,
+                "tileIndexLandscape" to icon.tileIndexLandscape
             )
         }
 
@@ -9844,7 +10526,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             serializedIcons.forEach { iconData ->
                 val packageName = iconData["packageName"] as String
-                val name = iconData["name"] as String
+                // The player was called Zune when these were saved. Only the untouched
+                // ones: a name the user typed themselves is theirs to keep.
+                val name = (iconData["name"] as String)
+                    .let { if (packageName == "system.zune" && it == "Zune") "Music" else it }
                 val x = (iconData["x"] as Double).toFloat()
                 val y = (iconData["y"] as Double).toFloat()
                 val id = iconData["id"] as String
@@ -9855,6 +10540,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Read grid indices (may be null for old data)
                 val portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
                 val landscapeGridIndex = (iconData["landscapeGridIndex"] as? Double)?.toInt()
+
+                // Windows Phone 8.1 tile placement; absent for icons saved before it existed.
+                val tileSize = iconData["tileSize"] as? String
+                val tileIndex = (iconData["tileIndex"] as? Double)?.toInt()
+                val tileSizeLandscape = iconData["tileSizeLandscape"] as? String
+                val tileIndexLandscape = (iconData["tileIndexLandscape"] as? Double)?.toInt()
 
 
                 val iconType = if (typeStr != null) {
@@ -9888,7 +10579,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         IconType.FOLDER -> {
                             // Use custom icon if available, otherwise use theme-appropriate folder icon
                             getAppIcon(packageName) ?: run {
-                                val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+                                // Chrome string: Windows Phone 8.1 needs the Vista folder art.
+                                val selectedTheme = themeManager.chromeThemeString()
                                 AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
                             }
                         }
@@ -9912,7 +10604,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         }
                     }
 
-                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex, targetUrl)
+                    val desktopIcon = DesktopIcon(
+                        name, packageName, icon, x, y, id, iconType, parentFolderId,
+                        portraitGridIndex, landscapeGridIndex, targetUrl,
+                        tileSize, tileIndex, tileSizeLandscape, tileIndexLandscape)
                     desktopIcons.add(desktopIcon)
 
                     // Skip icons that are inside folders - they shouldn't be shown on desktop
@@ -11080,6 +11775,56 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.e("MainActivity", "❌ All notification shade expansion methods failed")
     }
     
+    /**
+     * Searches the web for [query], preferring the Google app.
+     *
+     * Three attempts, narrowing as they go: Google's own app with the query already run,
+     * then whatever app claims a web search, then the query as a Google URL for the
+     * browser to open. A phone with no Google app and no browser is not one this can help.
+     */
+    private fun searchTheWebFor(query: String) {
+        val term = query.trim()
+        if (term.isEmpty()) return
+
+        val google = "com.google.android.googlequicksearchbox"
+        try {
+            val inGoogle = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                setPackage(google)
+                putExtra(SearchManager.QUERY, term)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            }
+            startActivity(inGoogle)
+            Log.d("MainActivity", "Searched Google for '$term'")
+            return
+        } catch (e: Exception) {
+            Log.d("MainActivity", "Google app would not take the search: ${e.message}")
+        }
+
+        try {
+            val anySearch = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                putExtra(SearchManager.QUERY, term)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            }
+            if (anySearch.resolveActivity(packageManager) != null) {
+                startActivity(anySearch)
+                return
+            }
+        } catch (e: Exception) {
+            Log.d("MainActivity", "No app claims web search: ${e.message}")
+        }
+
+        try {
+            val url = "https://www.google.com/search?q=" +
+                java.net.URLEncoder.encode(term, "UTF-8")
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            })
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Nothing on this phone can search the web", e)
+            showNotification("Search", "No browser to search with")
+        }
+    }
+
     private fun launchWebSearch() {
         Log.d("MainActivity", "🔍 launchWebSearch() called")
         try {
@@ -11234,18 +11979,31 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onBackPressed() {
         // Custom back button behavior for home screen launcher
         when {
-
+            // WP8.1 shell, but only when nothing is open on top of it. A window on screen
+            // owns back before the shell does.
+            floatingWindowManager.getFrontVisibleWindow() == null &&
+                wp81Shell?.handleBack() == true -> {
+                Log.d("MainActivity", "Back pressed (legacy): handled by WP8.1 shell")
+            }
             isStartMenuVisible -> {
                 // If start menu is open, close it
                 Log.d("MainActivity", "Back pressed: closing start menu")
                 hideStartMenu()
             }
-            floatingWindowManager.getFrontWindow() != null -> {
-                val frontWindow = floatingWindowManager.getFrontWindow()
+            floatingWindowManager.getFrontVisibleWindow() != null -> {
+                val frontWindow = floatingWindowManager.getFrontVisibleWindow()
+
+                // The phone's browser, as above.
+                val metroIE =
+                    if (frontWindow?.windowIdentifier == "system.internet_explorer")
+                        metroIEAppInstance
+                    else null
 
                 // Check if front window is Internet Explorer with navigation history
                 val ieApp = frontWindow?.internetExplorerApp as? InternetExplorerApp
-                if (ieApp != null && ieApp.canNavigateBack()) {
+                if (metroIE != null && metroIE.handleBack()) {
+                    Log.d("MainActivity", "Back pressed (legacy): handled by IE (phone)")
+                } else if (ieApp != null && ieApp.canNavigateBack()) {
                     // Navigate back in browser history
                     Log.d("MainActivity", "Back pressed: navigating back in IE")
                     ieApp.navigateBack()
@@ -11256,6 +12014,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         // Navigate back in folder history
                         Log.d("MainActivity", "Back pressed: navigating back in My Computer")
                         mcApp.navigateBackPublic()
+                    } else if (frontWindow?.windowIdentifier == "system.zune" &&
+                        zuneAppInstance?.handleBack() == true
+                    ) {
+                        // Something was open over the player - a record, a sheet, the
+                        // queue. That is what back closes first.
+                        Log.d("MainActivity", "Back pressed: handled by Zune")
+                    } else if (frontWindow?.windowIdentifier == "system.zune") {
+                        // Put Zune away rather than shutting it down; it keeps playing.
+                        Log.d("MainActivity", "Back pressed: minimising Zune")
+                        frontWindow.minimize()
                     } else {
                         // Close the front-most window
                         Log.d("MainActivity", "Back pressed: closing front window")
@@ -11331,6 +12099,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val newOrientation = getCurrentOrientation()
         Log.d("MainActivity", "Configuration changed to: $newOrientation")
 
+        // The phone shell keeps a wall for each way up - see wp81Landscape - so turning it
+        // over is not a re-layout of the same wall but a different one, read from the
+        // arrangement that was made in this orientation. Rebuilt rather than repacked: the
+        // sizes are the other wall's too, and which of them a tile is wearing is part of
+        // what the user arranged.
+        if (wp81Shell != null) {
+            wp81Shell?.startScreen?.columns = themeManager.getWP81Columns()
+            refreshWP81Tiles()
+        }
+
         // The wallpaper and any open floating windows re-fit themselves via OnLayoutChangeListeners
         // (see applyWallpaperDrawable and WindowsDialog.setupDialogLayout) once their views are
         // re-laid-out for the new size, so neither needs handling here.
@@ -11391,6 +12169,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (isStartMenuVisible) {
                 hideStartMenu()
             }
+            resetWP81ToStart()
         }
         
         // Update intent for activity
@@ -11403,6 +12182,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(clockRunnable)
+
+        // Windows Phone 8.1 shell: the live-tile flip is a repeating post and would
+        // otherwise outlive the activity.
+        stopWP81LiveTiles()
+        floatingWindowManager.onWindowCountChanged = null
+        wp81Shell = null
 
         // Release Plus! 95 click sound MediaPlayer
         plus95ClickPlayer?.release()
@@ -11466,6 +12251,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Clean up app install receiver listener
         AppInstallReceiver.setListener(null)
+        unregisterLauncherAppsCallback()
+        iconRefreshRunnable?.let { handler.removeCallbacks(it) }
+        iconRefreshRunnable = null
 
         // Stop app checking
         stopPeriodicAppChecking()
@@ -11929,7 +12717,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 try {
                     Log.d("MainActivity", "Weather fetch attempt ${attempt + 1}/$maxRetries")
                     
-                    val url = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,weather_code&timezone=auto"
+                    // Two days of daily figures alongside the current reading: index 0 is
+                    // today, index 1 tomorrow, which is what the Start screen's weather
+                    // tile turns over to show. Costs nothing extra - one request either
+                    // way - and everything downstream reads the same cached response.
+                    val url = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
+                            "&current=temperature_2m,weather_code" +
+                            "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                            "&forecast_days=2&timezone=auto"
                     val connection = URL(url).openConnection() as HttpURLConnection
                     connection.requestMethod = "GET"
                     connection.connectTimeout = 10000 + (attempt * 2000) // Increase timeout with retries
@@ -12333,6 +13128,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
                 // Load music tracks if Winamp is open
                 winampAppInstance?.loadMusicTracks()
+                zuneAppInstance?.refreshLibrary()
             } else {
                 Log.d("Winamp", "Audio permission denied")
                 showNotification("Permission Needed", "Storage permission required to access music files")
@@ -12353,6 +13149,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             } else {
                 Log.d("MainActivity", "Notification permission denied")
                 // Don't show a toast for notification denial as it's optional
+            }
+
+            PHOTOS_PERMISSION_REQUEST_CODE -> {
+                // Any of them: on Android 14 the user may have granted a selection rather
+                // than the library, which arrives as the second permission and not the first.
+                val granted = grantResults.any { it == PackageManager.PERMISSION_GRANTED }
+                if (granted) {
+                    // The tile fills with pictures where the invitation was. Opening the
+                    // gallery on top of that would take the user away from the thing they
+                    // have just this second switched on.
+                    refreshWP81Photos(force = true)
+                } else {
+                    showNotification("Photos", "Photo access is needed to show your pictures")
+                }
             }
 
             MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE -> {
@@ -12404,6 +13214,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Notification monitoring functionality
     fun updateNotificationDots() {
         handler.post {
+            // The WP8.1 tiles surface the notification text itself, not just a dot, and
+            // they ignore the dots setting - a live tile *is* the notification.
+            refreshWP81Notifications()
             try {
                 // Check if notification dots are enabled in settings
                 val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -12462,14 +13275,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onAppInstalled(packageName: String) {
         Log.d("MainActivity", "App installed notification: $packageName")
         runOnUiThread {
-            // First refresh the app list
+            // Drop anything cached under this package name (a reinstall reuses it) and refresh
+            invalidateIconCache(packageName)
             loadInstalledApps()
-            
+            refreshCommandsList()
+            refreshWP81ForPackageChange(packageName)
+
             // Then create a desktop icon for the new app (only if it's launchable)
             try {
+                // The install can be reported by both the broadcast receiver and the LauncherApps
+                // callback, so only add a shortcut when the desktop doesn't already have one
+                val alreadyOnDesktop = desktopIcons.any { it.packageName == packageName }
+
                 // Check if the app has a launcher intent (is launchable by user)
                 val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-                if (launchIntent != null) {
+                if (launchIntent != null && !alreadyOnDesktop) {
                     val appInfo = packageManager.getApplicationInfo(packageName, 0)
                     val appName = packageManager.getApplicationLabel(appInfo).toString()
                     val appIcon = getAppIcon(packageName) ?: packageManager.getApplicationIcon(appInfo)
@@ -12484,7 +13304,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     createDesktopShortcut(newAppInfo)
                     Log.d("MainActivity", "Created desktop shortcut for: $appName")
                 } else {
-                    Log.d("MainActivity", "Skipping desktop shortcut for non-launchable app: $packageName")
+                    Log.d("MainActivity", "Skipping desktop shortcut for $packageName (launchable: ${launchIntent != null}, already on desktop: $alreadyOnDesktop)")
                 }
                 
             } catch (e: Exception) {
@@ -12496,8 +13316,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onAppRemoved(packageName: String) {
         Log.d("MainActivity", "App removed notification: $packageName")
         runOnUiThread {
-            // First refresh the app list
+            // Drop the removed app's cached icons, then refresh the app list
+            invalidateIconCache(packageName)
             loadInstalledApps()
+            refreshWP81ForPackageChange(packageName)
             
             // Then remove any desktop icons for the uninstalled app
             try {
@@ -12537,8 +13359,33 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onAppReplaced(packageName: String) {
         Log.d("MainActivity", "App replaced notification: $packageName")
         runOnUiThread {
-            loadInstalledApps()
+            // An update can ship a different icon under the same package name, so the cached
+            // bitmaps have to go before anything reads the icon again
+            refreshIconsForPackage(packageName)
+            refreshWP81ForPackageChange(packageName)
         }
+    }
+
+    /**
+     * Brings the Windows Phone 8.1 shell up to date after a package changed.
+     *
+     * The desktop themes were already told - this is the same routine, which rebuilt the
+     * app list and the desktop icons and simply had no branch for this shell, so under
+     * WP8.1 a newly installed app stayed invisible until the theme was applied again.
+     *
+     * Both surfaces are refreshed because both are downstream of the change: the app list
+     * reads the package manager, and Start is built from the desktop icons this routine
+     * has just added one to (or taken one away from).
+     *
+     * All three calls no-op when the shell is not up, so this is safe on every theme.
+     */
+    private fun refreshWP81ForPackageChange(packageName: String) {
+        if (wp81Shell == null) return
+        // The glyph is derived from the app's icon and cached by package; an update can
+        // ship a new one under the same name.
+        wp81IconProvider.invalidate(packageName)
+        refreshWP81AppList()
+        refreshWP81Tiles()
     }
     
     private fun handlePendingPackageAction() {
@@ -12914,6 +13761,2920 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Dialogs will check this when they're created
     }
 
+
+    // ==================================================================================
+    // Windows Phone 8.1 shell
+    //
+    // Unlike the other three themes this is not a reskin of the desktop: it replaces the
+    // desktop, taskbar and Start menu outright with a phone UI. Windowed programs still
+    // run in the existing floating window container, in Vista chrome (see
+    // AppTheme.chrome / DesktopChrome.VISTA), above the shell.
+    // ==================================================================================
+
+    private var wp81Shell: rocks.gorjan.gokixp.wp81.WP81Shell? = null
+    private val wp81IconProvider by lazy {
+        rocks.gorjan.gokixp.wp81.MonochromeIconProvider(this)
+    }
+    private var wp81LiveTileRunnable: Runnable? = null
+    private val wp81Handler = Handler(Looper.getMainLooper())
+
+    /** Latest next-event summary for the Calendar live widget, or null when there is none. */
+    private var wp81NextCalendarEvent: Pair<String, Long>? = null
+
+    /** Tomorrow, as the calendar tile's reverse says it: how many, and the first of them. */
+    private var wp81TomorrowEvents: Pair<Int, String?> = 0 to null
+    private var wp81CalendarProvider:
+        rocks.gorjan.gokixp.quickglance.CalendarDataProvider? = null
+    private var wp81MediaSessions: rocks.gorjan.gokixp.wp81.MediaSessions? = null
+
+    /**
+     * Tile glyphs for the built-in programs. Third-party apps go through
+     * [rocks.gorjan.gokixp.wp81.MonochromeIconProvider] instead; these are fixed because
+     * the built-ins have no Android icon to derive anything from.
+     */
+    private val wp81SystemGlyphs: Map<String, Int> = mapOf(
+        "system.internet_explorer" to R.drawable.wp81_glyph_ie,
+        "system.registry_editor" to R.drawable.wp81_glyph_regedit,
+        "system.dialer" to R.drawable.wp81_glyph_dialer,
+        "system.notepad" to R.drawable.wp81_glyph_notepad,
+        "system.msn" to R.drawable.wp81_glyph_msn,
+        "system.winamp" to R.drawable.wp81_glyph_winamp,
+        "system.zune" to R.drawable.wp81_glyph_zune,
+        "system.news" to R.drawable.wp81_glyph_news,
+        "system.welcome" to R.drawable.wp81_glyph_welcome,
+        "system.wmp" to R.drawable.wp81_glyph_wmp,
+        "system.minesweeper" to R.drawable.wp81_glyph_minesweeper,
+        "system.solitare" to R.drawable.wp81_glyph_solitaire,
+        "system.pinball" to R.drawable.wp81_glyph_pinball,
+        "system.clock" to R.drawable.wp81_glyph_clock,
+        "system.midtown2" to R.drawable.wp81_glyph_midtown
+    )
+
+    /**
+     * Puts the desktop back after the Windows Phone shell has been over it.
+     *
+     * The mirror of what [applyWindowsPhone81Theme] takes away. Written as a restore rather
+     * than as an undo inside each desktop theme, because there are four of those and they
+     * all want the same thing: a screen that looks like nothing else was ever on it.
+     */
+    private fun restoreDesktopAfterWP81() {
+        wp81Shell?.let { shell ->
+            stopWP81LiveTiles()
+            (shell.parent as? ViewGroup)?.removeView(shell)
+        }
+        wp81Shell = null
+
+        findViewById<View>(R.id.desktop_icons_container)?.visibility = View.VISIBLE
+        findViewById<View>(R.id.taskbar_container)?.visibility = View.VISIBLE
+        findViewById<View>(R.id.christmas_wrapper)?.visibility = View.VISIBLE
+        // A Start menu is opened by the Start button, not by arriving on the desktop.
+        findViewById<View>(R.id.start_menu_container)?.visibility = View.GONE
+
+        // The pointer is a desktop conceit the phone hides; on a desktop it is how the
+        // machine is used at all, and its absence is the most disabling half of this.
+        findViewById<View>(R.id.cursor_effect)?.visibility = View.VISIBLE
+
+        // Back to whatever the user set it to rather than simply on.
+        findViewById<View>(R.id.gesture_bar_background)?.let { loadGestureBarVisibility(it) }
+
+        // The phone paints these its own accent; a desktop draws its wallpaper over the
+        // one and wants black behind the system bars in the other.
+        findViewById<View>(R.id.root_container)?.setBackgroundColor(android.graphics.Color.BLACK)
+        findViewById<RelativeLayout>(R.id.main_background)?.setBackgroundColor(
+            android.graphics.Color.TRANSPARENT)
+    }
+
+    private fun applyWindowsPhone81Theme() {
+        Log.d("MainActivity", "Applying Windows Phone 8.1 theme")
+
+        // Tear down the desktop metaphor. None of this has a counterpart on a phone.
+        findViewById<View>(R.id.desktop_icons_container)?.visibility = View.GONE
+        findViewById<View>(R.id.taskbar_container)?.visibility = View.GONE
+        findViewById<View>(R.id.start_menu_container)?.visibility = View.GONE
+        findViewById<View>(R.id.gesture_bar_background)?.visibility = View.GONE
+        findViewById<View>(R.id.christmas_wrapper)?.visibility = View.GONE
+
+        val palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager)
+
+        val mainBackground = findViewById<RelativeLayout>(R.id.main_background)
+        mainBackground?.background = null
+        mainBackground?.setBackgroundColor(palette.background)
+
+        // root_container is declared black in the layout, and it is what shows through the
+        // padding held back for the system status and navigation bars. Left alone, a Light
+        // theme would sit in a black frame top and bottom.
+        findViewById<View>(R.id.root_container)?.setBackgroundColor(palette.background)
+
+        // The fake mouse cursor is a desktop conceit; a phone is touch-only.
+        findViewById<View>(R.id.cursor_effect)?.visibility = View.GONE
+
+        // Drop any wallpaper a previous theme left behind. It is added at index 0 of
+        // main_background, so it would otherwise sit on top of anything added there.
+        mainBackground?.findViewWithTag<ImageView>("wallpaper")?.let { wallpaper ->
+            mainBackground.removeView(wallpaper)
+        }
+
+        val shell = wp81Shell ?: rocks.gorjan.gokixp.wp81.WP81Shell(
+            this, palette, wp81IconProvider
+        ).also { created ->
+            wp81Shell = created
+            // Added last, at elevation 0: above every other elevation-0 sibling, but still
+            // below floating_windows_container (elevation 50dp), so windowed programs keep
+            // drawing over the shell.
+            mainBackground?.addView(
+                created,
+                RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.MATCH_PARENT,
+                    RelativeLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+            wireWP81Shell(created)
+        }
+
+        shell.applyPalette(palette)
+        applyWP81SystemBarAppearance(palette)
+        applyWP81StartBackground()
+        rebaseFloatingWindowsForWP81()
+        refreshWP81Tiles()
+        refreshWP81AppList()
+        startWP81LiveTiles()
+
+        notifyThemeChanged(AppTheme.WindowsPhone81)
+    }
+
+    /**
+     * Points Android's own status bar icons the right way.
+     *
+     * WP8.1's shell is either black or white end to end, and the system bar sits directly
+     * on it, so the icons have to invert with the Light/Dark setting or they vanish.
+     */
+    private fun applyWP81SystemBarAppearance(palette: rocks.gorjan.gokixp.wp81.WP81Palette) {
+        val controller = androidx.core.view.WindowCompat
+            .getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !palette.isDark
+        controller.isAppearanceLightNavigationBars = !palette.isDark
+    }
+
+    private fun wireWP81Shell(shell: rocks.gorjan.gokixp.wp81.WP81Shell) {
+        wireWP81Settings(shell)
+        shell.startScreen.onLaunch = { tile -> launchWP81Tile(tile) }
+        shell.startScreen.onSwipeDownAtTop = { expandNotificationShade() }
+        // Pushing up at the bottom of Start reaches the app list, which still arrives from
+        // the side: the gesture is a shortcut to the page, not a different way of showing it.
+        shell.startScreen.onSwipeUpAtBottom = {
+            // The same knock the shade gives when it is pulled out of the other end. Both
+            // gestures push the wall off an edge and hand the screen to something else, so
+            // both should land the same way.
+            Helpers.performHapticFeedback(this)
+            shell.openAppSearch()
+        }
+        shell.startScreen.onTilesChanged = { tiles -> persistWP81Tiles(tiles) }
+        shell.startScreen.onTileUnpin = { tile -> unpinOrHideWP81Tile(tile) }
+        // The arrow under the wall goes where the leftward swipe goes.
+        shell.startScreen.onOpenAppList = { shell.openAppSearch() }
+        // A folder opens into the wall rather than onto a page of its own.
+        shell.startScreen.onFolderOpened = { folder -> openWP81FolderInline(folder) }
+        // Resizing a tile inside an opened folder writes back to the folder's own icons.
+        shell.startScreen.onFolderTilesChanged = { folderId, tiles ->
+            persistWP81FolderTiles(folderId, tiles)
+        }
+        shell.startScreen.onTileFiled = { tile, folderId, alreadyMoved ->
+            fileWP81Tile(tile, folderId, alreadyMoved)
+        }
+        shell.startScreen.onFolderRename = { folder -> renameWP81Tile(folder) }
+        shell.startScreen.folderPreviewOf = { pair -> wp81PreviewOf(pair) }
+        shell.startScreen.folderPreviewWith = { folder, incoming ->
+            wp81PreviewWith(folder, incoming)
+        }
+        shell.startScreen.onTilesFoldered = { dragged, onto -> foldWP81Tiles(dragged, onto) }
+
+        shell.appList.onLaunch = { app ->
+            if (isSystemApp(app.packageName)) {
+                // A program of this shell's own opens in a window over the shell, so the
+                // shell has to be somewhere worth opening over: left in search, the list
+                // and its keyboard stayed in front of the window that had just opened, and
+                // pressing search on a sole result looked like it had done nothing.
+                shell.appList.endSearch()
+                shell.goToStart(animated = false)
+                launchSystemApp(app.packageName)
+            } else {
+                // An installed app takes the screen, but coming back should not land on a
+                // list still filtered to the one thing that was launched.
+                shell.appList.endSearch()
+                packageManager.getLaunchIntentForPackage(app.packageName)?.let {
+                    it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(it)
+                }
+            }
+        }
+        shell.appList.onLongPress = { app, anchorY ->
+            // No buzz of its own: the row claimed the long press, so the framework has
+            // already given the system's tick. See WP81NavBar.
+            // A menu over a keyboard leaves the commands squeezed into what is left of the
+            // screen; the search text is kept so the list is unchanged on the way back.
+            shell.appList.hideKeyboard()
+            shell.contextMenu.show(app.name, wp81AppMenu(app), anchorY)
+        }
+
+        shell.onSearch = { launchWebSearch() }
+        shell.appList.onSearchWeb = { query ->
+            // Leaving search behind: coming back to a list still filtered to nothing, with
+            // the keyboard up, is not where anyone wants to land after being sent away.
+            shell.appList.endSearch()
+            searchTheWebFor(query)
+        }
+        shell.navBar.onBack = { onBackPressedDispatcher.onBackPressed() }
+        shell.navBar.onNewFolder = { promptNewWP81Folder() }
+        shell.navBar.onAddApp = { addAppToOpenWP81Folder() }
+        shell.navBar.onRemoveFromFolder = { removeSelectedFromWP81Folder() }
+        shell.navBar.onTileColor = {
+            shell.selectedTile()?.let { tile ->
+                shell.colorPicker.show(tile.label, themeManager.getWP81TileColors()[tile.id])
+            }
+        }
+        shell.colorPicker.onPicked = { color ->
+            shell.selectedTile()?.let { tile ->
+                themeManager.setWP81TileColor(tile.id, color)
+                wp81TileColors = themeManager.getWP81TileColors()
+                if (themeManager.getWP81HideTileColors()) {
+                    // Stored, but nothing on screen will change until the switch in
+                    // settings goes back off - and a command that silently does nothing is
+                    // a command the user will assume is broken.
+                    showNotification("Tile colour", "Saved \u2013 tile colours are hidden")
+                } else {
+                    // Repainted in place: rebuilding the wall to change one colour would
+                    // drop the selection and replay every tile's entrance.
+                    shell.startScreen.setTileColor(tile.id, color)
+                    shell.folderPage.contents.setTileColor(tile.id, color)
+                }
+            }
+        }
+        shell.navBar.onTileMenu = {
+            // Anchored to the strip the command came from, so the list opens next to it.
+            shell.selectedTile()?.let { tile ->
+                shell.contextMenu.show(
+                    tile.label,
+                    wp81TileMenu(tile, inFolder = shell.isFolderOpen()),
+                    shell.height * 0.45f
+                )
+            }
+        }
+
+        // Windowed programs sit on black: WP8.1 has no desktop for them to float over.
+        // The same signal tells the shell where the user is, so the key strip answers for
+        // the program on screen rather than for the Start screen hidden behind it.
+        floatingWindowManager.onWindowCountChanged = { visible ->
+            val wasCovered = wp81ProgramOnScreen
+            wp81ProgramOnScreen = visible > 0
+            shell.setWindowBackdropVisible(visible > 0)
+            shell.programOnScreen = visible > 0
+            // The last program has gone and Start is back, so it arrives rather than
+            // simply being there again - and it has to. Launching from a tile turns the
+            // whole wall away and leaves it transparent, and the only thing that ever put
+            // it back was the Start screen becoming visible again. That never happens to a
+            // program in a window: the shell is covered by a backdrop drawn over it, not
+            // hidden, so closing one left the wall turned away on a black screen.
+            if (wasCovered && visible == 0) shell.startScreen.playEntrance()
+        }
+        // And once now: the callback only fires on a change, so a program left open across
+        // a theme switch would otherwise have the shell believing it was on Start.
+        floatingWindowManager.notifyWindowVisibilityChanged()
+
+        // The Start key means Start. With a program on screen the shell's own answer -
+        // "you are already on Start, so open the searchable app list" - was true of the
+        // shell and wrong for the user, who was looking at Zune and got a keyboard.
+        //
+        // Programs are put away rather than shut down: nothing here has been asked to
+        // stop, Zune in particular is still playing, and every one of them comes back by
+        // being launched again.
+        // Holding the Start key: the shell's own commands, as against a tile's. Settings
+        // is here rather than on the key strip, which is now the three hardware keys on
+        // every page - and the shell's commands are what a hold on Start should offer
+        // anyway. The app list is built once and cached, so an app installed since then is
+        // invisible until something asks for it again - and until now nothing did short of
+        // switching theme.
+        shell.navBar.onStartLongPress = {
+            // The command list belongs to the shell, which sits under the window
+            // container - so with a program on screen it would open where nobody could
+            // see it. There the hold does what the tap does: put the program away.
+            if (!minimiseWP81Windows()) shell.contextMenu.show(
+                "start",
+                listOfNotNull(
+                    rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("settings") {
+                        openWP81Settings()
+                    },
+                    // What is hidden is a fact about the wall, not about whichever tile
+                    // happened to be selected when the user went looking for it - which is
+                    // where this used to be, on the command list of a tile that had nothing
+                    // to do with it. Offered only once something is hidden: a list of
+                    // nothing is a command that answers a question nobody asked.
+                    rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("hidden tiles") {
+                        showWP81HiddenTiles()
+                    }.takeIf { themeManager.getWP81HiddenTiles().isNotEmpty() },
+                    rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("refresh app list") {
+                        refreshWP81AppList()
+                        showNotification("App list", "Looking for new apps")
+                    },
+                    // Welcome is where the release notes are, and it is the nearest thing
+                    // this shell has to an about box. Straight to it, rather than to the
+                    // update the tile diverts to: this is a command that was asked for by
+                    // name, not a tile showing something.
+                    rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("about") {
+                        showWelcomeDialogWP81()
+                    }
+                ),
+                // Low on the screen, next to the key the command came from.
+                shell.height * 0.62f
+            )
+        }
+        shell.navBar.onStart = {
+            when {
+                minimiseWP81Windows() -> Unit
+                shell.isOnStartPage() -> shell.openAppSearch()
+                else -> shell.goToStart()
+            }
+        }
+    }
+
+    /**
+     * The floating window container is laid out for the desktop themes - 60dp of headroom
+     * and 70dp for the taskbar. Under WP8.1 it has to clear the status and navigation bars
+     * instead.
+     */
+    private fun rebaseFloatingWindowsForWP81() {
+        val container = findViewById<View>(R.id.floating_windows_container) ?: return
+        val density = resources.displayMetrics.density
+        val params = container.layoutParams as RelativeLayout.LayoutParams
+        params.topMargin = 0
+        params.bottomMargin = (rocks.gorjan.gokixp.wp81.WP81NavBar.HEIGHT_DP * density).toInt()
+        container.layoutParams = params
+    }
+
+    // ---------------------------------------------------------------- tiles
+
+    /**
+     * Builds the Start screen from the launcher's existing desktop icons.
+     *
+     * Icons with no tile placement yet - which is all of them the first time this theme is
+     * used - are migrated in their existing desktop grid order and given a medium tile,
+     * so the user's arrangement carries over rather than being thrown away.
+     */
+    private fun buildWP81Tiles(): List<rocks.gorjan.gokixp.wp81.Tile> {
+        val placements = loadWP81BuiltInPlacements()
+        val widgets = wp81BuiltInTiles(placements)
+        var migrated = false
+        // Only what sits at the top level: icons filed inside a folder belong to that
+        // folder's page, not to Start. The Recycle Bin and My Computer are desktop
+        // furniture with no phone counterpart, so they are left off entirely - the icons
+        // themselves survive for when the user switches back to a desktop theme.
+        val ordered = desktopIcons.filter {
+            it.parentFolderId == null &&
+                it.type != IconType.RECYCLE_BIN &&
+                it.type != IconType.MY_COMPUTER
+        }.sortedWith(
+            compareBy(
+                { it.wp81TileIndex ?: Int.MAX_VALUE },
+                { it.portraitGridIndex ?: Int.MAX_VALUE },
+                { it.name.lowercase() }
+            )
+        )
+        val tiles = ordered.mapIndexed { position, icon ->
+            if (icon.wp81TileIndex == null) {
+                icon.wp81TileIndex = position
+                icon.wp81TileSize = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name
+                migrated = true
+            }
+            rocks.gorjan.gokixp.wp81.Tile(
+                id = icon.id,
+                label = getCustomOrOriginalName(icon.packageName, icon.name)
+                    .replace("\\n", " ").replace("\n", " "),
+                packageName = icon.packageName,
+                size = rocks.gorjan.gokixp.wp81.TileSize.fromName(icon.wp81TileSize),
+                index = icon.wp81TileIndex ?: position,
+                kind = wp81KindFor(icon)
+            )
+        }
+        if (migrated) saveDesktopIcons()
+
+        // Built-ins and user tiles share one ordering, sorted by their stored positions,
+        // then renumbered densely so the packer sees a clean sequence.
+        val ordered_all = (widgets + tiles).sortedBy { it.index }
+        ordered_all.forEachIndexed { i, tile -> tile.index = i }
+
+        // A first run has just invented positions for the built-ins; write them down now
+        // so they are not re-invented on the next refresh.
+        if (placements.size < widgets.size) {
+            persistWP81Tiles(ordered_all)
+        }
+        return ordered_all
+    }
+
+    /**
+     * The tiles the shell always provides, pinned above the user's own.
+     *
+     * Three live widgets - clock, calendar and air quality - plus Settings. All are part
+     * of the shell rather than the user's arrangement: they always show current content
+     * and cannot be unpinned, so they are rebuilt on every refresh instead of being
+     * persisted as desktop icons.
+     */
+    private fun wp81BuiltInTiles(
+        placements: MutableMap<String, Pair<rocks.gorjan.gokixp.wp81.TileSize, Int>>
+    ): List<rocks.gorjan.gokixp.wp81.Tile> {
+        // Defaults, used only for a tile that has never been placed. Seeded with negative
+        // indices so a first run sorts them ahead of any tiles the user already had; the
+        // dense renumber that follows turns those into ordinary positions.
+        val defaults = listOf(
+            Triple(WP81_WIDGET_CLOCK, "Clock", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK),
+            Triple(WP81_WIDGET_AQI, "Air quality", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI),
+            Triple(WP81_WIDGET_WEATHER, "Weather", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER),
+            Triple(WP81_WIDGET_CALENDAR, "Calendar", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR),
+            Triple(WP81_WIDGET_NEWS, "News", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS),
+            Triple(WP81_WIDGET_PHOTOS, "Photos", rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_PHOTOS),
+            // Its id is the package the shell knows it by, so the tile picks up the update
+            // through the same lookup an app's tile uses for its notifications.
+            Triple("system.welcome", "Welcome", rocks.gorjan.gokixp.wp81.Tile.Kind.WELCOME)
+        )
+        // Drop any stored placement for the Settings tile, which no longer exists.
+        placements.remove(WP81_WIDGET_SETTINGS)
+
+        val hidden = themeManager.getWP81HiddenTiles()
+        return defaults.filterNot { (id, _, _) -> id in hidden }.mapIndexed { position, (id, label, kind) ->
+            val stored = placements[id]
+            // A headline needs a line to itself; the calendar wants room for what is on.
+            val defaultSize = when (kind) {
+                rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR,
+                rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS ->
+                    rocks.gorjan.gokixp.wp81.TileSize.WIDE
+                else -> rocks.gorjan.gokixp.wp81.TileSize.MEDIUM
+            }
+            rocks.gorjan.gokixp.wp81.Tile(
+                id = id,
+                label = label,
+                packageName = id,
+                size = stored?.first ?: defaultSize,
+                index = stored?.second ?: (position - defaults.size),
+                kind = kind
+            )
+        }
+    }
+
+    /**
+     * Pushes current notification text onto the tiles.
+     *
+     * Called from [updateNotificationDots], which the listener already invokes on every
+     * change, so tiles track the shade without a poll of their own.
+     */
+    private fun refreshWP81Notifications() {
+        val shell = wp81Shell ?: return
+        shell.startScreen.setNotifications { tile -> wp81NotificationsFor(tile) }
+        // The folder page shows tiles too, so it gets the same treatment while it is open.
+        shell.folderPage.setNotifications { tile -> wp81NotificationsFor(tile) }
+        // A folder's preview carries the same information as a dot, one app at a time, so
+        // it is refreshed on the same pass.
+        shell.startScreen.setFolderPreviews { tile -> wp81FolderPreviewFor(tile) }
+        shell.folderPage.setFolderPreviews { tile -> wp81FolderPreviewFor(tile) }
+        refreshWP81Media()
+    }
+
+    /**
+     * Which package's media session a tile should read.
+     *
+     * Its own, for a real app. Zune is a program inside this launcher rather than an
+     * installed app, so its session is held by *this* process - and a tile looking for one
+     * under "system.zune" would never find anything, leaving the one player on the phone
+     * that belongs to this shell as the only one whose tile stayed dead.
+     */
+    private fun wp81MediaPackageFor(tile: rocks.gorjan.gokixp.wp81.Tile): String =
+        if (tile.packageName == "system.zune") packageName else tile.packageName
+
+    /**
+     * Pushes what each app is playing onto its tile.
+     *
+     * Applied after notifications so that media wins where both exist: a tile can only say
+     * one thing, and what is playing now beats what arrived earlier.
+     */
+    private fun refreshWP81Media() {
+        val shell = wp81Shell ?: return
+        val sessions = wp81MediaSessions?.active().orEmpty()
+        val lookup: (rocks.gorjan.gokixp.wp81.Tile) -> rocks.gorjan.gokixp.wp81.MediaSessions.Info? =
+            { tile -> sessions[wp81MediaPackageFor(tile)] }
+        shell.startScreen.setMedia(lookup)
+        shell.folderPage.contents.setMedia(lookup)
+
+        for (surface in listOf(shell.startScreen, shell.folderPage.contents)) {
+            surface.setMediaHandlers(
+                onPlayPause = { tile -> wp81MediaSessions?.togglePlayPause(wp81MediaPackageFor(tile)) },
+                onNext = { tile -> wp81MediaSessions?.next(wp81MediaPackageFor(tile)) },
+                onPrevious = { tile -> wp81MediaSessions?.previous(wp81MediaPackageFor(tile)) }
+            )
+        }
+    }
+
+    /**
+     * Notification lines for a tile.
+     *
+     * A folder has no notifications of its own, so it stands in for everything filed
+     * inside it - otherwise something arriving in a folder would be invisible from Start,
+     * which is the one screen the user is looking at.
+     */
+    /** The stories behind the News tile. Fed by whichever feeds are switched on. */
+    private val wp81NewsFeed by lazy {
+        rocks.gorjan.gokixp.wp81.NewsFeed { refreshWP81News() }
+    }
+
+    /**
+     * Hands the News tile the run of stories it turns through.
+     *
+     * Headline over source: a tile has room for what happened and who says so, and the
+     * summary underneath it would leave neither legible.
+     */
+    private fun refreshWP81News() {
+        // The reader, if it is open, shows the same stories as the tile.
+        newsAppInstance?.bind()
+        val shell = wp81Shell ?: return
+        val faces = wp81NewsFeed.stories().map { story ->
+            rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                title = story.title,
+                detail = story.source.takeIf { it.isNotBlank() },
+                image = story.image
+            )
+        }
+        val waiting = listOf(
+            rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                title = if (themeManager.getWP81NewsFeeds().isEmpty()) "No feeds turned on"
+                        else "Fetching the news…",
+                detail = "News"
+            )
+        )
+        // The tiles are rebuilt often; the loader is theirs for as long as they live. One
+        // loader serves the whole wall, so it answers for both kinds of picture: a story's,
+        // fetched over the network, and one of the user's own, read out of MediaStore.
+        shell.startScreen.setBackdropLoader { source, onReady ->
+            if (source.startsWith("content:")) {
+                rocks.gorjan.gokixp.wp81.PhotoFeed.load(this, source, onReady)
+            } else {
+                rocks.gorjan.gokixp.wp81.NewsImages.load(source, onReady)
+            }
+        }
+        shell.startScreen.setLiveWidgetRotation(
+            WP81_WIDGET_NEWS,
+            faces.ifEmpty { waiting },
+            rocks.gorjan.gokixp.wp81.TileView.LiveStyle.STORY
+        )
+    }
+
+    /** Reads the feeds, if the tile that shows them is on Start. */
+    private fun refreshWP81NewsFeeds(force: Boolean = false) {
+        if (!wp81HasNewsTile()) return
+        wp81NewsFeed.refreshIfStale(themeManager.getWP81NewsFeeds().toList().sorted(), force)
+    }
+
+    private fun wp81HasNewsTile(): Boolean =
+        wp81Shell?.startScreen?.tiles()?.any { it.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS } == true
+
+    // ---------------------------------------------------------------- photos
+
+    /** The camera roll the Photos tile is turning through, newest first. */
+    private var wp81Photos: List<rocks.gorjan.gokixp.wp81.PhotoFeed.Shot> = emptyList()
+
+    /** When that was last read, so new pictures arrive without re-reading on every tick. */
+    private var wp81PhotosReadAt = 0L
+    private var wp81PhotosLoading = false
+
+    private fun wp81HasPhotosTile(): Boolean =
+        wp81Shell?.startScreen?.tiles()
+            ?.any { it.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_PHOTOS } == true
+
+    /**
+     * Hands the Photos tile the run of pictures it turns through.
+     *
+     * Three states, and the tile says which one it is in: no permission yet, in which case
+     * it is an invitation rather than a slideshow; permission but nothing read back; and
+     * the pictures themselves, which carry no words at all - a photograph on a tile is not
+     * captioned, it is looked at.
+     */
+    private fun refreshWP81Photos(force: Boolean = false) {
+        val shell = wp81Shell ?: return
+        if (!wp81HasPhotosTile()) return
+
+        if (!rocks.gorjan.gokixp.wp81.PhotoFeed.hasAccess(this)) {
+            wp81Photos = emptyList()
+            wp81PhotosReadAt = 0L
+            shell.startScreen.setLiveWidgetRotation(
+                WP81_WIDGET_PHOTOS,
+                listOf(
+                    rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                        title = "Photos",
+                        detail = "tap to allow",
+                        glyph = R.drawable.wp81_glyph_photos
+                    )
+                ),
+                rocks.gorjan.gokixp.wp81.TileView.LiveStyle.READING
+            )
+            return
+        }
+
+        val age = System.currentTimeMillis() - wp81PhotosReadAt
+        if (!wp81PhotosLoading && (force || wp81PhotosReadAt == 0L || age > WP81_PHOTOS_MAX_AGE_MS)) {
+            wp81PhotosLoading = true
+            // A forced read is one where what was there is no longer to be trusted - the
+            // permission just changed - so what was decoded under it goes too.
+            if (force) rocks.gorjan.gokixp.wp81.PhotoFeed.clear()
+            rocks.gorjan.gokixp.wp81.PhotoFeed.recent(this) { shots ->
+                wp81PhotosLoading = false
+                wp81PhotosReadAt = System.currentTimeMillis()
+                wp81Photos = shots
+                refreshWP81Photos()
+            }
+        }
+
+        val faces = wp81Photos.map { shot ->
+            rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                title = "",
+                detail = null,
+                image = shot.uri,
+                // The picture is the tile. See TileView.LiveFace.washed.
+                washed = false,
+                // A clip plays on the tile rather than sitting there as its first frame.
+                motion = shot.isVideo
+            )
+        }
+        val waiting = listOf(
+            rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                title = "Photos",
+                detail = if (wp81PhotosLoading) "looking\u2026" else "no pictures yet",
+                glyph = R.drawable.wp81_glyph_photos
+            )
+        )
+        shell.startScreen.setLiveWidgetRotation(
+            WP81_WIDGET_PHOTOS,
+            faces.ifEmpty { waiting },
+            rocks.gorjan.gokixp.wp81.TileView.LiveStyle.READING
+        )
+    }
+
+    /**
+     * Tapping the Photos tile: the permission first, the app after.
+     *
+     * The first tap is the opt-in, because the shell has nowhere else to ask - and asking
+     * on first run, for a tile the user may never have wanted, is how a launcher earns a
+     * reputation. Once it has been granted the tile does what it says: it opens the
+     * pictures.
+     */
+    private fun openWP81Photos() {
+        if (!rocks.gorjan.gokixp.wp81.PhotoFeed.hasAccess(this)) {
+            androidx.core.app.ActivityCompat.requestPermissions(
+                this,
+                rocks.gorjan.gokixp.wp81.PhotoFeed.permissions(),
+                PHOTOS_PERMISSION_REQUEST_CODE
+            )
+            return
+        }
+        // Reading the roll again on the way out. A tap on this tile is someone going to
+        // look at their pictures, which is exactly the moment the tile behind them should
+        // stop showing the ones from before the last time they did - and it is the only
+        // signal the shell gets that anything has been taken since.
+        refreshWP81Photos(force = true)
+        packageManager.getLaunchIntentForPackage(WP81_PHOTOS_PACKAGE)?.let {
+            it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(it)
+            return
+        }
+        // No Google Photos on this phone; hand the pictures to whatever does show them.
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(
+                    android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+        } catch (e: Exception) {
+            Log.w("MainActivity", "WP8.1: nothing on this phone opens pictures", e)
+            showNotification("Photos", "No gallery app found")
+        }
+    }
+
+    private fun wp81NotificationsFor(
+        tile: rocks.gorjan.gokixp.wp81.Tile
+    ): List<rocks.gorjan.gokixp.wp81.TileView.Line> =
+        // An app that is playing something shows that instead; its notifications would be
+        // competing for the same tile and are the less useful of the two.
+        if (wp81MediaSessions?.active()?.containsKey(wp81MediaPackageFor(tile)) == true) {
+            emptyList()
+        } else if (tile.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER) {
+            collectFolderNotifications(tile.id, mutableSetOf())
+        } else {
+            NotificationListenerService.getNotificationLines(tile.packageName)
+                .map { rocks.gorjan.gokixp.wp81.TileView.Line(it.title, it.text) }
+        } + wp81UpdateLine(tile)
+
+    /**
+     * The Welcome tile's live content: the update, when there is one.
+     *
+     * Reusing the notification path rather than inventing a second one - the tile turns
+     * over to it, wears the unread dot and comes back to its icon exactly as an app's
+     * tile does with a message. There is no notification behind it, only a version number
+     * this launcher happens to know about itself.
+     */
+    private fun wp81UpdateLine(
+        tile: rocks.gorjan.gokixp.wp81.Tile
+    ): List<rocks.gorjan.gokixp.wp81.TileView.Line> {
+        if (tile.packageName != "system.welcome") return emptyList()
+        val version = updateAvailableVersion ?: return emptyList()
+        return listOf(
+            rocks.gorjan.gokixp.wp81.TileView.Line(
+                "Update available", "Version $version \u00b7 tap to download")
+        )
+    }
+
+    /**
+     * Every notification from the apps inside [folderId], recursively.
+     *
+     * Each line is titled with the app it came from, since a folder tile showing bare
+     * message text gives no clue which of its contents produced it. [visited] guards
+     * against a folder cycle, which the data model does not forbid.
+     */
+    private fun collectFolderNotifications(
+        folderId: String,
+        visited: MutableSet<String>
+    ): List<rocks.gorjan.gokixp.wp81.TileView.Line> {
+        if (!visited.add(folderId)) return emptyList()
+        val lines = mutableListOf<rocks.gorjan.gokixp.wp81.TileView.Line>()
+        for (child in desktopIcons.filter { it.parentFolderId == folderId }) {
+            if (child.type == IconType.FOLDER) {
+                lines += collectFolderNotifications(child.id, visited)
+                continue
+            }
+            val appName = getCustomOrOriginalName(child.packageName, child.name)
+            for (line in NotificationListenerService.getNotificationLines(child.packageName)) {
+                val detail = listOf(line.title, line.text)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" \u00b7 ")
+                lines += rocks.gorjan.gokixp.wp81.TileView.Line(appName, detail)
+            }
+        }
+        return lines
+    }
+
+    /**
+     * What each folder's tile previews, keyed by folder id.
+     *
+     * Built with the tiles rather than looked up per refresh: resolving a glyph reads the
+     * package manager and rasterises artwork to measure it, and the notification pass runs
+     * every couple of seconds. The contents of a folder change when the user changes them,
+     * which is one of the things that rebuilds the tiles anyway.
+     */
+    private var wp81FolderPreviews: Map<String, List<rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry>> =
+        emptyMap()
+
+    /** Resolves every folder's contents into the mini tiles its own tile shows. */
+    private fun buildWP81FolderPreviews() {
+        wp81FolderPreviews = desktopIcons
+            .filter { it.parentFolderId != null }
+            .groupBy { it.parentFolderId!! }
+            .mapValues { (_, children) ->
+                children
+                    // The same order the folder page lists them in, so the preview and the
+                    // page inside it agree about what comes first.
+                    .sortedWith(compareBy({ it.wp81TileIndex ?: Int.MAX_VALUE }, { it.name.lowercase() }))
+                    .map { icon -> wp81FolderEntryFor(icon) }
+            }
+    }
+
+    /** What a folder holding these tiles would show, for the fold-together preview. */
+    private fun wp81PreviewOf(
+        tiles: List<rocks.gorjan.gokixp.wp81.Tile>
+    ): List<rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry> =
+        tiles.mapNotNull { tile ->
+            desktopIcons.firstOrNull { it.id == tile.id }?.let { wp81FolderEntryFor(it) }
+        }
+
+    /** What an existing folder would show with one more tile in it, for the hover offer. */
+    private fun wp81PreviewWith(
+        folder: rocks.gorjan.gokixp.wp81.Tile,
+        incoming: rocks.gorjan.gokixp.wp81.Tile
+    ): List<rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry> =
+        // The arrival last, which is where filing it will actually put it: a folder keeps
+        // what it already had in order and adds to the end.
+        wp81FolderPreviewFor(folder) + wp81PreviewOf(listOf(incoming))
+
+    /**
+     * Makes a folder of two tiles held together, where the lower one was standing, and
+     * opens it.
+     *
+     * Opened straight away because a folder with two things in it is not finished: it wants
+     * a name, and the heading of the open folder is where that is done. Arriving inside it
+     * also shows what was actually made, which a new tile appearing on the wall does not.
+     */
+    private fun foldWP81Tiles(
+        dragged: rocks.gorjan.gokixp.wp81.Tile,
+        onto: rocks.gorjan.gokixp.wp81.Tile
+    ) {
+        val first = desktopIcons.firstOrNull { it.id == onto.id } ?: return
+        val second = desktopIcons.firstOrNull { it.id == dragged.id } ?: return
+        if (first.type == IconType.FOLDER || second.type == IconType.FOLDER) return
+
+        val folderId = "folder_${System.currentTimeMillis()}"
+        val folderIcon = AppCompatResources.getDrawable(this, R.drawable.folder_vista) ?: return
+        desktopIcons.add(
+            DesktopIcon(
+                name = "New Folder",
+                packageName = folderId,
+                icon = folderIcon,
+                x = 0f,
+                y = 0f,
+                id = folderId,
+                type = IconType.FOLDER,
+                // In the slot the tile it was dropped on was in, at that tile's size: the
+                // folder appears where the user was looking, not at the end of the wall.
+                tileSize = onto.size.name,
+                tileIndex = first.tileIndex,
+                tileSizeLandscape = onto.size.name,
+                tileIndexLandscape = first.tileIndexLandscape
+            )
+        )
+
+        // The one that was underneath first, so the folder opens in the order they were
+        // put together in.
+        first.parentFolderId = folderId
+        first.wp81TileIndex = 0
+        second.parentFolderId = folderId
+        second.wp81TileIndex = 1
+
+        saveDesktopIcons()
+        refreshWP81Tiles()
+
+        // After the rebuild, and after it has been laid out: the gap is placed against the
+        // folder's own row, and the packer has not worked out where that is until then.
+        wp81Shell?.startScreen?.post {
+            wp81Shell?.startScreen?.tiles()?.firstOrNull { it.id == folderId }
+                ?.let { openWP81FolderInline(it) }
+        }
+    }
+
+    /** One app inside a folder, as its mini tile draws it. */
+    private fun wp81FolderEntryFor(
+        icon: DesktopIcon
+    ): rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry {
+        // Routed through the tile glyph resolver rather than straight to the launcher
+        // icon, so a mini tile shows exactly what the app's own tile would: a custom icon
+        // if the user set one, the themed monochrome layer if the app ships one.
+        val glyph = wp81GlyphFor(
+            rocks.gorjan.gokixp.wp81.Tile(
+                id = icon.id,
+                label = icon.name,
+                packageName = icon.packageName,
+                size = rocks.gorjan.gokixp.wp81.TileSize.SMALL,
+                index = 0,
+                kind = wp81KindFor(icon)
+            )
+        )
+        return rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry(
+            id = icon.id,
+            icon = when (glyph) {
+                is rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.Monochrome -> glyph.drawable
+                is rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.FullColor -> glyph.drawable
+                null -> null
+            },
+            tint = glyph is rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.Monochrome,
+            contentRatio = when (glyph) {
+                is rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.Monochrome -> glyph.contentRatio
+                is rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.FullColor -> glyph.contentRatio
+                null -> 1f
+            }
+        )
+    }
+
+    /**
+     * A folder's contents, as its tile previews them.
+     *
+     * Straight from the cache: a preview is icons, and what is unread inside the folder is
+     * marked on the folder's name rather than on the squares.
+     */
+    private fun wp81FolderPreviewFor(
+        tile: rocks.gorjan.gokixp.wp81.Tile
+    ): List<rocks.gorjan.gokixp.wp81.FolderPreviewView.Entry> {
+        if (tile.kind != rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER) return emptyList()
+        return wp81FolderPreviews[tile.id].orEmpty()
+    }
+
+    /** Which kind of tile a desktop icon becomes. Shared by Start, folders and previews. */
+    private fun wp81KindFor(icon: DesktopIcon): rocks.gorjan.gokixp.wp81.Tile.Kind =
+        when (icon.type) {
+            IconType.FOLDER -> rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER
+            IconType.MY_COMPUTER -> rocks.gorjan.gokixp.wp81.Tile.Kind.MY_COMPUTER
+            IconType.RECYCLE_BIN -> rocks.gorjan.gokixp.wp81.Tile.Kind.RECYCLE_BIN
+            IconType.URL_SHORTCUT -> rocks.gorjan.gokixp.wp81.Tile.Kind.URL_SHORTCUT
+            IconType.APP ->
+                if (isSystemApp(icon.packageName)) rocks.gorjan.gokixp.wp81.Tile.Kind.SYSTEM_APP
+                else rocks.gorjan.gokixp.wp81.Tile.Kind.APP
+        }
+
+    /**
+     * Whether the phone is on its side.
+     *
+     * The Start screen keeps a wall for each way up: turned sideways the screen is twice
+     * as wide and half as tall and the wall is packed into twice the columns, so the
+     * arrangement that suited it upright is not an arrangement at all - tiles the user put
+     * side by side end up on different rows and the order they chose reads as nothing.
+     * Two arrangements, remembered separately, and each one only written when the phone is
+     * being held that way.
+     */
+    private fun wp81Landscape(): Boolean =
+        resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    /**
+     * Where this icon sits on the wall the phone is currently holding, and how big.
+     *
+     * Reading sideways falls back to the upright placement while there is none of its own,
+     * so the first turn of the phone lands on the wall the user already knows rather than
+     * on an alphabetical one. Writing never falls back: it puts the arrangement where the
+     * orientation it was made in will find it.
+     */
+    private var DesktopIcon.wp81TileIndex: Int?
+        get() = if (wp81Landscape()) tileIndexLandscape ?: tileIndex else tileIndex
+        set(value) {
+            if (wp81Landscape()) tileIndexLandscape = value else tileIndex = value
+        }
+
+    private var DesktopIcon.wp81TileSize: String?
+        get() = if (wp81Landscape()) tileSizeLandscape ?: tileSize else tileSize
+        set(value) {
+            if (wp81Landscape()) tileSizeLandscape = value else tileSize = value
+        }
+
+    /** Read once per rebuild rather than per tile: it parses a string every time. */
+    private var wp81TileColors: Map<String, Int> = emptyMap()
+
+    /** Whether those colours are currently being held back so the wallpaper shows. */
+    private var wp81TileColorsHidden = false
+
+    /**
+     * What a tile should actually be painted, which is nothing while colours are hidden.
+     *
+     * Null rather than the accent: a tile with no colour of its own is a window onto the
+     * Start background, where one painted the accent would be a solid block of it - and
+     * seeing the wallpaper is the entire point of the switch. See TileView.onDraw.
+     */
+    private fun wp81ColorFor(tile: rocks.gorjan.gokixp.wp81.Tile): Int? {
+        if (wp81TileColorsHidden) return null
+        wp81TileColors[tile.id]?.let { return it }
+        // Failing one of its own, a tile filed in a folder wears the folder's: a folder is
+        // one thing on the wall and opens into one band, and a row of tiles inside it in
+        // the plain accent read as having escaped from somewhere else. Painting one of
+        // them still overrides this - what the user set by hand is never guessed over.
+        val parent = desktopIcons.firstOrNull { it.id == tile.id }?.parentFolderId ?: return null
+        return wp81TileColors[parent]
+    }
+
+    /**
+     * Repaints the wall for the current colour setting, without rebuilding it.
+     *
+     * In place, like the colour picker: rebuilding to change what is only a paint job
+     * would drop the selection and replay every tile's entrance.
+     */
+    private fun applyWP81TileColors() {
+        val shell = wp81Shell ?: return
+        wp81TileColors = themeManager.getWP81TileColors()
+        wp81TileColorsHidden = themeManager.getWP81HideTileColors()
+        for (tile in shell.startScreen.tiles()) {
+            shell.startScreen.setTileColor(tile.id, wp81ColorFor(tile))
+        }
+        // The folder page is a wall of tiles too, and may be open in front of this one.
+        for (tile in shell.folderPage.contents.tiles()) {
+            shell.folderPage.contents.setTileColor(tile.id, wp81ColorFor(tile))
+        }
+    }
+
+    private fun refreshWP81Tiles() {
+        val shell = wp81Shell ?: return
+        wp81TileColors = themeManager.getWP81TileColors()
+        wp81TileColorsHidden = themeManager.getWP81HideTileColors()
+        // Set before the tiles are built, so each one is born knowing which mark to wear.
+        shell.startScreen.countsEnabled = themeManager.getWP81TileCounts()
+        shell.startScreen.columns = themeManager.getWP81Columns()
+        buildWP81FolderPreviews()
+        shell.startScreen.setTiles(
+            buildWP81Tiles(),
+            liveWidget = { tile -> wp81LiveWidgetContent(tile) },
+            widgetGlyphs = { tile -> wp81WidgetGlyphFor(tile) },
+            widgetBacks = { tile -> wp81LiveWidgetBack(tile) },
+            tileColors = { tile -> wp81ColorFor(tile) }
+        ) { tile -> wp81GlyphFor(tile) }
+        // The entrance is for arriving at Start, not for keeping it up to date. Every
+        // rebuild replayed it - pinning an app, renaming a tile, a package changing
+        // underneath - and every one of those blanked the whole wall and faded it back in.
+        //
+        // Coming home from another app is the worst of them: the system shows the launcher
+        // as it left it, the activity is rebuilt behind that, and the tiles the user is
+        // already looking at drop to nothing and stagger back. Played once per process, so
+        // a genuine cold start still gets it.
+        if (!wp81EntrancePlayed) {
+            wp81EntrancePlayed = true
+            shell.startScreen.playEntrance()
+        }
+        refreshWP81News()
+        refreshWP81Photos()
+        refreshWP81Weather()
+        refreshWP81Notifications()
+        refreshWP81Media()
+    }
+
+    /**
+     * Headline and detail for a built-in live widget, or null if the tile is not one.
+     *
+     * Fed from the caches the Quick Glance widget already maintains, so the tiles say
+     * something real rather than animating for its own sake, and cost nothing extra to
+     * keep current.
+     */
+    private fun wp81LiveWidgetContent(tile: rocks.gorjan.gokixp.wp81.Tile): rocks.gorjan.gokixp.wp81.TileView.Reading? {
+        val now = java.util.Date()
+        val locale = java.util.Locale.getDefault()
+        return when (tile.kind) {
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK -> {
+                // No leading zero on the hour, on either clock: a tile is read at a glance
+                // rather than lined up in a column, and "9:05" is how the time is said.
+                val timePattern =
+                    if (android.text.format.DateFormat.is24HourFormat(this)) "H:mm" else "h:mm"
+                // The day and the date stand beside the time rather than under it, the way
+                // the phone's own clock tile had them: the time is what is being read, and
+                // the date is what tells you which day's time it is.
+                val small = tile.size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+                val weekday = java.text.SimpleDateFormat("EEE", locale).format(now)
+                    .lowercase(locale)
+                // On the 1x1 there is no room beside a time for anything - four glyphs and
+                // the tile is spent - so the day goes over it instead of next to it. It is
+                // the same three letters either way, which is what the day is called here.
+                rocks.gorjan.gokixp.wp81.TileView.Reading(
+                    number = java.text.SimpleDateFormat(timePattern, locale).format(now),
+                    caption = weekday.takeIf { small },
+                    aside = if (small) null else weekday + "\n" +
+                        java.text.SimpleDateFormat("d MMM", locale).format(now).lowercase(locale)
+                )
+            }
+
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> wp81CalendarSummary(tile.size)
+
+            // The News tile is a run of stories rather than one reading, so its content
+            // arrives through setLiveWidgetRotation instead - see refreshWP81News.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS -> null
+
+            // Three faces rather than one reading, so its content arrives through
+            // setLiveWidgetRotation - see refreshWP81Weather.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> null
+
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> {
+                val aqi = if (isShowAqiEnabled()) getCachedAqi() else null
+                // The index itself is the reading, and the caption over it says both what
+                // the number is and what it amounts to - "good aqi" is how it would be read
+                // aloud, where the word alone is an opinion with no subject and the unit
+                // alone is a label. Lower case throughout: this shell shouts at nobody.
+                if (aqi == null) rocks.gorjan.gokixp.wp81.TileView.Reading("--", "aqi", "tap to enable")
+                else rocks.gorjan.gokixp.wp81.TileView.Reading(
+                    number = aqi.toString(),
+                    caption = "${wp81AqiLabel(aqi).lowercase(locale)} aqi"
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    /**
+     * The date, over the next calendar entry - or a friendly empty state when there is
+     * nothing on (or no permission to look).
+     *
+     * The day of the month is the reading; the weekday and the month stand beside it. The
+     * narrowest strip abbreviates the weekday, which is otherwise wider than the room
+     * beside a number.
+     */
+    private fun wp81CalendarSummary(size: rocks.gorjan.gokixp.wp81.TileSize): rocks.gorjan.gokixp.wp81.TileView.Reading {
+        val locale = java.util.Locale.getDefault()
+        val now = java.util.Date()
+        val calendar = java.util.Calendar.getInstance()
+        val small = size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+
+        // The date is the reading whatever the day holds: the day of the month as the
+        // number with the weekday against it - "sun 30" - which is how a date is read, the
+        // number being what is looked for and the weekday what places it.
+        val weekdayPattern = if (size == rocks.gorjan.gokixp.wp81.TileSize.WIDE) "EEEE" else "EEE"
+        val weekday = java.text.SimpleDateFormat(weekdayPattern, locale).format(now)
+
+        // What is next goes above it, in two lines: the appointment, and the time it
+        // starts. Two lines because they are two different kinds of thing - somebody's own
+        // words, and a number - and running them together makes a sentence out of neither.
+        //
+        // The event keeps whatever case it was written in: "Standup with Marija" flattened
+        // to lower case reads as a typo.
+        val next = wp81NextCalendarEvent
+        val caption = when {
+            // The 1x1 has room for the date and nothing else.
+            small -> null
+            next == null -> "no events"
+            else -> "${next.first}\n${wp81EventWhen(next.second)}"
+        }
+        return rocks.gorjan.gokixp.wp81.TileView.Reading(
+            number = calendar.get(java.util.Calendar.DAY_OF_MONTH).toString(),
+            caption = caption,
+            // The weekday stands beside the number on the 1x1 too: "sun 31" is the date,
+            // where the number alone is half of it, and the tile sets the word to whatever
+            // room the number leaves rather than dropping it.
+            aside = weekday.lowercase(locale)
+        )
+    }
+
+    /**
+     * How many appointments tomorrow holds, and the first of them.
+     *
+     * Its own query rather than the Quick Glance provider's: that one exists to answer
+     * "what is next", which is a different question and never looks past the event it
+     * finds. Instances rather than Events, so a weekly meeting counts once for each time
+     * it actually occurs rather than once for the series.
+     *
+     * Runs off the main thread - a calendar query walks every provider on the phone.
+     */
+    /**
+     * When an appointment starts, in the terms it is worth saying it in.
+     *
+     * Close to, a clock time is arithmetic the reader has to do: "14:20" is only useful
+     * once you have worked out what it is now, and the answer they wanted was how long
+     * they have. Past a couple of hours that stops being true - "in 5 hours 40 minutes" is
+     * a number nobody holds on to - and the time of day is the better answer again.
+     */
+    private fun wp81EventWhen(starts: Long): String {
+        val locale = java.util.Locale.getDefault()
+        val minutes = Math.ceil((starts - System.currentTimeMillis()) / 60000.0).toLong()
+        // Already running: it was found because it has not finished, not because it has
+        // not begun.
+        if (minutes <= 0L) return "now"
+        if (minutes < 60L) return if (minutes == 1L) "in 1 minute" else "in $minutes minutes"
+        if (minutes <= RELATIVE_EVENT_MINUTES) {
+            val hours = minutes / 60
+            val rest = minutes % 60
+            val said = if (hours == 1L) "in 1 hour" else "in $hours hours"
+            return when (rest) {
+                0L -> said
+                1L -> "$said 1 minute"
+                else -> "$said $rest minutes"
+            }
+        }
+        val pattern = if (android.text.format.DateFormat.is24HourFormat(this)) "HH:mm" else "h:mm"
+        return java.text.SimpleDateFormat(pattern, locale).format(java.util.Date(starts))
+    }
+
+    /**
+     * The next appointment left today, and when it starts.
+     *
+     * Its own query rather than the Quick Glance provider's, which answers "what is next"
+     * in words - "in 20 minutes" - and looks no further than six hours ahead. A tile says
+     * the time itself and says it about the whole day.
+     */
+    private fun refreshWP81TodayEvent() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.READ_CALENDAR
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            wp81NextCalendarEvent = null
+            return
+        }
+        Thread {
+            val found = try {
+                queryWP81NextEvent()
+            } catch (e: Exception) {
+                Log.w("MainActivity", "WP8.1: could not read today's calendar", e)
+                null
+            }
+            runOnUiThread {
+                wp81NextCalendarEvent = found
+                wp81Shell?.startScreen?.let { start ->
+                    start.tiles()
+                        .firstOrNull { it.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR }
+                        ?.let { tile ->
+                            wp81LiveWidgetContent(tile)?.let { reading ->
+                                start.setLiveWidgetContent(tile.id, reading)
+                            }
+                        }
+                }
+            }
+        }.start()
+    }
+
+    /** The first appointment still to come today: its name, and when it begins. */
+    private fun queryWP81NextEvent(): Pair<String, Long>? {
+        val now = System.currentTimeMillis()
+        val end = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+
+        val uri = android.provider.CalendarContract.Instances.CONTENT_URI.buildUpon()
+            .appendPath(now.toString())
+            .appendPath(end.timeInMillis.toString())
+            .build()
+
+        contentResolver.query(
+            uri,
+            arrayOf(
+                android.provider.CalendarContract.Instances.TITLE,
+                android.provider.CalendarContract.Instances.BEGIN,
+                android.provider.CalendarContract.Instances.ALL_DAY
+            ),
+            null,
+            null,
+            "${android.provider.CalendarContract.Instances.BEGIN} ASC"
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                // All-day entries are not appointments - see queryWP81TomorrowEvents.
+                if (cursor.getInt(2) != 0) continue
+                val title = cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+                return title to cursor.getLong(1)
+            }
+        }
+        return null
+    }
+
+    private fun refreshWP81TomorrowEvents() {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.READ_CALENDAR
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            wp81TomorrowEvents = 0 to null
+            return
+        }
+        Thread {
+            val found = try {
+                queryWP81TomorrowEvents()
+            } catch (e: Exception) {
+                Log.w("MainActivity", "WP8.1: could not read tomorrow's calendar", e)
+                0 to null
+            }
+            runOnUiThread { wp81TomorrowEvents = found }
+        }.start()
+    }
+
+    private fun queryWP81TomorrowEvents(): Pair<Int, String?> {
+        val start = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val end = (start.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+
+        val uri = android.provider.CalendarContract.Instances.CONTENT_URI.buildUpon()
+            .appendPath(start.timeInMillis.toString())
+            .appendPath(end.timeInMillis.toString())
+            .build()
+
+        var count = 0
+        var first: String? = null
+        contentResolver.query(
+            uri,
+            arrayOf(
+                android.provider.CalendarContract.Instances.TITLE,
+                android.provider.CalendarContract.Instances.BEGIN,
+                android.provider.CalendarContract.Instances.ALL_DAY
+            ),
+            null,
+            null,
+            "${android.provider.CalendarContract.Instances.BEGIN} ASC"
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                // All-day entries are not appointments: birthdays, holidays and the
+                // fortnight somebody blocked out as leave would have the tile reporting a
+                // full day when there is nothing to actually be anywhere for. They also
+                // begin at UTC midnight rather than local, so a day's worth of them lands
+                // in whichever day that happens to be.
+                //
+                // Read from the cursor rather than filtered in the query: not every
+                // provider honours a selection on Instances, and this cannot be argued
+                // with.
+                if (cursor.getInt(2) != 0) continue
+                count++
+                if (first == null) {
+                    first = cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() }
+                }
+            }
+        }
+        return count to first
+    }
+
+    /**
+     * Opens the phone's own clock app.
+     *
+     * Deliberately not [openClockApp], which is the launcher's fake Date and Time
+     * Properties window: on a phone shell, tapping the clock should land in the real
+     * clock. Falls back through the alarm intent, then the launch intent of whichever
+     * clock package is installed.
+     */
+    private fun openPhoneClockApp() {
+        val candidates = listOf(
+            Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS),
+            Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.APP_CALENDAR")
+        )
+        for (intent in candidates) {
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            if (intent.resolveActivity(packageManager) != null) {
+                try {
+                    startActivity(intent)
+                    return
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Clock intent failed: $intent", e)
+                }
+            }
+        }
+        val fallbackPackages = listOf(
+            "com.google.android.deskclock",
+            "com.android.deskclock",
+            "com.sec.android.app.clockpackage"
+        )
+        for (pkg in fallbackPackages) {
+            packageManager.getLaunchIntentForPackage(pkg)?.let {
+                it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(it)
+                return
+            }
+        }
+        Log.w("MainActivity", "No clock app found on this device")
+        showNotification("Clock", "No clock app is installed")
+    }
+
+    /**
+     * Temperature and conditions for the weather tile.
+     *
+     * Reads the cache the taskbar readout already fills, so the tile costs no extra
+     * network calls and shows the same reading the other themes do.
+     */
+    private fun wp81WeatherSummary(size: rocks.gorjan.gokixp.wp81.TileSize): Pair<String, String?> {
+        val cached = getCachedWeatherJson()
+            ?: return "--" to "Weather \u00b7 tap to refresh"
+        return try {
+            val current = cached.getJSONObject("current")
+            val temperature = kotlin.math.round(current.getDouble("temperature_2m")).toInt()
+            val code = current.optInt("weather_code", -1)
+            // The 1x1 drops the unit. C or F is a footnote next to the number itself, and
+            // on the one tile where the reading has to carry the whole face, the degree
+            // sign already says what kind of number it is.
+            val small = size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+            val unit = if (small) "" else getWeatherUnit()
+            // The condition is a phrase, and the 1x1 has room for a word - so there the
+            // caption says which day this is instead, which is the thing the reverse is
+            // about to contradict. The mark in the corner carries the condition either way.
+            val caption = if (small) "today" else wp81WeatherCondition(code)
+            "$temperature\u00b0$unit" to caption
+        } catch (e: Exception) {
+            Log.w("MainActivity", "WP8.1: could not read cached weather", e)
+            "--" to "Weather \u00b7 tap to refresh"
+        }
+    }
+
+    /**
+     * The reverse of a live widget: the same reading told another way, or more of it.
+     *
+     * Returning null leaves a widget one-sided, and turning it over spins it back to
+     * itself rather than doing nothing.
+     */
+    private fun wp81LiveWidgetBack(tile: rocks.gorjan.gokixp.wp81.Tile): rocks.gorjan.gokixp.wp81.TileView.Reading? {
+        val locale = java.util.Locale.getDefault()
+        val now = java.util.Date()
+        return when (tile.kind) {
+            // Front says the time; the back says which day it is. The full date is a
+            // caption a 1x1 cannot hold, so there the weekday stands alone.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK -> rocks.gorjan.gokixp.wp81.TileView.Reading(
+                number = java.text.SimpleDateFormat("EEEE", locale).format(now).lowercase(locale),
+                caption = java.text.SimpleDateFormat("d MMMM yyyy", locale).format(now)
+                    .lowercase(locale)
+                    .takeUnless { tile.size == rocks.gorjan.gokixp.wp81.TileSize.SMALL }
+            )
+
+            // The weather turns through three faces of its own; it has no reverse.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> null
+
+            // One-sided: the index is on the front and the mark in the corner says which
+            // index it is. Nothing is held back for a reverse.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> null
+
+            // Today on the front, tomorrow on the reverse - the one thing a calendar can
+            // tell you that looking at it cannot. Counted rather than listed: a tile has
+            // room for one appointment, and which one that is matters less than knowing
+            // whether tomorrow is empty or full.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> {
+                val (count, first) = wp81TomorrowEvents
+                val small = tile.size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+                val tomorrow = java.util.Calendar.getInstance()
+                    .apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
+                // Tomorrow's date, set out exactly as today's is, with what tomorrow
+                // holds above it: the first appointment by name, and under it how many
+                // follow. Named rather than counted, because the first one is what decides
+                // what kind of day it is - and the count only appears when there is one to
+                // give, since a second line saying "and 0 more" is a line saying nothing.
+                val weekdayPattern =
+                    if (tile.size == rocks.gorjan.gokixp.wp81.TileSize.WIDE) "EEEE" else "EEE"
+                val weekday = java.text.SimpleDateFormat(weekdayPattern, locale)
+                    .format(tomorrow.time).lowercase(locale)
+                val caption = when {
+                    small -> null
+                    count == 0 || first.isNullOrBlank() -> "no events"
+                    count > 1 -> "$first\nand ${count - 1} more"
+                    else -> first
+                }
+                rocks.gorjan.gokixp.wp81.TileView.Reading(
+                    number = tomorrow.get(java.util.Calendar.DAY_OF_MONTH).toString(),
+                    caption = caption,
+                    aside = weekday
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    /**
+     * Tomorrow's forecast, for the weather tile's reverse - or null before the cache has a
+     * daily block in it, which leaves the tile one-sided rather than turning over to
+     * nothing.
+     *
+     * The reading itself is the headline, as on the front; what makes it tomorrow's is
+     * said underneath, because a second temperature with no label is just a number that
+     * disagrees with the one before it.
+     */
+    private fun wp81TomorrowSummary(size: rocks.gorjan.gokixp.wp81.TileSize): Pair<String, String?>? {
+        val cached = getCachedWeatherJson() ?: return null
+        return try {
+            val daily = cached.getJSONObject("daily")
+            val highs = daily.getJSONArray("temperature_2m_max")
+            val codes = daily.getJSONArray("weather_code")
+            // Index 1 is tomorrow. A response that only carries today has nothing to show.
+            if (highs.length() < 2 || codes.length() < 2) return null
+
+            val high = kotlin.math.round(highs.getDouble(1)).toInt()
+            val code = codes.getInt(1)
+            val small = size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+            val unit = if (small) "" else getWeatherUnit()
+            val condition = wp81WeatherCondition(code)
+            // The 1x1 has one line and the corner mark already carries the condition, so
+            // there the word "tomorrow" is the only thing worth the second line.
+            val detail = if (small) "tomorrow" else "tomorrow \u00b7 ${condition.lowercase()}"
+            "$high\u00b0$unit" to detail
+        } catch (e: Exception) {
+            Log.w("MainActivity", "WP8.1: no forecast in the cached weather", e)
+            null
+        }
+    }
+
+    /**
+     * What the weather tile turns through: what it is doing now, and the highs either side
+     * of tonight.
+     *
+     * Three readings of the same kind, each labelled - a temperature with no label is a
+     * number, and three of them in turn without labels is three numbers that appear to
+     * disagree. The 1x1 shortens the labels rather than dropping them: "max tomorrow" does
+     * not fit across it, and "tomorrow" says the necessary half.
+     *
+     * Falls back to the current reading alone when the forecast has not arrived, which
+     * leaves the tile still rather than turning between a number and two blanks.
+     */
+    private fun wp81WeatherFaces(
+        size: rocks.gorjan.gokixp.wp81.TileSize
+    ): List<rocks.gorjan.gokixp.wp81.TileView.LiveFace> {
+        val cached = getCachedWeatherJson() ?: return emptyList()
+        val small = size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
+        val unit = if (small) "" else getWeatherUnit()
+
+        fun face(temperature: Int, label: String, code: Int) =
+            rocks.gorjan.gokixp.wp81.TileView.LiveFace(
+                title = "$temperature\u00b0$unit",
+                // What the sky is doing, and under it which reading this is. That order
+                // because the weather is what the tile is about and the label is only
+                // which of three it is showing - and the mark behind the tile says the
+                // same thing in a picture, so the word sits where the eye lands first.
+                detail = listOfNotNull(wp81WeatherWord(code), label).joinToString("\n")
+            )
+
+        return try {
+            val current = cached.getJSONObject("current")
+            val now = kotlin.math.round(current.getDouble("temperature_2m")).toInt()
+            val nowCode = current.optInt("weather_code", -1)
+            val faces = mutableListOf(face(now, "now", nowCode))
+
+            val daily = cached.optJSONObject("daily")
+            val highs = daily?.optJSONArray("temperature_2m_max")
+            val codes = daily?.optJSONArray("weather_code")
+            if (highs != null && codes != null && highs.length() >= 2) {
+                faces += face(
+                    kotlin.math.round(highs.getDouble(0)).toInt(),
+                    if (small) "today" else "max today",
+                    codes.optInt(0, -1)
+                )
+                faces += face(
+                    kotlin.math.round(highs.getDouble(1)).toInt(),
+                    if (small) "tomorrow" else "max tomorrow",
+                    codes.optInt(1, -1)
+                )
+            }
+            faces
+        } catch (e: Exception) {
+            Log.w("MainActivity", "WP8.1: could not read the weather", e)
+            emptyList()
+        }
+    }
+
+    /** Hands the weather tile the run of faces it turns through. */
+    private fun refreshWP81Weather() {
+        val shell = wp81Shell ?: return
+        val tile = shell.startScreen.tiles()
+            .firstOrNull { it.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER }
+            ?: return
+        val faces = wp81WeatherFaces(tile.size)
+        if (faces.isEmpty()) return
+        shell.startScreen.setLiveWidgetRotation(
+            tile.id, faces, rocks.gorjan.gokixp.wp81.TileView.LiveStyle.READING)
+    }
+
+    /** The WMO code from the cached reading, or -1 if there is none. */
+    private fun wp81CurrentWeatherCode(): Int = try {
+        getCachedWeatherJson()?.getJSONObject("current")?.optInt("weather_code", -1) ?: -1
+    } catch (e: Exception) {
+        -1
+    }
+
+    /**
+     * The corner mark a live widget carries, if any.
+     *
+     * Only the News tile, now. Every other widget is a reading with a caption that names
+     * it in words - "sunny", "good aqi", an appointment - and a mark repeating that is one
+     * more thing on a tile whose whole job is to be read at a glance.
+     */
+    private fun wp81WidgetGlyphFor(
+        tile: rocks.gorjan.gokixp.wp81.Tile
+    ): Pair<Int?, Int?> = when (tile.kind) {
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> null to null
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> null to null
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> null to null
+        // The mark stays up on both faces: every one of them is a story, and a tile of
+        // nothing but text needs something to say what it is.
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS ->
+            R.drawable.wp81_glyph_news to R.drawable.wp81_glyph_news
+        else -> null to null
+    }
+
+    /**
+     * WMO weather code to the one word a tile has room for.
+     *
+     * Nine of them for a hundred codes, so the grouping is coarse on purpose: drizzle,
+     * rain and showers are all rain to somebody deciding whether to take a coat, and the
+     * distinctions worth a word of their own are the ones that change the answer - a
+     * storm, thunder, hail on the way down.
+     */
+    private fun wp81WeatherWord(code: Int): String? = when (code) {
+        0, 1 -> "sunny"
+        2 -> "cloudy"
+        3 -> "overcast"
+        45, 48 -> "fog"
+        51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81 -> "rain"
+        // Violent showers: rain hard enough to be its own kind of weather.
+        82 -> "storm"
+        71, 73, 75, 77, 85, 86 -> "snow"
+        95 -> "t.storm"
+        96, 99 -> "hail"
+        // No reading yet, and a guess at the sky is worse than saying nothing about it.
+        else -> null
+    }
+
+    /**
+     * WMO weather code to plain words.
+     *
+     * Grouped rather than enumerated one-for-one: a tile has room for "light snow", not for
+     * distinguishing dense freezing drizzle from moderate freezing drizzle.
+     */
+    private fun wp81WeatherCondition(code: Int): String = when (code) {
+        0 -> "Clear"
+        1 -> "Mainly clear"
+        2 -> "Partly cloudy"
+        3 -> "Overcast"
+        45, 48 -> "Fog"
+        51, 53, 55 -> "Drizzle"
+        56, 57 -> "Freezing drizzle"
+        61, 63, 65 -> "Rain"
+        66, 67 -> "Freezing rain"
+        71, 73, 75, 77 -> "Snow"
+        80, 81, 82 -> "Showers"
+        85, 86 -> "Snow showers"
+        95 -> "Thunderstorm"
+        96, 99 -> "Thunderstorm, hail"
+        else -> "Weather"
+    }
+
+    /** Opens whatever the user set as their weather app, or refreshes if none is set. */
+    private fun openWeatherAppOrRefresh() {
+        val packageName = getWeatherApp()
+        if (packageName != null) {
+            packageManager.getLaunchIntentForPackage(packageName)?.let {
+                it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(it)
+                return
+            }
+        }
+        refreshWeatherIfNeeded()
+        showNotification("Weather", "Refreshing\u2026")
+    }
+
+    /** Matches the bands the desktop AQI readout colours by. */
+    private fun wp81AqiLabel(aqi: Int): String = when {
+        aqi <= 26 -> "Good"
+        aqi <= 33 -> "Fair"
+        aqi <= 66 -> "Moderate"
+        aqi <= 100 -> "Poor"
+        else -> "Very poor"
+    }
+
+    /** Resolves the art for one tile: fixed glyph for built-ins, provider for real apps. */
+    private fun wp81GlyphFor(
+        tile: rocks.gorjan.gokixp.wp81.Tile
+    ): rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph? {
+        // An icon the user chose outranks everything derived - the app's themed monochrome
+        // layer, its notification silhouette, and the built-in glyphs for system tiles.
+        // Without this check the provider preferred an app's Android 13 themed icon, and a
+        // custom icon simply never appeared for any app that ships one.
+        if (hasCustomIcon(tile.packageName)) {
+            getAppIcon(tile.packageName)?.let { drawable ->
+                return rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.FullColor(
+                    drawable,
+                    wp81IconProvider.ratioFor("custom:${tile.packageName}", drawable)
+                )
+            }
+        }
+
+        // The music player wears the platform's music mark. An asset rather than a
+        // drawable, because it comes from the same set the icon picker offers - and it
+        // falls through to the fixed glyph below if it will not load.
+        if (tile.packageName == "system.zune") {
+            rocks.gorjan.gokixp.wp81.SvgIcon
+                .fromAsset(this, "$WP81_ICON_FOLDER/appbar.music.svg")?.let { icon ->
+                    return rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.Monochrome(
+                        icon, wp81IconProvider.ratioFor("asset:appbar.music", icon))
+                }
+        }
+
+        val fixed = when (tile.kind) {
+            rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER -> R.drawable.wp81_glyph_folder
+            rocks.gorjan.gokixp.wp81.Tile.Kind.MY_COMPUTER -> R.drawable.wp81_glyph_computer
+            rocks.gorjan.gokixp.wp81.Tile.Kind.RECYCLE_BIN -> R.drawable.wp81_glyph_recycle
+            rocks.gorjan.gokixp.wp81.Tile.Kind.URL_SHORTCUT -> R.drawable.wp81_glyph_ie
+            rocks.gorjan.gokixp.wp81.Tile.Kind.SYSTEM_APP ->
+                wp81SystemGlyphs[tile.packageName] ?: R.drawable.wp81_glyph_computer
+            rocks.gorjan.gokixp.wp81.Tile.Kind.APP -> null
+            rocks.gorjan.gokixp.wp81.Tile.Kind.SETTINGS -> R.drawable.wp81_glyph_settings
+            rocks.gorjan.gokixp.wp81.Tile.Kind.WELCOME -> R.drawable.wp81_glyph_welcome
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> null
+            // Live widgets render their content directly; there is no glyph to resolve.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK,
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR,
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS,
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_PHOTOS,
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> null
+        }
+        if (fixed != null) {
+            val drawable = androidx.appcompat.content.res.AppCompatResources
+                .getDrawable(this, fixed) ?: return null
+            return rocks.gorjan.gokixp.wp81.MonochromeIconProvider.Glyph.Monochrome(
+                drawable,
+                wp81IconProvider.ratioFor("res:$fixed", drawable)
+            )
+        }
+        return wp81IconProvider.glyphFor(tile.packageName, getAppIcon(tile.packageName))
+    }
+
+    private fun launchWP81Tile(tile: rocks.gorjan.gokixp.wp81.Tile) {
+        val icon = desktopIcons.firstOrNull { it.id == tile.id }
+        when (tile.kind) {
+            // Folders are opened in place by the wall itself - see onFolderOpened - so a
+            // launch only reaches here for one tapped somewhere that has no wall to part:
+            // inside another folder's band.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER -> openWP81Folder(tile)
+            rocks.gorjan.gokixp.wp81.Tile.Kind.MY_COMPUTER -> {
+                val view = rocks.gorjan.gokixp.apps.explorer.MyComputerView(this)
+                icon?.let { view.setDesktopIcon(it) }
+                openMyComputer(view)
+            }
+            rocks.gorjan.gokixp.wp81.Tile.Kind.RECYCLE_BIN -> {
+                // No-op, matching the desktop: the Recycle Bin has no window of its own
+                // there either - it is a drop target with a context menu. The tile is kept
+                // so the migrated Start screen still mirrors what was on the desktop.
+                Log.d("MainActivity", "WP8.1: Recycle Bin tile tapped; no window to open")
+            }
+            rocks.gorjan.gokixp.wp81.Tile.Kind.URL_SHORTCUT -> openUrlShortcut(icon?.targetUrl)
+            rocks.gorjan.gokixp.wp81.Tile.Kind.SYSTEM_APP -> launchSystemApp(tile.packageName)
+            rocks.gorjan.gokixp.wp81.Tile.Kind.APP -> {
+                packageManager.getLaunchIntentForPackage(tile.packageName)?.let {
+                    it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(it)
+                }
+            }
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK -> openPhoneClockApp()
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> openCalendarApp()
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> openWeatherAppOrRefresh()
+            // The reader, not the story. A tile shows one headline at a time and tapping
+            // it is a request for the rest of them; the story on the face is one tap
+            // further in, where the whole front page is on offer.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS -> showNewsDialog()
+
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_PHOTOS -> openWP81Photos()
+
+            rocks.gorjan.gokixp.wp81.Tile.Kind.WELCOME -> launchSystemApp("system.welcome")
+
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> {
+                // Tapping doubles as the opt-in, since the desktop checkbox that normally
+                // enables air quality lives inside Settings. Enabling it also asks for a
+                // reading, so the tile has something to show on the way back.
+                if (!isShowAqiEnabled()) {
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                        .edit { putBoolean(KEY_SHOW_AQI, true) }
+                    refreshAqiData()
+                }
+                // Then AirCare itself, which is where the taskbar indicator goes on every
+                // other theme - the tile is that indicator, and should not behave differently
+                // for being square.
+                handleAqiTap()
+            }
+            rocks.gorjan.gokixp.wp81.Tile.Kind.SETTINGS -> openWP81Settings()
+        }
+    }
+
+    /**
+     * Commands for a Start screen tile.
+     *
+     * Deliberately shorter than the desktop's icon menu: "Send to Desktop", "Set as Swipe
+     * Right App" and "Change Icon" are desktop notions with nowhere to land here.
+     *
+     * Resizing and reordering are absent too - they are direct manipulations now, on the
+     * tile's own bottom-right and top-right handles, which beats picking a verb from a
+     * list and then doing the gesture anyway.
+     */
+    private fun wp81TileMenu(
+        tile: rocks.gorjan.gokixp.wp81.Tile,
+        inFolder: Boolean
+    ): List<rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item> {
+        val shell = wp81Shell
+        val items = mutableListOf<rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item>()
+
+        // Taking a tile out of a folder deletes it; on Start the same act is "unpin".
+        if (inFolder && !tile.kind.isBuiltIn) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("remove from folder") {
+                removeSelectedFromWP81Folder()
+            })
+        }
+
+        // Both of these used to have a key on the strip, which is now the colour key.
+        // Settings is excluded on purpose: it is the only route back to this screen.
+        if (tile.kind.isBuiltIn && tile.kind != rocks.gorjan.gokixp.wp81.Tile.Kind.SETTINGS) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("hide tile") { hideWP81Tile(tile.id) })
+        }
+
+        if (!tile.kind.isBuiltIn && !inFolder) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("unpin from start") {
+                shell?.startScreen?.unpinTile(tile)
+            })
+        }
+
+        val icon = desktopIcons.firstOrNull { it.id == tile.id }
+
+        if (!tile.kind.isBuiltIn) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("rename") { renameWP81Tile(tile) })
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("change icon") { changeWP81TileIcon(tile) })
+        }
+
+        // A web shortcut exists only on the Start screen, so removing it *is* deleting it -
+        // "unpin" would understate what happens.
+        if (tile.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.URL_SHORTCUT && icon != null) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("delete") {
+                desktopIcons.removeAll { it.id == icon.id }
+                saveDesktopIcons()
+                refreshWP81Tiles()
+            })
+        }
+
+        // Only real installed apps can be uninstalled or inspected.
+        if (tile.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.APP) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("app info") { openAppInfo(tile.packageName) })
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("uninstall") {
+                uninstallApp(AppInfo(tile.label, tile.packageName, icon = wp81BlankIcon()))
+            })
+        }
+
+        return items
+    }
+
+    /** Commands for a row in the app list. */
+    private fun wp81AppMenu(app: AppInfo): List<rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item> {
+        val shell = wp81Shell
+        val items = mutableListOf<rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item>()
+
+        val pinnedIcon = desktopIcons.firstOrNull {
+            it.packageName == app.packageName && it.parentFolderId == null
+        }
+        if (pinnedIcon != null) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("unpin from start") {
+                desktopIcons.removeAll { it.id == pinnedIcon.id }
+                saveDesktopIcons()
+                refreshWP81Tiles()
+                showNotification("Unpinned", app.name)
+            })
+        } else {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("pin to start") { pinWP81Tile(app) })
+        }
+
+        // Reuses the launcher's existing hidden-apps set, so a app hidden here is hidden
+        // in the desktop themes' start menu too.
+        val hidden = isAppHidden(app.packageName)
+        items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item(if (hidden) "unhide" else "hide from list") {
+            toggleHiddenApp(app.packageName)
+            refreshWP81AppList()
+        })
+
+        if (!isSystemApp(app.packageName)) {
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("app info") { openAppInfo(app.packageName) })
+            items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("uninstall") { uninstallApp(app) })
+        }
+
+        return items
+    }
+
+    /**
+     * Renames a tile, through the Metro prompt rather than the Vista rename window.
+     *
+     * Writes to the same customNameMappings the desktop themes use, so a rename here shows
+     * up on the desktop too rather than being a WP8.1-only alias.
+     */
+    private fun renameWP81Tile(tile: rocks.gorjan.gokixp.wp81.Tile) {
+        val shell = wp81Shell ?: return
+        val icon = desktopIcons.firstOrNull { it.id == tile.id } ?: return
+        val current = getCustomOrOriginalName(icon.packageName, icon.name)
+        shell.inputDialog.show("rename", current) { newName ->
+            if (newName.isEmpty()) customNameMappings.remove(icon.packageName)
+            else customNameMappings[icon.packageName] = newName
+            saveCustomNameMappings()
+            refreshWP81Tiles()
+        }
+    }
+
+    /**
+     * Opens the Metro icon picker for a tile.
+     *
+     * Icons are decoded in batches on a background thread and handed over as they arrive:
+     * the bundled sets run to several hundred files, and decoding them before showing the
+     * page would stall it for seconds.
+     */
+    private fun changeWP81TileIcon(tile: rocks.gorjan.gokixp.wp81.Tile) {
+        val shell = wp81Shell ?: return
+        val icon = desktopIcons.firstOrNull { it.id == tile.id } ?: return
+        val picker = shell.iconPicker
+
+        picker.show(tile.label)
+        picker.onPicked = { path ->
+            applyWP81CustomIcon(icon.packageName, path)
+            picker.dismiss()
+        }
+        picker.onResetToDefault = {
+            applyWP81CustomIcon(icon.packageName, "default")
+            picker.dismiss()
+        }
+        picker.onBrowse = {
+            setPendingImagePick(PICK_TARGET_WP81_ICON_PREFIX + icon.packageName)
+            imagePickerLauncher.launch("image/*")
+        }
+
+        loadWP81IconChoices(picker)
+    }
+
+    // ---- pending image pick -----------------------------------------------------------
+
+    private fun setPendingImagePick(target: String) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
+            putString(KEY_PENDING_IMAGE_PICK, target)
+        }
+    }
+
+    /** Reads and clears the pending target, so a stale one cannot claim a later pick. */
+    private fun consumePendingImagePick(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val target = prefs.getString(KEY_PENDING_IMAGE_PICK, null)
+        if (target != null) prefs.edit { remove(KEY_PENDING_IMAGE_PICK) }
+        return target
+    }
+
+    /**
+     * Applies an image picked for the Start background.
+     *
+     * Copied into app storage rather than stored as a content URI: the picker is
+     * GetContent, which grants read access for this session only, so a remembered URI
+     * would stop resolving after a reboot.
+     */
+    private fun applyPickedWP81Background(uri: Uri) {
+        val stored = copyWP81BackgroundLocally(uri)
+        if (stored == null) {
+            showNotification("Start background", "That image could not be used")
+            return
+        }
+        themeManager.setWP81StartBackground(stored)
+        themeManager.setWP81StartBackgroundFocusX(0.5f)
+        applyWP81StartBackground()
+        refreshWP81BackgroundControls()
+    }
+
+    /** Applies an image picked as a tile icon for [packageName]. */
+    private fun applyPickedWP81Icon(packageName: String, uri: Uri) {
+        val stored = importCustomIconFromUri(uri)
+        if (stored == null) {
+            showNotification("Change icon", "That image could not be used")
+            return
+        }
+        applyWP81CustomIcon(packageName, stored)
+        wp81Shell?.iconPicker?.dismiss()
+    }
+
+    /** Streams the current theme's icon set into the picker, a batch at a time. */
+    private fun loadWP81IconChoices(picker: rocks.gorjan.gokixp.wp81.WP81IconPicker) {
+        // This theme's own set first. getCustomIconsPath answers for the desktop chrome
+        // the shell stands in for, which is not what a Windows Phone tile should be
+        // offered: those icons are drawn for a desktop, in colour, with shadows.
+        val folders = listOf(WP81_ICON_FOLDER, "custom_icons_programs")
+        Thread {
+            for (folder in folders) {
+                val names = try {
+                    assets.list(folder)?.sorted().orEmpty()
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "WP8.1: cannot list $folder", e)
+                    emptyList()
+                }
+                val batch = mutableListOf<rocks.gorjan.gokixp.wp81.WP81IconPicker.Choice>()
+                for (name in names) {
+                    if (!name.matches(".*\\.(svg|png|jpg|jpeg|webp)$".toRegex(RegexOption.IGNORE_CASE))) continue
+                    val path = "$folder/$name"
+                    val drawable = try {
+                        loadIconFromPath(path)
+                    } catch (e: Exception) {
+                        null
+                    } ?: continue
+                    batch.add(rocks.gorjan.gokixp.wp81.WP81IconPicker.Choice(path, drawable))
+                    if (batch.size >= WP81_ICON_BATCH) {
+                        val chunk = batch.toList()
+                        batch.clear()
+                        runOnUiThread { if (picker.isShowing()) picker.addChoices(chunk) }
+                    }
+                }
+                if (batch.isNotEmpty()) {
+                    val chunk = batch.toList()
+                    runOnUiThread { if (picker.isShowing()) picker.addChoices(chunk) }
+                }
+            }
+        }.start()
+    }
+
+    /** Commits a chosen icon through the same mappings the desktop themes read. */
+    private fun applyWP81CustomIcon(packageName: String, path: String) {
+        if (path == "default") customIconMappings.remove(packageName)
+        else customIconMappings[packageName] = path
+        saveCustomIconMappings()
+        pruneUnusedImportedIcons()
+        invalidateIconCache(packageName)
+        // The artwork changed, so its measured proportions have to go too, or the new icon
+        // is drawn scaled for the old one.
+        wp81IconProvider.invalidate(packageName)
+        refreshWP81Tiles()
+    }
+
+    /** Hides a built-in tile from Start. Its position is kept for when it comes back. */
+    private fun hideWP81Tile(tileId: String) {
+        themeManager.setWP81HiddenTiles(themeManager.getWP81HiddenTiles() + tileId)
+        wp81Shell?.exitEditModeEverywhere()
+        refreshWP81Tiles()
+        showNotification("Tile hidden", "Bring it back from the hidden list while editing")
+    }
+
+    private fun restoreWP81Tile(tileId: String) {
+        themeManager.setWP81HiddenTiles(themeManager.getWP81HiddenTiles() - tileId)
+        refreshWP81Tiles()
+    }
+
+    /**
+     * The top-right edit handle's job, which depends on whose tile it is.
+     *
+     * A tile the user pinned comes off Start; one the shell provides is hidden instead,
+     * because unpinning it would only last until the next refresh rebuilt it.
+     */
+    private fun unpinOrHideWP81Tile(tile: rocks.gorjan.gokixp.wp81.Tile) {
+        val shell = wp81Shell ?: return
+        if (tile.kind.isBuiltIn) hideWP81Tile(tile.id) else shell.startScreen.unpinTile(tile)
+    }
+
+    /** Human-readable names for the hideable built-ins, for the restore list. */
+    private fun wp81BuiltInLabel(id: String): String = when (id) {
+        WP81_WIDGET_CLOCK -> "Clock"
+        WP81_WIDGET_WEATHER -> "Weather"
+        WP81_WIDGET_AQI -> "Air quality"
+        WP81_WIDGET_CALENDAR -> "Calendar"
+        WP81_WIDGET_NEWS -> "News"
+        WP81_WIDGET_PHOTOS -> "Photos"
+        "system.welcome" -> "Welcome"
+        WP81_WIDGET_SETTINGS -> "Settings"
+        else -> id
+    }
+
+    /** Lists what has been hidden, so any of it can be put back. */
+    private fun showWP81HiddenTiles() {
+        val shell = wp81Shell ?: return
+        val hidden = themeManager.getWP81HiddenTiles()
+        if (hidden.isEmpty()) return
+        val items = hidden.sorted().map { id ->
+            rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item(wp81BuiltInLabel(id)) { restoreWP81Tile(id) }
+        }
+        shell.contextMenu.show("hidden tiles", items, shell.height * 0.4f)
+    }
+
+    /** Placeholder icon for the AppInfo that [uninstallApp] only reads the package from. */
+    private fun wp81BlankIcon(): Drawable =
+        android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+
+    /**
+     * Opens the WP8.1 settings page and populates its wallpaper strip.
+     *
+     * Wallpaper drawables are decoded off the main thread - there are a few dozen bundled
+     * and decoding them inline visibly stutters the page-in.
+     */
+    private fun openWP81Settings() {
+        val shell = wp81Shell ?: return
+        shell.openSettings()
+        Thread {
+            val items = try {
+                loadWallpapers().mapNotNull { item ->
+                    item.filePath?.let { path -> path to item.drawable }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "WP8.1: failed to load wallpapers", e)
+                emptyList()
+            }
+            runOnUiThread {
+                shell.settingsPage.setWallpapers(items, themeManager.getWP81StartBackground())
+                refreshWP81BackgroundControls()
+            }
+        }.start()
+    }
+
+    private fun wireWP81Settings(shell: rocks.gorjan.gokixp.wp81.WP81Shell) {
+        shell.settingsPage.onBack = { shell.closeSettings() }
+        shell.settingsPage.onAccentPicked = { color ->
+            commitWP81Appearance(color, themeManager.isWP81Dark())
+        }
+        shell.settingsPage.onDarkPicked = { dark ->
+            commitWP81Appearance(themeManager.getWP81Accent(), dark)
+        }
+        shell.settingsPage.onBackgroundPicked = { path ->
+            themeManager.setWP81StartBackground(path)
+            // A fresh pick starts centred; the preview strip is how it gets reframed.
+            themeManager.setWP81StartBackgroundFocusX(0.5f)
+            applyWP81StartBackground()
+            refreshWP81BackgroundControls()
+        }
+        shell.settingsPage.onBlurChanged = { amount ->
+            themeManager.setWP81StartBackgroundBlur(amount)
+            refreshWP81Blur()
+        }
+        shell.settingsPage.onDriftChanged = { enabled ->
+            themeManager.setWP81StartBackgroundDrift(enabled)
+            shell.setBackgroundDrift(enabled)
+        }
+        shell.settingsPage.onHideTileColorsChanged = { hidden ->
+            themeManager.setWP81HideTileColors(hidden)
+            applyWP81TileColors()
+        }
+        shell.settingsPage.onTileCountsChanged = { enabled ->
+            themeManager.setWP81TileCounts(enabled)
+            applyWP81TileCounts()
+        }
+        shell.settingsPage.onColumnsPicked = { columns ->
+            themeManager.setWP81Columns(columns)
+            shell.startScreen.columns = columns
+            shell.folderPage.contents.columns = columns
+        }
+        // Written to the same key Display Properties uses, so the answer is the launcher's
+        // rather than each shell's. See openUrlShortcut.
+        shell.settingsPage.setOpenLinksInIe(isOpenUrlsInIeEnabled())
+        shell.settingsPage.onOpenLinksInIeChanged = { enabled ->
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
+                putBoolean(KEY_OPEN_URLS_IN_IE, enabled)
+            }
+        }
+        shell.settingsPage.setLauncherThemes(
+            AppTheme.all().map { it.toString() },
+            themeManager.getSelectedTheme().toString()
+        )
+        shell.settingsPage.onThemePicked = { name ->
+            // Same path the desktop Display Properties uses: persist, then applyTheme(),
+            // which plays the grayscale transition and recreates the activity.
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
+                putString("selected_theme", name)
+                if (AppTheme.fromString(name) !is AppTheme.WindowsClassic) {
+                    putString(ThemeManager.KEY_PLUS95_THEME, ThemeManager.PLUS95_DEFAULT)
+                }
+            }
+            applyTheme(name)
+        }
+        shell.settingsPage.onBrowse = {
+            setPendingImagePick(PICK_TARGET_WP81_BACKGROUND)
+            imagePickerLauncher.launch("image/*")
+        }
+    }
+
+    /**
+     * Copies a picked image into app storage and returns a file:// path for it, or null.
+     * One slot, overwritten each time - only the current background is ever needed.
+     */
+    private fun copyWP81BackgroundLocally(uri: Uri): String? = try {
+        val target = java.io.File(filesDir, "wp81_start_background.img")
+        contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        }
+        if (target.length() > 0) Uri.fromFile(target).toString() else null
+    } catch (e: Exception) {
+        Log.e("MainActivity", "WP8.1: could not copy picked background", e)
+        null
+    }
+
+    /** Cached Start background at full sharpness, so a drag never re-decodes. */
+    private var wp81BackgroundBitmap: Bitmap? = null
+
+    /** The blurred derivative actually handed to the tiles, keyed by the blur it was made at. */
+    private var wp81BlurredBackground: Bitmap? = null
+    private var wp81BlurredAmount = -1f
+
+    /**
+     * Where the built-in tiles sit, by tile id.
+     *
+     * The widgets and Settings have no DesktopIcon to hang a position on, so unlike the
+     * user's tiles their placement lives here. Seeded once, the first time the theme is
+     * used, and thereafter owned by the user exactly like any other tile - rebuilding them
+     * at fixed positions on every refresh is what made them jump back to the top whenever
+     * an icon changed or the user came home.
+     */
+    private fun loadWP81BuiltInPlacements(): MutableMap<String, Pair<rocks.gorjan.gokixp.wp81.TileSize, Int>> {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        // The upright arrangement stands in until the screen has been arranged on its
+        // side, exactly as an icon's own placement does.
+        val raw = (if (wp81Landscape()) prefs.getString(KEY_WP81_BUILTIN_TILES_LANDSCAPE, null) else null)
+            ?: prefs.getString(KEY_WP81_BUILTIN_TILES, null) ?: return mutableMapOf()
+        val result = mutableMapOf<String, Pair<rocks.gorjan.gokixp.wp81.TileSize, Int>>()
+        for (entry in raw.split(";")) {
+            val parts = entry.split(":")
+            if (parts.size != 3) continue
+            val index = parts[2].toIntOrNull() ?: continue
+            result[parts[0]] = rocks.gorjan.gokixp.wp81.TileSize.fromName(parts[1]) to index
+        }
+        return result
+    }
+
+    private fun saveWP81BuiltInPlacements(placements: Map<String, Pair<rocks.gorjan.gokixp.wp81.TileSize, Int>>) {
+        val raw = placements.entries.joinToString(";") { (id, p) ->
+            "$id:${p.first.name}:${p.second}"
+        }
+        val key = if (wp81Landscape()) KEY_WP81_BUILTIN_TILES_LANDSCAPE else KEY_WP81_BUILTIN_TILES
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit { putString(key, raw) }
+    }
+
+    /** Guards against a slow blur landing after a newer one has already been requested. */
+    private var wp81BlurGeneration = 0
+
+    /**
+     * The Start background as the tiles should draw it right now.
+     *
+     * Returns the sharp original when no blur is set, and otherwise whatever blurred copy
+     * is currently cached - which may briefly be a stale one while a new blur is computed.
+     */
+    private fun wp81DisplayBackground(): Bitmap? {
+        val source = wp81BackgroundBitmap ?: return null
+        if (themeManager.getWP81StartBackgroundBlur() <= 0.01f) return source
+        return wp81BlurredBackground ?: source
+    }
+
+    /**
+     * Recomputes the blurred background off the main thread and hands it to the shell.
+     *
+     * Blurring a wallpaper is tens of milliseconds even at a reduced working size, which
+     * is far too slow to run per frame while the slider is moving - so the slider stays
+     * responsive and the result catches up. Requests are generation-stamped so a slow one
+     * cannot overwrite a newer result.
+     */
+    private fun refreshWP81Blur() {
+        val shell = wp81Shell ?: return
+        val source = wp81BackgroundBitmap
+        val amount = themeManager.getWP81StartBackgroundBlur()
+        val focusX = themeManager.getWP81StartBackgroundFocusX()
+
+        if (source == null || amount <= 0.01f) {
+            // Supersede anything still blurring. The slider fires all the way down, so
+            // sliding to zero leaves a request for the last non-zero amount in flight -
+            // and without claiming the generation here it landed a moment later and put
+            // the blur straight back, which is why zero was not sharp.
+            wp81BlurGeneration++
+            wp81BlurredBackground?.recycle()
+            wp81BlurredBackground = null
+            wp81BlurredAmount = -1f
+            shell.setStartBackground(source, focusX)
+            return
+        }
+        if (kotlin.math.abs(amount - wp81BlurredAmount) < BLUR_QUANTISATION &&
+            wp81BlurredBackground != null) {
+            shell.setStartBackground(wp81BlurredBackground, focusX)
+            return
+        }
+
+        val generation = ++wp81BlurGeneration
+        Thread {
+            val blurred = try {
+                rocks.gorjan.gokixp.wp81.Blur.apply(source, amount)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "WP8.1: blur failed", e)
+                null
+            }
+            runOnUiThread {
+                if (generation != wp81BlurGeneration || wp81Shell == null) {
+                    // Superseded while we were working; drop it rather than flicker back.
+                    if (blurred !== source) blurred?.recycle()
+                    return@runOnUiThread
+                }
+                val previous = wp81BlurredBackground
+                wp81BlurredBackground = blurred
+                wp81BlurredAmount = amount
+                shell.setStartBackground(
+                    blurred ?: source,
+                    themeManager.getWP81StartBackgroundFocusX()
+                )
+                // Recycled only after the tiles have been handed the replacement.
+                if (previous !== source) previous?.recycle()
+            }
+        }.start()
+    }
+
+    /** Offers the settings page's blur slider, for a background that is actually set. */
+    /** Pushes the numbers-or-dots setting onto the wall, and onto an open folder page. */
+    private fun applyWP81TileCounts() {
+        val shell = wp81Shell ?: return
+        val enabled = themeManager.getWP81TileCounts()
+        shell.startScreen.countsEnabled = enabled
+        shell.folderPage.contents.countsEnabled = enabled
+    }
+
+    private fun refreshWP81BackgroundControls() {
+        val shell = wp81Shell ?: return
+        shell.settingsPage.setTileControls(
+            themeManager.getWP81TileCounts(), themeManager.getWP81Columns())
+        shell.settingsPage.setBackgroundControls(
+            wp81BackgroundBitmap != null,
+            themeManager.getWP81StartBackgroundBlur(),
+            themeManager.getWP81StartBackgroundDrift(),
+            themeManager.getWP81HideTileColors()
+        )
+    }
+
+    /**
+     * Loads and applies the Start background photo, or clears it.
+     *
+     * Accepts either a bundled asset path or a content:// URI from the picker, and
+     * downsamples to roughly screen size - a full-resolution camera photo is many times
+     * more pixels than the tiles will ever show.
+     */
+    private fun applyWP81StartBackground() {
+        val shell = wp81Shell ?: return
+        val source = themeManager.getWP81StartBackground()
+        val focusX = themeManager.getWP81StartBackgroundFocusX()
+        // Set before the photo: the drift is cut out of the crop, so the crop has to know
+        // whether there will be any before it is taken.
+        shell.setBackgroundDrift(themeManager.getWP81StartBackgroundDrift())
+        if (source == null) {
+            wp81BackgroundBitmap = null
+            wp81BlurredBackground = null
+            wp81BlurredAmount = -1f
+            shell.setStartBackground(null, focusX)
+            refreshWP81BackgroundControls()
+            return
+        }
+        Thread {
+            val bitmap = decodeWP81Background(source)
+            runOnUiThread {
+                // Likewise: a blur of the photo being replaced must not land on top of
+                // the one that replaced it.
+                wp81BlurGeneration++
+                wp81BackgroundBitmap = bitmap
+                wp81BlurredBackground?.recycle()
+                wp81BlurredBackground = null
+                wp81BlurredAmount = -1f
+                shell.setStartBackground(bitmap, focusX)
+                refreshWP81Blur()
+                refreshWP81BackgroundControls()
+            }
+        }.start()
+    }
+
+    /** Decodes a Start background from an asset path or a content URI, downsampled to fit. */
+    private fun decodeWP81Background(source: String): Bitmap? = try {
+        val metrics = resources.displayMetrics
+        val targetW = metrics.widthPixels
+        val targetH = metrics.heightPixels
+
+        fun open(): java.io.InputStream? =
+            if (source.startsWith("content://") || source.startsWith("file://")) {
+                contentResolver.openInputStream(source.toUri())
+            } else {
+                assets.open(source)
+            }
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        open()?.use { BitmapFactory.decodeStream(it, null, bounds) }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(bounds, targetW, targetH)
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        open()?.use { BitmapFactory.decodeStream(it, null, options) }
+    } catch (e: Exception) {
+        Log.e("MainActivity", "WP8.1: failed to load start background $source", e)
+        null
+    }
+
+    /**
+     * Asks for a name, then makes an empty folder tile.
+     *
+     * The folder is a normal DesktopIcon of type FOLDER, exactly as the desktop themes
+     * create one, so it is still there - with its contents - if the user switches theme.
+     */
+    private fun promptNewWP81Folder() {
+        val shell = wp81Shell ?: return
+        shell.inputDialog.show("new folder", "") { rawName ->
+            val name = rawName.ifBlank { "New Folder" }
+            val folderId = "folder_${System.currentTimeMillis()}"
+            val folderIcon = AppCompatResources.getDrawable(this, R.drawable.folder_vista)!!
+            desktopIcons.add(
+                DesktopIcon(
+                    name = name,
+                    packageName = folderId,
+                    icon = folderIcon,
+                    x = 0f,
+                    y = 0f,
+                    id = folderId,
+                    type = IconType.FOLDER,
+                    tileSize = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name,
+                    tileIndex = (desktopIcons.mapNotNull { it.tileIndex }.maxOrNull() ?: -1) + 1,
+                    tileSizeLandscape = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name,
+                    tileIndexLandscape =
+                        (desktopIcons.mapNotNull { it.tileIndexLandscape }.maxOrNull() ?: -1) + 1
+                )
+            )
+            saveDesktopIcons()
+            refreshWP81Tiles()
+            showNotification("Folder created", name)
+        }
+    }
+
+    /** The folder page currently open, if any. */
+    private var wp81OpenFolderId: String? = null
+
+    /**
+     * Sends the user to the app list to choose something to put in the open folder.
+     *
+     * The list doubles as a picker rather than getting a near-identical screen of its own -
+     * see AppListView.onPick.
+     */
+    private fun addAppToOpenWP81Folder() {
+        val shell = wp81Shell ?: return
+        val folderId = wp81OpenFolderId ?: return
+        shell.openAppPicker(onCancel = { reopenWP81Folder(folderId) }) { app ->
+            val existing = desktopIcons.firstOrNull { it.packageName == app.packageName }
+            if (existing != null) {
+                // Already on Start or in another folder - move it rather than duplicating.
+                existing.parentFolderId = folderId
+                existing.wp81TileIndex = null
+            } else {
+                desktopIcons.add(
+                    DesktopIcon(
+                        name = app.name,
+                        packageName = app.packageName,
+                        icon = app.icon,
+                        x = 0f,
+                        y = 0f,
+                        type = IconType.APP,
+                        parentFolderId = folderId,
+                        tileSize = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name
+                    )
+                )
+            }
+            saveDesktopIcons()
+            refreshWP81Tiles()
+            reopenWP81Folder(folderId)
+            showNotification("Added to folder", app.name)
+        }
+    }
+
+    /**
+     * Gives the tiles inside a folder the same behaviour they have on Start.
+     *
+     * Rewired per folder because the callbacks close over which folder is open - what
+     * "unpin" and "reorder" mean depends on it.
+     */
+    private fun wireWP81FolderContents(shell: rocks.gorjan.gokixp.wp81.WP81Shell, folderId: String) {
+        val contents = shell.folderPage.contents
+        contents.onLaunch = { child -> launchWP81Tile(child) }
+        contents.onEditModeChanged = { shell.refreshNavMode() }
+        contents.onTilesChanged = { tiles -> persistWP81FolderTiles(folderId, tiles) }
+        // Inside a folder the same handle means "take it out of here", which for a folder
+        // is a deletion rather than an unpinning - see removeSelectedFromWP81Folder.
+        contents.onTileUnpin = { removeSelectedFromWP81Folder() }
+        // Wired before the page is filled, so its tiles are built knowing it too.
+        contents.countsEnabled = themeManager.getWP81TileCounts()
+        contents.columns = themeManager.getWP81Columns()
+        shell.folderPage.onBack = { shell.closeFolder() }
+    }
+
+    /**
+     * Writes size and order back onto the icons filed inside a folder.
+     *
+     * Kept separate from [persistWP81Tiles] because the two sweep different sets: that one
+     * treats an icon missing from the list as unpinned from Start, which for folder
+     * contents would delete every icon that merely lives somewhere else.
+     */
+    private fun persistWP81FolderTiles(
+        folderId: String,
+        tiles: List<rocks.gorjan.gokixp.wp81.Tile>
+    ) {
+        val byId = desktopIcons.associateBy { it.id }
+        tiles.sortedBy { it.index }.forEachIndexed { position, tile ->
+            byId[tile.id]?.let { icon ->
+                icon.wp81TileSize = tile.size.name
+                icon.wp81TileIndex = position
+            }
+        }
+        // Removing a tile from inside a folder deletes that icon, matching Start. Scoped to
+        // this folder's own children so nothing outside it is touched.
+        val keep = tiles.map { it.id }.toSet()
+        desktopIcons.removeAll { it.parentFolderId == folderId && it.id !in keep }
+        saveDesktopIcons()
+    }
+
+    /**
+     * Deletes the selected tile from the folder it is in.
+     *
+     * The icon is removed outright rather than relocated to Start - a folder is where the
+     * user put it, and quietly moving it somewhere else means having to go and find it.
+     */
+    private fun removeSelectedFromWP81Folder() {
+        val shell = wp81Shell ?: return
+        val tile = shell.selectedTile() ?: return
+        val folderId = wp81OpenFolderId ?: return
+        val icon = desktopIcons.firstOrNull { it.id == tile.id } ?: return
+        val name = getCustomOrOriginalName(icon.packageName, icon.name)
+
+        desktopIcons.removeAll { it.id == icon.id }
+        saveDesktopIcons()
+
+        shell.exitEditModeEverywhere()
+        refreshWP81Tiles()
+        reopenWP81Folder(folderId)
+        showNotification("Removed", name)
+    }
+
+    /** Re-shows a folder page after its contents changed. */
+    private fun reopenWP81Folder(folderId: String) {
+        val icon = desktopIcons.firstOrNull { it.id == folderId } ?: return
+        val tile = rocks.gorjan.gokixp.wp81.Tile(
+            id = icon.id,
+            label = getCustomOrOriginalName(icon.packageName, icon.name),
+            packageName = icon.packageName,
+            size = rocks.gorjan.gokixp.wp81.TileSize.fromName(icon.wp81TileSize),
+            index = 0,
+            kind = rocks.gorjan.gokixp.wp81.Tile.Kind.FOLDER
+        )
+        openWP81Folder(tile)
+    }
+
+    /**
+     * Opens a folder as a Metro page rather than a Vista window.
+     *
+     * A folder is part of the shell, not a program: Solitaire and Internet Explorer are
+     * genuine windowed applications and keep their Vista chrome, but a folder browsing its
+     * own contents has no reason to leave the phone UI.
+     */
+    /**
+     * Opens a folder into the Start screen, in the gap under its own tile.
+     *
+     * The contents are built exactly as the folder page built them; what changed is where
+     * they are put. Nothing is pushed, nothing is navigated to, and the tile that was
+     * tapped stays where it is with the gap hanging off it.
+     */
+    private fun openWP81FolderInline(folder: rocks.gorjan.gokixp.wp81.Tile) {
+        val shell = wp81Shell ?: return
+        val contents = wp81FolderContents(folder.id)
+        if (contents.isEmpty()) {
+            showNotification(folder.label, "This folder is empty")
+            return
+        }
+        shell.startScreen.openFolder(
+            folder, contents, { child -> wp81ColorFor(child) }
+        ) { child -> wp81GlyphFor(child) }
+        refreshWP81Notifications()
+    }
+
+    /**
+     * Moves a tile into a folder, or back out onto Start.
+     *
+     * One field decides which of the two lists an icon is in, so this is a one-line change
+     * followed by a rebuild of everything that reads it. Rebuilding rather than patching:
+     * the wall repacks around the hole, the folder repacks around the arrival, and both of
+     * those are the packer's job rather than something to reproduce here.
+     */
+    private fun fileWP81Tile(
+        tile: rocks.gorjan.gokixp.wp81.Tile,
+        folderId: String?,
+        landed: Boolean
+    ) {
+        val icon = desktopIcons.firstOrNull { it.id == tile.id } ?: return
+        // A folder cannot be put inside itself, and a tile already where it is asked to go
+        // is a drop that changed nothing.
+        if (folderId == icon.id || icon.parentFolderId == folderId) return
+
+        val leaving = icon.parentFolderId
+        icon.parentFolderId = folderId
+        // [landed] means the tile is sitting in its new list's grid, in the place the user
+        // put it, and that grid writes down the order. A tile posted into a folder that
+        // was not open has no place in it yet, so it goes on the end.
+        // Put on the end of the list it is joining, in whichever way up the phone is being
+        // held: the other arrangement has its own idea of where things go and is not being
+        // looked at.
+        if (!landed) icon.wp81TileIndex = null
+        saveDesktopIcons()
+
+        // Nothing is rebuilt either way. The wall has already closed around the tile that
+        // left, and replacing every view on it would undo the movement the user has just
+        // watched. Only what reads the icons afresh has to be told.
+        refreshWP81Notifications()
+        buildWP81FolderPreviews()
+
+        if (leaving != null) discardWP81FolderIfEmpty(leaving)
+    }
+
+    /**
+     * Throws away a folder whose last tile has just been taken out of it.
+     *
+     * An empty folder is a tile that opens onto nothing. It was made by putting two things
+     * together, so taking both out again undoes the making - leaving the shell to be tidied
+     * up by hand would be asking the user to clear up after a gesture.
+     */
+    private fun discardWP81FolderIfEmpty(folderId: String) {
+        if (desktopIcons.any { it.parentFolderId == folderId }) return
+        val folder = desktopIcons.firstOrNull { it.id == folderId } ?: return
+        if (folder.type != IconType.FOLDER) return
+
+        // Whatever is on screen of it goes first: the gap belongs to a tile that is about
+        // to stop existing.
+        wp81Shell?.startScreen?.closeFolder(animated = false)
+        desktopIcons.remove(folder)
+        saveDesktopIcons()
+        refreshWP81Tiles()
+    }
+
+    /** The tiles filed inside a folder, in the order the folder keeps them. */
+    private fun wp81FolderContents(folderId: String): List<rocks.gorjan.gokixp.wp81.Tile> =
+        desktopIcons
+            .filter { it.parentFolderId == folderId }
+            .sortedWith(compareBy({ it.wp81TileIndex ?: Int.MAX_VALUE }, { it.name.lowercase() }))
+            .mapIndexed { i, icon ->
+                rocks.gorjan.gokixp.wp81.Tile(
+                    id = icon.id,
+                    label = icon.name.replace("\\n", " ").replace("\n", " "),
+                    packageName = icon.packageName,
+                    size = rocks.gorjan.gokixp.wp81.TileSize.fromName(icon.wp81TileSize),
+                    index = i,
+                    kind = wp81KindFor(icon)
+                )
+            }
+
+    private fun openWP81Folder(folder: rocks.gorjan.gokixp.wp81.Tile) {
+        val shell = wp81Shell ?: return
+        val contents = desktopIcons
+            .filter { it.parentFolderId == folder.id }
+            .sortedWith(compareBy({ it.wp81TileIndex ?: Int.MAX_VALUE }, { it.name.lowercase() }))
+            .mapIndexed { i, icon ->
+                rocks.gorjan.gokixp.wp81.Tile(
+                    id = icon.id,
+                    label = icon.name.replace("\\n", " ").replace("\n", " "),
+                    packageName = icon.packageName,
+                    size = rocks.gorjan.gokixp.wp81.TileSize.fromName(icon.wp81TileSize),
+                    index = i,
+                    kind = wp81KindFor(icon)
+                )
+            }
+        wp81OpenFolderId = folder.id
+        wireWP81FolderContents(shell, folder.id)
+        // Read fresh rather than from the per-rebuild cache: a tile is repainted in place
+        // without rebuilding the wall, so the cache can be a colour behind. Empty while
+        // colours are being held back for the wallpaper's sake - see wp81ColorFor.
+        val colors =
+            if (themeManager.getWP81HideTileColors()) emptyMap()
+            else themeManager.getWP81TileColors()
+        // A folder that was painted a colour hands it to everything inside: the page *is*
+        // the folder opened up, and a wall of accent tiles inside a green folder reads as
+        // having arrived somewhere else. A tile the user painted individually keeps its
+        // own - that was a deliberate choice about that app, and it outranks the folder's.
+        val folderColor = colors[folder.id]
+        shell.openFolder(
+            folder.label,
+            contents,
+            notifications = { child -> wp81NotificationsFor(child) },
+            tileColors = { child -> colors[child.id] ?: folderColor }
+        ) { child -> wp81GlyphFor(child) }
+        // A folder inside a folder previews its own contents too, and the page is on
+        // screen before the next notification pass comes round.
+        shell.folderPage.setFolderPreviews { child -> wp81FolderPreviewFor(child) }
+    }
+
+    /** Writes tile size and order back onto the desktop icons that back them. */
+    /**
+     * Writes tile size and order back onto the desktop icons that back them.
+     *
+     * Built-ins and user tiles share one index space, because the user can interleave
+     * them freely. User positions ride on their DesktopIcon; the built-ins have no icon to
+     * hang anything on, so theirs go to SharedPreferences.
+     */
+    private fun persistWP81Tiles(tiles: List<rocks.gorjan.gokixp.wp81.Tile>) {
+        val byId = desktopIcons.associateBy { it.id }
+        val ordered = tiles.sortedBy { it.index }
+
+        // One shared index space: built-ins and user tiles are interleaved however the
+        // user arranged them, so positions must be numbered across both, not per family.
+        val builtInPlacements = mutableMapOf<String, Pair<rocks.gorjan.gokixp.wp81.TileSize, Int>>()
+        ordered.forEachIndexed { position, tile ->
+            if (tile.kind.isBuiltIn) {
+                builtInPlacements[tile.id] = tile.size to position
+            } else {
+                byId[tile.id]?.let { icon ->
+                    icon.wp81TileSize = tile.size.name
+                    icon.wp81TileIndex = position
+                }
+            }
+        }
+        // Merged over what is already stored: a hidden tile is absent from this list, and
+        // replacing outright would forget where it used to sit.
+        saveWP81BuiltInPlacements(loadWP81BuiltInPlacements() + builtInPlacements)
+
+        val userTiles = ordered.filterNot { it.kind.isBuiltIn }
+
+        // Unpinning a tile removes the underlying desktop icon: in this theme the Start
+        // screen *is* the icon list. Three kinds are exempt, because their absence from
+        // Start means something other than "the user removed it":
+        //   - icons filed inside a folder live on that folder's page;
+        //   - the Recycle Bin and My Computer are deliberately not shown here at all, and
+        //     deleting them would lose them from the desktop themes too.
+        val keep = userTiles.map { it.id }.toSet()
+        desktopIcons.removeAll {
+            it.id !in keep &&
+                it.parentFolderId == null &&
+                it.type != IconType.RECYCLE_BIN &&
+                it.type != IconType.MY_COMPUTER
+        }
+        saveDesktopIcons()
+    }
+
+    /** Pins an app from the app list as a new medium tile. */
+    private fun pinWP81Tile(app: AppInfo) {
+        // Already on the wall: nothing to do. Tested the same way the menu tests it - a
+        // tile *on Start*, not an icon anywhere in the list. Refusing on the whole list
+        // meant an app filed inside a folder could never be pinned: the menu offered
+        // "pin to start", because there was no tile on Start, and this returned without
+        // doing anything, because there was an icon somewhere.
+        if (desktopIcons.any { it.packageName == app.packageName && it.parentFolderId == null }) return
+
+        // On the end of both walls: a new tile has no place on either, and the one the
+        // phone is not being held in would otherwise put it wherever its name falls.
+        val nextIndex = (desktopIcons.mapNotNull { it.tileIndex }.maxOrNull() ?: -1) + 1
+        val nextLandscape =
+            (desktopIcons.mapNotNull { it.tileIndexLandscape }.maxOrNull() ?: -1) + 1
+
+        // An app that is already in a folder moves out onto Start rather than appearing in
+        // both places. A phone gives an app one tile, and two tiles for one app - one of
+        // them buried in a folder - is not something the user could have asked for.
+        val filed = desktopIcons.firstOrNull {
+            it.packageName == app.packageName && it.parentFolderId != null
+        }
+        if (filed != null) {
+            filed.parentFolderId = null
+            filed.tileIndex = nextIndex
+            filed.tileIndexLandscape = nextLandscape
+            if (filed.tileSize == null) filed.tileSize = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name
+            if (filed.tileSizeLandscape == null) {
+                filed.tileSizeLandscape = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name
+            }
+            saveDesktopIcons()
+            refreshWP81Tiles()
+            wp81Shell?.let { shell ->
+                shell.goToStart()
+                shell.startScreen.scrollToEnd()
+            }
+            return
+        }
+
+        val icon = DesktopIcon(
+            name = app.name,
+            packageName = app.packageName,
+            icon = app.icon,
+            x = 0f,
+            y = 0f,
+            type = IconType.APP,
+            tileSize = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name,
+            tileIndex = nextIndex,
+            tileSizeLandscape = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM.name,
+            tileIndexLandscape = nextLandscape
+        )
+        desktopIcons.add(icon)
+        saveDesktopIcons()
+        refreshWP81Tiles()
+        // Shown rather than announced: the tile goes on the end of the wall, which on a
+        // full Start screen is off the bottom of it, so a message saying it had been
+        // pinned was the only evidence the user got. Going there is better evidence, and
+        // it also leaves them where they can move it.
+        wp81Shell?.let { shell ->
+            shell.goToStart()
+            shell.startScreen.scrollToEnd()
+        }
+    }
+
+    // ---------------------------------------------------------------- app list
+
+    /**
+     * Loads the app list for the shell.
+     *
+     * Deliberately independent of [cachedAppList]: that cache is nulled every time the
+     * desktop Start menu closes, whereas the WP8.1 app list is a permanent page.
+     */
+    private fun refreshWP81AppList() {
+        val shell = wp81Shell ?: return
+        Thread {
+            val apps = try {
+                loadAppsInBackground()
+            } catch (e: Exception) {
+                Log.e("MainActivity", "WP8.1: failed to load apps", e)
+                emptyList()
+            }
+            val hidden = getHiddenApps()
+            val visible = apps.filterNot { it.packageName in hidden }
+            runOnUiThread { shell.setApps(visible) }
+        }.start()
+    }
+
+    // ---------------------------------------------------------------- live tiles
+
+    private fun startWP81LiveTiles() {
+        stopWP81LiveTiles()
+
+        // Only worth the request if the tile that shows it is on Start.
+        refreshWP81NewsFeeds()
+        refreshWP81News()
+        refreshWP81TodayEvent()
+        refreshWP81TomorrowEvents()
+
+        // Media sessions are read through the notification listener this launcher already
+        // runs, so no extra permission - but nothing shows until notification access is on.
+        wp81MediaSessions = rocks.gorjan.gokixp.wp81.MediaSessions(this).also {
+            it.startUpdates { runOnUiThread { refreshWP81Media() } }
+        }
+
+        // Reuse the Quick Glance calendar provider rather than querying the calendar again:
+        // it already handles permissions, the all-day/next-event logic and its own refresh
+        // cadence, and pushes results back on the main thread.
+        wp81CalendarProvider = rocks.gorjan.gokixp.quickglance.CalendarDataProvider(this).also {
+            it.startUpdates { data ->
+                // The provider is the signal, not the content: it notices the calendar
+                // moving, and both days are then re-read for what a tile actually shows -
+                // a name and a time, rather than "in twenty minutes".
+                refreshWP81TodayEvent()
+                refreshWP81TomorrowEvents()
+                wp81Shell?.startScreen?.let { start ->
+                    wp81LiveWidgetContent(
+                        start.tiles().firstOrNull { t ->
+                            t.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR
+                        } ?: return@let
+                    )?.let { reading ->
+                        start.setLiveWidgetContent(WP81_WIDGET_CALENDAR, reading)
+                    }
+                }
+            }
+        }
+        val runnable = object : Runnable {
+            override fun run() {
+                wp81Shell?.startScreen?.let { start ->
+                    // Built-in widgets show their content permanently, so they are simply
+                    // refreshed in place.
+                    // Cheap: it returns without doing anything until the stories are half
+                    // an hour old, or the feeds turned on have changed.
+                    refreshWP81NewsFeeds()
+
+                    refreshWP81Weather()
+                    // Media sessions announce themselves when they change, but a session
+                    // quietly going away is a change nobody reports. Re-read on the tick
+                    // so a tile cannot be left holding a track that finished.
+                    refreshWP81Media()
+                    for (tile in start.tiles()) {
+                        wp81LiveWidgetContent(tile)?.let { reading ->
+                            start.setLiveWidgetContent(tile.id, reading)
+                        }
+                        // Conditions change with the reading, so the mark refreshes with it.
+                        val (frontGlyph, backGlyph) = wp81WidgetGlyphFor(tile)
+                        start.setWidgetGlyph(tile.id, frontGlyph, backGlyph)
+                        start.setWidgetBack(tile.id, wp81LiveWidgetBack(tile))
+                    }
+                }
+                wp81Handler.postDelayed(this, WP81_LIVE_TILE_INTERVAL_MS)
+            }
+        }
+        wp81LiveTileRunnable = runnable
+        wp81Handler.postDelayed(runnable, WP81_LIVE_TILE_INTERVAL_MS)
+    }
+
+    private fun stopWP81LiveTiles() {
+        wp81LiveTileRunnable?.let { wp81Handler.removeCallbacks(it) }
+        wp81LiveTileRunnable = null
+        wp81CalendarProvider?.stopUpdates()
+        wp81CalendarProvider = null
+        wp81MediaSessions?.stopUpdates()
+        wp81MediaSessions = null
+    }
+
+    /**
+     * Stores a new accent / background and repaints immediately.
+     *
+     * Deliberately does not recreate the activity: unlike a theme switch, changing accent
+     * is meant to be instant, and every WP8.1 surface repaints from the palette.
+     */
+    private fun commitWP81Appearance(accent: Int, dark: Boolean) {
+        val changed = accent != themeManager.getWP81Accent() || dark != themeManager.isWP81Dark()
+        if (!changed) return
+        themeManager.setWP81Accent(accent)
+        themeManager.setWP81Dark(dark)
+        refreshWP81Palette()
+    }
+
+    /**
+     * Returns the WP8.1 shell to the top of Start.
+     *
+     * Home means home: whatever was open - the app list mid-search, a folder page,
+     * settings, a selected tile, or Start scrolled halfway down - swiping home puts the
+     * user back at the top of the Start screen, the way pressing Start on a real phone did.
+     */
+    /**
+     * Everything "home" means under Windows Phone 8.1.
+     *
+     * Reached from the system's home gesture as well as from the Start key, and both mean
+     * the same thing: whatever the user has got themselves into, put it away. Programs
+     * included - resetting the shell while a maximised program covered it left the user
+     * looking at exactly what they had just asked to leave, with a Start screen tidying
+     * itself up behind it.
+     */
+    private fun resetWP81ToStart() {
+        val shell = wp81Shell ?: return
+        minimiseWP81Windows()
+        wp81OpenFolderId = null
+        shell.contextMenu.dismiss()
+        shell.startScreen.exitEditMode()
+        shell.goToStart(animated = false)
+        shell.startScreen.scrollToTop()
+    }
+
+    /**
+     * Takes every program that is on screen off it, and says whether there were any.
+     *
+     * Minimised rather than closed: none of them has been asked to stop, Zune in
+     * particular is still playing, and each comes back by being launched again - which
+     * restores it rather than starting it over.
+     */
+    private fun minimiseWP81Windows(): Boolean {
+        val onScreen = floatingWindowManager.getAllActiveWindows().filterNot { it.isMinimized() }
+        onScreen.forEach { it.minimize() }
+        return onScreen.isNotEmpty()
+    }
+
+    /** Repaints the shell after an accent or Light/Dark change, without a recreate. */
+    fun refreshWP81Palette() {
+        val shell = wp81Shell ?: return
+        val palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager)
+        shell.applyPalette(palette)
+        applyWP81SystemBarAppearance(palette)
+        findViewById<RelativeLayout>(R.id.main_background)?.setBackgroundColor(palette.background)
+        findViewById<View>(R.id.root_container)?.setBackgroundColor(palette.background)
+    }
+
     private fun setupStartBannerCycling() {
         try {
             // Only set up banner cycling if we're in Windows 98 theme
@@ -12996,6 +16757,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun applyTaskbarHeightOffset(offset: Int) {
+        // The WP8.1 shell owns its own vertical layout - status bar on top, navigation bar
+        // at the bottom - and this would stamp desktop taskbar margins over it.
+        if (themeManager.isWindowsPhone81()) return
+
         val gestureBarBackground = findViewById<View>(R.id.gesture_bar_background)
         val taskbarContainer = findViewById<View>(R.id.taskbar_container)
         val floatingWindowsContainer = findViewById<View>(R.id.floating_windows_container)
@@ -13118,8 +16883,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun initializeTheme() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-        Log.d("MainActivity", "initializeTheme: selectedTheme = '$selectedTheme'")
+        // Read through AppTheme rather than compared as text. The phone theme answers to
+        // two spellings - "Windows Phone 8" is what AppTheme.toString gives and what the
+        // phone's own settings page therefore stores, "Windows Phone 8.1" is what the
+        // desktop's Display Properties writes - and this used to test for one of them. A
+        // theme stored under the other name matched no branch at all, so nothing was
+        // applied: the desktop stayed up with the phone's colours on it and no shell.
+        val stored = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        val selectedTheme = AppTheme.fromString(stored).toString()
+        Log.d("MainActivity", "initializeTheme: stored='$stored' resolved='$selectedTheme'")
 
         // Check if this theme is already applied to prevent double application
         if (lastAppliedTheme == selectedTheme) {
@@ -13127,20 +16899,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        // First reload the start menu layout for the correct theme
-        setupStartMenu(selectedTheme)
+        // The WP8.1 shell has no Start menu - building one would inflate a taskbar-anchored
+        // layout that is never shown.
+        if (AppTheme.fromString(selectedTheme) != AppTheme.WindowsPhone81) {
+            // And before anything is built on top: the phone shell takes the desktop apart
+            // to make room for itself, and nothing ever put it back. A switch that reaches
+            // here without the activity having been rebuilt in between - which does happen -
+            // left a desktop with no cursor, no icons and whichever Start menu was there
+            // two themes ago. Undoing it here means any theme applied over the phone shell
+            // heals the screen rather than inheriting half of it.
+            restoreDesktopAfterWP81()
+            setupStartMenu(selectedTheme)
+        }
 
-        // Apply theme layouts directly (bypass tracking for initialization)
-        when (selectedTheme) {
-            "Windows Classic" -> {
-                applyWindows98Theme()
-            }
-            "Windows XP" -> {
-                applyWindowsXPTheme()
-            }
-            "Windows Vista" -> {
-                applyWindowsVistaTheme()
-            }
+        // Apply theme layouts directly (bypass tracking for initialization). On the enum,
+        // so every spelling of a theme's name lands on the same branch and adding one can
+        // never again leave a theme that matches nothing.
+        when (AppTheme.fromString(selectedTheme)) {
+            AppTheme.WindowsClassic -> applyWindows98Theme()
+            AppTheme.WindowsXP -> applyWindowsXPTheme()
+            AppTheme.WindowsVista -> applyWindowsVistaTheme()
+            AppTheme.WindowsPhone81 -> applyWindowsPhone81Theme()
         }
 
         // Mark theme as applied to prevent future unnecessary applications
@@ -13426,6 +17205,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun showCursorAt(x: Float, y: Float, isMoving: Boolean = false) {
+        // No mouse pointer under Windows Phone 8.1 - it is a touch OS.
+        if (themeManager.isWindowsPhone81()) {
+            cursorEffect.visibility = View.GONE
+            return
+        }
         // Cancel any pending cursor hide
         cursorRunnable?.let { cursorHandler.removeCallbacks(it) }
 
@@ -13452,6 +17236,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var busyCursorAnimator: android.animation.ObjectAnimator? = null
 
     private fun setCursorBusy() {
+        // No mouse pointer under Windows Phone 8.1 - it is a touch OS.
+        if (themeManager.isWindowsPhone81()) {
+            cursorEffect.visibility = View.GONE
+            return
+        }
         if (::cursorEffect.isInitialized) {
             val plus95 = themeManager.getActivePlus95()
             if (plus95 != null && plus95.busyAsset != null) {
@@ -13478,6 +17267,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     // Switch cursor back to normal (pointer) state
     private fun setCursorNormal() {
+        // No mouse pointer under Windows Phone 8.1 - it is a touch OS.
+        if (themeManager.isWindowsPhone81()) {
+            cursorEffect.visibility = View.GONE
+            return
+        }
         if (::cursorEffect.isInitialized) {
             // Stop any busy rotation animation
             busyCursorAnimator?.cancel()
@@ -13491,8 +17285,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Creates a WindowsDialog with the correct theme from the start to avoid re-inflation
      */
     private fun createThemedWindowsDialog(): WindowsDialog {
+        // Pass the *chrome* theme, not the selected one. Under Windows Phone 8.1 this
+        // hands the dialog AppTheme.WindowsVista, so every `currentTheme is WindowsVista`
+        // check inside WindowsDialog - layout, border, focused/unfocused title bars -
+        // takes the Vista branch without needing a WP8.1 arm of its own.
         val theme = themeManager.getSelectedTheme()
-        return WindowsDialog(this, initialTheme = theme)
+        val chromeTheme = when (theme.chrome) {
+            DesktopChrome.CLASSIC -> AppTheme.WindowsClassic
+            DesktopChrome.XP -> AppTheme.WindowsXP
+            DesktopChrome.VISTA -> AppTheme.WindowsVista
+        }
+        return WindowsDialog(this, initialTheme = chromeTheme)
     }
 
     /**
@@ -13501,6 +17304,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * @param description The notification message
      */
     private fun showNotification(title: String, description: String, onTap: (() -> Unit)? = null) {
+        // Windows Phone 8.1 announces things with a band across the top instead of the
+        // Vista speech bubble, which is anchored to a system tray this shell does not have.
+        wp81Shell?.let { shell ->
+            shell.toast.show(title, description, NOTIFICATION_DURATION_MS, onTap)
+            // The phone's own alert, not the desktop's: a band across the top of a Start
+            // screen announcing itself with Vista's bubble is two operating systems at once.
+            playSound(R.raw.bubble_8)
+            return
+        }
+
         // Cancel any pending hide runnable
         notificationHideRunnable?.let { notificationHandler.removeCallbacks(it) }
 
@@ -13519,7 +17332,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             hideNotification()
             notificationTapCallback = null // Clear callback if not tapped
         }
-        notificationHandler.postDelayed(notificationHideRunnable!!, 7000)
+        notificationHandler.postDelayed(notificationHideRunnable!!, NOTIFICATION_DURATION_MS)
 
         playSound(R.raw.bubble)
     }
@@ -13585,6 +17398,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     if (updateAvailable) {
                         runOnUiThread {
                             updateDownloadLink = downloadUrl
+                            updateAvailableVersion = latestTag
+                            // The Welcome tile says so on Start, the way the taskbar icon
+                            // says so on the desktop.
+                            refreshWP81Notifications()
                             updateIcon.visibility = View.VISIBLE
 
                             showNotification(
@@ -13595,7 +17412,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                     try {
 //                                        val intent = Intent(Intent.ACTION_VIEW, downloadUrl.toUri())
 //                                        startActivity(intent)
-                                        showInternetExplorerDialog(downloadUrl)
+                                        openUrlShortcut(downloadUrl)
                                     } catch (e: Exception) {
                                         Log.e("MainActivity", "Error opening link", e)
                                     }

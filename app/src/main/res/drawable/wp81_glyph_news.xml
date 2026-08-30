@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_glyph_news - the News live tile.
+
+  A folded newspaper: the sheet behind, the front page over it with a masthead rule, a
+  boxed lead story and column rules. Drawn on the same 76x76 grid and with the same 3-4
+  unit stroke weight as the icons derived from Templarian/WindowsIcons (Modern UI Icons,
+  CC BY 3.0), so it sits with them rather than beside them.
+
+  Emitted white so callers can tint per accent / light-dark theme.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <!-- The sheet behind, showing along the right edge and the foot. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 56,24L 62,24L 62,56L 20,56L 20,52L 56,52L 56,24 Z" />
+    <!-- The front page. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 14,20L 56,20L 56,50L 14,50L 14,20 Z M 18,24L 18,46L 52,46L 52,24L 18,24 Z" />
+    <!-- Masthead rule. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 21,27L 49,27L 49,30L 21,30L 21,27 Z" />
+    <!-- The lead story, boxed. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 21,33L 33,33L 33,43L 21,43L 21,33 Z" />
+    <!-- Column rules beside it. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 36,33L 49,33L 49,35L 36,35L 36,33 Z M 36,37L 49,37L 49,39L 36,39L 36,37 Z M 36,41L 49,41L 49,43L 36,43L 36,41 Z" />
+</vector>

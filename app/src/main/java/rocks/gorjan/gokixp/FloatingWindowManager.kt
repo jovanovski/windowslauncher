@@ -14,6 +14,29 @@ class FloatingWindowManager(private val context: Context, private val container:
     private val activeWindows = mutableListOf<WindowsDialog>()
     private val themeManager = ThemeManager(context)
 
+    /**
+     * Notified whenever the number of open windows changes.
+     *
+     * The Windows Phone 8.1 shell uses this to raise a black backdrop behind windowed
+     * programs: WP8.1 has no desktop, so a fixed-size window like Winamp or the Phone
+     * Dialer would otherwise float over the Start screen.
+     */
+    var onWindowCountChanged: ((Int) -> Unit)? = null
+
+    /**
+     * How many windows are actually on screen.
+     *
+     * What the backdrop cares about is whether anything is covering the shell, which a
+     * minimized window is not - counting those left a black sheet over the Start screen
+     * with nothing on top of it and no way past.
+     */
+    fun visibleWindowCount(): Int = activeWindows.count { !it.isMinimized() }
+
+    /** Re-announces the count after a window is minimized or restored. */
+    fun notifyWindowVisibilityChanged() {
+        onWindowCountChanged?.invoke(visibleWindowCount())
+    }
+
     fun showWindow(windowsDialog: WindowsDialog) {
         // Unfocus all existing windows
         activeWindows.forEach { it.setUnfocused() }
@@ -34,7 +57,7 @@ class FloatingWindowManager(private val context: Context, private val container:
         windowsDialog.setFocused()
 
         // Apply fade-in animation for Vista
-        if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+        if (themeManager.isVistaChrome()) {
             windowsDialog.alpha = 0f
             windowsDialog.animate()
                 .alpha(1f)
@@ -46,6 +69,8 @@ class FloatingWindowManager(private val context: Context, private val container:
         themeManager.getActivePlus95()?.let { plus95 ->
             (context as? MainActivity)?.applyPlus95MenuColor(windowsDialog, plus95.menuColor)
         }
+
+        onWindowCountChanged?.invoke(visibleWindowCount())
     }
 
     fun removeWindow(windowsDialog: WindowsDialog) {
@@ -54,18 +79,20 @@ class FloatingWindowManager(private val context: Context, private val container:
             windowsDialog.unregisterFromTaskbar()
 
             // Apply fade-out animation for Vista
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+            if (themeManager.isVistaChrome()) {
                 windowsDialog.animate()
                     .alpha(0f)
                     .setDuration(150)
                     .withEndAction {
                         container.removeView(windowsDialog)
                         activeWindows.remove(windowsDialog)
+                        onWindowCountChanged?.invoke(visibleWindowCount())
                     }
                     .start()
             } else {
                 container.removeView(windowsDialog)
                 activeWindows.remove(windowsDialog)
+                onWindowCountChanged?.invoke(visibleWindowCount())
             }
         } catch (e: Exception) {
             // Window might already be removed
@@ -108,10 +135,22 @@ class FloatingWindowManager(private val context: Context, private val container:
     }
 
     /**
+     * The front-most window the user can actually see.
+     *
+     * A minimized window is still open and still in the list, but it is not on screen and
+     * has no business owning the back press - which, while one was minimized, went to the
+     * window instead of to the shell and so did nothing at all.
+     */
+    fun getFrontVisibleWindow(): WindowsDialog? =
+        activeWindows.lastOrNull { !it.isMinimized() }
+
+    /**
      * Closes the front-most window
      */
     fun closeFrontWindow(): Boolean {
-        val frontWindow = getFrontWindow()
+        // The visible one: closing a window nobody can see, while the one they are looking
+        // at stays put, is not what "close this" means.
+        val frontWindow = getFrontVisibleWindow()
         if (frontWindow != null) {
             // Trigger the close listener before removing
             frontWindow.triggerCloseListener()

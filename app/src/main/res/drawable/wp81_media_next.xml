@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_media_next - media transport control on a live tile.
+
+  Derived from Templarian/WindowsIcons (Modern UI Icons), CC BY 3.0.
+  Source: WindowsPhone/svg/appbar.control.fastforward.svg
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 19,27.7083L 32.4583,38L 19,48.2917L 19,27.7083 Z M 36.4167,27.7083L 49.875,38L 36.4167,48.2917L 36.4167,27.7083 Z M 52.25,28.5L 57,28.5L 57,47.5L 52.25,47.5L 52.25,28.5 Z" />
+</vector>
