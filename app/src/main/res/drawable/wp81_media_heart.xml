@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_media_heart - the favourite toggle on Zune's now playing screen, unfilled.
+
+  Drawn here rather than traced from the Modern UI Icons set: the phone's heart is an
+  outline you can see the wallpaper through, and the set's appbar.heart sits inside a
+  circle, which on this screen would have made a fourth kind of button in a column that
+  already has three bare glyphs in it.
+
+  Authored on the same 76x76 grid as the rest of the set so it sits at the same weight
+  beside shuffle and repeat, and emitted white; the player tints it per state. Its filled
+  twin is wp81_media_heart_filled.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <group
+        android:translateX="14"
+        android:translateY="14"
+        android:scaleX="2"
+        android:scaleY="2">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.4"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M 12,21.35 C 12,21.35 2,13.4 2,8.4 C 2,5.32 4.42,2.9 7.5,2.9 C 9.24,2.9 10.91,3.71 12,4.99 C 13.09,3.71 14.76,2.9 16.5,2.9 C 19.58,2.9 22,5.32 22,8.4 C 22,13.4 12,21.35 12,21.35 Z" />
+    </group>
+</vector>

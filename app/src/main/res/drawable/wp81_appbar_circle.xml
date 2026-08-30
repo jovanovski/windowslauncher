@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ring behind a button on IE's app bar.
+
+  The tile handles' disc (wp81_handle_circle) is black-filled because it sits half on a
+  tile and half on the page behind it, and has to read against both at once. These sit on
+  the app bar's own near-black and nothing else, so the fill would only be a slightly
+  different black inside a ring - a smudge rather than a button. Left open, so the bar
+  shows through and the ring is the whole button.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="2dp"
+        android:color="#FFFFFFFF" />
+</shape>

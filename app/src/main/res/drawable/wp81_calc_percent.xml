@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's percent key. Shares the 32-unit box of wp81_calc_plus, but not its
+  geometry: two rings and a solidus, drawn heavier than Segoe's own per-cent sign so it
+  carries the same weight as the bars on the keys either side of it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- The rings are cut rather than stroked: even-odd against a second circle inside. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M6,11a5,5 0 1,0 10,0a5,5 0 1,0 -10,0z M9.5,11a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M16,21a5,5 0 1,0 10,0a5,5 0 1,0 -10,0z M19.5,21a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.96,26.05L8.04,23.95L21.04,5.95L23.96,8.05Z" />
+</vector>

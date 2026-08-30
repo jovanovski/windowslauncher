@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_media_nowplaying - the little broadcast mark that sat in front of the song's name.
+
+  A dot with two arcs either side of it. It is the one thing on the now playing screen
+  that says which of the lines of type is the song, and the phone put it there rather
+  than labelling the line.
+
+  Authored on the same 76x76 grid as the rest of the set, and drawn out to the same edges
+  the traced glyphs reach so it carries the same weight at the same size. Emitted white;
+  the player tints it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 29,38 a 9,9 0 1 0 18,0 a 9,9 0 1 0 -18,0 z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M 26,26 A 17,17 0 0 0 26,50 M 50,26 A 17,17 0 0 1 50,50 M 18.2,18.2 A 28,28 0 0 0 18.2,57.8 M 57.8,18.2 A 28,28 0 0 1 57.8,57.8" />
+</vector>

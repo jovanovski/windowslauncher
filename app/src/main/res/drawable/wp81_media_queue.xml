@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_media_queue - the way to the running order, under the cover on now playing.
+
+  A list with its marks down the left, which is how the phone's player drew the button
+  that turned the cover over. Authored on the same 76x76 grid as the rest of the set and
+  emitted white; the player tints it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 16,23.5 h 6.5 v 6.5 h -6.5 z M 28.5,23.5 h 31.5 v 6.5 h -31.5 z M 16,34.75 h 6.5 v 6.5 h -6.5 z M 28.5,34.75 h 31.5 v 6.5 h -31.5 z M 16,46 h 6.5 v 6.5 h -6.5 z M 28.5,46 h 31.5 v 6.5 h -31.5 z" />
+</vector>

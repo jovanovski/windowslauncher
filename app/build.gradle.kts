@@ -48,6 +48,16 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("pl.droidsonroids.gif:android-gif-drawable:1.2.29")
 
+    // Android Auto: template host + the navigation surface the car screen is drawn on.
+    // See car/GokiCarAppService.kt. app-projected is the phone-projection artifact;
+    // app-automotive would be the one for cars running Android Automotive OS.
+    // app-projected declares the core artifact as runtime-only, so it has to be asked for
+    // by name or none of the API resolves at compile time.
+    // MediaBrowserService, so the car's media list can browse the Zune library.
+    implementation("androidx.media:media:1.8.0")
+    implementation("androidx.car.app:app:1.7.0")
+    implementation("androidx.car.app:app-projected:1.7.0")
+
     // WindowManager for foldable device detection
     implementation("androidx.window:window:1.3.0")
 

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's divide key: an obelus. See wp81_calc_plus for the shared 16/4 geometry.
+
+  The dots are round and noticeably smaller than the bar is thick, which is what keeps it
+  from reading as a minus with two squares stacked on it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,14h16v4h-16z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13.75,9.5a2.25,2.25 0 1,0 4.5,0a2.25,2.25 0 1,0 -4.5,0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13.75,22.5a2.25,2.25 0 1,0 4.5,0a2.25,2.25 0 1,0 -4.5,0z" />
+</vector>

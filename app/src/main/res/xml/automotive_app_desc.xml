@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tells the Android Auto host what kind of car app this is.
+
+  "template" means the app talks to the car through the Car App Library rather than by
+  projecting an activity, which is the only thing a third party is allowed to do.
+-->
+<automotiveApp>
+    <uses name="template" />
+    <!--
+      A media entry belongs here too - it is what gives Zune a real browse screen in the
+      car instead of "Windows Launcher is open on the phone", and ZuneCarMediaService is
+      written and registered for it. It is commented out because declaring both identities
+      made the host stop the navigation session the moment a tile was tapped, taking the
+      Start screen off the car screen with no way back. Restore it only together with a
+      test that the wall survives a tap.
+      <uses name="media" />
+    -->
+</automotiveApp>

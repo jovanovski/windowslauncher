@@ -34,6 +34,11 @@ import rocks.gorjan.gokixp.R
  * that the app is one wide surface being moved across rather than a stack of screens being
  * swapped. Microsoft's own guidance for the control puts it exactly that way - the title's
  * rate of motion is slow relative to the content, and slower again than the background art.
+ *
+ * It is a loop: pushing past the last section brings the first one round again, which is
+ * what the platform did and what makes a panorama a surface rather than a queue. What it
+ * does *not* do is lay its names out twice to get there - see [rebuildStrip] for how the
+ * strip crosses the seam with only one of each name on it.
  */
 @SuppressLint("ViewConstructor")
 class MetroPanorama(
@@ -70,15 +75,6 @@ class MetroPanorama(
     /** The section names, and every label drawn for them - one per name per repeat. */
     private val titleTexts = mutableListOf<String>()
     private val titleLabels = mutableListOf<TextView>()
-
-    /**
-     * How many times over the section names are laid out end to end.
-     *
-     * The panorama wraps, so the strip has to be able to run off the end of the last name
-     * and into the first without a seam. Grown until one repeat's worth of strip past any
-     * position still covers the screen - see [growStripIfNeeded].
-     */
-    private var stripRepeats = 2
 
     private val pages = mutableListOf<View>()
 
@@ -162,54 +158,34 @@ class MetroPanorama(
     }
 
     /**
-     * Lays the section names out end to end, [stripRepeats] times over.
+     * Lays the section names out end to end, once each.
      *
-     * The repeats are what let the strip wrap: read from any point in it, the names run in
-     * order for at least a full turn, so the last name is followed by the first exactly as
-     * it is on the pages underneath. Rebuilt rather than appended to, because a name added
-     * to the end of the list belongs in the middle of every repeat but the first.
+     * Once. The strip used to be repeated so the last name could run straight into the
+     * first, which is the obvious way to carry a loop - but a panorama of two short names
+     * then spent most of the screen saying "notes archive notes archive", and two sections
+     * that read as four is worse than anything the repeats were buying. The loop is still
+     * there; the seam is crossed by sending this one strip home instead, in the same step
+     * and at the same time as the first section is pulled in. See [titleOffsetFor].
      */
     private fun rebuildStrip() {
         headerRow.removeAllViews()
         titleLabels.clear()
-        val count = titleTexts.size
-        if (count == 0) return
-        val repeats = if (count < 2) 1 else stripRepeats
-        for (repeat in 0 until repeats) {
-            for ((index, text) in titleTexts.withIndex()) {
-                val label = TextView(context).apply {
-                    this.text = text
-                    typeface = ResourcesCompat.getFont(context, R.font.segoeui_light)
-                    textSize = TITLE_SP
-                    includeFontPadding = false
-                    maxLines = 1
-                    setPadding(0, dp(4), dp(TITLE_GAP_DP), dp(10))
-                    isClickable = true
-                    setOnClickListener { goTo(index, animated = true) }
-                }
-                titleLabels.add(label)
-                headerRow.addView(label)
+        if (titleTexts.isEmpty()) return
+        for ((index, text) in titleTexts.withIndex()) {
+            val label = TextView(context).apply {
+                this.text = text
+                typeface = ResourcesCompat.getFont(context, R.font.segoeui_light)
+                textSize = TITLE_SP
+                includeFontPadding = false
+                maxLines = 1
+                setPadding(0, dp(4), dp(TITLE_GAP_DP), dp(10))
+                isClickable = true
+                setOnClickListener { goTo(index, animated = true) }
             }
+            titleLabels.add(label)
+            headerRow.addView(label)
         }
         repaintTitles()
-    }
-
-    /**
-     * Adds another repeat if one turn of the strip cannot fill the screen on its own.
-     *
-     * The strip is read from anywhere in the first repeat, so what has to be there is a
-     * repeat's width of names *after* that point. Two is enough for a panorama whose names
-     * are wider than the screen, which most are; a short one needs more.
-     */
-    private fun growStripIfNeeded() {
-        val count = titleTexts.size
-        if (count < 2 || titleLabels.size <= count) return
-        if (stripRepeats >= MAX_STRIP_REPEATS) return
-        val period = titleLabels[count].left
-        if (period <= 0) return
-        if (headerRow.width - period >= width) return
-        stripRepeats++
-        rebuildStrip()
     }
 
     /** Which section is showing, rounded to the nearest while a drag is in progress. */
@@ -281,7 +257,9 @@ class MetroPanorama(
         // Everything is drawn from the position counted round the loop rather than from
         // the raw one. The pages, the strip and the name are all periodic in it, so the
         // moment the count turns over - a lap ended, or a drag taken back past the first
-        // section - nothing on screen moves.
+        // section - nothing on screen moves. It also puts both ways of reaching the seam,
+        // forwards off the last section and backwards off the first, on the same stretch
+        // of the count, which is the stretch the strip and the name travel home over.
         val position = if (count > 0) ((offset % count) + count) % count else 0f
 
         for ((i, page) in pages.withIndex()) {
@@ -314,16 +292,7 @@ class MetroPanorama(
     }
 
     /**
-     * Moves the app's name, the slowest layer there is.
-     *
-     * Its travel is set by what has to remain rather than by a share of the screen: over
-     * the sections it drifts from the margin to the point where [APP_TITLE_KEEP] of it is
-     * still showing on the last one, and the final step of the lap - the wrap itself -
-     * carries the rest of it off. So the name is always partly there wherever the user
-     * stops, and gone exactly at the seam, which is where it has to be put back.
-     */
-    /**
-     * Where the name sits at [position].
+     * Where the app's name sits at [position]. The slowest of the moving layers.
      *
      * Two parts to the lap, and the name moves throughout both of them.
      *
@@ -331,7 +300,7 @@ class MetroPanorama(
      * [APP_TITLE_KEEP] of it is still showing on the last one - so wherever the user stops,
      * the name is still partly there.
      *
-     * The last step of the lap is the wrap, and the name spends it travelling back: it
+     * The last step of the lap is the seam, and the name spends it travelling back: it
      * slides home as the first section is pulled in, arriving exactly as that section
      * does. That is the whole reason to compute it this way rather than to animate a jump
      * afterwards - the return is part of the swipe, so it is under the finger like every
@@ -351,11 +320,30 @@ class MetroPanorama(
         return if (lap <= last) -(lap / last) * travel else -(count - lap) * travel
     }
 
-    /** Where the title strip has to sit for [position], interpolated between two titles. */
+    /**
+     * Where the title strip has to sit for [position], interpolated between two titles.
+     *
+     * Across the sections that is the plain thing: each name is carried to the left margin
+     * exactly as its own page arrives, which is what makes the strip read as one line of
+     * words being drawn past rather than as a set of tabs lighting up.
+     *
+     * The last step of the lap is the seam, and there is no further name to run into -
+     * this strip holds one of each. So the strip does what the app's name does over that
+     * same step and travels home: it slides back to the first name as the first section is
+     * pulled in, arriving with it. The names move against the pages for that one step,
+     * which is the price of never saying "notes" twice, and it is paid where the eye is on
+     * the section arriving rather than on the strip.
+     */
     private fun titleOffsetFor(position: Float): Float {
         if (titleLabels.isEmpty()) return 0f
-        val low = position.toInt().coerceIn(0, titleLabels.size - 1)
-        val high = (low + 1).coerceAtMost(titleLabels.size - 1)
+        val last = titleLabels.size - 1
+        val lastLeft = titleLabels[last].left.toFloat()
+        if (position >= last) {
+            val step = (position - last).coerceIn(0f, 1f)
+            return lastLeft * (1f - step)
+        }
+        val low = position.toInt().coerceIn(0, last)
+        val high = (low + 1).coerceAtMost(last)
         val lowLeft = titleLabels[low].left.toFloat()
         val highLeft = titleLabels[high].left.toFloat()
         return lowLeft + (highLeft - lowLeft) * (position - low)
@@ -363,19 +351,16 @@ class MetroPanorama(
 
     /** The section you are on is lit; the ones either side of it stand back. */
     private fun repaintTitles() {
-        val count = titleTexts.size
-        if (count == 0) return
+        if (titleLabels.isEmpty()) return
         val current = currentPage()
         for ((i, title) in titleLabels.withIndex()) {
-            title.setTextColor(
-                if (i % count == current) palette.foreground else palette.inactive)
+            title.setTextColor(if (i == current) palette.foreground else palette.inactive)
         }
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         super.onLayout(changed, l, t, r, b)
         if (changed) applyOffset(offset)
-        growStripIfNeeded()
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -517,9 +502,6 @@ class MetroPanorama(
 
         /** However long the name, it never drifts further than this share of the screen. */
         const val APP_TITLE_MAX_TRAVEL = 0.5f
-
-        /** A ceiling on the repeats, so a strip that cannot fill the screen stops asking. */
-        const val MAX_STRIP_REPEATS = 6
 
         const val TITLE_SP = 30f
         const val TITLE_GAP_DP = 22

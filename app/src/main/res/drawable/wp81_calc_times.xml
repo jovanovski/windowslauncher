@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's multiply key. See wp81_calc_plus for the shared 16/4 geometry.
+
+  Two bars rather than a crossed outline: at four units thick the diagonals overlap in the
+  middle, and two overlapping subpaths wound the same way fill as their union.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.83,8L24,21.17L21.17,24L8,10.83Z M21.17,8L24,10.83L10.83,24L8,21.17Z" />
+</vector>

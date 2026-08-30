@@ -56,11 +56,12 @@ class WP81InputDialog(
         panel.addView(heading, wide())
 
         field.setSingleLine()
-        field.background = null
         field.textSize = 18f
         field.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         field.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
-        field.setPadding(0, dp(16), 0, dp(6))
+        // Air inside the box rather than around it: the fill is the field's edge now, and
+        // text against a white edge reads as text that has escaped.
+        field.setPadding(dp(10), dp(9), dp(10), dp(9))
         panel.addView(field, wide())
 
         panel.addView(underline, LinearLayout.LayoutParams(

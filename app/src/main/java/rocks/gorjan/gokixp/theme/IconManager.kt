@@ -11,6 +11,7 @@ import rocks.gorjan.gokixp.MainActivity
  *
  * BACKWARD COMPATIBILITY:
  * - Uses existing SharedPreferences keys: "custom_icons_98", "custom_icons_xp"
+ * - One key per theme, not per window chrome - see AppTheme.customIconsKey
  * - Preserves existing JSON format for custom icon mappings
  * - User custom icons are fully preserved during migration
  */
@@ -121,18 +122,12 @@ class IconManager(private val context: Context) {
      * Gets the SharedPreferences key for storing custom icons for a theme.
      * Uses the same keys as legacy code for backward compatibility.
      *
+     * Answered by the theme rather than by its chrome, so that Windows Phone - whose
+     * windows are Vista's but whose Start screen is nothing of the kind - keeps its own
+     * set rather than writing over Vista's. See [AppTheme.customIconsKey].
+     *
      * @param theme The theme
      * @return The SharedPreferences key
      */
-    private fun getIconKey(theme: AppTheme): String = when (theme.chrome) {
-        DesktopChrome.CLASSIC -> KEY_CUSTOM_ICONS_98
-        DesktopChrome.XP -> KEY_CUSTOM_ICONS_XP
-        DesktopChrome.VISTA -> KEY_CUSTOM_ICONS_VISTA
-    }
-
-    companion object {
-        private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
-        private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
-        private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"
-    }
+    private fun getIconKey(theme: AppTheme): String = theme.customIconsKey
 }

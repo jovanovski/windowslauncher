@@ -132,6 +132,16 @@ data class Tile(
         LIVE_PHOTOS,
 
         /**
+         * The address book, as the wall of faces Windows Phone put on Start.
+         *
+         * The other tile whose content the phone already has, and the only one that is a
+         * grid rather than a face: it fills itself with contact pictures and turns them
+         * over a square at a time. See PeopleMosaicView, which draws it, and ContactFeed,
+         * which reads them.
+         */
+        LIVE_PEOPLE,
+
+        /**
          * Welcome, which the shell provides rather than the user pinning.
          *
          * Not a live widget - it has an icon like any program and only speaks up when
@@ -153,7 +163,7 @@ data class Tile(
         val isLiveWidget: Boolean
             get() = this == LIVE_CLOCK || this == LIVE_CALENDAR ||
                 this == LIVE_AQI || this == LIVE_WEATHER || this == LIVE_NEWS ||
-                this == LIVE_PHOTOS
+                this == LIVE_PHOTOS || this == LIVE_PEOPLE
 
         /**
          * Tiles the shell provides rather than the user pinning them.

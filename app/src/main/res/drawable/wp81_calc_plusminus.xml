@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's sign key. See wp81_calc_plus for the shared 16/4 geometry.
+
+  A plus riding higher in the box than the plus key's does, so the bar underneath it has
+  somewhere to sit without the whole mark drifting off the key's centre line.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,11h16v4h-16z M14,5h4v16h-4z M8,23h16v4h-16z" />
+</vector>

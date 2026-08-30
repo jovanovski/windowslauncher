@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's backspace key.
+
+  Windows Phone's own back-arrow tag - a rectangle drawn to a point on the left with a
+  cross struck through it - rather than the 16/4 bars the arithmetic keys use: it is a
+  picture of an action, not an operator, and it is outlined where they are solid.
+
+  Stroked rather than drawn as a filled outline, so the two-unit line stays two units at
+  any size and the wedge needs no second polygon inset inside the first.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineJoin="miter"
+        android:pathData="M2,16L10.5,6.5L30,6.5L30,25.5L10.5,25.5Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M16.5,12L24.5,20 M24.5,12L16.5,20" />
+</vector>

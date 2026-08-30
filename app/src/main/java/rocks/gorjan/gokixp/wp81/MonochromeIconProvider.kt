@@ -65,6 +65,17 @@ class MonochromeIconProvider(private val context: Context) {
         ratioCache.keys.removeAll { it.endsWith(":$packageName") }
     }
 
+    /**
+     * Forgets every cached measurement.
+     *
+     * For when the whole set of hand-picked icons has been swapped out - arriving on the
+     * phone shell reloads the mappings for its own theme, and every "custom:" measurement
+     * taken under the previous theme was of a different picture.
+     */
+    fun invalidateAll() {
+        ratioCache.clear()
+    }
+
     /** Cached [measureContentRatio]; measuring means rasterising, so do it once per app. */
     fun ratioFor(key: String, drawable: Drawable): Float =
         ratioCache.getOrPut(key) { measureContentRatio(drawable) }

@@ -98,6 +98,35 @@ class TileView(
     /** Whether [folderPreview] is the front face right now. */
     private var hasFolderPreview = false
 
+    /**
+     * The People tile's wall of faces, shown in place of everything else. See
+     * [setPeopleMosaic].
+     *
+     * Built on first use for the same reason the folder preview is: one tile on the wall
+     * ever wants one.
+     */
+    private var peopleMosaic: PeopleMosaicView? = null
+
+    /** Whether [peopleMosaic] is the front face right now. */
+    private var hasPeopleMosaic = false
+
+    /**
+     * Whose name the label is carrying, while the mosaic has given the tile to one person.
+     *
+     * The mosaic draws no words of its own: a name on this tile is set in the same type,
+     * in the same corner, as the name of any other tile - see [applyFolderLabel], which is
+     * where the two meet.
+     */
+    private var peopleName: String? = null
+
+    /**
+     * Who the mosaic fills itself from: the people the user starred, and the rest of the
+     * book behind them. See [applyPeopleGrid], which decides how many of the second it
+     * actually takes.
+     */
+    private var favourites: List<ContactFeed.Person> = emptyList()
+    private var otherPeople: List<ContactFeed.Person> = emptyList()
+
     private val label = TextView(context)
     private val backText = TextView(context)
     private val backTitle = TextView(context)
@@ -117,12 +146,13 @@ class TileView(
     private val widgetGlyph = ImageView(context)
 
     /**
-     * Marks a tile that has something unread it is not currently showing.
+     * Marks a tile that has something unread.
      *
      * On a medium or wide tile it is tappable and turns the tile over to the notification,
      * so it can be read without leaving Start. A small tile has no room for a title and
      * body and cannot turn over at all, so there the dot is a pure indicator and the tap
-     * falls through to launching the app.
+     * falls through to launching the app - as it does once the tile *is* turned over,
+     * where the dot stays on as a mark and has nothing left to turn to.
      *
      * The view is larger than the dot it draws: an inset keeps the mark small while the
      * touch target stays worth aiming at.
@@ -334,6 +364,10 @@ class TileView(
         // turns itself face-down - but it does turn back up on its own, or a tile flipped
         // by hand would stay on its notification for good. See setFolderPreview.
         if (hasFolderPreview && !showingBack) return false
+        // The People tile is the same case: its faces are already turning over, one square
+        // at a time, and a tile that spent half its time face-down would be showing them
+        // to nobody.
+        if (hasPeopleMosaic) return false
         if (!hasFlipContent()) return false
         // A 1x1 app tile has no room for a title and a body; it carries the dot instead.
         // A widget's reverse is a bare reading, which fits anywhere.
@@ -579,6 +613,9 @@ class TileView(
             if (field == value) return
             field = value
             updateNotificationDot()
+            // Which of the two the corner holds on a turned-over tile is this setting's
+            // answer as well. See [dotHoldsCorner].
+            applyNotificationMark()
             requestLayout()
         }
 
@@ -753,7 +790,8 @@ class TileView(
             LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL))
 
         // The app's own mark, so a tile full of message text is still identifiable at a
-        // glance. Only shown while a notification is up; the icon face has the full glyph.
+        // glance. Only shown while a notification is up - the icon face has the full glyph
+        // - and not even then where the dot has the corner. See [applyNotificationMark].
         notificationIcon.scaleType = ImageView.ScaleType.FIT_CENTER
         notificationIcon.visibility = GONE
         addView(notificationIcon, LayoutParams(
@@ -766,8 +804,9 @@ class TileView(
         notificationDot.visibility = GONE
         notificationDot.setOnClickListener { showNotificationFace() }
         TiltEffect.apply(notificationDot)
-        // Sits in the same corner as the app mark, but the two are never shown together:
-        // the mark belongs to the notification face, the dot to the icon face.
+        // Sits in the same corner as the app mark, and the two are never shown together:
+        // where the tile marks what is unread with a dot, the dot holds that corner on
+        // both faces and the mark stands down. See [dotHoldsCorner].
         addView(notificationDot, LayoutParams(
             dp(NOTIFICATION_DOT_TARGET_DP), dp(NOTIFICATION_DOT_TARGET_DP),
             Gravity.TOP or Gravity.END))
@@ -815,7 +854,12 @@ class TileView(
 
         mediaArtist.maxLines = 1
         mediaArtist.ellipsize = android.text.TextUtils.TruncateAt.END
-        mediaArtist.typeface = segoe(CAPTION_FONT)
+        // The same pair the News tile sets its story in: the title in the semilight face
+        // and the line under it in the regular one, both at the sizes the wall shares. A
+        // track and a headline are the same kind of thing on a tile - a line of somebody
+        // else's words with its source under it - and they were being set in two different
+        // faces on tiles standing next to each other.
+        mediaArtist.typeface = segoe(SUBTITLE_FONT)
         for (text in listOf(mediaTitle, mediaArtist)) tightenLines(text)
 
         mediaText.orientation = android.widget.LinearLayout.VERTICAL
@@ -854,7 +898,10 @@ class TileView(
         mediaFace.visibility = GONE
         addView(mediaFace, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
-        mediaTime.typeface = segoe(CAPTION_FONT)
+        // Semibold, like the count on an app's tile: it is a figure being read off rather
+        // than a caption, and at this size the semilight face left the digits looking like
+        // they belonged to whatever was under them.
+        mediaTime.typeface = segoe(COUNT_FONT)
         mediaTime.textSize = LIVE_CAPTION_SP
         mediaTime.maxLines = 1
         mediaTime.includeFontPadding = false
@@ -1290,6 +1337,126 @@ class TileView(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         }
 
+    /**
+     * The address book, filling the People tile in place of a glyph or a reading.
+     *
+     * An empty list hands the tile back to whatever it would otherwise show, which is the
+     * invitation to grant access - so the same tile is a wall of faces once there is one
+     * to draw and an ordinary live widget until then, without the host having to know
+     * which of the two it is looking at.
+     *
+     * Like a folder showing its contents, a tile showing the mosaic does not turn itself
+     * over any more: it has a live behaviour of its own, and the two cannot share the
+     * tile. See [canTurnOver].
+     */
+    fun setPeopleMosaic(
+        favourites: List<ContactFeed.Person>,
+        others: List<ContactFeed.Person> = emptyList()
+    ) {
+        val show = favourites.isNotEmpty() || others.isNotEmpty()
+        // Nothing to show and nothing built to show it in, which is every tile that is
+        // not the People tile. Asked on every refresh, so it answers before it builds.
+        if (!show && peopleMosaic == null) return
+        val mosaic = requirePeopleMosaic()
+        hasPeopleMosaic = show
+        this.favourites = favourites
+        this.otherPeople = others
+        mosaic.visibility = if (show) VISIBLE else GONE
+        if (show) {
+            // The mosaic *is* the tile: neither the glyph nor the reading that stood in
+            // for it while the address book was out of reach has anywhere left to sit.
+            iconRow.visibility = GONE
+            liveBox.visibility = GONE
+            // The invitation turns over like any other widget, so the faces can arrive at
+            // a tile that is face-down or halfway through a turn - and the mosaic is on
+            // the front. It is brought back rather than left showing a blank reverse.
+            flipAnimator?.cancel()
+            rotationX = 0f
+            if (showingBack) {
+                showingBack = false
+                applyNotificationState()
+            }
+        }
+        applyPeopleGrid()
+        applyLabelVisibility()
+    }
+
+    /**
+     * Fits the mosaic to the tile's footprint, and to how many people there are to put in
+     * it.
+     *
+     * Three faces across the short side is the nine-square People tile as Windows Phone
+     * drew it, and as many rows as it takes to fill the rest - eighteen on the wide tile.
+     * Two exceptions there, both about the tile running out of room: the 1x1 halves rather
+     * than thirds, because a ninth of it is no longer a face, and a one-row strip gives its
+     * whole height to a single row of them.
+     *
+     * Then who there is to put in it. The favourites come first and always - they are what
+     * the tile is about - but four of them on a nine-square tile would be four faces and
+     * five holes, so the rest of the address book makes up the difference, and [SPARE]
+     * more than that go in behind them so there is somebody for a square to turn over to.
+     * A wall of four favourites on a 3x3 tile is those four, five other contacts, and
+     * three more waiting.
+     *
+     * Only if the phone has them. A book with fewer people in it than the tile has squares
+     * falls back on the coarser grids behind each footprint - the same shape, the squares
+     * still square - and takes the densest one it can actually fill, so a phone with four
+     * contacts on it shows a 2x2 wherever the tile lands rather than a grid with holes.
+     */
+    private fun applyPeopleGrid() {
+        val mosaic = peopleMosaic ?: return
+        val grids = when (tile.size) {
+            TileSize.SMALL -> listOf(2 to 2, 1 to 1)
+            TileSize.SMALL_WIDE -> listOf(2 to 1, 1 to 1)
+            TileSize.SMALL_WIDE_3 -> listOf(3 to 1, 1 to 1)
+            TileSize.SMALL_WIDE_4 -> listOf(4 to 1, 2 to 1, 1 to 1)
+            TileSize.MEDIUM -> listOf(3 to 3, 2 to 2, 1 to 1)
+            // Two cells wide and three tall divides into neither three nor four rows
+            // squarely; four is the closer of the two, and the one with the larger faces.
+            TileSize.MEDIUM_TALL_3 -> listOf(3 to 4, 2 to 3, 1 to 1)
+            TileSize.MEDIUM_TALL_4 -> listOf(3 to 6, 2 to 4, 1 to 2)
+            TileSize.WIDE -> listOf(6 to 3, 4 to 2, 2 to 1)
+        }
+        // The densest grid the people on hand fill, or the coarsest there is when even that
+        // is more squares than people - one face is better than one face and a hole.
+        val available = favourites.size + otherPeople.size
+        val (cols, rows) = grids.firstOrNull { (c, r) -> c * r <= available } ?: grids.last()
+        mosaic.setGrid(cols, rows)
+        // The grid decides how many people are wanted, so the wall is filled after it is
+        // shaped rather than before.
+        mosaic.setPeople(peopleForGrid(cols * rows))
+    }
+
+    /**
+     * The favourites, and enough of the rest of the book to fill [slots] and turn over.
+     *
+     * Nobody else is added once the favourites already outnumber the squares: they have
+     * their own spares by then, and a tile that is about the people the user marked should
+     * not be showing anybody it did not have to.
+     */
+    private fun peopleForGrid(slots: Int): List<ContactFeed.Person> {
+        val wanted = (slots + SPARE - favourites.size).coerceAtLeast(0)
+        return favourites + otherPeople.take(wanted)
+    }
+
+    private fun requirePeopleMosaic(): PeopleMosaicView =
+        peopleMosaic ?: PeopleMosaicView(context, palette).also { mosaic ->
+            peopleMosaic = mosaic
+            mosaic.visibility = GONE
+            // The tile's own label carries whoever the mosaic has turned over onto, and
+            // goes back to naming the tile when it turns back to the wall of faces.
+            mosaic.onHero = { person ->
+                peopleName = person?.name
+                applyFolderLabel()
+                // The mosaic turns over underneath it; the name it lands on arrives with
+                // the turn rather than snapping in over a tile still mid-flip.
+                label.alpha = 0f
+                label.animate().alpha(1f).setDuration(HERO_LABEL_MS).start()
+            }
+            frontFace.addView(mosaic, LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        }
+
     fun setGlyphResource(res: Int) {
         glyph.setImageResource(res)
         glyph.imageTintList = android.content.res.ColorStateList.valueOf(palette.onAccent())
@@ -1445,7 +1612,7 @@ class TileView(
         val back = widgetBack ?: return
         backTitle.text = back.number
         backTitle.visibility = VISIBLE
-        backText.text = back.caption.orEmpty()
+        setBackCaption(back.caption.orEmpty())
         backAside.text = back.aside.orEmpty()
         // The size of a reading is measured against the reading itself, so a new one is a
         // new size - "23:57" does not fit where "7" did.
@@ -1620,8 +1787,7 @@ class TileView(
         if (showBack && tile.kind.isLiveWidget) bindWidgetBack()
         frontFace.visibility = if (showBack) GONE else VISIBLE
         backFace.visibility = if (showBack) VISIBLE else GONE
-        notificationIcon.visibility =
-            if (showBack && !tile.kind.isLiveWidget) VISIBLE else GONE
+        applyNotificationMark()
         applyWidgetGlyph()
         applyLabelVisibility()
         updateNotificationDot()
@@ -1677,6 +1843,10 @@ class TileView(
         val same = faces == rotation
         rotation = faces
         liveStyle = style
+        // Both of those decide whether the tile carries a name - a run of stories is
+        // somebody else's words and says whose, a reading is its own caption - so the
+        // question is put again here, empty run included.
+        applyLabelVisibility()
         if (faces.isEmpty()) return
         if (!same) rotationIndex = rotationIndex.coerceIn(0, faces.size - 1)
         applyFlipCornerSize()
@@ -1706,14 +1876,14 @@ class TileView(
         if (onBack) {
             backTitle.text = title
             backTitle.visibility = VISIBLE
-            backText.text = detail.orEmpty()
+            setBackCaption(detail.orEmpty())
             backText.visibility = if (detail.isNullOrEmpty()) GONE else VISIBLE
             backAside.text = face.aside.orEmpty()
         } else {
             iconRow.visibility = GONE
             liveBox.visibility = VISIBLE
             liveHeadline.text = title
-            liveDetail.text = detail.orEmpty()
+            setLiveCaption(detail.orEmpty())
             liveDetail.visibility = if (detail.isNullOrEmpty()) GONE else VISIBLE
             liveAside.text = face.aside.orEmpty()
         }
@@ -1926,12 +2096,72 @@ class TileView(
         iconRow.visibility = GONE
         liveBox.visibility = VISIBLE
         liveHeadline.text = reading.number
-        liveDetail.text = reading.caption.orEmpty()
+        setLiveCaption(reading.caption.orEmpty())
         liveDetail.visibility = if (reading.caption.isNullOrEmpty()) GONE else VISIBLE
         liveAside.text = reading.aside.orEmpty()
         applyLabelVisibility()
         applyWidgetGlyphVisibility()
         applyLiveTextSizes()
+    }
+
+    /**
+     * The captions the two faces were handed, before they were fitted to the tile.
+     *
+     * Kept so the fitting can be done again - a caption is cut to the width the tile
+     * turned out to have, and a tile is filled before it is measured and resized after
+     * that. See [fitCaption].
+     */
+    private var liveCaption: String = ""
+    private var backCaption: String = ""
+
+    private fun setLiveCaption(text: String) {
+        liveCaption = text
+        liveDetail.text = fitCaption(liveDetail, liveBox, text)
+    }
+
+    private fun setBackCaption(text: String) {
+        backCaption = text
+        backText.text = fitCaption(backText, backBox, text)
+    }
+
+    /** Re-cuts both captions to the width the tile has now. */
+    private fun applyCaptionFit() {
+        if (liveCaption.isNotEmpty()) liveDetail.text = fitCaption(liveDetail, liveBox, liveCaption)
+        if (backCaption.isNotEmpty()) backText.text = fitCaption(backText, backBox, backCaption)
+    }
+
+    /**
+     * Keeps a widget's caption to one line of type per line it was written in.
+     *
+     * A widget's caption is written as lines rather than as prose - the appointment and
+     * then when it is, tomorrow's first entry and then how many follow it - and the second
+     * of those is the half that says something the tile is not already showing. Left to
+     * wrap, a long name takes both lines of the caption and the line that was meant to
+     * carry the count is either pushed off the tile or dropped outright, so what is left
+     * reads as the only thing on tomorrow rather than the first of four.
+     *
+     * So each line is cut to the tile instead, and every one of them keeps its own line.
+     * Only where the caption *is* lines: a notification's body is prose, and prose is meant
+     * to wrap - see [bindNotification], which comes through here with the tile's own kind
+     * to say so.
+     */
+    private fun fitCaption(
+        view: TextView,
+        box: android.widget.LinearLayout,
+        text: String
+    ): CharSequence {
+        if (!tile.kind.isLiveWidget || '\n' !in text) return text
+        // The caption is as wide as the face it sits on, less what the column is inset by.
+        // Taken from the tile rather than from the view, which is a layout behind whenever
+        // the tile has just been resized - and being a layout behind is exactly the case
+        // this exists to survive.
+        val room = (width - box.paddingLeft - box.paddingRight).toFloat()
+        if (room <= 0f) return text
+        return text.split('\n').joinToString("\n") { line ->
+            android.text.TextUtils.ellipsize(
+                line, view.paint, room, android.text.TextUtils.TruncateAt.END
+            ).toString()
+        }
     }
 
     private fun applyLiveTextSizes() {
@@ -1980,6 +2210,9 @@ class TileView(
         // whole reason the number means anything. Whether a given widget has one short
         // enough for the smallest tile is the host's call, and it makes it per size.
         liveDetail.visibility = if (liveDetail.text.isNotEmpty()) VISIBLE else GONE
+        // Last, because where a line has to be cut depends on the size it is set in, and
+        // that is what this method has just decided.
+        applyCaptionFit()
     }
 
     /**
@@ -2226,7 +2459,8 @@ class TileView(
      *
      * Sets the faces to match the state the tile is in; the turning itself is [liveFlip]'s,
      * which alternates a tile with something waiting between its icon and what it has, the
-     * way the live widgets alternate. The dot marks the tile while the icon is up.
+     * way the live widgets alternate. The dot marks the tile through both of them - see
+     * [dotHoldsCorner].
      */
     private fun applyNotificationState() {
         val playing = media != null
@@ -2258,7 +2492,7 @@ class TileView(
         // which app is playing them, and on a wall of tiles that is the question being
         // asked. It has the top of the corner and the transport has the bottom - see
         // applyMediaControlMetrics.
-        notificationIcon.visibility = if (showingBack || mediaFaceShowing) VISIBLE else GONE
+        applyNotificationMark()
         // The 1x1 never shows a media face, so this is only ever asking about the rest.
         mediaTime.visibility = if (mediaFaceShowing) VISIBLE else GONE
         applyMediaLayout()
@@ -2275,6 +2509,10 @@ class TileView(
      * which used to set the faces directly and leave this untouched, so turning a tile over
      * to its notification silently dropped the name of the app the notification was from.
      */
+    /** Whether a live widget has been handed anything to show yet. */
+    private fun hasLiveContent(): Boolean =
+        liveBox.visibility == VISIBLE || rotation.isNotEmpty()
+
     private fun applyLabelVisibility() {
         val contentShowing = showingBack || mediaFace.visibility == VISIBLE
         label.visibility = when {
@@ -2286,7 +2524,18 @@ class TileView(
             // its caption already names it.
             tile.kind.isLiveWidget && liveStyle == LiveStyle.STORY ->
                 if (tile.size.rows >= 2) VISIBLE else GONE
-            tile.kind.isLiveWidget -> GONE
+            // A wall of faces says who is on it, not what it is - so the tile says the
+            // second part, exactly as Windows Phone's People tile did, and gives the same
+            // corner over to a name while one of them has the whole tile. The 1x1 has room
+            // for neither.
+            hasPeopleMosaic -> if (tile.size.canShowText) VISIBLE else GONE
+            // Only once it has something to show. A widget whose content has not arrived
+            // yet - the weather before the forecast is fetched, the news before the first
+            // story - is a tile with an icon on it and nothing else, and it names itself
+            // wherever an icon tile would: on a 1x1, nowhere. Reading the rule the other
+            // way round is what left "Weather" sitting on the small tile until the first
+            // flip went through and finally called this.
+            tile.kind.isLiveWidget && hasLiveContent() -> GONE
             // A folder names itself at every size, the 1x1 included. Everywhere else the
             // smallest tile goes without because its icon already says what it is; a
             // folder's squares say what is *in* it, which is a different question from
@@ -2302,13 +2551,14 @@ class TileView(
     }
 
     /**
-     * Says how much is waiting on a tile that is showing its icon.
+     * Says how much is waiting on a tile, or merely that something is.
      *
      * A number beside the icon wherever there is an icon to put one beside, which is what
      * WP8.1 did - it says how many rather than merely that there are some, and it costs
      * nothing that the corner was using. The dot is what is left for the cases with no
      * icon of their own: a live widget, whose face is a reading, and a folder, which marks
-     * the app it came from on that app's own square instead.
+     * the app it came from on that app's own square instead - and for a tile turned over
+     * onto the notification, where there is no icon left to count beside either.
      */
     private fun updateNotificationDot() {
         // A small tile that is playing shows play/pause in the corner instead of the dot -
@@ -2316,17 +2566,52 @@ class TileView(
         val badge = media != null && !tile.size.canShowText && !isEditMode
         mediaBadge.visibility = if (badge) VISIBLE else GONE
 
-        val unread = notifications.isNotEmpty() && media == null && !showingBack && !isEditMode
-        val counted = unread && countsEnabled && !tile.kind.isLiveWidget && !hasFolderPreview
+        val unread = notifications.isNotEmpty() && media == null && !isEditMode
+        // The count belongs beside the glyph, so it is only ever asked for on the face
+        // that has one.
+        val counted = unread && !showingBack && countsEnabled &&
+            !tile.kind.isLiveWidget && !hasFolderPreview
         if (counted) countLabel.text = formatCount(notifications.size)
         countLabel.visibility = if (counted) VISIBLE else GONE
 
         applyFolderLabel()
-        val show = unread && !counted && !hasFolderPreview
+        val show = unread && !counted && !hasFolderPreview && (!showingBack || dotHoldsCorner())
         notificationDot.visibility = if (show) VISIBLE else GONE
         // Only a tile that can actually turn over should take the tap; on a small one it
-        // must fall through so the tile still launches.
-        notificationDot.isClickable = show && tile.size.canShowText
+        // must fall through so the tile still launches, and on a tile already turned over
+        // there is nothing left for the tap to do.
+        notificationDot.isClickable = show && tile.size.canShowText && !showingBack
+    }
+
+    /**
+     * Whether the dot keeps the corner while the notification itself is up.
+     *
+     * The corner is the app's mark on the notification face, so that a tile full of
+     * message text still says which app it came from. Where the dot is what marks the
+     * icon face, that swap costs more than it gives: the mark answers a question the
+     * notification on the same tile has already answered, while the dot - the one thing
+     * on the tile that says something is *unread* - disappears the moment the tile turns
+     * over, so a wall mid-flip reads as quieter than it is. The dot stays put instead,
+     * exactly where the icon face had it, and the mark stands down for it.
+     *
+     * Only where the dot is the mark. With numbers turned on the corner is empty on both
+     * faces - the count sits beside the glyph - so there the mark keeps it, and a widget
+     * or a folder never had an app mark of its own to give up.
+     */
+    private fun dotHoldsCorner(): Boolean =
+        !countsEnabled && !tile.kind.isLiveWidget && !hasFolderPreview
+
+    /**
+     * Puts the app's mark in the corner, or leaves the corner to something else.
+     *
+     * One rule in one place, because the mark is set from every path that changes what a
+     * tile is showing - the turn, a notification arriving, edit mode - and they used to
+     * each carry their own version of it.
+     */
+    private fun applyNotificationMark() {
+        val showing = !isEditMode && !isEmptied && !tile.kind.isLiveWidget &&
+            (mediaFace.visibility == VISIBLE || (showingBack && !dotHoldsCorner()))
+        notificationIcon.visibility = if (showing) VISIBLE else GONE
     }
 
     /**
@@ -2340,7 +2625,9 @@ class TileView(
      * count in front of it where counts are turned on - "(3) Socials".
      */
     private fun applyFolderLabel() {
-        val name = tile.label
+        // Whoever the People tile has turned over onto outranks the tile's own name; the
+        // mosaic hands it over and takes it back. See [setPeopleMosaic].
+        val name = peopleName ?: tile.label
         val marked = hasFolderPreview && notifications.isNotEmpty() && !isEditMode
         val counted = marked && countsEnabled
         label.text = if (counted) "(${formatCount(notifications.size)}) $name" else name
@@ -2417,7 +2704,7 @@ class TileView(
         val line = notifications.getOrNull(index) ?: return
         backTitle.text = line.title
         backTitle.visibility = if (line.title.isEmpty()) GONE else VISIBLE
-        backText.text = line.text
+        setBackCaption(line.text)
         backText.visibility = if (line.text.isEmpty()) GONE else VISIBLE
     }
 
@@ -2459,6 +2746,7 @@ class TileView(
             glyph.imageTintList = android.content.res.ColorStateList.valueOf(p.onAccent())
         }
         folderPreview?.applyPalette(p)
+        peopleMosaic?.applyPalette(p)
     }
 
     /**
@@ -2573,6 +2861,7 @@ class TileView(
         applyUnpinHandle()
         applyFlipCornerSize()
         applyFolderPreviewGrid()
+        applyPeopleGrid()
         val pad = dp(8)
         label.setPadding(pad + dp(2), 0, pad, pad)
         backBox.setPadding(pad + dp(2), 0, pad, 0)
@@ -2584,6 +2873,11 @@ class TileView(
         // Set whatever the tile is: a widget showing stories names the source of them.
         // A folder's name may carry a mark in front of it - see applyFolderLabel.
         applyFolderLabel()
+        // Asked here as well as everywhere content changes, because this runs when the
+        // tile is built. Without it a tile's name was whatever the field defaulted to
+        // until something happened to it, which on a widget waiting for its first content
+        // meant showing the app's name on a tile that should never carry one.
+        applyLabelVisibility()
         if (tile.kind.isLiveWidget) {
             liveBox.setPadding(pad + dp(2), 0, pad, 0)
             applyLiveTextSizes()
@@ -2712,10 +3006,14 @@ class TileView(
         // instead made the clock as tall as the inflation and sat it below the mark.
         val markSlot = dp(CORNER_INSET_DP) + dp(CORNER_MARK_DP) + dp(CLOCK_GAP_DP)
         val markBand = dp(CORNER_MARK_DP)
+        // Clear of the mark's slot, and then a little further in: the digits are ranged
+        // right, and sitting exactly on the slot's edge put them tight against the mark
+        // above them rather than under it.
+        val timeEnd = markSlot + dp(MEDIA_TIME_NUDGE_DP)
         (mediaTime.layoutParams as? LayoutParams)?.let { params ->
-            if (params.marginEnd != markSlot || params.height != markBand) {
+            if (params.marginEnd != timeEnd || params.height != markBand) {
                 mediaTime.layoutParams = params.apply {
-                    marginEnd = markSlot
+                    marginEnd = timeEnd
                     height = markBand
                 }
             }
@@ -2728,7 +3026,7 @@ class TileView(
             // A strip is short enough that the corner and the transport are both beside
             // the text rather than above it, so it keeps clear of whichever reaches
             // further in.
-            val corner = markSlot + mediaTime.paint.measureText("00:00").toInt()
+            val corner = timeEnd + mediaTime.paint.measureText("00:00").toInt()
             val reserve = maxOf(transportReservePx, corner)
             val room = w - mediaFace.paddingStart - mediaFace.paddingEnd - reserve
             val cap = room.coerceAtLeast(dp(MEDIA_TEXT_MIN_DP))
@@ -2750,6 +3048,7 @@ class TileView(
         unpinHandle.visibility = if (editing && unpinHandle.isEnabled) VISIBLE else GONE
         // Nothing on a tile being arranged moves under the finger holding it.
         folderPreview?.setPaused(editing)
+        peopleMosaic?.setPaused(editing)
         videoPlayer?.let { player ->
             try {
                 if (editing && player.isPlaying) player.pause() else if (!editing) player.start()
@@ -2760,7 +3059,7 @@ class TileView(
         // Nothing is turned over while a tile is being arranged.
         applyFlipCornerSize()
         // The corner is the resize handle's while editing, so no indicator shows.
-        notificationIcon.visibility = if (!editing && showingBack) VISIBLE else GONE
+        applyNotificationMark()
         applyWidgetGlyphVisibility()
         updateNotificationDot()
         // Lifted above its neighbours, because its handles now hang over them: without
@@ -3061,6 +3360,9 @@ class TileView(
         /** How far the artist is pulled up under the track it belongs to. */
         private const val MEDIA_TEXT_TIGHTEN_DP = 2
 
+        /** How far in from the mark's slot the elapsed time is ranged. */
+        private const val MEDIA_TIME_NUDGE_DP = 3
+
         private const val LIVE_TITLE_SP = 16f
         private const val LIVE_CAPTION_SP = 13f
 
@@ -3135,6 +3437,17 @@ class TileView(
 
         /** How long a tile rests on each face before turning over. */
         private const val LIVE_FLIP_MS = 9_000L
+
+        /** How long the People tile's label takes to fade in on a name. */
+        private const val HERO_LABEL_MS = 260L
+
+        /**
+         * How many people beyond the squares the People tile keeps in hand.
+         *
+         * Three. A wall with exactly as many people as squares is a wall that can never
+         * turn one over: every face is already up, and there is nobody to turn over *to*.
+         */
+        private const val SPARE = 3
 
         private const val TAG = "WP81Tile"
 

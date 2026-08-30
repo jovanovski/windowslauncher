@@ -5,6 +5,7 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -23,25 +24,32 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.wp81.Haptics
+import rocks.gorjan.gokixp.wp81.MetroPageHeader
+import rocks.gorjan.gokixp.wp81.MetroPageTransition
 import rocks.gorjan.gokixp.wp81.SvgIcon
 import rocks.gorjan.gokixp.wp81.TiltEffect
 import rocks.gorjan.gokixp.wp81.WP81Palette
+import rocks.gorjan.gokixp.wp81.applyToField
+
+/** One open page, as it is written down between sessions. See MetroIEApp.saveTabs. */
+internal data class SavedTab(val url: String, val title: String)
 
 /**
  * Internet Explorer, as the phone had it.
  *
  * The desktop themes give the browser a window with a toolbar, a status bar and eight
  * buttons across the top. The phone gave it none of that: the page has the whole screen,
- * and everything you can do to it lives on one dark strip along the bottom - stop or
- * reload on the left, the address in the middle, and a row of dots on the right that
- * lifts the rest of the commands into view.
+ * and everything you can do to it lives on one dark strip along the bottom - the tabs on
+ * the left, the address in the middle, and a row of dots on the right that lifts the rest
+ * of the commands into view.
  *
  * The strip is deliberately not palette-coloured. Every other page in this shell follows
  * the light/dark setting, but IE's app bar was the same near-black on every phone, because
@@ -60,16 +68,61 @@ class MetroIEApp(
     private val onUpdateWindowTitle: (String) -> Unit
 ) {
 
+    /**
+     * One open page.
+     *
+     * Every tab keeps its own WebView, which is what makes switching back to a tab a
+     * return to the page as it was - its history, its scroll position, its half-filled
+     * form - rather than a reload of the same address. All of them stay in the page
+     * container; the ones that are not being looked at are simply hidden, so a background
+     * tab goes on loading and is ready when it is reached.
+     */
+    private inner class Tab {
+        val webView = WebView(context)
+        var title: String = ""
+        var url: String = ""
+
+        /**
+         * An address read back from a previous session that has not been loaded yet.
+         *
+         * Restoring nine tabs means nine WebViews, and fetching nine pages the moment the
+         * launcher comes back would spend the phone's first few seconds on eight pages
+         * nobody is looking at. A restored tab is a name and an address until it is
+         * reached; the one being reached loads at once. See [activate].
+         */
+        var pending: String? = null
+
+        /** The last picture of this page, for the tabs grid. Captured on the way out. */
+        var thumbnail: Bitmap? = null
+
+        var loading = false
+
+        /** Set when the page could not be reached, so the error shows again on return. */
+        var failedUrl: String? = null
+        var failed = false
+    }
+
     private lateinit var root: FrameLayout
-    private lateinit var webView: WebView
+
+    /** Holds every tab's WebView. Only the current one is visible. */
+    private lateinit var pages: FrameLayout
+
+    private val tabs = mutableListOf<Tab>()
+    private var current: Tab? = null
 
     /** The strip along the bottom: the menu, when it is open, sitting on top of the row. */
     private lateinit var appBar: LinearLayout
     private lateinit var menuPanel: LinearLayout
 
     /** Holds [menuPanel], and stops a long favourites list running off the top edge. */
-    private lateinit var menuScroller: android.widget.ScrollView
+    private lateinit var menuScroller: ScrollView
+
     private lateinit var addressBar: EditText
+
+    /** The left button: how many pages are open, and the way to them. */
+    private lateinit var tabsButton: ImageView
+
+    /** Reload, or stop while a page is coming in. Lives in the address bar itself. */
     private lateinit var reloadButton: ImageView
 
     /** The blue line over the address bar. Scaled from the left rather than resized. */
@@ -82,16 +135,16 @@ class MetroIEApp(
     private lateinit var errorPage: LinearLayout
     private lateinit var errorDetail: TextView
 
+    /** The tabs page, which covers the browser entirely - app bar included. */
+    private lateinit var tabsPage: FrameLayout
+    private lateinit var tabsGrid: LinearLayout
+    private lateinit var tabsScroller: ScrollView
+
     private var homepage: String = DEFAULT_HOMEPAGE
     private val favourites = mutableListOf<Favourite>()
 
-    private var isLoading = false
-
     /** What the address bar should say once the user stops editing it. */
     private var currentUrl: String = ""
-
-    /** The address that failed, for the retry on the error page. */
-    private var failedUrl: String? = null
 
     fun createView(initialUrl: String? = null): View {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
@@ -107,13 +160,11 @@ class MetroIEApp(
             isFocusableInTouchMode = true
         }
 
-        webView = WebView(context)
-        buildWebView()
-
         // The page gets everything above the strip. The strip is laid over the top of it
         // rather than beside it so the menu can grow upward over the page instead of
         // squeezing it - which would reflow the whole document every time it opened.
-        root.addView(webView, FrameLayout.LayoutParams(MATCH, MATCH).apply {
+        pages = FrameLayout(context)
+        root.addView(pages, FrameLayout.LayoutParams(MATCH, MATCH).apply {
             bottomMargin = dp(BAR_DP)
         })
 
@@ -134,15 +185,323 @@ class MetroIEApp(
         appBar = buildAppBar()
         root.addView(appBar, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM))
 
-        val lastUrl = prefs.getString(InternetExplorerApp.KEY_LAST_URL, null)
-        loadUrl(initialUrl ?: lastUrl ?: homepage)
+        tabsPage = buildTabsPage()
+        root.addView(tabsPage, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // What was open last time. A browser on a phone is a place rather than a document
+        // - the pages you left in it are still yours when you come back - and the launcher
+        // is restarted often enough (a theme change, a rotation, the system reclaiming it)
+        // that losing them to that would make tabs useless.
+        val restored = loadTabs()
+        if (restored.isEmpty()) {
+            val lastUrl = prefs.getString(InternetExplorerApp.KEY_LAST_URL, null)
+            openTab(initialUrl ?: lastUrl ?: homepage)
+        } else {
+            for (saved in restored) restoreTab(saved)
+            val active = prefs.getInt(KEY_ACTIVE_TAB, 0).coerceIn(0, tabs.size - 1)
+            activate(tabs[active])
+            // An address that arrived with the window is a new thing to read, and goes in
+            // its own tab on top of what was already there.
+            if (initialUrl != null) openTab(initialUrl)
+        }
         root.requestFocus()
         return root
     }
 
+    // ---------------------------------------------------------------- tabs
+
+    /**
+     * Opens a page in a tab of its own and goes to it.
+     *
+     * Nine is the ceiling, which is what the button can say: there is a card for one
+     * through nine and nothing past it, so a tenth page would be open without the bar
+     * being able to admit it. IE Mobile stopped at six for the same kind of reason, and
+     * there has to be a limit somewhere regardless - every tab is a live WebView, and a
+     * launcher that runs out of memory takes the home screen down with it.
+     */
+    private fun openTab(url: String) {
+        if (tabs.size >= MAX_TABS) {
+            onShowNotification("Internet Explorer", "Nine pages is as many as it will hold")
+            return
+        }
+        val tab = Tab()
+        configure(tab)
+        tabs.add(tab)
+        pages.addView(tab.webView, FrameLayout.LayoutParams(MATCH, MATCH))
+        activate(tab)
+        load(tab, url)
+        saveTabs()
+    }
+
+    /** Puts back a tab read from the last session, without fetching it. See [Tab.pending]. */
+    private fun restoreTab(saved: SavedTab) {
+        val tab = Tab()
+        configure(tab)
+        tab.url = saved.url
+        tab.title = saved.title
+        tab.pending = saved.url
+        tabs.add(tab)
+        pages.addView(tab.webView, FrameLayout.LayoutParams(MATCH, MATCH))
+    }
+
+    /** Brings [tab] to the front and points the app bar at it. */
+    private fun activate(tab: Tab) {
+        if (current === tab) return
+        current?.let {
+            // Photographed on the way out, while it is still on screen at full size: a
+            // hidden view has nothing to draw, so a thumbnail taken after the switch is a
+            // white rectangle.
+            capture(it)
+            it.webView.visibility = View.GONE
+        }
+        current = tab
+        tab.webView.visibility = View.VISIBLE
+        showAddress(tab.url)
+        showError(if (tab.failed) tab.failedUrl else null)
+        paintLoading(tab)
+        onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
+        paintTabsButton()
+        // Reached for the first time since the launcher came back: now it is worth
+        // fetching, and not a moment before.
+        tab.pending?.let { url ->
+            tab.pending = null
+            load(tab, url)
+        }
+        saveTabs()
+    }
+
+    /**
+     * Closes [tab], and with the last one closes nothing: a browser with no pages in it is
+     * a blank screen with an address bar, so the last close starts a new page instead.
+     */
+    private fun closeTab(tab: Tab) {
+        val index = tabs.indexOf(tab)
+        if (index < 0) return
+        tabs.remove(tab)
+        pages.removeView(tab.webView)
+        tab.webView.stopLoading()
+        tab.webView.destroy()
+        if (current === tab) {
+            current = null
+            // The one before it, which is where the eye already was.
+            val next = tabs.getOrNull(index - 1) ?: tabs.firstOrNull()
+            if (next != null) activate(next) else openTab(homepage)
+        }
+        paintTabsButton()
+        saveTabs()
+    }
+
+    /** The mark on the left button: one card per open page, and nine for nine or more. */
+    private fun paintTabsButton() {
+        val shown = tabs.size.coerceIn(1, CARD_ICONS)
+        tabsButton.setImageDrawable(SvgIcon.fromAsset(context, "$ICON_DIR/appbar.card.$shown.svg"))
+    }
+
+    /** Draws the page as it stands, small enough to keep one of per tab. */
+    private fun capture(tab: Tab) {
+        val width = tab.webView.width
+        val height = tab.webView.height
+        if (width <= 0 || height <= 0) return
+        try {
+            val scale = dp(THUMB_WIDTH_DP).toFloat() / width
+            val bitmap = Bitmap.createBitmap(
+                (width * scale).toInt().coerceAtLeast(1),
+                (height * scale).toInt().coerceAtLeast(1),
+                Bitmap.Config.ARGB_8888
+            )
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            canvas.scale(scale, scale)
+            tab.webView.draw(canvas)
+            tab.thumbnail = bitmap
+        } catch (e: Exception) {
+            // A page too large to photograph is not a page that should stop working.
+            Log.w(TAG, "Could not capture a thumbnail", e)
+        }
+    }
+
+    // ---------------------------------------------------------------- the tabs page
+
+    /**
+     * Every open page at once, the way the phone showed them.
+     *
+     * IE Mobile had no tab strip - there is no room for one, and nobody can hit a tab the
+     * width of a word on a phone. Tabs were somewhere you *went*: a page of screenshots,
+     * two across, each with its title under it and a cross in the corner, and one button
+     * at the foot of it for a new one. It is the same shape as this shell's own folder and
+     * settings pages, which is why it belongs here.
+     */
+    private fun buildTabsPage(): FrameLayout {
+        val page = FrameLayout(context).apply {
+            visibility = View.GONE
+            setBackgroundColor(palette.background)
+            // Nothing behind it is reachable while it is up.
+            isClickable = true
+        }
+
+        val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+        val header = MetroPageHeader(context, palette)
+        header.setTitle("tabs")
+        header.onBack = { closeTabs() }
+        column.addView(header, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        tabsGrid = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(PAGE_MARGIN_DP), 0, dp(PAGE_MARGIN_DP), dp(20))
+        }
+        tabsScroller = ScrollView(context).apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            addView(tabsGrid, FrameLayout.LayoutParams(MATCH, WRAP))
+        }
+        column.addView(tabsScroller, LinearLayout.LayoutParams(MATCH, 0, 1f))
+
+        // Its own app bar, in the same near-black as the browser's: this page has one
+        // command, and it is the same kind of thing as the browser's own strip.
+        //
+        // Centred and unlabelled, because it is the only thing on the bar. A lone button
+        // in the left corner reads as the first of a row that never arrives, and a plus
+        // says "another one" without help.
+        val bar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(BAR_COLOUR)
+            isClickable = true
+        }
+        bar.addView(circleButton(NEW_ICON) {
+            closeTabs()
+            openTab(homepage)
+        }, LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)))
+        column.addView(bar, LinearLayout.LayoutParams(MATCH, dp(BAR_DP)))
+
+        page.addView(column, FrameLayout.LayoutParams(MATCH, MATCH))
+        return page
+    }
+
+    private fun openTabs() {
+        closeMenu()
+        addressBar.clearFocus()
+        hideKeyboard()
+        current?.let { capture(it) }
+        buildTabsGrid()
+        tabsPage.visibility = View.VISIBLE
+        tabsScroller.scrollTo(0, 0)
+        // Turned in the way the shell's own pages turn, because that is what it is.
+        // Deferred a frame: a view that has been GONE has no height yet, and a turn
+        // measured against one pivots around the wrong place.
+        tabsPage.post { MetroPageTransition(tabsPage).playIn() }
+    }
+
+    private fun closeTabs() {
+        if (tabsPage.visibility != View.VISIBLE) return
+        tabsPage.visibility = View.GONE
+        tabsGrid.removeAllViews()
+    }
+
+    /** Two across, in the order they were opened. */
+    private fun buildTabsGrid() {
+        tabsGrid.removeAllViews()
+        var row: LinearLayout? = null
+        tabs.forEachIndexed { index, tab ->
+            if (index % TABS_PER_ROW == 0) {
+                row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+                tabsGrid.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
+            }
+            row?.addView(tabCell(tab), LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+                marginStart = if (index % TABS_PER_ROW == 0) 0 else dp(8)
+                bottomMargin = dp(12)
+            })
+        }
+        // The odd tab out would otherwise stretch across the whole width, twice the size of
+        // every other card and looking like the one that matters.
+        if (tabs.size % TABS_PER_ROW != 0) {
+            row?.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+        }
+    }
+
+    private fun tabCell(tab: Tab): View {
+        val cell = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+        val shot = FrameLayout(context).apply {
+            isClickable = true
+            setOnClickListener {
+                closeTabs()
+                activate(tab)
+            }
+            TiltEffect.apply(this)
+            // The page it is standing in for is white until it says otherwise, and an
+            // empty frame on a black background reads as a hole rather than a page.
+            setBackgroundColor(if (tab.thumbnail != null) Color.WHITE else palette.inactive)
+        }
+
+        val image = ImageView(context).apply {
+            // Scaled by hand rather than by a scaleType: the card wants the *top* of the
+            // page at the card's own width, and none of the stock ones do that. FIT_START
+            // fits the whole screenshot and leaves a tall page as a thin strip down the
+            // left; CENTER_CROP fills the card with the middle of the page, which is the
+            // one part of it nobody recognises.
+            scaleType = ImageView.ScaleType.MATRIX
+            tab.thumbnail?.let { setImageBitmap(it) }
+        }
+        image.addOnLayoutChangeListener { view, left, _, right, _, _, _, _, _ ->
+            val bitmap = tab.thumbnail ?: return@addOnLayoutChangeListener
+            val scale = (right - left).toFloat() / bitmap.width
+            (view as ImageView).imageMatrix = android.graphics.Matrix().apply {
+                setScale(scale, scale)
+            }
+        }
+        shot.addView(image, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // The one open now, marked. A border rather than a tint: the card is a photograph,
+        // and colouring it over would make the page itself look wrong.
+        if (tab === current) {
+            shot.addView(View(context).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.TRANSPARENT)
+                    setStroke(dp(3), palette.accent)
+                }
+            }, FrameLayout.LayoutParams(MATCH, MATCH))
+        }
+
+        // On the corner of the card, half on and half off, like the tile handles: it sits
+        // over an arbitrary screenshot and a ringed disc is the only thing that reads
+        // against all of them.
+        val close = ImageView(context).apply {
+            setBackgroundResource(R.drawable.wp81_handle_circle)
+            setImageDrawable(SvgIcon.fromAsset(context, REMOVE_ICON))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(5), dp(5), dp(5), dp(5))
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            clipToOutline = true
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                closeTab(tab)
+                buildTabsGrid()
+            }
+            TiltEffect.apply(this)
+        }
+        shot.addView(close, FrameLayout.LayoutParams(
+            dp(CLOSE_DP), dp(CLOSE_DP), Gravity.TOP or Gravity.END))
+
+        cell.addView(shot, LinearLayout.LayoutParams(MATCH, dp(THUMB_HEIGHT_DP)))
+        cell.addView(TextView(context).apply {
+            text = tab.title.ifBlank { hostOf(tab.url) }
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            textSize = 13f
+            setTextColor(palette.foreground)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(6), 0, 0)
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+        return cell
+    }
+
     // ---------------------------------------------------------------- the page
 
-    private fun buildWebView() {
+    private fun configure(tab: Tab) {
+        val webView = tab.webView
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.loadWithOverviewMode = true
@@ -155,34 +514,48 @@ class MetroIEApp(
         // White rather than the palette's background: a page that has not painted yet is
         // about to be white, and flashing black in between is worse than being early.
         webView.setBackgroundColor(Color.WHITE)
+        webView.visibility = View.GONE
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView?, request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
-                return handleScheme(url)
+                return handleScheme(tab, url)
             }
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean =
-                if (url != null) handleScheme(url) else false
+                if (url != null) handleScheme(tab, url) else false
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                errorPage.visibility = View.GONE
-                setLoading(true)
-                if (url != null) showAddress(url)
+                tab.failed = false
+                tab.loading = true
+                if (url != null) tab.url = url
+                if (tab === current) {
+                    showError(null)
+                    paintLoading(tab)
+                    if (url != null) showAddress(url)
+                }
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                setLoading(false)
-                if (url != null) {
-                    showAddress(url)
-                    saveLastUrl(url)
+                tab.loading = false
+                if (url != null) tab.url = url
+                tab.title = view?.title?.takeIf { it.isNotBlank() }.orEmpty()
+                if (tab === current) {
+                    paintLoading(tab)
+                    if (url != null) {
+                        showAddress(url)
+                        saveLastUrl(url)
+                    }
+                    onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
                 }
-                onUpdateWindowTitle(view?.title?.takeIf { it.isNotBlank() } ?: "Internet Explorer")
+                // Where this tab is now, so a restart puts it back here rather than on
+                // whatever it was opened at.
+                saveTabs()
             }
 
             override fun onReceivedError(
@@ -193,19 +566,26 @@ class MetroIEApp(
                 // page that could not be reached, and covering the article over because
                 // one of its ads timed out is worse than the ad being missing.
                 if (request?.isForMainFrame != true) return
-                setLoading(false)
-                failedUrl = request.url?.toString()
-                showError(failedUrl)
+                tab.loading = false
+                tab.failed = true
+                tab.failedUrl = request.url?.toString()
+                if (tab === current) {
+                    paintLoading(tab)
+                    showError(tab.failedUrl)
+                }
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                setProgress(newProgress / 100f)
+                if (tab === current) setProgress(newProgress / 100f)
             }
 
             override fun onReceivedTitle(view: WebView?, title: String?) {
-                onUpdateWindowTitle(title?.takeIf { it.isNotBlank() } ?: "Internet Explorer")
+                tab.title = title?.takeIf { it.isNotBlank() }.orEmpty()
+                if (tab === current) {
+                    onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
+                }
             }
         }
 
@@ -222,7 +602,7 @@ class MetroIEApp(
      * fallback address for exactly this case, so an app link on a phone with no app still
      * lands on the web page it was standing in for.
      */
-    private fun handleScheme(url: String): Boolean {
+    private fun handleScheme(tab: Tab, url: String): Boolean {
         val uri = Uri.parse(url)
         val scheme = uri.scheme?.lowercase()
         if (scheme == "http" || scheme == "https") return false
@@ -234,7 +614,7 @@ class MetroIEApp(
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     context.startActivity(intent)
                 } else {
-                    intent.getStringExtra("browser_fallback_url")?.let { webView.loadUrl(it) }
+                    intent.getStringExtra("browser_fallback_url")?.let { load(tab, it) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Could not follow $url", e)
@@ -292,7 +672,7 @@ class MetroIEApp(
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(6), 0, dp(6))
         }
-        menuScroller = object : android.widget.ScrollView(context) {
+        menuScroller = object : ScrollView(context) {
             override fun onMeasure(widthSpec: Int, heightSpec: Int) {
                 // The bar grows upward, and nothing stops it growing past the top of the
                 // screen: a long favourites list would take its own first entries off the
@@ -314,12 +694,13 @@ class MetroIEApp(
             setPadding(dp(10), 0, dp(10), 0)
         }
 
-        reloadButton = circleButton(REFRESH_ICON) {
-            // Whatever it does, it is about the page - so the commands go away with it.
-            closeMenu()
-            if (isLoading) webView.stopLoading() else webView.reload()
-        }
-        row.addView(reloadButton, LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)))
+        // The left button is the tabs button, as it was on the phone once IE could hold
+        // more than one page: it both says how many are open and is the way to them.
+        // Reload went where the phone put it when that button was spent - in the menu
+        // under the dots. See buildMenu.
+        tabsButton = circleButton(null) { openTabs() }
+        paintTabsButton()
+        row.addView(tabsButton, LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)))
 
         row.addView(buildAddressColumn(), LinearLayout.LayoutParams(0, WRAP, 1f).apply {
             marginStart = dp(10)
@@ -352,15 +733,13 @@ class MetroIEApp(
         column.addView(track, LinearLayout.LayoutParams(MATCH, dp(PROGRESS_DP)))
 
         addressBar = EditText(context).apply {
-            background = null
-            setBackgroundColor(Color.WHITE)
-            setTextColor(Color.BLACK)
-            setHintTextColor(Color.argb(140, 0, 0, 0))
             hint = "search or enter web address"
             typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
             textSize = 14f
             isSingleLine = true
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+            // Room on the right for the button that sits over this field, so a long
+            // address runs out of room before it runs under the mark rather than after.
+            setPadding(dp(10), dp(8), dp(RELOAD_DP) + dp(4), dp(8))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                 android.text.InputType.TYPE_TEXT_VARIATION_URI
             imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
@@ -385,20 +764,41 @@ class MetroIEApp(
                 }
             }
         }
-        // The caret and the selection band, set by hand rather than through the palette's
-        // applyToField: this is the one field in the shell that is not on the shell's
-        // background. It is white whichever way the light/dark setting is turned, so a
-        // caret drawn in the palette's foreground would be white on white half the time.
-        addressBar.setTextCursorDrawable(GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.BLACK)
-            // Stretched to the line's height; only the width is read from here.
-            setSize(dp(2), dp(2))
-        })
-        addressBar.highlightColor = Color.argb(
-            90, Color.red(palette.accent), Color.green(palette.accent), Color.blue(palette.accent))
+        // Fill, ink, caret and selection from the one place the shell describes a text
+        // box. This field was where that description came from - it is white under either
+        // setting, because a field is a hole cut in the page rather than words on it - and
+        // now the rename dialog and the two searches are the same field.
+        palette.applyToField(addressBar)
 
-        column.addView(addressBar, LinearLayout.LayoutParams(MATCH, dp(ADDRESS_DP)))
+        // The address and its button are one thing: the field is white, the button sits
+        // on the white, and the pair reads as a single control the way the phone's did.
+        // The mark is black rather than the set's own white for the same reason.
+        reloadButton = ImageView(context).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            imageTintList = android.content.res.ColorStateList.valueOf(Color.BLACK)
+            // Nearly none. The box is the tap target and the mark inside it was being
+            // drawn at half of it - eight device-independent pixels off each side of a
+            // 34dp button leaves 18dp of glyph, which is a mark you have to look for on a
+            // white field. What is left here is enough to keep the mark off the field's
+            // own edge and no more. See RELOAD_DP.
+            setPadding(dp(RELOAD_INSET_DP), dp(RELOAD_INSET_DP), dp(RELOAD_INSET_DP), dp(RELOAD_INSET_DP))
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                closeMenu()
+                val tab = current ?: return@setOnClickListener
+                if (tab.loading) tab.webView.stopLoading() else tab.webView.reload()
+            }
+            TiltEffect.apply(this)
+        }
+
+        val field = FrameLayout(context)
+        field.addView(addressBar, FrameLayout.LayoutParams(MATCH, MATCH))
+        field.addView(reloadButton, FrameLayout.LayoutParams(
+            dp(RELOAD_DP), dp(RELOAD_DP), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+            marginEnd = dp(3)
+        })
+        column.addView(field, LinearLayout.LayoutParams(MATCH, dp(ADDRESS_DP)))
         return column
     }
 
@@ -412,7 +812,7 @@ class MetroIEApp(
         val holder = FrameLayout(context).apply {
             isClickable = true
             setOnClickListener {
-                Helpers.performHapticFeedback(context)
+                Haptics.tap(it)
                 if (menuScroller.visibility == View.VISIBLE) closeMenu() else openMenu()
             }
         }
@@ -436,23 +836,23 @@ class MetroIEApp(
     }
 
     /**
-     * A black disc with a white ring and a white mark in it.
+     * A white ring with a white mark in it, open in the middle.
      *
-     * The same button the Start screen puts on a tile in edit mode, for the same reason:
-     * it sits on an app bar that has an arbitrary web page a few pixels above it, and a
-     * ringed disc is legible against anything.
+     * The shape the Start screen puts on a tile in edit mode, without its black fill: on
+     * the app bar there is nothing behind the button but the bar, so the ring alone is
+     * the button and the strip shows through it. See wp81_appbar_circle.
      */
-    private fun circleButton(icon: String, onTap: () -> Unit): ImageView =
+    private fun circleButton(icon: String?, onTap: () -> Unit): ImageView =
         ImageView(context).apply {
-            setBackgroundResource(R.drawable.wp81_handle_circle)
-            setImageDrawable(SvgIcon.fromAsset(context, icon))
+            setBackgroundResource(R.drawable.wp81_appbar_circle)
+            if (icon != null) setImageDrawable(SvgIcon.fromAsset(context, icon))
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP))
             outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             clipToOutline = true
             isClickable = true
             setOnClickListener {
-                Helpers.performHapticFeedback(context)
+                Haptics.tap(it)
                 onTap()
             }
             TiltEffect.apply(this)
@@ -496,8 +896,11 @@ class MetroIEApp(
             return
         }
 
-        if (webView.canGoForward()) menuPanel.addView(menuRow("forward") { webView.goForward() })
-        menuPanel.addView(menuRow("home") { loadUrl(homepage) })
+        val tab = current
+        if (tab?.webView?.canGoForward() == true) {
+            menuPanel.addView(menuRow("forward") { tab.webView.goForward() })
+        }
+        menuPanel.addView(menuRow("home") { current?.let { load(it, homepage) } })
         menuPanel.addView(menuRow("favourites", closes = false) {
             buildMenu(favouritesOpen = true)
             playMenuEntrance()
@@ -517,7 +920,7 @@ class MetroIEApp(
             setPadding(dp(22), dp(12), dp(22), dp(12))
             isClickable = true
             setOnClickListener {
-                Helpers.performHapticFeedback(context)
+                Haptics.tap(it)
                 if (closes) closeMenu()
                 action()
             }
@@ -540,9 +943,9 @@ class MetroIEApp(
             setPadding(dp(22), dp(12), dp(8), dp(12))
             isClickable = true
             setOnClickListener {
-                Helpers.performHapticFeedback(context)
+                Haptics.tap(it)
                 closeMenu()
-                loadUrl(favourite.url)
+                current?.let { load(it, favourite.url) }
             }
             TiltEffect.apply(this)
         }, LinearLayout.LayoutParams(0, WRAP, 1f))
@@ -559,7 +962,7 @@ class MetroIEApp(
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 isClickable = true
                 setOnClickListener {
-                    Helpers.performHapticFeedback(context)
+                    Haptics.tap(it)
                     favourites.remove(favourite)
                     saveFavourites()
                     buildMenu(favouritesOpen = true)
@@ -595,11 +998,12 @@ class MetroIEApp(
     // ---------------------------------------------------------------- commands
 
     private fun sharePage() {
-        val url = webView.url ?: return
+        val tab = current ?: return
+        val url = tab.webView.url ?: return
         try {
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, webView.title ?: url)
+                putExtra(Intent.EXTRA_SUBJECT, tab.title.ifBlank { url })
                 putExtra(Intent.EXTRA_TEXT, url)
             }, null).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
         } catch (e: Exception) {
@@ -608,7 +1012,7 @@ class MetroIEApp(
     }
 
     private fun setHomepageToCurrent() {
-        val url = webView.url?.takeIf { it.isNotBlank() && !it.startsWith("about:") } ?: return
+        val url = liveUrl() ?: return
         homepage = url
         context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_HOMEPAGE, url).apply()
@@ -616,19 +1020,23 @@ class MetroIEApp(
     }
 
     private fun addCurrentToFavourites() {
-        val url = webView.url?.takeIf { it.isNotBlank() && !it.startsWith("about:") } ?: return
+        val url = liveUrl() ?: return
         if (favourites.any { it.url == url }) {
             onShowNotification("Internet Explorer", "${hostOf(url)} is already a favourite")
             return
         }
         favourites.add(0, Favourite(
-            name = webView.title?.takeIf { it.isNotBlank() } ?: url,
+            name = current?.title?.takeIf { it.isNotBlank() } ?: url,
             url = url,
             isDefault = false
         ))
         saveFavourites()
         onShowNotification("Internet Explorer", "${hostOf(url)} added to favourites")
     }
+
+    /** Where the browser actually is, or null if it is nowhere worth remembering. */
+    private fun liveUrl(): String? =
+        current?.webView?.url?.takeIf { it.isNotBlank() && !it.startsWith("about:") }
 
     private fun hostOf(url: String): String = try {
         Uri.parse(url).host ?: url
@@ -645,6 +1053,7 @@ class MetroIEApp(
     private fun go(typed: String) {
         val text = typed.trim()
         if (text.isEmpty()) return
+        val tab = current ?: return
 
         val looksLikeUrl = text.startsWith("http://") || text.startsWith("https://") ||
             (!text.contains(" ") && text.matches(HOSTNAME))
@@ -658,15 +1067,29 @@ class MetroIEApp(
 
         addressBar.clearFocus()
         hideKeyboard()
-        loadUrl(target)
+        load(tab, target)
     }
 
-    fun navigateToUrl(url: String) = loadUrl(url)
+    /**
+     * Opens an address arriving from elsewhere in the launcher.
+     *
+     * In its own tab, the way the phone did it: a link followed from a tile or a news
+     * story is a new thing to read, and loading it over whatever was already open throws
+     * away a page the user never closed.
+     */
+    fun navigateToUrl(url: String) {
+        closeTabs()
+        openTab(url)
+    }
 
-    private fun loadUrl(url: String) {
-        errorPage.visibility = View.GONE
-        showAddress(url)
-        webView.loadUrl(url)
+    private fun load(tab: Tab, url: String) {
+        tab.failed = false
+        tab.url = url
+        if (tab === current) {
+            showError(null)
+            showAddress(url)
+        }
+        tab.webView.loadUrl(url)
     }
 
     /** Puts [url] in the bar, unless the user is in the middle of typing over it. */
@@ -682,12 +1105,18 @@ class MetroIEApp(
     }
 
     /**
-     * Back is the page's before it is the window's.
+     * Back is the browser's before it is the window's.
      *
-     * Returns false only when there is nothing left inside the browser to go back to,
-     * which is the point at which the shell closes the window.
+     * The tabs page, the menu and the address field are all things the user opened and
+     * expects to come out of; then it is the page's own history; and then, with more than
+     * one page open, closing this one and returning to the last. Only with a single page
+     * that has nowhere left to go does it hand back to the shell, which closes the window.
      */
     fun handleBack(): Boolean {
+        if (tabsPage.visibility == View.VISIBLE) {
+            closeTabs()
+            return true
+        }
         if (menuScroller.visibility == View.VISIBLE) {
             closeMenu()
             return true
@@ -697,13 +1126,19 @@ class MetroIEApp(
             hideKeyboard()
             return true
         }
-        if (errorPage.visibility == View.VISIBLE) {
-            errorPage.visibility = View.GONE
-            if (webView.canGoBack()) webView.goBack()
+        val tab = current ?: return false
+        if (tab.failed) {
+            tab.failed = false
+            showError(null)
+            if (tab.webView.canGoBack()) tab.webView.goBack()
             return true
         }
-        if (webView.canGoBack()) {
-            webView.goBack()
+        if (tab.webView.canGoBack()) {
+            tab.webView.goBack()
+            return true
+        }
+        if (tabs.size > 1) {
+            closeTab(tab)
             return true
         }
         return false
@@ -711,19 +1146,18 @@ class MetroIEApp(
 
     // ---------------------------------------------------------------- loading state
 
-    /** Swaps the mark on the left button and shows or clears the line. */
-    private fun setLoading(loading: Boolean) {
-        if (isLoading == loading) return
-        isLoading = loading
+    /** Shows or clears the line, and names the button, for the tab being looked at. */
+    private fun paintLoading(tab: Tab) {
         reloadButton.setImageDrawable(
-            SvgIcon.fromAsset(context, if (loading) STOP_ICON else REFRESH_ICON))
-        if (loading) {
+            SvgIcon.fromAsset(context, if (tab.loading) STOP_ICON else REFRESH_ICON))
+        if (tab.loading) {
             progressFill.animate().cancel()
             progressFill.alpha = 1f
             progressFill.scaleX = 0.02f
         } else {
             // Run to the end before disappearing: a line that vanishes at two thirds reads
             // as a page that gave up rather than one that arrived.
+            progressFill.animate().cancel()
             progressFill.animate().scaleX(1f).setDuration(120).withEndAction {
                 progressFill.animate().alpha(0f).setDuration(180).start()
             }.start()
@@ -731,7 +1165,7 @@ class MetroIEApp(
     }
 
     private fun setProgress(fraction: Float) {
-        if (!isLoading) return
+        if (current?.loading != true) return
         progressFill.animate().cancel()
         progressFill.animate()
             .scaleX(fraction.coerceIn(0.02f, 1f))
@@ -782,21 +1216,63 @@ class MetroIEApp(
             setTextColor(palette.accent)
             setPadding(0, dp(26), 0, dp(10))
             isClickable = true
-            setOnClickListener { failedUrl?.let { loadUrl(it) } }
+            setOnClickListener {
+                val tab = current ?: return@setOnClickListener
+                tab.failedUrl?.let { load(tab, it) }
+            }
             TiltEffect.apply(this)
         }, LinearLayout.LayoutParams(WRAP, WRAP))
         return page
     }
 
+    /** Puts the error up for [url], or takes it down when handed nothing. */
     private fun showError(url: String?) {
+        if (url == null) {
+            errorPage.visibility = View.GONE
+            return
+        }
         errorDetail.text = buildString {
             append("Make sure the address is right, and that this phone is on a network.")
-            if (!url.isNullOrBlank()) append("\n\n").append(url)
+            if (url.isNotBlank()) append("\n\n").append(url)
         }
         errorPage.visibility = View.VISIBLE
     }
 
     // ---------------------------------------------------------------- storage
+
+    /**
+     * Writes down what is open, so the next launch finds it.
+     *
+     * Addresses and titles only. A tab is a page you meant to come back to, which is an
+     * address; its history and its scroll position belong to a WebView that will not
+     * outlive the process, and pretending otherwise would mean promising a restored tab
+     * behaves like one that never went away.
+     */
+    private fun saveTabs() {
+        // A tab with nowhere to go yet is not written down - there is nothing to put back
+        // - and the position is taken against the list that *is* written, so dropping one
+        // does not leave the mark pointing at the tab beside it.
+        val kept = tabs.filter { it.url.isNotBlank() && !it.url.startsWith("about:") }
+        context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_TABS, Gson().toJson(kept.map { SavedTab(it.url, it.title) }))
+            .putInt(KEY_ACTIVE_TAB, kept.indexOf(current).coerceAtLeast(0))
+            .apply()
+    }
+
+    private fun loadTabs(): List<SavedTab> {
+        val json = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_TABS, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<SavedTab>>() {}.type
+            Gson().fromJson<List<SavedTab>>(json, type)
+                ?.filter { it.url.isNotBlank() }
+                ?.take(MAX_TABS)
+                ?: emptyList()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unreadable tabs", e)
+            emptyList()
+        }
+    }
 
     private fun saveLastUrl(url: String) {
         if (url == "about:blank" || url.startsWith("file://")) return
@@ -823,10 +1299,12 @@ class MetroIEApp(
     }
 
     fun cleanup() {
-        webView.stopLoading()
-        webView.loadUrl("about:blank")
-        webView.clearHistory()
-        webView.destroy()
+        for (tab in tabs) {
+            tab.webView.stopLoading()
+            tab.webView.destroy()
+        }
+        tabs.clear()
+        current = null
     }
 
     private fun dp(v: Int) = (v * context.resources.displayMetrics.density).toInt()
@@ -840,6 +1318,10 @@ class MetroIEApp(
         private const val DEFAULT_HOMEPAGE = "https://news.google.com"
         private const val KEY_HOMEPAGE = "ie_homepage"
 
+        /** What was open last time, and which of them was being read. */
+        private const val KEY_TABS = "ie_tabs"
+        private const val KEY_ACTIVE_TAB = "ie_active_tab"
+
         /** The app bar's own near-black, which is not the palette's and never was. */
         private const val BAR_COLOUR = 0xFF212021.toInt()
 
@@ -849,9 +1331,37 @@ class MetroIEApp(
         private const val BAR_DP = 62
         private const val BUTTON_DP = 44
         private const val ADDRESS_DP = 40
+
+        /**
+         * The reload button's box, inside the address field's right-hand end.
+         *
+         * As large as the field is tall, less the air that keeps it off the top and bottom
+         * edges. With [RELOAD_INSET_DP] that puts a 36dp glyph in it - twice what the same
+         * button used to draw - which is the size the mark has to be to be read at a glance
+         * against a page's own white.
+         */
+        private const val RELOAD_DP = 38
+
+        /** How far the mark sits inside the button. Enough to clear the field, no more. */
+        private const val RELOAD_INSET_DP = 1
         private const val PROGRESS_DP = 3
         private const val DOT_DP = 5
         private const val REMOVE_DP = 32
+
+        /** The tabs page: two cards across, at the shell's own page margin. */
+        private const val TABS_PER_ROW = 2
+        private const val PAGE_MARGIN_DP = 22
+        private const val THUMB_HEIGHT_DP = 190
+        private const val CLOSE_DP = 30
+
+        /** How wide a thumbnail is kept. Enough for a card, far less than a screen. */
+        private const val THUMB_WIDTH_DP = 200
+
+        /** Cards in the set, and so the most pages the button could ever say. */
+        private const val CARD_ICONS = 9
+
+        /** See openTab. The button's ceiling is the browser's. */
+        private const val MAX_TABS = CARD_ICONS
 
         /**
          * How far the mark sits inside the ring.
@@ -864,9 +1374,11 @@ class MetroIEApp(
 
         private const val STAGGER_MS = 30L
 
-        private const val REFRESH_ICON = "custom_icons_8/appbar.refresh.svg"
-        private const val STOP_ICON = "custom_icons_8/appbar.axis.x.letter.svg"
-        private const val REMOVE_ICON = "custom_icons_8/appbar.close.svg"
+        private const val ICON_DIR = "custom_icons_8"
+        private const val NEW_ICON = "$ICON_DIR/appbar.add.svg"
+        private const val REFRESH_ICON = "$ICON_DIR/appbar.refresh.svg"
+        private const val STOP_ICON = "$ICON_DIR/appbar.axis.x.letter.svg"
+        private const val REMOVE_ICON = "$ICON_DIR/appbar.close.svg"
 
         /** Something with a dot in it and no spaces: `example.com`, `a.b.co.uk/path`. */
         private val HOSTNAME = Regex("^[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}(/.*)?$")

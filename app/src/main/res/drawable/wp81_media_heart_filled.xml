@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_media_heart_filled - the same heart, kept.
+
+  The outline says "you could keep this" and the fill says "you have"; nothing else about
+  the glyph changes, so the eye reads the state rather than re-reading the shape. Same
+  grid and same outer edge as wp81_media_heart, so the two swap without the column
+  shifting by a pixel.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <group
+        android:translateX="14"
+        android:translateY="14"
+        android:scaleX="2"
+        android:scaleY="2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 12,21.35 C 12,21.35 2,13.4 2,8.4 C 2,5.32 4.42,2.9 7.5,2.9 C 9.24,2.9 10.91,3.71 12,4.99 C 13.09,3.71 14.76,2.9 16.5,2.9 C 19.58,2.9 22,5.32 22,8.4 C 22,13.4 12,21.35 12,21.35 Z" />
+    </group>
+</vector>

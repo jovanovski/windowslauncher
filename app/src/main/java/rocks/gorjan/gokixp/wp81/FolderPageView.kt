@@ -180,6 +180,18 @@ class MetroPageHeader(
         title.text = text.lowercase()
     }
 
+    /**
+     * A name the user typed, at the head of the page showing it - as they typed it.
+     *
+     * The lowercasing above is a rule about *this platform's own words*: "tabs", "notes",
+     * "settings". A note called "AirCare" is not one of the platform's words, and a shell
+     * that quietly renamed it to "aircare" wherever it was shown would be correcting the
+     * user's typing on their behalf.
+     */
+    fun setName(text: String) {
+        title.text = text
+    }
+
     fun playEntrance() {
         translationY = dp(16).toFloat()
         alpha = 0f

@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -379,6 +378,25 @@ class StartScreenView(
         forEachTileView { if (it.tile.id == tileId) it.setLiveWidgetRotation(faces, style) }
     }
 
+    /**
+     * Hands the People tile the address book its wall of faces is made of.
+     *
+     * Both parts of it: the favourites, and the rest of the book the tile makes its
+     * numbers up from. How many of the second it takes is the tile's own decision - only
+     * it knows how many squares it has. See TileView.applyPeopleGrid.
+     *
+     * Passing nothing takes the mosaic away again, which is what a tile whose access has
+     * been revoked gets: it goes back to being an ordinary live widget with an invitation
+     * on it.
+     */
+    fun setPeopleMosaic(
+        tileId: String,
+        favourites: List<ContactFeed.Person>,
+        others: List<ContactFeed.Person> = emptyList()
+    ) {
+        forEachTileView { if (it.tile.id == tileId) it.setPeopleMosaic(favourites, others) }
+    }
+
     /** Hands every tile the loader it fetches face pictures through. */
     fun setBackdropLoader(loader: (String, (android.graphics.Bitmap?) -> Unit) -> Unit) {
         forEachTileView { it.backdropLoader = loader }
@@ -492,14 +510,49 @@ class StartScreenView(
      * scaled by how much wider the screen has become. A tile then stays the size it is in
      * portrait, and the width that was gained is spent on more of them.
      */
+    /**
+     * Whether the column count is scaled to the screen's shape.
+     *
+     * True on a phone, where a screen turned on its side should hold more tiles of the
+     * same size rather than the same number of larger ones. False where the extra width
+     * is not extra room: a car's screen is wide because it is short, and is read from
+     * across the cabin rather than from arm's length, so it wants the few large tiles the
+     * scaling is designed to prevent. Such a surface sets its own count and keeps it.
+     */
+    var autoColumns: Boolean = true
+
+    /**
+     * Whether the way down to the app list is offered.
+     *
+     * There is not always one to go to. The car screen shows the wall by itself, and an
+     * arrow there is a button that does nothing at best.
+     */
+    var showAppListArrow: Boolean = true
+        set(value) {
+            field = value
+            appListArrow.visibility = if (value) VISIBLE else GONE
+        }
+
+    /**
+     * The screen measurement margins and gaps are worked out from, when it should not be
+     * the screen's own shorter side.
+     *
+     * Those are a fixed fraction of the phone's width, so that a tile and the space around
+     * it keep their relation whatever the screen. A surface showing the wall smaller than
+     * life has to say so here as well as in its column count, or the tiles shrink and the
+     * gutters between them stay where they were.
+     */
+    var metricBasisOverride: Int? = null
+
     private fun applyColumns(): Boolean {
         // The phone's shorter side, whichever way it is being held: that is the width the
         // wall was designed across, and what a tile's size is worked out from.
         val metrics = resources.displayMetrics
-        val basis = kotlin.math.min(metrics.widthPixels, metrics.heightPixels)
+        val basis = metricBasisOverride
+            ?: kotlin.math.min(metrics.widthPixels, metrics.heightPixels)
         grid.metricBasis = basis
         bandGrid?.metricBasis = basis
-        val across = TileGridLayout.columnsFor(width, basis, columns)
+        val across = if (autoColumns) TileGridLayout.columnsFor(width, basis, columns) else columns
         if (grid.columns == across) return false
         grid.columns = across
         bandGrid?.columns = across
@@ -746,9 +799,11 @@ class StartScreenView(
             // to be cut off at.
             clipChildren = false
             clipToPadding = false
-            // The same air the folder ends with - see the closing rule's bottom margin -
-            // so the band sits between the rows above and below it rather than nearer one.
-            setPadding(0, (BAND_TOP_DP * density).toInt(), 0, 0)
+            // Nothing above the name. The row of tiles the folder opened out of already
+            // ends with its own gap, so a band that added air of its own on top of that
+            // sat the name a clear step further from the folder it belongs to than from
+            // the tiles under it. The air at the other end stays - see the closing rule's
+            // bottom margin - because there is no such gap under the last row to borrow.
         }
 
         val heading = LinearLayout(context).apply {
@@ -1310,7 +1365,7 @@ class StartScreenView(
         // looks like here - and it is the same signal whether a folder is being made or
         // added to, which the preview alone is not.
         under.setDimmed(false)
-        under.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        Haptics.tap(under)
         return true
     }
 

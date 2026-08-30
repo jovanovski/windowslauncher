@@ -41,6 +41,12 @@ class WP81Shell(
 ) : FrameLayout(context) {
 
     val navBar = WP81NavBar(context, palette)
+
+    /**
+     * The app bar: the commands for whatever is being held or filled, on a strip that
+     * slides up over the wall. The keys below it never change - see [WP81SecondaryBar].
+     */
+    val secondaryBar = WP81SecondaryBar(context)
     val startScreen = StartScreenView(context, palette)
     val appList = AppListView(context, palette, iconProvider)
 
@@ -88,6 +94,16 @@ class WP81Shell(
             bottomMargin = dp(WP81NavBar.HEIGHT_DP)
         })
 
+        // The app bar sits over the pages and under the keys - it slides out from beneath
+        // them, so the nav bar has to be drawn after it - and takes no space of its own:
+        // its margin puts it directly on top of the keys, and the wall below is untouched.
+        addView(secondaryBar, LayoutParams(
+            LayoutParams.MATCH_PARENT, dp(WP81SecondaryBar.HEIGHT_DP)
+        ).apply {
+            gravity = android.view.Gravity.BOTTOM
+            bottomMargin = dp(WP81NavBar.HEIGHT_DP)
+        })
+
         // Backdrop for windowed programs. Non-maximizable windows - Winamp, the Phone
         // Dialer - keep their fixed size and Vista chrome, so without this they would
         // float over the Start screen; WP8.1 has no such notion, so they get black.
@@ -121,12 +137,13 @@ class WP81Shell(
 
         // The Start key means Start, wherever the user is not already: a key with a
         // Windows flag on it that took you *away* from the Start screen read as broken.
-        // Only once there - with nothing to return from - does it take on its second job,
-        // opening the searchable app list, since typing a couple of letters is the fastest
-        // way to reach an app from the one page that has no back.
-        navBar.onStart = { if (isOnStartPage()) openAppSearch() else goToStart() }
-        // The key strip follows what the user is doing: arranging tiles or filling a
-        // folder each replace navigation with the commands for that job.
+        // Only once there - with nothing to return from - does it take on its second job
+        // and page to the app list. To the list itself, not into a search of it: a key
+        // pressed to see what is installed should not answer with a keyboard over it.
+        navBar.onStart = { if (isOnStartPage()) goToAppList() else goToStart() }
+        // The app bar follows what the user is doing: arranging tiles or filling a folder
+        // each bring up the commands for that job, above the keys rather than instead of
+        // them.
         startScreen.onEditModeChanged = { editing -> refreshNavMode() }
         navBar.onSearch = { onSearch?.invoke() }
 
@@ -151,19 +168,25 @@ class WP81Shell(
         animateTo(0f, animated)
     }
 
-    /** Chooses the key strip for whatever is currently on screen. */
+    /**
+     * Chooses the app bar for whatever is currently on screen.
+     *
+     * The three keys are not part of this any more - they are the same three wherever the
+     * user is - but every call site that used to mean "the strip has to change" still
+     * means it, so the name stays.
+     */
     fun refreshNavMode() {
-        // The colour key acts on the selected tile, so it is offered only when there is
-        // one. Set before the mode, which reads it.
-        navBar.hasSelection = selectedTile() != null
-        navBar.setMode(
+        secondaryBar.setMode(
             when {
                 // A folder page is on top when open, so its selection wins.
-                isFolderOpen() && folderPage.contents.isEditMode -> WP81NavBar.Mode.EDIT_FOLDER
-                isFolderOpen() -> WP81NavBar.Mode.FOLDER
-                startScreen.isEditMode -> WP81NavBar.Mode.EDIT_START
-                else -> WP81NavBar.Mode.NORMAL
-            }
+                isFolderOpen() && folderPage.contents.isEditMode -> WP81SecondaryBar.Mode.EDIT_FOLDER
+                isFolderOpen() -> WP81SecondaryBar.Mode.FOLDER
+                startScreen.isEditMode -> WP81SecondaryBar.Mode.EDIT_START
+                else -> WP81SecondaryBar.Mode.NONE
+            },
+            // Both editing commands act on the selected tile, so they are offered only
+            // when there is one.
+            hasSelection = selectedTile() != null
         )
     }
 
@@ -339,7 +362,13 @@ class WP81Shell(
         startScreen.translationX = -pageProgress * w * PARALLAX
         startScreen.alpha = 1f - pageProgress * 0.35f
         appList.translationX = (1f - pageProgress) * w
-        appList.visibility = if (pageProgress <= 0.001f) GONE else VISIBLE
+        val listGone = pageProgress <= 0.001f
+        // Put back to the top the moment it is off the screen, so every arrival at the
+        // list is an arrival at the top of it. Done on the way out rather than on the way
+        // in for the obvious reason: nobody can see it happen here, where the same jump
+        // on arrival would be the first thing they saw.
+        if (listGone && appList.visibility != GONE) appList.scrollToTop()
+        appList.visibility = if (listGone) GONE else VISIBLE
         startScreen.visibility = if (pageProgress >= 0.999f) GONE else VISIBLE
         // Crossing between Start and the app list swaps settings for back.
         if (wasOnAppList != (pageProgress > 0.5f)) refreshNavMode()
@@ -404,8 +433,14 @@ class WP81Shell(
                 }
                 animateTo(target, animated = true)
                 // Swiping settles the page directly rather than going through
-                // goToStart()/goToAppList(), so search has to be opened and closed here
-                // too - otherwise swiping back to Start left the keyboard up over it.
+                // goToStart()/goToAppList(), so search has to be closed here too -
+                // otherwise swiping back to Start left the keyboard up over it.
+                //
+                // The swipe is the one way in that still opens search with it: it is the
+                // gesture of somebody already reaching for the list, and their hands are
+                // in the right place to type. The arrow and the Start key are for looking
+                // through what is there, and the button at the top of the rail is for
+                // saying so on purpose.
                 if (target == 1f) appList.beginSearch() else appList.endSearch()
             }
         }

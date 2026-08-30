@@ -27,18 +27,30 @@ sealed class AppTheme {
     /** The window chrome this theme draws with. See [DesktopChrome]. */
     abstract val chrome: DesktopChrome
 
+    /**
+     * Where the icons the user picked by hand for this theme are kept.
+     *
+     * Deliberately keyed on the theme and not on [chrome]: an icon is chosen for the shell
+     * that is on screen, and Windows Phone's shell is its own even though its windows are
+     * Vista's. Keying this on the chrome had a tile icon overwrite a desktop one.
+     */
+    abstract val customIconsKey: String
+
     object WindowsXP : AppTheme() {
         override val chrome = DesktopChrome.XP
+        override val customIconsKey = "custom_icons_xp"
         override fun toString() = "Windows XP"
     }
 
     object WindowsClassic : AppTheme() {
         override val chrome = DesktopChrome.CLASSIC
+        override val customIconsKey = "custom_icons_98"
         override fun toString() = "Windows Classic"
     }
 
     object WindowsVista : AppTheme() {
         override val chrome = DesktopChrome.VISTA
+        override val customIconsKey = "custom_icons_vista"
         override fun toString() = "Windows Vista"
     }
 
@@ -49,6 +61,7 @@ sealed class AppTheme {
      */
     object WindowsPhone81 : AppTheme() {
         override val chrome = DesktopChrome.VISTA
+        override val customIconsKey = "custom_icons_wp8"
         override fun toString() = "Windows Phone 8"
     }
 

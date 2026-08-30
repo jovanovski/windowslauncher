@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The calculator's add key.
+
+  The arithmetic keys are geometry rather than type: Windows Phone's calculator draws them
+  as bars four units thick on a sixteen-unit arm, which is a good deal heavier than the
+  same characters set in Segoe. All of them share this 32-unit box and that 16/4 system, so
+  a plus, a minus and a times drawn side by side line up and weigh the same.
+
+  White so the key can tint it: black on the Light theme, white on Dark.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,14h16v4h-16z M14,8h4v16h-4z" />
+</vector>

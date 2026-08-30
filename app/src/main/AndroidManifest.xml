@@ -4,6 +4,13 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- Lets the app hand the car a NavigationTemplate, which is what carries the Surface. -->
+    <!-- Zune keeps playing for the car once the launcher's own screen is gone. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <!-- And to draw on it. The template is refused without this, not merely left blank. -->
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
@@ -123,6 +130,38 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
+
+        <!-- Android Auto. See car/GokiCarAppService.kt -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <!-- 5 is where SurfaceCallback gained onClick, which the tile grid needs. -->
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="5" />
+
+        <service
+            android:name=".car.GokiCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+
+        <!--
+          The car's music source. Exported because the host binds it from its own process,
+          and browsable because that is what turns "Windows Launcher is open on the phone"
+          into a library the car can actually show.
+        -->
+        <service
+            android:name=".car.ZuneCarMediaService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
 
         <!-- FileProvider for My Computer file sharing -->
         <provider

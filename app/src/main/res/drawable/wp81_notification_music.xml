@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_notification_music - the badge the phone's media controls show beside the song.
+
+  The same headphones as wp81_glyph_headphones, on a canvas cut down to fit them. The
+  glyphs in this set are drawn on a 76x76 grid with the mark occupying about half of it,
+  which is right on a tile - the air is what keeps it off the tile's own edges - and wrong
+  here: Android draws a notification's small icon at a fixed size and scales the whole
+  canvas into it, air included, so half of what was reserved for the badge was being spent
+  on nothing. Beside an app whose badge fills its canvas, ours looked half the size.
+
+  The path is untouched. The viewport is the mark's own bounding box (x 19-57, y 19-56)
+  plus two units of margin, and the group shifts the drawing into it. Emitted white: a
+  notification icon is a silhouette the system tints itself.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="42"
+    android:viewportHeight="42">
+    <group
+        android:translateX="-17"
+        android:translateY="-16.5">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 37.75,19L 38.25,19C 38.25,19 57,19 57,39C 57,48 55,51 54,52C 54,52 51,54 51.9999,51.25C 51.9999,48.9362 53,44 53,44C 53,44 54,44 54,39C 54,33 50,22.5 39,22.5L 37,22.5C 26,22.5 22,33 22,39C 22,44 23,44 23,44C 23,44 24.0001,48.9362 24.0001,51.25C 25,54 22,52 22,52C 21,51 19,48 19,39C 19,19 37.75,19 37.75,19 Z M 26.5533,39.1655C 28.194,38.9349 29.711,40.0781 29.9416,41.7188L 31.4725,52.6117C 31.7031,54.2524 30.56,55.7694 28.9192,56C 27.2785,56.2306 25.2615,55.0875 25.0309,53.4467L 23.5,42.5538C 23.2694,40.9131 24.9126,39.3961 26.5533,39.1655 Z M 49.4467,39.1655C 51.0874,39.3961 52.7306,40.9131 52.5,42.5538L 50.9691,53.4467C 50.7385,55.0875 48.7215,56.2306 47.0808,56C 45.44,55.7694 44.2969,54.2524 44.5275,52.6117L 46.0584,41.7188C 46.289,40.0781 47.806,38.9349 49.4467,39.1655 Z " />
+    </group>
+</vector>

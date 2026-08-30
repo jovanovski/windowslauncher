@@ -166,6 +166,13 @@ class MediaSessions(private val context: Context) {
                 else -> false
             }
             if (!live) continue
+            // One entry per app, and when an app holds more than one session the one that
+            // is playing wins. Our own process publishes two - the music app's and the car
+            // service's - and taking whichever came last off the system's list meant the
+            // tile could describe a session that was not the one making the sound.
+            val existing = result[controller.packageName]
+            val playing = state?.state == PlaybackState.STATE_PLAYING
+            if (existing != null && existing.isPlaying && !playing) continue
             val actions = state?.actions ?: 0L
             result[controller.packageName] = Info(
                 packageName = controller.packageName,
@@ -203,11 +210,28 @@ class MediaSessions(private val context: Context) {
         transport.skipToPrevious()
     }
 
+    /**
+     * Runs a transport command against the session that is actually doing the playing.
+     *
+     * Not simply the first session the app holds. An app may hold several - this launcher
+     * itself does, one in the music app and one in the car service - and the first on the
+     * system's list can easily be an idle one. Sending it "play" does not resume what the
+     * user is listening to: it starts that session's own idea of playback, underneath the
+     * song already going, and neither half can then stop the other.
+     *
+     * So: the one that is playing, or failing that the one that is paused mid-song, and
+     * only then whatever is left.
+     */
     private inline fun withTransport(
         packageName: String,
         action: (MediaController.TransportControls, Boolean) -> Unit
     ) {
-        val controller = controllers().firstOrNull { it.packageName == packageName } ?: return
+        val forApp = controllers().filter { it.packageName == packageName }
+        val controller = forApp.firstOrNull {
+            it.playbackState?.state == PlaybackState.STATE_PLAYING
+        } ?: forApp.firstOrNull {
+            it.playbackState?.state == PlaybackState.STATE_PAUSED
+        } ?: forApp.firstOrNull() ?: return
         val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
         try {
             action(controller.transportControls, playing)
