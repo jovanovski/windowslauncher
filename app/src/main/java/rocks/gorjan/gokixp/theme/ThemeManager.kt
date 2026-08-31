@@ -490,12 +490,6 @@ class ThemeManager(private val context: Context) {
         DesktopChrome.VISTA -> R.drawable.icon_clock_vista
     }
 
-    fun getMsnIcon(): Int = when (getSelectedTheme().chrome) {
-        DesktopChrome.CLASSIC -> R.drawable.msn_icon
-        DesktopChrome.XP -> R.drawable.msn_icon
-        DesktopChrome.VISTA -> R.drawable.msn_icon_vista
-    }
-
     fun getMyComputerIcon(): Int = when (getSelectedTheme().chrome) {
         DesktopChrome.CLASSIC -> R.drawable.my_computer_98_icon
         DesktopChrome.XP -> R.drawable.my_computer_xp_icon

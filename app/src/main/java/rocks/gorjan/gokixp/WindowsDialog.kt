@@ -696,6 +696,22 @@ class WindowsDialog @JvmOverloads constructor(
     }
 
     /**
+     * How much of the screen lies below the area windows are laid out in, in pixels.
+     *
+     * The container's own bottom margin and everything the root is inset by, taken from
+     * where the container actually ends up rather than from the numbers that put it there:
+     * the two shells lay it out differently, the system bars move it again, and the one
+     * thing both of those agree on is where it is.
+     */
+    private fun spaceBelowWindowArea(): Int {
+        val container = windowFrame.parent as? View ?: return 0
+        val location = IntArray(2)
+        container.getLocationInWindow(location)
+        val bottom = location[1] + container.height
+        return (windowFrame.rootView.height - bottom).coerceAtLeast(0)
+    }
+
+    /**
      * Adjusts maximized window bottom margin to accommodate keyboard
      */
     private fun adjustMaximizedWindowForKeyboard() {
@@ -707,14 +723,21 @@ class WindowsDialog @JvmOverloads constructor(
             width = FrameLayout.LayoutParams.MATCH_PARENT
             height = FrameLayout.LayoutParams.MATCH_PARENT
             if (isKeyboardVisible) {
-                // The floating windows container has 70dp bottom margin for taskbar
-                // We need to subtract that from keyboard height to get the actual adjustment needed
-                val density = resources.displayMetrics.density
-                val taskbarMarginPx = (70 * density).toInt()
-                val adjustedMargin = (keyboardHeight - taskbarMarginPx).coerceAtLeast(0)
+                // Only the part of the keyboard the window would actually be under. The
+                // container windows live in already stops short of the bottom of the screen
+                // - 70dp for the desktop taskbar, the navigation bar's height under the
+                // phone shell, plus whatever the system bars are inset by - and every
+                // pixel of that is keyboard the window was never covering.
+                //
+                // Measured rather than assumed. It was a hardcoded 70dp, which is the
+                // desktop number and one the phone shell has never used, so a note being
+                // typed sat with its command strip floating above the keyboard by the
+                // difference between the two.
+                val clearance = spaceBelowWindowArea()
+                val adjustedMargin = (keyboardHeight - clearance).coerceAtLeast(0)
 
                 bottomMargin = adjustedMargin
-                Log.d("WindowsDialog", "Keyboard height=$keyboardHeight, taskbar margin=$taskbarMarginPx, adjusted margin=$adjustedMargin")
+                Log.d("WindowsDialog", "Keyboard height=$keyboardHeight, clearance=$clearance, adjusted margin=$adjustedMargin")
             } else {
                 // Fill entire screen
                 bottomMargin = 0

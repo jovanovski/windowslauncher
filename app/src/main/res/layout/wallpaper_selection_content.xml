@@ -585,6 +585,32 @@
                 android:paddingLeft="4dp"
                 android:layout_marginBottom="4dp" />
 
+            <!-- Where links from the rest of the phone go. Not a checkbox, because it is
+                 not ours to tick: Android asks the user itself. -->
+            <TextView
+                android:id="@+id/default_browser_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Links from other apps open in the system browser"
+                android:textColor="#000000"
+                android:textSize="11dp"
+                android:fontFamily="@font/micross_block"
+                android:paddingLeft="4dp" />
+
+            <TextView
+                android:id="@+id/default_browser_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set as default browser"
+                android:textColor="#0000FF"
+                android:textSize="11dp"
+                android:fontFamily="@font/micross_block"
+                android:paddingLeft="4dp"
+                android:layout_marginBottom="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:textStyle="bold" />
+
             <!-- ==================== Notifications ==================== -->
             <TextView
                 style="@style/Win95.SectionHeader"

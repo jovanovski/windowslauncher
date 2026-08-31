@@ -14,13 +14,15 @@ import androidx.core.content.res.ResourcesCompat
 import rocks.gorjan.gokixp.R
 
 /**
- * A Windows Phone text prompt.
+ * A Windows Phone prompt.
  *
- * WP8.1 asks for a single value with a dimmed screen, a lowercase heading, one underlined
- * field and a pair of plain text commands along the bottom - no window chrome, no title
- * bar, no OK/Cancel buttons in the Vista sense.
+ * WP8.1 asks for something with a dimmed screen, a lowercase heading, and a pair of plain
+ * text commands along the bottom - no window chrome, no title bar, no OK/Cancel buttons in
+ * the Vista sense. Between the two it puts either one underlined field, when it wants a
+ * value ([show]), or a line of text, when it wants an answer ([confirm]).
  *
- * Used for renaming a tile, in place of the desktop themes' Vista rename window.
+ * Used for renaming a tile, in place of the desktop themes' Vista rename window, and for
+ * asking before something is thrown away.
  */
 @SuppressLint("ViewConstructor")
 class WP81InputDialog(
@@ -31,6 +33,9 @@ class WP81InputDialog(
     private val scrim = View(context)
     private val panel = LinearLayout(context)
     private val heading = TextView(context)
+
+    /** What is being asked, when the prompt is a question rather than a field. */
+    private val message = TextView(context)
     private val field = EditText(context)
     private val underline = View(context)
     private val acceptButton = TextView(context)
@@ -54,6 +59,12 @@ class WP81InputDialog(
         heading.textSize = 28f
         heading.includeFontPadding = false
         panel.addView(heading, wide())
+
+        message.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+        message.textSize = 16f
+        message.setPadding(0, dp(10), 0, dp(4))
+        message.visibility = GONE
+        panel.addView(message, wide())
 
         field.setSingleLine()
         field.textSize = 18f
@@ -104,7 +115,44 @@ class WP81InputDialog(
         heading.text = title.lowercase()
         field.setText(initial)
         field.setSelection(field.text.length)
+        message.visibility = GONE
+        field.visibility = VISIBLE
+        underline.visibility = VISIBLE
+        acceptButton.text = "done"
 
+        appear()
+
+        field.requestFocus()
+        field.post {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+                    as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    /**
+     * Asks before something is done, rather than asking for a value.
+     *
+     * The same prompt with the field taken out and a line of words in its place, and the
+     * accepting command named after the thing it is about to do - "delete" over "done",
+     * because the one word the user reads before answering should be the answer.
+     *
+     * No keyboard: there is nothing to type into.
+     */
+    fun confirm(title: String, question: String, accept: String, onAccept: () -> Unit) {
+        this.onAccept = { onAccept() }
+        heading.text = title.lowercase()
+        message.text = question
+        message.visibility = VISIBLE
+        field.visibility = GONE
+        underline.visibility = GONE
+        acceptButton.text = accept.lowercase()
+
+        appear()
+    }
+
+    /** The dim and the panel's rise, shared by both kinds of prompt. */
+    private fun appear() {
         visibility = VISIBLE
         scrim.alpha = 0f
         scrim.animate().alpha(1f).setDuration(140).start()
@@ -113,13 +161,6 @@ class WP81InputDialog(
         panel.alpha = 0f
         panel.animate().translationY(0f).alpha(1f)
             .setDuration(200).setInterpolator(DecelerateInterpolator()).start()
-
-        field.requestFocus()
-        field.post {
-            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
-                    as? android.view.inputmethod.InputMethodManager
-            imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-        }
     }
 
     fun dismiss() {
@@ -141,6 +182,7 @@ class WP81InputDialog(
         palette = p
         panel.setBackgroundColor(p.background)
         heading.setTextColor(p.foreground)
+        message.setTextColor(p.foreground)
         p.applyToField(field)
         underline.setBackgroundColor(p.accent)
         acceptButton.setTextColor(p.accent)

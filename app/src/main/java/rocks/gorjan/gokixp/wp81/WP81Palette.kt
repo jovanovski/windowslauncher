@@ -1,6 +1,7 @@
 package rocks.gorjan.gokixp.wp81
 
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.widget.EditText
 import androidx.annotation.ColorInt
@@ -141,7 +142,29 @@ fun WP81Palette.applyToPageText(field: EditText) {
     field.setHintTextColor(foregroundSubtle)
     field.setTextCursorDrawable(caret(field, foreground))
     field.highlightColor = selection()
+    grips(field, foreground)
 }
+
+/**
+ * Colours the two grips either end of a selection.
+ *
+ * They come from the platform's own theme, which draws them in near-black - fine on the
+ * white box [applyToField] makes, invisible on a page that is black. There is nothing to
+ * see while dragging one either: the grip is under the finger. So they are tinted to the
+ * colour the text itself is written in, which answers for both settings rather than
+ * swapping one blind spot for the other.
+ *
+ * Three of them: one for a caret with no selection, and one for each end of a selection.
+ */
+private fun grips(field: EditText, @ColorInt color: Int) {
+    field.textSelectHandle?.let { field.setTextSelectHandle(tinted(it, color)) }
+    field.textSelectHandleLeft?.let { field.setTextSelectHandleLeft(tinted(it, color)) }
+    field.textSelectHandleRight?.let { field.setTextSelectHandleRight(tinted(it, color)) }
+}
+
+/** Mutated first: a drawable out of the theme is shared with everything else using it. */
+private fun tinted(drawable: Drawable, @ColorInt color: Int): Drawable =
+    drawable.mutate().apply { setTint(color) }
 
 private fun caret(field: EditText, @ColorInt color: Int): GradientDrawable {
     val width = (CARET_WIDTH_DP * field.resources.displayMetrics.density).toInt()

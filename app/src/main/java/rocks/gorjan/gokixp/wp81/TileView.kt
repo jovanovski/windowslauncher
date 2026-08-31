@@ -168,6 +168,19 @@ class TileView(
      */
     private val flipCorner = View(context)
 
+    /**
+     * The same hot zone at the tile's top-left, for the story before this one.
+     *
+     * A tile that turns through a run of stories on its own is a tile that can turn past
+     * the one being read - the clock does not wait to be finished with - and the corner
+     * that turns it over only ever goes forward, so the way back was another five faces
+     * round. Two corners, one either side, read as what they are: the left hand goes
+     * back, the right hand goes on. Only where there is a run to step through; a tile with
+     * one face and a reverse has nothing behind it, and the corner stays out of the way of
+     * the tap that opens the app.
+     */
+    private val flipBackCorner = View(context)
+
     // --- Media -------------------------------------------------------------------------
     // An app that is playing something shows that instead of its icon or its notifications:
     // what is on now is more use than what arrived earlier, and the two would otherwise be
@@ -815,6 +828,11 @@ class TileView(
         flipCorner.setOnClickListener { toggleFlip() }
         addView(flipCorner, LayoutParams(
             dp(FLIP_CORNER_DP), dp(FLIP_CORNER_DP), Gravity.TOP or Gravity.END))
+
+        flipBackCorner.isClickable = true
+        flipBackCorner.setOnClickListener { retreatRotation() }
+        addView(flipBackCorner, LayoutParams(
+            dp(FLIP_CORNER_DP), dp(FLIP_CORNER_DP), Gravity.TOP or Gravity.START))
 
         widgetGlyph.scaleType = ImageView.ScaleType.FIT_CENTER
         widgetGlyph.visibility = GONE
@@ -1548,14 +1566,20 @@ class TileView(
         val earnsCorner =
             tile.size != TileSize.SMALL || (tile.kind.isLiveWidget && hasFlipContent())
         flipCorner.visibility = if (isEditMode || !earnsCorner) GONE else VISIBLE
+        // Going back means going back through something: a run of faces. A reverse is one
+        // face behind one other, where forward and back are the same turn.
+        val earnsBack = rotation.size > 1
+        flipBackCorner.visibility = if (isEditMode || !earnsBack) GONE else VISIBLE
         // The 1x1's corner is measured against the tile rather than in dp - see onMeasure,
         // which is where the tile's own size is known.
         if (tile.size == TileSize.SMALL) return
         val edge = if (tile.size.isStrip) FLIP_CORNER_STRIP_DP else FLIP_CORNER_DP
-        val params = flipCorner.layoutParams as? LayoutParams ?: return
-        flipCorner.layoutParams = params.apply {
-            width = dp(edge)
-            height = dp(edge)
+        for (corner in listOf(flipCorner, flipBackCorner)) {
+            val params = corner.layoutParams as? LayoutParams ?: continue
+            corner.layoutParams = params.apply {
+                width = dp(edge)
+                height = dp(edge)
+            }
         }
     }
 
@@ -1847,9 +1871,11 @@ class TileView(
         // somebody else's words and says whose, a reading is its own caption - so the
         // question is put again here, empty run included.
         applyLabelVisibility()
+        // Asked before the empty run is returned on, because both corners are the run's:
+        // a tile whose stories have gone is a tile that should be nothing but a tap again.
+        applyFlipCornerSize()
         if (faces.isEmpty()) return
         if (!same) rotationIndex = rotationIndex.coerceIn(0, faces.size - 1)
-        applyFlipCornerSize()
         // Re-bind whichever face is up, so refreshed content lands without waiting for the
         // next turn - and without turning the tile under someone who is reading it.
         bindRotationFace(showingBack)
@@ -2057,6 +2083,25 @@ class TileView(
         } catch (e: IllegalStateException) {
             // Not prepared yet; the prepared listener will start it if it should be.
         }
+    }
+
+    /**
+     * Moves back to the previous face in the rotation and turns the tile over to it.
+     *
+     * The clock is restarted as it is for a turn by hand: a tile that went back one story
+     * and moved itself on again a second later has ignored what it was asked for.
+     */
+    fun retreatRotation() {
+        restartFlipClock()
+        if (rotation.size < 2) {
+            spinInPlace()
+            return
+        }
+        rotationIndex = (rotationIndex + rotation.size - 1) % rotation.size
+        // Words now, picture at the halfway point - see [advanceRotation], which is this
+        // in the other direction.
+        bindRotationText(!showingBack)
+        flipTo(!showingBack)
     }
 
     /** Moves to the next face in the rotation and turns the tile over to it. */
@@ -2989,10 +3034,12 @@ class TileView(
         // tile actually is holds on every screen and every grid, and is a corner rather
         // than the tile.
         if (tile.size == TileSize.SMALL) {
-            (flipCorner.layoutParams as? LayoutParams)?.let { params ->
-                flipCorner.layoutParams = params.apply {
-                    width = (w * SMALL_CORNER_FRACTION).toInt().coerceAtLeast(1)
-                    height = (h * SMALL_CORNER_FRACTION).toInt().coerceAtLeast(1)
+            for (corner in listOf(flipCorner, flipBackCorner)) {
+                (corner.layoutParams as? LayoutParams)?.let { params ->
+                    corner.layoutParams = params.apply {
+                        width = (w * SMALL_CORNER_FRACTION).toInt().coerceAtLeast(1)
+                        height = (h * SMALL_CORNER_FRACTION).toInt().coerceAtLeast(1)
+                    }
                 }
             }
         }

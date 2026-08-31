@@ -91,7 +91,6 @@ import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
 import rocks.gorjan.gokixp.apps.lights.SnowfallManager
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
-import rocks.gorjan.gokixp.apps.msn.MsnApp
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
 import rocks.gorjan.gokixp.apps.regedit.RegistryEditorApp
 import rocks.gorjan.gokixp.apps.regedit.GoogleDriveHelper
@@ -275,6 +274,25 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * The system's own "make this your browser?" prompt, and what it answered.
+     *
+     * Registered rather than fired and forgotten so the settings that offered it can say
+     * where things stand the moment the user comes back from it - see [refreshDefaultBrowserUi].
+     */
+    private val defaultBrowserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        refreshDefaultBrowserUi()
+    }
+
+    /** Set by whichever settings surface is open, so it can be told the answer. */
+    private var refreshDefaultBrowser: (() -> Unit)? = null
+
+    private fun refreshDefaultBrowserUi() {
+        refreshDefaultBrowser?.invoke()
+    }
+
     // When the Change Icon dialog's Browse button is used, this receives the path of the
     // image the user picked, after it has been imported into the app's own icon storage.
     private var onCustomIconImagePicked: ((String) -> Unit)? = null
@@ -305,6 +323,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private var metroNotepadAppInstance:
         rocks.gorjan.gokixp.apps.notepad.MetroNotepadApp? = null
+
+    /**
+     * The two games, when the shell is wearing Windows Phone.
+     *
+     * Held for the same reason the notepad is: the back key has to reach whatever the game
+     * has open over itself before the window treats it as a way out, and the clock in each
+     * of them has to be stopped when the window closes.
+     */
+    private var metroMinesweeperInstance:
+        rocks.gorjan.gokixp.apps.minesweeper.MetroMinesweeperApp? = null
+    private var metroSolitaireInstance:
+        rocks.gorjan.gokixp.apps.solitare.MetroSolitaireApp? = null
 
     private val notepadGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         currentNotepadApp?.onImageSelected(uri)
@@ -515,6 +545,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val BLUR_QUANTISATION = 0.02f
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_HIDDEN_APPS = "hidden_apps"
+
+        /**
+         * Programs that were part of the shell once and are not any more.
+         *
+         * Retiring one is a matter of adding its package here; see
+         * [purgeRetiredSystemApps], which takes it back out of whatever the user had
+         * done with it.
+         */
+        private val RETIRED_SYSTEM_APPS = setOf("system.msn")
+
+        /** Which of [RETIRED_SYSTEM_APPS] have already been swept out of the user's arrangement. */
+        private const val KEY_RETIRED_APPS_PURGED = "retired_system_apps_purged"
         private const val KEY_SOUND_MUTED = "sound_muted"
         private const val KEY_PLAY_EMAIL_SOUND = "play_email_sound"
         private const val KEY_SHOW_NOTIFICATION_DOTS = "show_notification_dots"
@@ -1008,6 +1050,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Give the phone shell back the icons it filed under a desktop theme's key
         migrateWP81CustomIconsIfNeeded()
 
+        // Take programs that have since left the shell out of the user's arrangement,
+        // before anything reads that arrangement back in
+        purgeRetiredSystemApps()
+
         // Load custom icon mappings first so they're available when loading desktop icons
         loadCustomIconMappings()
 
@@ -1054,8 +1100,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Handle pending app installation/removal from broadcast receiver
         handlePendingPackageAction()
 
-        // Handle a URL shared into the launcher on cold start
+        // Handle a URL shared into the launcher on cold start, and one it was sent to open
+        // as the phone's browser.
         handleSharedUrlIntent(intent)
+        handleViewUrlIntent(intent)
 
         // Initialize app detection
         initializeAppDetection()
@@ -1486,11 +1534,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showNotepadDialog()
         }
 
-        // Register MSN Messenger
-        systemAppActions["system.msn"] = { appInfo ->
-            showMsnDialog()
-        }
-
         // Register Winamp
         systemAppActions["system.winamp"] = { appInfo ->
             showWinampDialog(appInfo = appInfo)
@@ -1602,17 +1645,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "notepad.exe",
                 packageName = "system.notepad",
                 icon = createSquareDrawable(notepadDrawable)
-            ))
-        }
-
-        // MSN Messenger - scale icon to match app icon size
-        val msnDrawable = AppCompatResources.getDrawable(this,themeManager.getMsnIcon())
-        if (msnDrawable != null) {
-            systemApps.add(AppInfo(
-                name = "MSN Messenger",
-                exeName = "msn.exe",
-                packageName = "system.msn",
-                icon = createSquareDrawable(msnDrawable)
             ))
         }
 
@@ -2201,7 +2233,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.welcome" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_welcome)
                 "system.calculator" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_calculator)
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
-                "system.msn" ->AppCompatResources.getDrawable(this, themeManager.getMsnIcon())
                 else -> null
             }
         }
@@ -3641,6 +3672,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // list. Backing out of one of those is a step inside the
                                 // app rather than a way out of it.
                                 Log.d("MainActivity", "Back pressed (modern): handled by Notepad")
+                            } else if (frontWindow?.windowIdentifier == "system.minesweeper" &&
+                                metroMinesweeperInstance?.handleBack() == true
+                            ) {
+                                // The strip's own command list was open over the field.
+                                Log.d("MainActivity", "Back pressed (modern): handled by Minesweeper")
+                            } else if (frontWindow?.windowIdentifier == "system.solitare" &&
+                                metroSolitaireInstance?.handleBack() == true
+                            ) {
+                                Log.d("MainActivity", "Back pressed (modern): handled by Solitaire")
                             } else if (frontWindow?.windowIdentifier == "system.zune" &&
                             zuneAppInstance?.handleBack() == true
                         ) {
@@ -5585,8 +5625,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "launcher_prefs",
             "agent_settings",
             "quick_glance_position",
-            "GokiXP",  // Internet Explorer homepage
-            "msn_thread_prefs"  // MSN message read status
+            "GokiXP"  // Internet Explorer homepage
         )
 
         var migrationNeeded = false
@@ -5706,6 +5745,93 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (moved.isNotEmpty()) {
             Log.d("MainActivity", "Moved ${moved.size} Windows Phone icons to $phoneKey")
         }
+    }
+
+    /**
+     * Takes a retired program back out of everything the user had put it in.
+     *
+     * A program that leaves the shell leaves its traces behind: a desktop shortcut, a
+     * tile on Start, a pin in the Start menu, an icon or a name the user chose for it by
+     * hand. All of those are filed under the package name and nothing prunes them, so
+     * without this a shortcut to a program that no longer exists survives as its old
+     * name under Internet Explorer's icon - that is the fallback in [loadDesktopIcons] -
+     * and tapping it does nothing whatever, there being no action registered any more.
+     *
+     * The packages already swept are written down rather than a single "done" flag, so
+     * that retiring the next program is one entry in [RETIRED_SYSTEM_APPS] and not
+     * another migration.
+     */
+    private fun purgeRetiredSystemApps() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val swept = (prefs.getString(KEY_RETIRED_APPS_PURGED, "") ?: "")
+            .split(",").filter { it.isNotEmpty() }.toSet()
+        val retiring = RETIRED_SYSTEM_APPS - swept
+        if (retiring.isEmpty()) return
+
+        // Nothing is written unless the whole sweep gets through: edit {} applies at the
+        // end of the block, so a throw half way leaves the arrangement as it was and the
+        // packages unmarked, to be tried again on the next launch.
+        try {
+            prefs.edit {
+                // Desktop shortcuts, the icons filed inside folders, and - a Start screen
+                // tile being a desktop icon under Windows Phone 8.1 - the tiles as well.
+                val json = prefs.getString(KEY_DESKTOP_ICONS, null)
+                if (json != null) {
+                    val gson = Gson()
+                    val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+                    val icons: List<Map<String, Any>> = gson.fromJson(json, type)
+                    val kept = icons.filterNot { it["packageName"] in retiring }
+                    if (kept.size != icons.size) putString(KEY_DESKTOP_ICONS, gson.toJson(kept))
+                }
+
+                // Pins in the Start menu, and anything the user had hidden from the app list.
+                for (key in listOf(KEY_PINNED_APPS, KEY_HIDDEN_APPS)) {
+                    purgeListedPackages(prefs, key, ",", retiring) { it }
+                }
+
+                // Icons chosen by hand - one set per theme - and renamed shortcuts. Both
+                // are "package:value" pairs, and a renamed one escapes the colons in the
+                // value, so the package is always what stands before the first.
+                for (key in AppTheme.all().map { it.customIconsKey } + KEY_CUSTOM_NAMES) {
+                    purgeListedPackages(prefs, key, ";", retiring) { it.substringBefore(":") }
+                }
+
+                // The gestures that are pointed at one particular program.
+                for (key in listOf(KEY_SWIPE_RIGHT_APP, KEY_WEATHER_APP)) {
+                    if (prefs.getString(key, null) in retiring) remove(key)
+                }
+
+                // MSN Messenger read the phone's messages, and stamped when each
+                // correspondent was last read. Nothing is left to read those stamps, and
+                // message data has no business travelling on in a settings backup.
+                if ("system.msn" in retiring) {
+                    prefs.all.keys.filter { it.startsWith("last_read_") }.forEach { remove(it) }
+                }
+
+                putString(KEY_RETIRED_APPS_PURGED, (swept + retiring).joinToString(","))
+            }
+            Log.d("MainActivity", "Swept retired programs out of the user arrangement: $retiring")
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not sweep retired programs, will retry next launch", e)
+        }
+    }
+
+    /**
+     * Drops the retired packages from one of the delimited lists the shell keeps.
+     *
+     * [packageOf] pulls the package out of an entry, which for the plain lists is the
+     * entry itself and for the mapped ones is the half before the colon.
+     */
+    private fun android.content.SharedPreferences.Editor.purgeListedPackages(
+        prefs: android.content.SharedPreferences,
+        key: String,
+        separator: String,
+        retiring: Set<String>,
+        packageOf: (String) -> String
+    ) {
+        val entries = (prefs.getString(key, "") ?: "").split(separator).filter { it.isNotEmpty() }
+        val kept = entries.filterNot { packageOf(it) in retiring }
+        if (kept.size != entries.size) putString(key, kept.joinToString(separator))
     }
 
     private fun loadCustomIconMappings() {
@@ -6334,6 +6460,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
         val tapToHideIconsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.tap_to_hide_icons_checkbox)
         val openUrlsInIeCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.open_urls_in_ie_checkbox)
+        val defaultBrowserStatus = contentView.findViewById<TextView>(R.id.default_browser_status)
+        val defaultBrowserLink = contentView.findViewById<TextView>(R.id.default_browser_link)
         val showAirQualityCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_air_quality_checkbox)
         val airQualityAttribution = contentView.findViewById<TextView>(R.id.air_quality_attribution)
         val showCursorCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_cursor_checkbox)
@@ -6530,6 +6658,28 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         openUrlsInIeCheckbox.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_OPEN_URLS_IN_IE, isChecked) }
             Log.d("MainActivity", "Open URLs in IE changed to: $isChecked")
+        }
+
+        // Where the rest of the phone's links go. Read back from the system every time this
+        // is shown rather than remembered, since the user can hand the role to something
+        // else from Android's own settings without passing through here.
+        defaultBrowserLink.paintFlags =
+            defaultBrowserLink.paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
+        val showDefaultBrowser = {
+            val held = isDefaultBrowser()
+            defaultBrowserStatus.text = if (held) {
+                "Links from other apps open in Internet Explorer"
+            } else {
+                "Links from other apps open in the system browser"
+            }
+            defaultBrowserLink.text =
+                if (held) "Change the default browser" else "Set as default browser"
+        }
+        showDefaultBrowser()
+        refreshDefaultBrowser = showDefaultBrowser
+        defaultBrowserLink.setOnClickListener {
+            playClickSound()
+            requestDefaultBrowser()
         }
 
         // Set up Show Air Quality checkbox (opt-in; default off)
@@ -7853,6 +8003,69 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         turnWP81PageIn(notepadView)
     }
 
+    /**
+     * Opens the phone's Minesweeper.
+     *
+     * Full screen and chromeless like the rest of the shell's own programs, and one window
+     * only: a second copy would be a second game running its own clock behind the first.
+     */
+    private fun showMetroMinesweeperDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.minesweeper")) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.minesweeper"
+
+        val game = rocks.gorjan.gokixp.apps.minesweeper.MetroMinesweeperApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager)
+        )
+        metroMinesweeperInstance = game
+
+        val view = game.createView()
+        windowsDialog.setContentView(view)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_minesweeper)
+        windowsDialog.setTitle("Minesweeper")
+        windowsDialog.setOnCloseListener {
+            game.cleanup()
+            metroMinesweeperInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(view)
+    }
+
+    /** Opens the phone's Solitaire. The same window rules as Minesweeper above. */
+    private fun showMetroSolitaireDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.solitare")) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.solitare"
+
+        val game = rocks.gorjan.gokixp.apps.solitare.MetroSolitaireApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager)
+        )
+        metroSolitaireInstance = game
+
+        val view = game.createView()
+        windowsDialog.setContentView(view)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_solitaire)
+        windowsDialog.setTitle("Solitaire")
+        windowsDialog.setOnCloseListener {
+            game.cleanup()
+            metroSolitaireInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(view)
+    }
+
     private fun createAndShowNotepadDialog() {
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
@@ -8003,94 +8216,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         dialog.setContentView(imageView)
         dialog.show()
-    }
-
-    private fun showMsnDialog() {
-        // Set cursor to busy while loading
-        setCursorBusy()
-
-        // Defer the actual loading to allow cursor to render
-        Handler(Looper.getMainLooper()).post {
-            createAndShowMsnDialog()
-        }
-    }
-
-    private fun createAndShowMsnDialog() {
-        // Check if permissions are granted
-        val hasReadSms = checkSelfPermission(android.Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-        val hasSendSms = checkSelfPermission(android.Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
-        val hasReceiveSms = checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        val hasReadContacts = checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-
-        if (!hasReadSms || !hasSendSms || !hasReceiveSms || !hasReadContacts) {
-            // Request permissions
-            requestPermissions(
-                arrayOf(
-                    android.Manifest.permission.READ_SMS,
-                    android.Manifest.permission.SEND_SMS,
-                    android.Manifest.permission.RECEIVE_SMS,
-                    android.Manifest.permission.READ_CONTACTS
-                ),
-                101
-            )
-            setCursorNormal()
-            return
-        }
-
-        // Create Windows-style dialog with correct theme from start
-        val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.windowIdentifier = "system.msn"  // Set identifier for tracking
-        windowsDialog.setTitle("MSN Messenger")
-        windowsDialog.setTaskbarIcon(themeManager.getMsnIcon())
-
-        // Inflate the MSN content
-        val contentView = layoutInflater.inflate(R.layout.program_msn, null)
-
-        // Create MSN app instance
-        val msnApp = MsnApp(
-            context = this,
-            onSoundPlay = {
-                playClickSound()
-            },
-            onCloseWindow = {
-                windowsDialog.closeWindow()
-            },
-            onMoveWindow = { offsetY ->
-                windowsDialog.moveWindowVertical(offsetY)
-            },
-            onShakeWindow = {
-                windowsDialog.shakeWindow()
-            }
-        )
-
-        // Setup the app
-        msnApp.setupApp(contentView)
-
-        windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(400, 522)
-
-        // Set up window control handlers
-        windowsDialog.setOnMinimizeListener {
-            msnApp.onMinimize()
-        }
-
-        windowsDialog.setOnMaximizeListener {
-            // Do nothing for now
-        }
-
-        // Cleanup on close
-        windowsDialog.setOnCloseListener {
-            msnApp.cleanup()
-        }
-
-        // Set context menu reference and show as floating window
-        windowsDialog.setContextMenuView(contextMenu)
-        floatingWindowManager.showWindow(windowsDialog)
-
-        // Set cursor back to normal after window is shown and loaded
-        Handler(Looper.getMainLooper()).postDelayed({
-            setCursorNormal()
-        }, 100) // Small delay to ensure window is fully rendered
     }
 
 
@@ -8295,6 +8420,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var wmpAppInstance: rocks.gorjan.gokixp.apps.wmp.WmpApp? = null
 
     private fun showMinesweeperDialog(appInfo: AppInfo? = null) {
+        // The phone has its own, which is the same game on a page rather than in a window.
+        if (themeManager.isWindowsPhone81()) {
+            showMetroMinesweeperDialog()
+            return
+        }
+
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.minesweeper"  // Set identifier for tracking
@@ -8334,6 +8465,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun showSolitareDialog(appInfo: AppInfo? = null) {
+        // Likewise: the same deck, dealt onto a page. See showMetroSolitaireDialog.
+        if (themeManager.isWindowsPhone81()) {
+            showMetroSolitaireDialog()
+            return
+        }
+
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.solitare"  // Set identifier for tracking
@@ -10503,6 +10640,82 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * Handles an incoming ACTION_SEND intent carrying shared text/URL.
      * Called from onCreate (cold start) and onNewIntent (warm start).
      */
+    /**
+     * A link tapped somewhere else on the phone, handed to the launcher to open.
+     *
+     * Straight into the launcher's own browser rather than through [openUrlShortcut]: that
+     * one asks whether links should go to Internet Explorer or to the phone's default
+     * browser, and neither question applies here - the phone has already decided the
+     * launcher *is* the browser, and sending the link back out to be resolved would hand it
+     * to whatever answers next, or to this activity a second time.
+     *
+     * The data is cleared once it has been read so a rotation or a return to the launcher
+     * does not open the same page again - the same reason [handleSharedUrlIntent] clears
+     * its extra - and delayed for the same reason as well: on a cold start the window
+     * manager and the shell are not up yet, and a browser opened into a launcher that has
+     * not finished being built is a window with nowhere to go.
+     */
+    private fun handleViewUrlIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val data = intent.data ?: return
+        val scheme = data.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return
+
+        val url = data.toString()
+        intent.data = null
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            showInternetExplorerDialog(url)
+        }, 500)
+    }
+
+    /**
+     * Whether the phone sends its links here.
+     *
+     * Asked of the system rather than kept as a setting of our own: the user can change
+     * this from Android's own screens at any time, and a checkbox in Display Properties
+     * remembering an answer the system has since overruled is a setting that lies.
+     */
+    private fun isDefaultBrowser(): Boolean = try {
+        val roles = getSystemService(android.app.role.RoleManager::class.java)
+        roles?.isRoleHeld(android.app.role.RoleManager.ROLE_BROWSER) == true
+    } catch (e: Exception) {
+        Log.w("MainActivity", "Could not ask about the browser role", e)
+        false
+    }
+
+    /**
+     * Asks to be made the phone's browser.
+     *
+     * Android puts the choice to the user itself - it is not ours to make - so this raises
+     * the system's own request where there is one to raise, and drops the user at the
+     * default-apps screen where there is not: either the role is already held, in which
+     * case the request would be refused outright and that screen is where it can be given
+     * away again, or the phone has no such role and the list is all there is.
+     */
+    private fun requestDefaultBrowser() {
+        try {
+            val roles = getSystemService(android.app.role.RoleManager::class.java)
+            if (roles != null &&
+                roles.isRoleAvailable(android.app.role.RoleManager.ROLE_BROWSER) &&
+                !roles.isRoleHeld(android.app.role.RoleManager.ROLE_BROWSER)
+            ) {
+                defaultBrowserLauncher.launch(
+                    roles.createRequestRoleIntent(android.app.role.RoleManager.ROLE_BROWSER)
+                )
+                return
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not ask for the browser role", e)
+        }
+        try {
+            startActivity(Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+        } catch (e: Exception) {
+            Log.e("MainActivity", "No default-apps screen on this phone", e)
+            showNotification("Default browser", "This phone has no default apps screen")
+        }
+    }
+
     private fun handleSharedUrlIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
         if (intent.type != "text/plain") return
@@ -10608,7 +10821,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        if (isOpenUrlsInIeEnabled()) {
+        // Ours to open, either because the user asked for that or because the phone has made
+        // the launcher its browser - in which case handing the link to the system would
+        // only bring it straight back here through the front door.
+        if (isOpenUrlsInIeEnabled() || isDefaultBrowser()) {
             showInternetExplorerDialog(target)
             return
         }
@@ -12187,6 +12403,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     ) {
                         // A menu, a rename or the note itself was open over the list.
                         Log.d("MainActivity", "Back pressed (legacy): handled by Notepad")
+                    } else if (frontWindow?.windowIdentifier == "system.minesweeper" &&
+                        metroMinesweeperInstance?.handleBack() == true
+                    ) {
+                        // The strip's own command list was open over the field.
+                        Log.d("MainActivity", "Back pressed (legacy): handled by Minesweeper")
+                    } else if (frontWindow?.windowIdentifier == "system.solitare" &&
+                        metroSolitaireInstance?.handleBack() == true
+                    ) {
+                        Log.d("MainActivity", "Back pressed (legacy): handled by Solitaire")
                     } else if (frontWindow?.windowIdentifier == "system.zune" &&
                         zuneAppInstance?.handleBack() == true
                     ) {
@@ -12368,6 +12593,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Handle a URL shared into the launcher while it's already running (the common path)
         handleSharedUrlIntent(intent)
+        handleViewUrlIntent(intent)
     }
 
     override fun onDestroy() {
@@ -13366,42 +13592,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     Log.d("Midtown2", "Location permission denied")
                 }
             }
-
-            101 -> {
-                // MSN Messenger SMS permissions
-                val allGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-
-                if (allGranted) {
-                    // Permissions granted, open MSN Messenger
-                    Log.d("MainActivity", "MSN permissions granted, opening app")
-                    Handler(Looper.getMainLooper()).post {
-                        showMsnDialog()
-                    }
-                } else {
-                    // Check if any permission was permanently denied
-                    val hasReadSms = checkSelfPermission(android.Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-                    val hasSendSms = checkSelfPermission(android.Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
-                    val hasReadContacts = checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-
-                    val canRequestReadSms = shouldShowRequestPermissionRationale(android.Manifest.permission.READ_SMS)
-                    val canRequestSendSms = shouldShowRequestPermissionRationale(android.Manifest.permission.SEND_SMS)
-                    val canRequestContacts = shouldShowRequestPermissionRationale(android.Manifest.permission.READ_CONTACTS)
-
-                    // If any permission is denied and we can't request it again (permanently denied)
-                    if ((!hasReadSms && !canRequestReadSms) ||
-                        (!hasSendSms && !canRequestSendSms) ||
-                        (!hasReadContacts && !canRequestContacts)) {
-
-                        // Show notification to open settings
-                        showNotification(
-                            "Permissions Needed",
-                            "Tap here to open settings and grant Contact and SMS permissions"
-                        ) {
-                            openAppSettings()
-                        }
-                    }
-                }
-            }
         }
     }
     
@@ -14008,7 +14198,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         "system.registry_editor" to R.drawable.wp81_glyph_regedit,
         "system.dialer" to R.drawable.wp81_glyph_dialer,
         "system.notepad" to R.drawable.wp81_glyph_notepad,
-        "system.msn" to R.drawable.wp81_glyph_msn,
         "system.winamp" to R.drawable.wp81_glyph_winamp,
         "system.zune" to R.drawable.wp81_glyph_headphones,
         "system.news" to R.drawable.wp81_glyph_news,
@@ -14040,7 +14229,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         "system.welcome",
         "system.zune",
         "system.news",
-        "system.calculator"
+        "system.calculator",
+        "system.minesweeper",
+        "system.solitare"
     )
 
     /**
@@ -15845,6 +16036,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         themeManager.setWP81StartBackgroundFocusX(0.5f)
         applyWP81StartBackground()
         refreshWP81BackgroundControls()
+        // Straight onto the same command list a bundled wallpaper answers a hold with.
+        // A photo the user went looking for is the one most likely to be wanted on the
+        // phone as well, and there is nothing to hold here - it was chosen in a picker
+        // that has already closed. Posted so the list is placed against a laid-out shell.
+        wp81Shell?.let { shell ->
+            shell.post { showWP81WallpaperMenu(stored, shell.height * 0.4f) }
+        }
     }
 
     /** Applies an image picked as a tile icon for [packageName]. */
@@ -15971,6 +16169,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun openWP81Settings() {
         val shell = wp81Shell ?: return
         shell.openSettings()
+        shell.settingsPage.setDefaultBrowser(isDefaultBrowser())
+        refreshDefaultBrowser = { shell.settingsPage.setDefaultBrowser(isDefaultBrowser()) }
         Thread {
             val items = try {
                 loadWallpapers().mapNotNull { item ->
@@ -16031,6 +16231,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 putBoolean(KEY_OPEN_URLS_IN_IE, enabled)
             }
         }
+        // Where the rest of the phone's links go. Read from the system rather than kept
+        // here - see isDefaultBrowser - and asked again when the user comes back from
+        // Android's own prompt.
+        shell.settingsPage.setDefaultBrowser(isDefaultBrowser())
+        shell.settingsPage.onDefaultBrowser = { requestDefaultBrowser() }
         shell.settingsPage.setLauncherThemes(
             AppTheme.all().map { it.toString() },
             themeManager.getSelectedTheme().toString()
@@ -16050,6 +16255,121 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             setPendingImagePick(PICK_TARGET_WP81_BACKGROUND)
             imagePickerLauncher.launch("image/*")
         }
+        shell.settingsPage.onWallpaperLongPress = { source, anchorY ->
+            showWP81WallpaperMenu(source, anchorY)
+        }
+    }
+
+    /**
+     * Where a wallpaper can go besides Start.
+     *
+     * A tap on one of these dresses the Start screen, which is the shell's own business
+     * and all it used to be able to do. The phone underneath has two more walls of its
+     * own - the launcher it falls back to and the lock screen - and the picture the user
+     * is looking at is as good for those as for this one. The desktop themes have offered
+     * this since they had a wallpaper picker; this is the same offer in the shape WP8.1
+     * asks a question, which is a command list under the thing being asked about.
+     *
+     * Start itself is not on the list. Tapping the wallpaper already does that, and a
+     * command list that repeats the tap is a list with a wasted line on it.
+     */
+    private fun showWP81WallpaperMenu(source: String, anchorY: Float) {
+        val shell = wp81Shell ?: return
+        shell.contextMenu.show(
+            "wallpaper",
+            listOf(
+                rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("apply to lock screen") {
+                    applyWP81WallpaperToDevice(source, system = false, lock = true)
+                },
+                rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("apply to system wallpaper") {
+                    applyWP81WallpaperToDevice(source, system = true, lock = false)
+                },
+                rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("apply to both") {
+                    applyWP81WallpaperToDevice(source, system = true, lock = true)
+                },
+                // Nothing to undo - the list has done nothing yet - so this is the row that
+                // closes it. WP8.1 put one on every command list that could be opened by
+                // accident, and a hold on a wallpaper is exactly that kind of press.
+                rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("cancel") { }
+            ),
+            anchorY
+        )
+    }
+
+    /**
+     * Puts a wallpaper on the phone itself: the system wall, the lock screen, or both.
+     *
+     * Off the main thread, and at the size the wallpaper is actually drawn at rather than
+     * the size Start needs. The Start background is downsampled to the screen and kept in
+     * 565 - it sits behind tiles under a blur, where neither costs anything - but a lock
+     * screen is the picture itself, and a gradient in 565 is a gradient in visible bands.
+     */
+    private fun applyWP81WallpaperToDevice(source: String, system: Boolean, lock: Boolean) {
+        if (!system && !lock) return
+        Thread {
+            val bitmap = decodeWallpaperFullSize(source)
+            if (bitmap == null) {
+                runOnUiThread {
+                    showNotification("Wallpaper", "That image could not be used")
+                }
+                return@Thread
+            }
+            val flags = (if (system) android.app.WallpaperManager.FLAG_SYSTEM else 0) or
+                (if (lock) android.app.WallpaperManager.FLAG_LOCK else 0)
+            val done = try {
+                android.app.WallpaperManager.getInstance(this)
+                    .setBitmap(bitmap, null, true, flags)
+                true
+            } catch (e: Exception) {
+                Log.e("MainActivity", "WP8.1: failed to set device wallpaper", e)
+                false
+            }
+            runOnUiThread {
+                val where = when {
+                    system && lock -> "Applied to lock screen and system wallpaper"
+                    system -> "Applied to system wallpaper"
+                    else -> "Applied to lock screen"
+                }
+                showNotification(
+                    "Wallpaper",
+                    if (done) where else "The wallpaper could not be changed"
+                )
+            }
+        }.start()
+    }
+
+    /**
+     * Decodes a wallpaper at its own size, from a bundled asset or a picked image.
+     *
+     * Sampled down only when the image is larger than the wall it is going on - the
+     * wallpaper service's own desired size, doubled, which is the room a phone gives a
+     * picture to be panned across. A bundled wallpaper is under that already and is
+     * decoded whole.
+     */
+    private fun decodeWallpaperFullSize(source: String): Bitmap? = try {
+        fun open(): java.io.InputStream? =
+            if (source.startsWith("content://") || source.startsWith("file://")) {
+                contentResolver.openInputStream(source.toUri())
+            } else {
+                assets.open(source)
+            }
+
+        val manager = android.app.WallpaperManager.getInstance(this)
+        val metrics = resources.displayMetrics
+        val targetW = maxOf(manager.desiredMinimumWidth, metrics.widthPixels * 2)
+        val targetH = maxOf(manager.desiredMinimumHeight, metrics.heightPixels * 2)
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        open()?.use { BitmapFactory.decodeStream(it, null, bounds) }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(bounds, targetW, targetH)
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        open()?.use { BitmapFactory.decodeStream(it, null, options) }
+    } catch (e: Exception) {
+        Log.e("MainActivity", "WP8.1: failed to decode wallpaper $source", e)
+        null
     }
 
     /**

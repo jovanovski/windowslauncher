@@ -41,6 +41,16 @@ class WP81SettingsView(
     /** Fired when the browse tile is tapped; the host runs the system image picker. */
     var onBrowse: (() -> Unit)? = null
 
+    /**
+     * Held on one of the bundled wallpapers.
+     *
+     * Carries the image and the bottom edge of the tile in this view's coordinates, so the
+     * host can hang a command list off it. A tap on a wallpaper is what Start is wearing;
+     * a hold is what the phone is wearing, which is a different question and belongs on a
+     * command list rather than on a tile of its own.
+     */
+    var onWallpaperLongPress: ((String, Float) -> Unit)? = null
+
     /** Fired when a different launcher theme is chosen. Carries AppTheme.toString(). */
     var onThemePicked: ((String) -> Unit)? = null
 
@@ -61,6 +71,9 @@ class WP81SettingsView(
 
     /** Fired when the switch for following links in Internet Explorer is toggled. */
     var onOpenLinksInIeChanged: ((Boolean) -> Unit)? = null
+
+    /** Tapping the row that asks the phone to send its links to the launcher. */
+    var onDefaultBrowser: (() -> Unit)? = null
 
     /** Tapping the back arrow beside the title. */
     var onBack: (() -> Unit)? = null
@@ -88,7 +101,7 @@ class WP81SettingsView(
     private val themeOptions = LinearLayout(context)
     private var currentThemeName: String = ""
     private var themeExpanded = false
-    private val wallpaperTiles = mutableListOf<Pair<View, String?>>()
+    private val wallpaperTiles = mutableListOf<Pair<StripTile, String?>>()
     private val blurLabel = TextView(context).apply {
         text = "blur"
         typeface = ResourcesCompat.getFont(context, R.font.segoeui_semibold)
@@ -133,6 +146,15 @@ class WP81SettingsView(
     private val openLinksRow =
         CheckRow("open links in internet explorer") { on -> onOpenLinksInIeChanged?.invoke(on) }
 
+    /**
+     * Where the rest of the phone's links go.
+     *
+     * A command rather than a switch, because it is not this page's to set: Android asks
+     * the user itself and can be told otherwise from its own settings at any time. So the
+     * row says where things stand and opens the question - see [setDefaultBrowser].
+     */
+    private val defaultBrowserRow = ActionRow("default browser") { onDefaultBrowser?.invoke() }
+
     private var selectedAccent: Int = palette.accent
     private var selectedDark: Boolean = palette.isDark
     private var selectedBackground: String? = null
@@ -140,6 +162,10 @@ class WP81SettingsView(
     init {
         isClickable = true
         column.orientation = LinearLayout.VERTICAL
+        // A hair of air under the last thing on the page. Scrolled to the end, the theme
+        // picker sat hard against the bottom edge, which reads as the page having been cut
+        // off rather than finished.
+        column.setPadding(0, 0, 0, dp(BOTTOM_GAP_DP))
 
         header.setTitle("settings")
         header.onBack = { onBack?.invoke() }
@@ -195,6 +221,7 @@ class WP81SettingsView(
         column.addView(sectionLabel("links"), wide())
         openLinksRow.setVisible(true)
         column.addView(openLinksRow.view, wide())
+        column.addView(defaultBrowserRow.view, wide())
 
         // Last, because it is the most drastic thing here: choosing another theme tears
         // this shell down entirely and rebuilds the launcher as a desktop.
@@ -538,15 +565,46 @@ class WP81SettingsView(
         wallpaperStrip.addView(wallpaperTile(null, null, "none"))
         // Browse sits right after "none", before the bundled set.
         wallpaperStrip.addView(browseTile())
-        for ((path, drawable) in items) {
+        // The one that is on leads the set. It is the answer to the question the strip is
+        // asking - which of these is Start wearing - and a few dozen squares in, it was an
+        // answer the user had to go looking for. Ordered here rather than as the strip is
+        // tapped: moving a square out from under the finger that just chose it would be the
+        // page rearranging itself as a reward for using it.
+        val ordered = items.sortedBy { (path, _) -> if (path == current) 0 else 1 }
+        for ((path, drawable) in ordered) {
             wallpaperStrip.addView(wallpaperTile(path, drawable, null))
         }
         repaintWallpaperTiles()
     }
 
-    private fun browseTile(): View = FrameLayout(context).apply {
+    /**
+     * One square of the wallpaper strip: a photo, "none", or "browse".
+     *
+     * Rests at the size its state calls for rather than at full size. The strip stands the
+     * chosen wallpaper out by leaving it whole and standing every other square back a
+     * little, and a press has to spring back to *that* - see [TiltEffect.Target]. Browse
+     * was the square that never learnt it: it was not one of the wallpapers, so nothing
+     * ever stood it back, and it sat visibly larger than the row it is part of.
+     */
+    private inner class StripTile(context: Context) : FrameLayout(context), TiltEffect.Target {
+
+        private var resting = UNSELECTED_SCALE
+
+        fun restAt(scale: Float) {
+            resting = scale
+            scaleX = scale
+            scaleY = scale
+        }
+
+        override fun restingScale(): Float = resting
+    }
+
+    private fun browseTile(): View = StripTile(context).apply {
         isClickable = true
         setBackgroundColor(palette.inactive)
+        // Never the chosen one - it is a way of choosing, not a choice - so it stands back
+        // with the rest of the unchosen squares.
+        restAt(UNSELECTED_SCALE)
         addView(TextView(context).apply {
             text = "browse"
             gravity = Gravity.CENTER
@@ -571,6 +629,13 @@ class WP81SettingsView(
         openLinksRow.set(on)
     }
 
+    /** Says whether the phone is sending its links here, in the row's second line. */
+    fun setDefaultBrowser(held: Boolean) {
+        defaultBrowserRow.setDetail(
+            if (held) "links open in internet explorer" else "links open somewhere else"
+        )
+    }
+
     /** Seeds the tile switches, which are not tied to whether a background is set. */
     fun setTileControls(counts: Boolean, columns: Int) {
         countsRow.set(counts)
@@ -591,6 +656,49 @@ class WP81SettingsView(
         driftRow.set(drift)
         hideColorsRow.setVisible(hasBackground)
         hideColorsRow.set(hideTileColors)
+    }
+
+    /**
+     * A row that does something when it is tapped, with a line under it saying where things
+     * stand.
+     *
+     * The shape WP8.1 used for anything it could not answer itself - a setting that lives
+     * somewhere else, or one the system has to be asked for. It has no marker, because
+     * there is nothing here that is on or off.
+     */
+    private inner class ActionRow(text: String, private val onTap: () -> Unit) {
+
+        val view = LinearLayout(context)
+        private val label = TextView(context)
+        private val detail = TextView(context)
+
+        init {
+            view.orientation = LinearLayout.VERTICAL
+            view.setPadding(dp(24), dp(6), dp(24), dp(18))
+            view.isClickable = true
+            view.setOnClickListener { onTap() }
+            TiltEffect.apply(view)
+
+            label.text = text
+            label.textSize = 17f
+            label.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            view.addView(label, wide())
+
+            detail.textSize = 13f
+            detail.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            view.addView(detail, wide())
+
+            repaint()
+        }
+
+        fun setDetail(text: String) {
+            detail.text = text
+        }
+
+        fun repaint() {
+            label.setTextColor(palette.foreground)
+            detail.setTextColor(palette.foregroundSubtle)
+        }
     }
 
     /**
@@ -645,12 +753,21 @@ class WP81SettingsView(
     }
 
     private fun wallpaperTile(path: String?, drawable: Drawable?, label: String?): View {
-        val frame = FrameLayout(context).apply {
+        val frame = StripTile(context).apply {
             isClickable = true
             setOnClickListener {
                 selectedBackground = path
                 repaintWallpaperTiles()
                 onBackgroundPicked?.invoke(path)
+            }
+            // "none" is the absence of a wallpaper, so there is nothing to hold it for.
+            if (path != null) setOnLongClickListener {
+                performHapticFeedback(
+                    android.view.HapticFeedbackConstants.LONG_PRESS,
+                    android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                )
+                onWallpaperLongPress?.invoke(path, anchorYOf(this))
+                true
             }
             TiltEffect.apply(this)
             layoutParams = LinearLayout.LayoutParams(dp(72), dp(120)).apply {
@@ -675,11 +792,19 @@ class WP81SettingsView(
         return frame
     }
 
+    /** The bottom edge of [view], in this page's own coordinates. */
+    private fun anchorYOf(view: View): Float {
+        val viewLoc = IntArray(2)
+        val selfLoc = IntArray(2)
+        view.getLocationInWindow(viewLoc)
+        getLocationInWindow(selfLoc)
+        return (viewLoc[1] - selfLoc[1] + view.height).toFloat()
+    }
+
     private fun repaintWallpaperTiles() {
         for ((tile, path) in wallpaperTiles) {
             val selected = path == selectedBackground
-            tile.scaleX = if (selected) 1f else 0.88f
-            tile.scaleY = if (selected) 1f else 0.88f
+            tile.restAt(if (selected) 1f else UNSELECTED_SCALE)
             if (path == null) {
                 tile.setBackgroundColor(if (selected) palette.accent else palette.inactive)
             }
@@ -708,6 +833,7 @@ class WP81SettingsView(
         hideColorsRow.repaint()
         countsRow.repaint()
         openLinksRow.repaint()
+        defaultBrowserRow.repaint()
         repaintColumnRows()
         blurSlider.applyPalette(p)
         repaintThemeRows()
@@ -724,5 +850,11 @@ class WP81SettingsView(
 
         /** Swatches to a row, and so also how many stay out when the rest roll up. */
         private const val ACCENTS_PER_ROW = 5
+
+        /** Air under the foot of the page, so the last setting is not on the edge. */
+        private const val BOTTOM_GAP_DP = 20
+
+        /** How far back a square of the strip stands while it is not the chosen one. */
+        private const val UNSELECTED_SCALE = 0.88f
     }
 }

@@ -94,6 +94,27 @@ class AppListView(
     /** The rail widening or closing. See [applyListInset]. */
     private var railAnimator: ValueAnimator? = null
 
+    /**
+     * The letter of the section being scrolled through, held at the top of the list.
+     *
+     * A copy of the square from the section's own header rather than that header moved:
+     * the rows keep scrolling underneath, so the one that has gone off the top has to be
+     * both gone and still there. It is pushed off in its turn by the next letter coming up
+     * - see [updateStickyLetter] - which is what says the list has moved on rather than
+     * simply that it has moved.
+     */
+    private val stickyLetter = TextView(context)
+
+    /**
+     * The page-coloured band the held letter sits on, a row deep and the width of the list.
+     *
+     * Without it the square is the only thing pinned and the list runs on behind it: the
+     * letter leaving its section slides up past the held one, and the names beside it climb
+     * out over the top of the page. The band is where the list ends while a letter is being
+     * held - rows reach it and are gone, which is the whole of what a held letter means.
+     */
+    private val stickyBand = FrameLayout(context)
+
     private val allApps = mutableListOf<AppInfo>()
     private val rows = mutableListOf<Row>()
     private val adapter = Adapter()
@@ -124,8 +145,19 @@ class AppListView(
         // nothing but the button, and would push the whole list down a button's height to
         // make room for it. The rail is empty of everything else, so there is nothing for
         // it to sit on top of. See ROW_INSET_DP.
+        buildStickyLetter()
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dp(BAND_DP)))
         applyListInset(animated = false)
+
+        list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recycler: RecyclerView, dx: Int, dy: Int) {
+                updateStickyLetter()
+            }
+        })
+        // The rows are re-laid-out by more than scrolling: rebuilt on a refresh, spread out
+        // when the rail slides away, and measured for the first time a frame after the page
+        // is put up.
+        list.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateStickyLetter() }
 
         jumpList.visibility = GONE
         // The globe at the end of the grid: the alphabet has run out of ways to narrow
@@ -152,6 +184,112 @@ class AppListView(
      * with the magnifier in it, the same button the app bars wear. Tapping it hands the
      * band over to the field - see [beginSearch].
      */
+    /**
+     * The square that stays at the top, set exactly as the ones in the list are.
+     *
+     * Same size, same corner, same type - it is standing in for a row that has scrolled
+     * away, so any difference between the two would read as the list having two kinds of
+     * letter. It answers a tap the same way as well, since a letter square is the way into
+     * the jump list wherever it is.
+     */
+    private fun buildStickyLetter() {
+        stickyLetter.gravity = Gravity.BOTTOM or Gravity.START
+        stickyLetter.textSize = LETTER_SP
+        stickyLetter.setPadding(dp(6), 0, 0, dp(2))
+        stickyLetter.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+        stickyLetter.isClickable = true
+        stickyLetter.setOnClickListener { showJumpList() }
+        TiltEffect.apply(stickyLetter)
+        paintLetterSquare(stickyLetter)
+
+        stickyBand.visibility = GONE
+        // Clickable, so a tap on the band beside the letter stops at the band rather than
+        // reaching the row hidden underneath it.
+        stickyBand.isClickable = true
+        stickyBand.setBackgroundColor(palette.background)
+        stickyBand.addView(stickyLetter, FrameLayout.LayoutParams(
+            dp(SQUARE_DP), dp(SQUARE_DP)).apply { topMargin = dp(HEADER_TOP_DP) })
+        addView(stickyBand, LayoutParams(LayoutParams.MATCH_PARENT, dp(HEADER_DP)))
+    }
+
+    /**
+     * A letter square's colours.
+     *
+     * Outlined rather than filled. A wall of solid accent squares down the side of the list
+     * competes with the tiles it is sitting next to; an outline says the same thing and
+     * lets the list be the thing being read. The letter is in the border's own colour
+     * rather than white: the square is one mark, not a white letter inside a coloured
+     * frame, and set in the accent it stops competing with the app names beside it.
+     */
+    private fun paintLetterSquare(square: TextView) {
+        square.background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(android.graphics.Color.BLACK)
+            setStroke(dp(2), palette.accent)
+        }
+        square.setTextColor(palette.accent)
+    }
+
+    /**
+     * Puts the held letter where the list has got to.
+     *
+     * Which letter is whichever section the top row belongs to, found by walking back to
+     * the header above it. Where it sits is the top of the list until the next letter's own
+     * row comes up into that space, at which point the two travel together: the incoming
+     * square pushes the held one off by however far it has come inside a row's height, so
+     * they pass each other at exactly the distance any two letters are apart in the list.
+     */
+    private fun updateStickyLetter() {
+        val manager = list.layoutManager as? LinearLayoutManager
+        val first = manager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        val header = if (manager == null || searching || first == RecyclerView.NO_POSITION) {
+            RecyclerView.NO_POSITION
+        } else {
+            sectionHeaderAt(first)
+        }
+        if (manager == null || header == RecyclerView.NO_POSITION) {
+            stickyBand.visibility = GONE
+            return
+        }
+
+        // Nothing to hold while the section's own header is still standing where this
+        // would be drawn - it is already there, and drawing a copy on top of it is two
+        // squares to keep in step. Which also covers the pull past the top of the list,
+        // where the first letter travels *down* and a held copy would sit on alone.
+        val own = manager.findViewByPosition(header)
+        if (own != null && own.top >= 0) {
+            stickyBand.visibility = GONE
+            return
+        }
+
+        val text = (rows[header] as Row.Header).letter.lowercase()
+        if (stickyLetter.text?.toString() != text) stickyLetter.text = text
+
+        // Only a header that is actually on screen can be pushing this one: anything
+        // further down is a screen away from touching it.
+        var shift = 0
+        val last = manager.findLastVisibleItemPosition()
+        for (position in (first + 1)..last) {
+            if (rows.getOrNull(position) !is Row.Header) continue
+            val view = manager.findViewByPosition(position) ?: break
+            shift = minOf(0, view.top - dp(HEADER_DP))
+            break
+        }
+
+        stickyBand.visibility = VISIBLE
+        // The rail moves - it slides away for the search field - and the square is inset by
+        // it exactly as the rows are.
+        stickyLetter.translationX = list.paddingLeft.toFloat()
+        stickyBand.translationY = (column.top + list.top + shift).toFloat()
+    }
+
+    /** Where the header for the section [position] is in, which is the one above it. */
+    private fun sectionHeaderAt(position: Int): Int {
+        for (index in position.coerceAtMost(rows.lastIndex) downTo 0) {
+            if (rows[index] is Row.Header) return index
+        }
+        return RecyclerView.NO_POSITION
+    }
+
     private fun buildHeader() {
         searchButton.setBackgroundResource(R.drawable.wp81_appbar_circle)
         searchButton.setImageResource(R.drawable.wp81_nav_search)
@@ -387,6 +525,7 @@ class AppListView(
     private fun setInsets(left: Int, top: Int) {
         list.setPadding(left, 0, 0, 0)
         column.setPadding(0, top, 0, 0)
+        updateStickyLetter()
     }
 
     fun isSearching(): Boolean = searching
@@ -497,6 +636,11 @@ class AppListView(
         searchButton.backgroundTintList = ink
         searchButton.imageTintList = ink
         jumpList.applyPalette(p)
+        // The held letter is one of the list's squares and takes the same accent as the
+        // rest, but it is not one of the adapter's rows and is not rebound by them. Its
+        // band is the page it is standing in for, and takes the page's own colour.
+        paintLetterSquare(stickyLetter)
+        stickyBand.setBackgroundColor(p.background)
         adapter.notifyDataSetChanged()
     }
 
@@ -538,7 +682,7 @@ class AppListView(
             root.layoutParams = RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(HEADER_DP))
             // No left padding of its own: the rail is the list's, so that it can move.
-            root.setPadding(0, dp(10), dp(EDGE_DP), dp(6))
+            root.setPadding(0, dp(HEADER_TOP_DP), dp(EDGE_DP), dp(HEADER_BOTTOM_DP))
 
             // Bottom left, not centred: the letter sits in the corner of its square the
             // way a tile's name sits in the corner of a tile, and the square reads as a
@@ -547,25 +691,14 @@ class AppListView(
             square.textSize = LETTER_SP
             square.setPadding(dp(6), 0, 0, dp(2))
             square.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
-            root.addView(square, FrameLayout.LayoutParams(dp(44), dp(44)))
+            root.addView(square, FrameLayout.LayoutParams(dp(SQUARE_DP), dp(SQUARE_DP)))
             TiltEffect.apply(square)
             square.setOnClickListener { showJumpList() }
         }
 
         fun bind(letter: Char) {
             square.text = letter.lowercase()
-            // Outlined rather than filled. A wall of solid accent squares down the side of
-            // the list competes with the tiles it is sitting next to; an outline says the
-            // same thing and lets the list be the thing being read.
-            square.background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(android.graphics.Color.BLACK)
-                setStroke(dp(2), palette.accent)
-            }
-            // The letter in the border's own colour rather than in white. The square is
-            // one mark, not a white letter inside a coloured frame - and set in the accent
-            // it stops competing with the app names beside it, which are the white thing
-            // on this page.
-            square.setTextColor(palette.accent)
+            paintLetterSquare(square)
 
             roll?.cancel()
             square.animate().cancel()
@@ -779,6 +912,9 @@ class AppListView(
 
         /** A letter header's row: the square, and the air above and below it. */
         private const val HEADER_DP = 60
+        private const val SQUARE_DP = 44
+        private const val HEADER_TOP_DP = 10
+        private const val HEADER_BOTTOM_DP = HEADER_DP - SQUARE_DP - HEADER_TOP_DP
 
         /** How the two of them swap: the rail slides off, the field rises in. */
         private const val SWAP_MS = 180L

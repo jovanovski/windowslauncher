@@ -127,6 +127,19 @@ class StartScreenView(
     private var backgroundFocusX = 0.5f
     private var lastSignature = 0
 
+    /**
+     * The crop the whole wall is drawing from: the region of the photo, and the area it is
+     * stretched over.
+     *
+     * Kept so a tile built after the crop was worked out can be handed the same one. The
+     * area is not the screen - it is the screen plus the room the photo pans and drifts in
+     * (see [pushBackgroundToTiles]) - so a tile given a crop fitted to the screen instead
+     * is a window onto a picture that stops at the bottom of it, which is what left the
+     * tiles across the fold half black.
+     */
+    private var backgroundSrc: Rect? = null
+    private var backgroundDest = Rect()
+
     // --- Drift ------------------------------------------------------------------------
     // The photo can be given a little slack in the crop and moved about inside it, which
     // turns a static wallpaper into something the tiles appear to be windows onto. The
@@ -427,9 +440,13 @@ class StartScreenView(
         view.countsEnabled = countsEnabled
         view.applySize()
         view.setGlyph(glyphs(tile))
+        // The wall's own crop, not a fresh one against the screen. Where there is none yet
+        // the tile is left bare: the crop has not been worked out at all, which means the
+        // signature cannot match either, so the next layout hands it to every tile at once.
         startBackground?.let { bmp ->
-            view.setStartBackground(bmp, cropFor(bmp, width, height, backgroundFocusX),
-                Rect(0, 0, width, height))
+            if (!backgroundDest.isEmpty) {
+                view.setStartBackground(bmp, backgroundSrc, backgroundDest)
+            }
         }
         view.setOnClickListener {
             when {
@@ -694,7 +711,11 @@ class StartScreenView(
         grid.bandProgress = 0f
         grid.setBand(buildFolderBand(folder, contents, tileColors, glyphs), folder.id)
         setBandClipping(true)
-        slideBand(open = true)
+        // Brought into view once it is all there: how far down the wall has to come depends
+        // on how tall the folder turned out to be, and that is only settled when the gap
+        // has finished opening. Posted from the end of the slide rather than run in it, so
+        // the scroll is measured against a wall that has stopped moving.
+        slideBand(open = true) { post { revealBand() } }
         // Built with a crop of their own by buildTileView, which is the wrong one: the
         // wall's photograph is zoomed for its own scroll range and the band's tiles have
         // to be windows onto that, not onto a fresh copy fitted to the screen.
@@ -718,6 +739,31 @@ class StartScreenView(
             // The wall is a row shorter again, so the parallax has a different range.
             post { pushBackgroundToTiles() }
         }
+    }
+
+    /**
+     * Scrolls a folder that has just opened fully onto the screen.
+     *
+     * A folder near the foot of the wall opens mostly below it: the tile it came out of is
+     * the last thing visible and its contents are somewhere under the navigation bar. So
+     * the wall comes up by however much of the gap is over the edge - and no further than
+     * the top of the gap, because the row the folder belongs to is what says which folder
+     * this is. A folder too tall to fit is shown from its own top for the same reason.
+     *
+     * Nothing happens where the whole of it is already on screen, which is most of the
+     * time: a wall that jumped every time a folder was opened would be a wall that moved
+     * for no reason.
+     */
+    private fun revealBand() {
+        val band = grid.bandView ?: return
+        val top = grid.top + band.top
+        val bottom = grid.top + band.bottom
+        val target = when {
+            bottom > scrollY + height -> minOf(top, bottom - height)
+            top < scrollY -> top
+            else -> return
+        }
+        smoothScrollTo(0, target.coerceIn(0, scrollRange()))
     }
 
     fun isFolderOpen(): Boolean = openFolderId != null
@@ -1789,6 +1835,8 @@ class StartScreenView(
     private fun pushBackgroundToTiles() {
         val bmp = startBackground
         if (bmp == null) {
+            backgroundSrc = null
+            backgroundDest = Rect()
             forEachTileView { it.setStartBackground(null, null, EMPTY_RECT) }
             return
         }
@@ -1820,6 +1868,8 @@ class StartScreenView(
             height + panRange + driftRange + 2 * overscrollSlack
         )
         val src = cropFor(bmp, dest.width(), dest.height(), backgroundFocusX)
+        backgroundSrc = src
+        backgroundDest = dest
         forEachTileView { it.setStartBackground(bmp, src, dest) }
         lastSignature = signature()
         updateTileOffsets()
@@ -1874,7 +1924,9 @@ class StartScreenView(
     private fun signature(): Int {
         var h = width
         h = 31 * h + height
-        h = 31 * h + grid.height
+        // The whole scrolling column, which is what the pan range is taken from - the
+        // grid alone leaves out the arrow under it.
+        h = 31 * h + content.height
         h = 31 * h + backgroundFocusX.hashCode()
         h = 31 * h + driftRange
         h = 31 * h + (startBackground?.hashCode() ?: 0)

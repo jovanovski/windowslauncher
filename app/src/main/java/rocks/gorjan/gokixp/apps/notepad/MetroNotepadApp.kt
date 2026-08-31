@@ -27,6 +27,7 @@ import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.wp81.Haptics
+import rocks.gorjan.gokixp.wp81.MetroAppBar
 import rocks.gorjan.gokixp.wp81.MetroPageHeader
 import rocks.gorjan.gokixp.wp81.MetroPageTransition
 import rocks.gorjan.gokixp.wp81.MetroPanorama
@@ -35,7 +36,6 @@ import rocks.gorjan.gokixp.wp81.TiltEffect
 import rocks.gorjan.gokixp.wp81.WP81ContextMenu
 import rocks.gorjan.gokixp.wp81.WP81InputDialog
 import rocks.gorjan.gokixp.wp81.WP81Palette
-import rocks.gorjan.gokixp.wp81.WP81SecondaryBar
 import rocks.gorjan.gokixp.wp81.applyToPageText
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -101,7 +101,7 @@ class MetroNotepadApp(
     private var body: EditText? = null
     private var pictureStrip: HorizontalScrollView? = null
     private var pictureRow: LinearLayout? = null
-    private var noteBarMenu: LinearLayout? = null
+    private var noteBar: MetroAppBar? = null
 
     /** Set while the editor is being filled in, so loading a note does not count as typing. */
     private var binding = false
@@ -146,7 +146,7 @@ class MetroNotepadApp(
 
         root.addView(
             buildListBar(),
-            FrameLayout.LayoutParams(MATCH, dp(BAR_DP), Gravity.BOTTOM)
+            FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM)
         )
         // The lists stop above the strip rather than running under it, so the last note is
         // reachable instead of sitting behind the button.
@@ -291,12 +291,19 @@ class MetroNotepadApp(
         closeNote(save = true, animated = false)
         current = note
 
-        val page = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+        val page = FrameLayout(context).apply {
             setBackgroundColor(palette.background)
             // Nothing behind it is reachable while it is up, and the panorama underneath
             // does not page when the note is swiped across.
             isClickable = true
+        }
+        // The strip goes over the note rather than under it, so the list behind its dots
+        // opens across the page instead of shortening the note to make room for itself.
+        // The column keeps clear of the strip's own row, which is all of it that is always
+        // there. See MetroAppBar.
+        val column = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(BAR_DP))
         }
 
         val header = MetroPageHeader(context, palette).apply {
@@ -309,7 +316,7 @@ class MetroNotepadApp(
             setOnClickListener { rename(note) }
         }
         noteHeader = header
-        page.addView(header, wide())
+        column.addView(header, wide())
 
         body = EditText(context).apply {
             setText(note.content)
@@ -341,7 +348,7 @@ class MetroNotepadApp(
                 }
             })
         }
-        page.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        column.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
         pictureRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -352,9 +359,13 @@ class MetroNotepadApp(
             overScrollMode = View.OVER_SCROLL_NEVER
             addView(pictureRow, FrameLayout.LayoutParams(WRAP, WRAP))
         }
-        page.addView(pictureStrip, wide())
+        column.addView(pictureStrip, wide())
 
-        page.addView(buildNoteBar(note), LinearLayout.LayoutParams(MATCH, WRAP))
+        page.addView(column, FrameLayout.LayoutParams(MATCH, MATCH))
+        page.addView(
+            buildNoteBar(note),
+            FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM)
+        )
 
         notePage = page
         root.addView(page, root.indexOfChild(contextMenu), FrameLayout.LayoutParams(MATCH, MATCH))
@@ -386,7 +397,7 @@ class MetroNotepadApp(
         body = null
         pictureRow = null
         pictureStrip = null
-        noteBarMenu = null
+        noteBar = null
         onUpdateWindowTitle("Notepad")
         refreshLists()
         if (animated) {
@@ -411,191 +422,37 @@ class MetroNotepadApp(
      * The strip under the lists, which has one thing on it.
      *
      * Centred, not in the left corner: a lone button against one end reads as the first of
-     * a row that never arrives, and a plus on its own says "another one" without help.
-     *
-     * Given the strip's own height by the caller rather than wrapping the button it holds.
-     * Wrapped, the bar was the ring and nothing else - 44dp of strip around a 44dp ring,
-     * where the note's bar is 62 - so the same button sat in a band two thirds the height
-     * with its edges against both sides of it.
+     * a row that never arrives, and a plus on its own says "another one" without help. No
+     * dots beside it, because there is nothing behind them - see [MetroAppBar.menu].
      */
-    private fun buildListBar(): View {
-        val bar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(BAR_COLOUR)
-            isClickable = true
-        }
-        bar.addView(circleButton(NEW_ICON) { newNote() },
-            LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)))
-        return bar
+    private fun buildListBar(): View = MetroAppBar(context, palette).apply {
+        addCommand(NEW_ICON) { newNote() }
     }
 
     /**
-     * The strip under a note: a picture from the camera, one from the phone, the bin, and
-     * the rest behind the dots.
+     * The strip under a note: a picture from the camera, one from the phone, and the rest
+     * behind the dots.
      *
-     * Four slots is what the platform gave an app bar and it is the right number here -
-     * the things a note is for, in the order you reach for them, with everything that is
-     * about the note rather than its contents kept under the ellipsis.
+     * The things a note is for in the row, in the order you reach for them, with everything
+     * that is about the note rather than its contents kept behind the ellipsis - including
+     * the bin, which is the one command here that cannot be taken back and has no business
+     * sitting in the row where the buttons for adding a picture are.
      */
-    private fun buildNoteBar(note: Note): View {
-        val bar = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BAR_COLOUR)
-            isClickable = true
-        }
-
-        val menu = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-            setPadding(0, dp(6), 0, dp(6))
-        }
-        noteBarMenu = menu
-        bar.addView(menu, LinearLayout.LayoutParams(MATCH, WRAP))
-
-        // The commands sit together in the middle and the dots on the edge, which is the
-        // shell's own strip - see WP81SecondaryBar, where the same rings are set out at the
-        // same size and the same distance apart. Spread across the bar they read as
-        // unrelated buttons; grouped they read as the things this note can be told to do,
-        // and the dots stay out of the group because what is behind them is not one of them.
-        val row = FrameLayout(context)
-        val group = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        group.addView(circleButton(CAMERA_ICON) { takePicture() },
-            LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)))
-        group.addView(circleButton(PICTURE_ICON) { choosePicture() },
-            LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)).apply {
-                marginStart = dp(GAP_DP)
-            })
-        group.addView(circleButton(DELETE_ICON) { delete(note) },
-            LinearLayout.LayoutParams(dp(BUTTON_DP), dp(BUTTON_DP)).apply {
-                marginStart = dp(GAP_DP)
-            })
-        row.addView(group, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
-        row.addView(
-            buildEllipsis(note),
-            FrameLayout.LayoutParams(
-                dp(BUTTON_DP), dp(BUTTON_DP), Gravity.END or Gravity.CENTER_VERTICAL
-            ).apply {
-                // As far from the edge as the rings are from the top and bottom of the
-                // strip, so the one thing that is not in the middle is still inset by the
-                // bar's own measurement rather than by a number picked for it.
-                marginEnd = dp((BAR_DP - BUTTON_DP) / 2)
-            }
-        )
-
-        bar.addView(row, LinearLayout.LayoutParams(MATCH, dp(BAR_DP)))
-        return bar
-    }
-
-    /**
-     * A white ring with a white mark in it, open in the middle.
-     *
-     * The shape the Start screen puts on a tile in edit mode without its black fill: on the
-     * app bar there is nothing behind the button but the bar, so the ring alone is the
-     * button and the strip shows through it. See wp81_appbar_circle.
-     */
-    private fun circleButton(icon: String, onTap: () -> Unit): ImageView =
-        ImageView(context).apply {
-            setBackgroundResource(R.drawable.wp81_appbar_circle)
-            setImageDrawable(SvgIcon.fromAsset(context, icon))
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP), dp(GLYPH_INSET_DP))
-            imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            clipToOutline = true
-            isClickable = true
-            setOnClickListener {
-                Haptics.tap(it)
-                closeBarMenu()
-                onTap()
-            }
-            TiltEffect.apply(this)
-        }
-
-    /**
-     * The three dots.
-     *
-     * Drawn rather than typed: an ellipsis character is a row of full stops sitting on the
-     * baseline, and what the phone had was three round dots centred in the button.
-     */
-    private fun buildEllipsis(note: Note): View {
-        val holder = FrameLayout(context).apply {
-            isClickable = true
-            setOnClickListener {
-                Haptics.tap(it)
-                if (noteBarMenu?.visibility == View.VISIBLE) closeBarMenu() else openBarMenu(note)
-            }
-        }
-        val dots = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        repeat(3) { i ->
-            dots.addView(View(context).apply {
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(Color.WHITE)
-                }
-            }, LinearLayout.LayoutParams(dp(DOT_DP), dp(DOT_DP)).apply {
-                if (i > 0) marginStart = dp(4)
-            })
-        }
-        holder.addView(dots, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
-        TiltEffect.apply(holder)
-        return holder
-    }
-
-    private fun openBarMenu(note: Note) {
-        val menu = noteBarMenu ?: return
-        menu.removeAllViews()
-        menu.addView(menuRow("rename") { rename(note) })
-        menu.addView(menuRow(if (note.isArchived) "restore" else "archive") {
-            setArchived(note, !note.isArchived)
-        })
-        menu.addView(menuRow("share") { share(note) })
-        menu.visibility = View.VISIBLE
-        // Each row swings down about its own top edge, on a stagger. Same as the shell's.
-        for (i in 0 until menu.childCount) {
-            val row = menu.getChildAt(i)
-            row.cameraDistance = 8000f * context.resources.displayMetrics.density
-            row.pivotX = 0f
-            row.pivotY = 0f
-            row.rotationX = -90f
-            row.alpha = 0f
-            row.animate().rotationX(0f).alpha(1f)
-                .setStartDelay(i * STAGGER_MS)
-                .setDuration(180)
-                .setInterpolator(DecelerateInterpolator())
-                .start()
+    private fun buildNoteBar(note: Note): View = MetroAppBar(context, palette).apply {
+        noteBar = this
+        addCommand(CAMERA_ICON) { takePicture() }
+        addCommand(PICTURE_ICON) { choosePicture() }
+        menu = {
+            listOf(
+                MetroAppBar.Item("rename") { rename(note) },
+                MetroAppBar.Item(if (note.isArchived) "restore" else "archive") {
+                    setArchived(note, !note.isArchived)
+                },
+                MetroAppBar.Item("share") { share(note) },
+                MetroAppBar.Item("delete") { delete(note) }
+            )
         }
     }
-
-    private fun closeBarMenu() {
-        val menu = noteBarMenu ?: return
-        if (menu.visibility != View.VISIBLE) return
-        menu.visibility = View.GONE
-        menu.removeAllViews()
-    }
-
-    private fun menuRow(label: String, action: () -> Unit): View =
-        TextView(context).apply {
-            // Lowercase, like every command list in this shell.
-            text = label.lowercase()
-            typeface = font(R.font.segoeui_regular)
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(dp(22), dp(12), dp(22), dp(12))
-            isClickable = true
-            setOnClickListener {
-                Haptics.tap(it)
-                closeBarMenu()
-                action()
-            }
-            TiltEffect.apply(this)
-        }
 
     // ------------------------------------------------------------------- commands
 
@@ -649,10 +506,23 @@ class MetroNotepadApp(
         onShowNotification("Notepad", if (archived) "Archived" else "Restored")
     }
 
+    /**
+     * Throws a note away, once the user has said so twice.
+     *
+     * There is no undo here and nowhere for a deleted note to go - the archive is a place
+     * for notes you are keeping - so the question is asked before the note is gone rather
+     * than offered as a way back afterwards.
+     */
     private fun delete(note: Note) {
-        notes.remove(note)
-        saveNotes()
-        if (current === note) closeNote(save = false, animated = true) else refreshLists()
+        renameDialog.confirm(
+            title = "delete note?",
+            question = "\"${note.title}\" will be deleted. This cannot be undone.",
+            accept = "delete"
+        ) {
+            notes.remove(note)
+            saveNotes()
+            if (current === note) closeNote(save = false, animated = true) else refreshLists()
+        }
     }
 
     /** The note as text, to whatever the phone can send text with. */
@@ -840,10 +710,7 @@ class MetroNotepadApp(
             renameDialog.dismiss()
             return true
         }
-        if (noteBarMenu?.visibility == View.VISIBLE) {
-            closeBarMenu()
-            return true
-        }
+        if (noteBar?.closeMenu() == true) return true
         if (notePage != null) {
             closeNote(save = true, animated = true)
             return true
@@ -918,23 +785,8 @@ class MetroNotepadApp(
 
         private const val PAGE_MARGIN_DP = 22
 
-        // The app bar, in the shell's own measurements: WP81SecondaryBar is the strip
-        // that slides up over Start, and an app's strip is the same piece of furniture
-        // doing the same job one level in. Its black, not the palette's - this surface
-        // sits over a page rather than being part of it, and has to stay legible whatever
-        // theme or accent is behind it.
-        private const val BAR_COLOUR = 0xFF1F1F1F.toInt()
-        private const val BAR_DP = WP81SecondaryBar.HEIGHT_DP
-        private const val BUTTON_DP = 44
-
-        /** Between the rings. Wide, so they read as a row of commands and not as a block. */
-        private const val GAP_DP = 28
-
-        /** How far the glyph sits inside its ring. */
-        private const val GLYPH_INSET_DP = 5
-
-        private const val DOT_DP = 5
-        private const val STAGGER_MS = 30L
+        /** How much of the page the strip is standing on. See [MetroAppBar]. */
+        private const val BAR_DP = MetroAppBar.HEIGHT_DP
 
         /** How large a picture on the strip is drawn. */
         private const val THUMB_DP = 78
@@ -947,6 +799,5 @@ class MetroNotepadApp(
         private const val NEW_ICON = "$ICON_DIR/appbar.add.svg"
         private const val CAMERA_ICON = "$ICON_DIR/appbar.camera.svg"
         private const val PICTURE_ICON = "$ICON_DIR/appbar.image.svg"
-        private const val DELETE_ICON = "$ICON_DIR/appbar.delete.svg"
     }
 }

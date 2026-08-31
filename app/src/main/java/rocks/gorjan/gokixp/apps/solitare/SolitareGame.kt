@@ -1210,11 +1210,6 @@ class SolitareGame(
                 val firstFaceUpIndex = sourceTableau.cards.indexOfFirst { it.faceUp }
                 if (firstFaceUpIndex >= 0) {
                     val cardToMove = sourceTableau.cards[firstFaceUpIndex]
-                    val currentBaseCard = if (firstFaceUpIndex > 0) {
-                        sourceTableau.cards[firstFaceUpIndex - 1]
-                    } else {
-                        null
-                    }
 
                     for (targetTableau in tableaus) {
                         if (sourceTableau != targetTableau && canPlaceOnTableau(listOf(cardToMove), targetTableau)) {
@@ -1222,13 +1217,13 @@ class SolitareGame(
                             if (targetTableau.cards.isEmpty() && firstFaceUpIndex == 0) {
                                 continue
                             }
-
-                            // Skip dead-end moves (same rank)
-                            if (targetTableau.cards.isNotEmpty() && currentBaseCard != null && currentBaseCard.faceUp) {
-                                if (targetTableau.cards.last().rank.value == currentBaseCard.rank.value) {
-                                    continue
-                                }
-                            }
+                            // There was a second guard here, against landing a run on a
+                            // base of the same rank as the one it is already on. It read
+                            // the card under the first face-up one and asked whether that
+                            // card was face up - which it is not, by definition of being
+                            // under the first face-up one - so it never once fired. What it
+                            // was reaching for is real but is about runs split in the
+                            // middle, and this loop only ever moves whole ones.
                             return cardToMove
                         }
                     }
@@ -1262,6 +1257,13 @@ class SolitareGame(
      * This simulates going through the stock pile once to check all possible moves
      */
     private fun checkForValidMoves() {
+        // A card in the player's hand has already been taken out of its pile, so the board
+        // is a card short until they let go of it. The deal animation finishes on its own
+        // clock and can land in the middle of that, which would judge the game on a board
+        // missing exactly the card that is about to be played. The drop calls back in here
+        // anyway, so nothing is lost by waiting for it.
+        if (selectedCards.isNotEmpty()) return
+
         // Check if the game is won first
         if (isGameWon()) {
             noMovesLeftTextView?.text = "Game won!"
@@ -1272,22 +1274,22 @@ class SolitareGame(
             return
         }
 
-        // Once game is over, keep the message shown until new game
-        if (isGameOver) {
-            noMovesLeftTextView?.text = "Game over - no valid moves"
-            noMovesLeftTextView?.visibility = View.VISIBLE
-            Helpers.performHapticFeedback(context)
-            return
-        }
-
+        // The message stays up while the game is stuck, but it is worked out again each
+        // time rather than latched on: a verdict reached on a board the player was halfway
+        // through a move on has to be able to withdraw itself. The buzz belongs to the
+        // moment the game ends and not to every check after it, which is what the latch was
+        // really for - it was answering with a haptic on every draw for the rest of the
+        // game.
         if (hasAnyValidMove()) {
+            isGameOver = false
             noMovesLeftTextView?.visibility = android.view.View.GONE
         } else {
-            // Game is now definitively over - set flag so it stays shown
-            isGameOver = true
+            if (!isGameOver) {
+                isGameOver = true
+                Helpers.performHapticFeedback(context)
+            }
             noMovesLeftTextView?.text = "Game over - no valid moves"
             noMovesLeftTextView?.visibility = View.VISIBLE
-            Helpers.performHapticFeedback(context)
         }
     }
 
@@ -1323,11 +1325,6 @@ class SolitareGame(
                 val firstFaceUpIndex = sourceTableau.cards.indexOfFirst { it.faceUp }
                 if (firstFaceUpIndex >= 0) {
                     val cardToMove = sourceTableau.cards[firstFaceUpIndex]
-                    val currentBaseCard = if (firstFaceUpIndex > 0) {
-                        sourceTableau.cards[firstFaceUpIndex - 1]
-                    } else {
-                        null
-                    }
 
                     for (targetTableau in tableaus) {
                         if (sourceTableau != targetTableau && canPlaceOnTableau(listOf(cardToMove), targetTableau)) {
@@ -1335,13 +1332,13 @@ class SolitareGame(
                             if (targetTableau.cards.isEmpty() && firstFaceUpIndex == 0) {
                                 continue
                             }
-
-                            // Skip dead-end moves (same rank)
-                            if (targetTableau.cards.isNotEmpty() && currentBaseCard != null && currentBaseCard.faceUp) {
-                                if (targetTableau.cards.last().rank.value == currentBaseCard.rank.value) {
-                                    continue
-                                }
-                            }
+                            // There was a second guard here, against landing a run on a
+                            // base of the same rank as the one it is already on. It read
+                            // the card under the first face-up one and asked whether that
+                            // card was face up - which it is not, by definition of being
+                            // under the first face-up one - so it never once fired. What it
+                            // was reaching for is real but is about runs split in the
+                            // middle, and this loop only ever moves whole ones.
                             return true
                         }
                     }
@@ -1400,20 +1397,19 @@ class SolitareGame(
             }
         }
 
-        // No move is available on the current board. The only remaining escape
-        // is a card coming out of the stock/waste. Because the player can freely
-        // draw and recycle the deck, every stock and waste card will eventually
-        // come back up on top, so if ANY of them can go to a foundation or
-        // tableau there is still a move to be made - even if the player already
-        // skipped past that card on an earlier pass without playing it.
+        // No move is available on the current board. The only remaining escape is a card
+        // coming out of the pack - but not every card in it is one the player can reach.
+        // The deal is three at a time and only the card a deal finishes on lands on top of
+        // the waste, so two cards in three are only ever reachable if the one above them is
+        // played first. Nothing here changes the tableaus or the foundations, so if every
+        // card that can surface is unplayable then nothing leaves the waste, the recycle
+        // rebuilds the pack in the order it came, and the same one-in-three cards keep
+        // coming up for ever.
         //
-        // This deterministic check replaces an older "full cycle" counter
-        // heuristic that declared the game over whenever the player drew through
-        // the whole deck without playing a card, which wrongly triggered when
-        // playable cards were simply left unplayed. Drawing never changes the
-        // tableaus or foundations, so if no draw-pile card is playable now,
-        // drawing or recycling more cards cannot create a new move either.
-        for (card in stockPile.cards + wastePile.cards) {
+        // This is what used to read as "every stock and waste card will eventually come
+        // back up on top" - true of a game dealt one at a time, and the reason a hand with
+        // a buried ace in it never showed the message at all.
+        for (card in reachableDrawPileCards()) {
             for (foundation in foundations) {
                 if (canPlaceOnFoundation(listOf(card), foundation)) {
                     return true
@@ -1426,8 +1422,84 @@ class SolitareGame(
             }
         }
 
-        // Nothing on the board and nothing in the draw pile can be played.
+        // A card can also be taken back off a foundation - handleCardSelection lets the
+        // player pick one up - and late in a game that is sometimes the only way to unstick
+        // a column. It counts only where the board wants the card back, though: pulling one
+        // down and putting it straight back is a move that would keep the message away for
+        // ever. Nothing else here was playable, so anything that can be stacked on the
+        // retrieved card is a card that currently has nowhere to go.
+        for (foundation in foundations) {
+            val retrieved = foundation.cards.lastOrNull() ?: continue
+            if (tableaus.none { canPlaceOnTableau(listOf(retrieved), it) }) continue
+            if (wouldTakeACard(retrieved)) return true
+        }
+
+        // Nothing on the board and nothing the pack can still bring up.
         return false
+    }
+
+    /**
+     * Every card the player can still turn face up, given the pack as it stands.
+     *
+     * Deals come off the end of the stock in threes and only the card a deal finishes on
+     * reaches the top of the waste. Once the stock runs out the whole waste goes back under
+     * it in the order it came, so the second pass deals the very same groups and a third
+     * would repeat them - one pass past the recycle is therefore all of it.
+     *
+     * The card on top of the waste right now is deliberately absent: it is already on the
+     * table and has been tested above.
+     */
+    private fun reachableDrawPileCards(): List<Card> {
+        val reachable = mutableListOf<Card>()
+
+        // What is left of this pass: the stock is dealt from its end, so walk it backwards
+        // in threes and take the card each deal would finish on.
+        var i = stockPile.cards.size - 1
+        while (i >= 0) {
+            val lastOfDeal = maxOf(i - 2, 0)
+            reachable.add(stockPile.cards[lastOfDeal])
+            i = lastOfDeal - 1
+        }
+
+        // And after the recycle: the waste as it stands goes back under whatever is left of
+        // the stock, and the whole pack is dealt from the front again in fresh groups.
+        val pack = wastePile.cards + stockPile.cards.reversed()
+        var j = 2
+        while (j < pack.size) {
+            reachable.add(pack[j])
+            j += 3
+        }
+        // The last card of the pack tops the waste however the groups fall.
+        pack.lastOrNull()?.let { reachable.add(it) }
+
+        return reachable
+    }
+
+    /** The tableau stacking rule on its own, for asking about a card that is not on a pile. */
+    private fun stacksOn(card: Card, base: Card): Boolean =
+        card.isRed() != base.isRed() && card.rank.value == base.rank.value - 1
+
+    /**
+     * Whether exposing [base] would give some stuck card a home.
+     *
+     * Only a card whose own move is worth making counts: a tableau top lying directly on a
+     * face-down card, so moving it turns that card over; the card on top of the waste; or a
+     * card the pack can still bring up. Anything else and the pair would simply trade
+     * places for the rest of the game.
+     */
+    private fun wouldTakeACard(base: Card): Boolean {
+        val fromTableau = tableaus.any { pile ->
+            val top = pile.cards.lastOrNull() ?: return@any false
+            val uncovers = pile.cards.size == 1 || !pile.cards[pile.cards.size - 2].faceUp
+            top.faceUp && uncovers && stacksOn(top, base)
+        }
+        if (fromTableau) return true
+
+        if (wasteGroupStartIndex < wastePile.cards.size &&
+            wastePile.cards.last().let { stacksOn(it, base) }
+        ) return true
+
+        return reachableDrawPileCards().any { stacksOn(it, base) }
     }
 
     private fun canPlaceOnFoundation(cards: List<Card>, foundation: Pile): Boolean {
@@ -1460,6 +1532,6 @@ class SolitareGame(
         if (!topCard.faceUp) return false
 
         // Alternating colors, descending rank
-        return card.isRed() != topCard.isRed() && card.rank.value == topCard.rank.value - 1
+        return stacksOn(card, topCard)
     }
 }
