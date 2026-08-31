@@ -4875,27 +4875,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun deleteFolderAndContents(folderId: String) {
-        Log.d("MainActivity", "Deleting folder and all contents: $folderId")
-
-        // Find all icons inside this folder
-        val iconsToDelete = desktopIcons.filter { it.parentFolderId == folderId }
-
-        Log.d("MainActivity", "Found ${iconsToDelete.size} icons to delete")
-
-        // Recursively delete any nested folders and their contents
-        iconsToDelete.forEach { icon ->
-            if (icon.type == IconType.FOLDER) {
-                deleteFolderAndContents(icon.id)
-            }
-        }
-
-        // Remove all icons that were in this folder
-        desktopIcons.removeAll { it.parentFolderId == folderId }
-
-        // Remove the folder itself
-        desktopIcons.removeAll { it.id == folderId }
-
-        Log.d("MainActivity", "Folder deletion complete")
+        val folder = desktopIcons.firstOrNull { it.id == folderId } ?: return
+        // Through the shared collector, so the desktop's delete and the phone shell's
+        // remove one identical set of rows - and so the folder's tile colours go with it.
+        val doomed = iconIdsWithContents(folder)
+        Log.d("MainActivity", "Deleting folder $folderId and its ${doomed.size - 1} contents")
+        removeIcons(doomed)
     }
 
     private fun playRecycleSound() {
@@ -10651,9 +10636,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      *
      * The data is cleared once it has been read so a rotation or a return to the launcher
      * does not open the same page again - the same reason [handleSharedUrlIntent] clears
-     * its extra - and delayed for the same reason as well: on a cold start the window
-     * manager and the shell are not up yet, and a browser opened into a launcher that has
-     * not finished being built is a window with nowhere to go.
+     * its extra.
      */
     private fun handleViewUrlIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
@@ -10663,10 +10646,49 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val url = data.toString()
         intent.data = null
+        openBrowserBeforeFirstFrame(url)
+    }
 
-        Handler(Looper.getMainLooper()).postDelayed({
+    /**
+     * Opens the browser in the last moment before the shell is put on screen.
+     *
+     * Somebody who taps a link in another app asked for a web page. What they were shown was
+     * half a second of a Start screen first - the tiles arriving, laying themselves out, and
+     * only then the browser over the top of them. The launcher was announcing itself in the
+     * middle of somebody else's task.
+     *
+     * This used to be a half-second delay, and the delay was covering something real: on a
+     * cold start the browser cannot simply be opened from `onCreate`, because the window it
+     * would open into has not been measured or laid out yet and there is nowhere to put it.
+     * Waiting for a fixed number of milliseconds is a guess at when that stops being true,
+     * and it has to be a generous guess to be safe on a slow phone - which is precisely why
+     * it was long enough to watch.
+     *
+     * A pre-draw listener asks the exact question instead. It runs after measure and layout
+     * and before the frame is painted: the shell is fully built, so the browser has somewhere
+     * to go, and nothing has been shown yet, so there is nothing for it to be shown *after*.
+     * On a warm start the same code path is simply the next frame.
+     *
+     * The frame is then skipped rather than drawn, because what it holds is the shell without
+     * the browser in it - the very thing this exists to avoid. Adding the browser's window
+     * schedules the next traversal by itself; the posted invalidate is a belt on that brace,
+     * for the paths that reuse an already-open browser and might not dirty anything.
+     */
+    private fun openBrowserBeforeFirstFrame(url: String) {
+        val root = window?.decorView ?: run {
             showInternetExplorerDialog(url)
-        }, 500)
+            return
+        }
+        root.viewTreeObserver.addOnPreDrawListener(
+            object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    root.viewTreeObserver.removeOnPreDrawListener(this)
+                    showInternetExplorerDialog(url)
+                    root.post { root.invalidate() }
+                    return false
+                }
+            }
+        )
     }
 
     /**
@@ -10954,41 +10976,52 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 try {
-                    val icon = when (iconType) {
-                        IconType.RECYCLE_BIN -> {
-                            // Special case for recycle bin - use recycle drawable
-                            AppCompatResources.getDrawable(this, R.drawable.recycle)!!
-                        }
-                        IconType.MY_COMPUTER -> {
-                            // Special case for My Computer - use theme-appropriate icon
-                            AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())!!
-                        }
-                        IconType.FOLDER -> {
-                            // Use custom icon if available, otherwise use theme-appropriate folder icon
-                            getAppIcon(packageName) ?: run {
-                                // Chrome string: Windows Phone 8.1 needs the Vista folder art.
-                                val selectedTheme = themeManager.chromeThemeString()
-                                AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
+                    // A picture is not what makes a row real. An icon dropped here is gone
+                    // for good - the next save writes the list without it - and when the one
+                    // that could not be drawn is a folder, everything filed inside it is
+                    // stranded behind a parent that no longer exists. So a missing image
+                    // falls back to another image, and what is genuinely no longer installed
+                    // is decided by tidyDesktopIcons, which says so in the log.
+                    val icon = try {
+                        when (iconType) {
+                            IconType.RECYCLE_BIN -> {
+                                // Special case for recycle bin - use recycle drawable
+                                AppCompatResources.getDrawable(this, R.drawable.recycle)!!
                             }
-                        }
-                        IconType.URL_SHORTCUT -> {
-                            // URL shortcut: use custom icon if set, otherwise the URL icon
-                            getAppIcon(packageName) ?: AppCompatResources.getDrawable(this, R.drawable.url_shortcut)!!
-                        }
-                        IconType.APP -> {
-                            // Check if this is a system app first
-                            if (isSystemApp(packageName)) {
-                                // Use custom icon if available, otherwise load from system app list
+                            IconType.MY_COMPUTER -> {
+                                // Special case for My Computer - use theme-appropriate icon
+                                AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())!!
+                            }
+                            IconType.FOLDER -> {
+                                // Use custom icon if available, otherwise use theme-appropriate folder icon
                                 getAppIcon(packageName) ?: run {
-                                    getSystemAppsList().find { it.packageName == packageName }?.icon
-                                        ?: AppCompatResources.getDrawable(this, themeManager.getIEIcon())!! // Fallback to IE icon
+                                    // Chrome string: Windows Phone 8.1 needs the Vista folder art.
+                                    val selectedTheme = themeManager.chromeThemeString()
+                                    AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
                                 }
-                            } else {
-                                val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                                // Use custom icon if available, otherwise fallback to default app icon
-                                getAppIcon(packageName) ?: appInfo.loadIcon(packageManager)
+                            }
+                            IconType.URL_SHORTCUT -> {
+                                // URL shortcut: use custom icon if set, otherwise the URL icon
+                                getAppIcon(packageName) ?: AppCompatResources.getDrawable(this, R.drawable.url_shortcut)!!
+                            }
+                            IconType.APP -> {
+                                // Check if this is a system app first
+                                if (isSystemApp(packageName)) {
+                                    // Use custom icon if available, otherwise load from system app list
+                                    getAppIcon(packageName) ?: run {
+                                        getSystemAppsList().find { it.packageName == packageName }?.icon
+                                            ?: AppCompatResources.getDrawable(this, themeManager.getIEIcon())!! // Fallback to IE icon
+                                    }
+                                } else {
+                                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                                    // Use custom icon if available, otherwise fallback to default app icon
+                                    getAppIcon(packageName) ?: appInfo.loadIcon(packageManager)
+                                }
                             }
                         }
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "No artwork for $packageName; using a stand-in", e)
+                        fallbackIconFor(iconType)
                     }
 
                     val desktopIcon = DesktopIcon(
@@ -11077,6 +11110,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Ensure My Computer exists as desktop icon
         ensureMyComputerExists()
 
+        // Whatever is wrong with what was saved is wrong the moment it is read, and every
+        // screen is built from this list afterwards - so the one place it is loaded is the
+        // place to put it right: nothing filed in a folder that is not there, and nothing
+        // left over from an app that is no longer installed.
+        tidyDesktopIcons()
+
         // Post to ensure container has dimensions
         desktopContainer.post {
             // Migrate old x/y positions to grid indices if needed
@@ -11093,6 +11132,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    /**
+     * A picture to stand in for one that could not be found.
+     *
+     * Every kind gets something of its own except an app, which gets the platform's own
+     * "some app" icon - the launcher has no generic app art of its own, and a folder icon
+     * on a program would say the wrong thing about it.
+     */
+    private fun fallbackIconFor(type: IconType): Drawable {
+        val chrome = themeManager.chromeThemeString()
+        val resource = when (type) {
+            IconType.RECYCLE_BIN -> R.drawable.recycle
+            IconType.MY_COMPUTER -> themeManager.getMyComputerIcon()
+            IconType.FOLDER -> when (chrome) {
+                "Windows Classic" -> R.drawable.folder_98
+                "Windows Vista" -> R.drawable.folder_vista
+                else -> R.drawable.folder_xp
+            }
+            IconType.URL_SHORTCUT -> R.drawable.url_shortcut
+            IconType.APP -> android.R.drawable.sym_def_app_icon
+        }
+        return AppCompatResources.getDrawable(this, resource)
+            ?: android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+    }
+
     private fun ensureRecycleBinExists() {
         // Check if recycle bin already exists in desktop icons
         val recycleBinExists = desktopIcons.any { it.packageName == "recycle.bin" }
@@ -12471,6 +12534,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Check for new apps when resuming and start periodic checking
         checkForNewApps()
+        // And for what the check above cannot see: an uninstall and an install between two
+        // resumes leave the app count exactly as it was.
+        if (tidyDesktopIcons()) {
+            refreshWP81Tiles()
+            refreshWP81OpenFolder()
+        }
         startPeriodicAppChecking()
 
         // Reset screensaver timer when app regains focus
@@ -13655,6 +13724,212 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return false
     }
     
+    /**
+     * Takes these icons out of the list, and off the desktop if they are on it.
+     *
+     * The one place icons stop existing. Deliberately not a save: a removal is always part
+     * of a larger change - an uninstall, a folder deleted, a tidy-up of several things at
+     * once - and the caller writes once when it is finished.
+     */
+    private fun removeIcons(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        // Views exist only for what a desktop theme drew, and only for the top level.
+        desktopIconViews.filter { it.getDesktopIcon()?.id in ids }.forEach { view ->
+            desktopIconViews.remove(view)
+            desktopContainer.removeView(view)
+        }
+        desktopIcons.removeAll { it.id in ids }
+        // A tile's colour is remembered against the icon's id, and no icon will ever carry
+        // that id again - ids are minted from a package name and the clock, so even a
+        // reinstall makes a new one. Left behind, it is a preference that grows by an entry
+        // per deletion and is never read again.
+        ids.forEach { themeManager.setWP81TileColor(it, null) }
+    }
+
+    /**
+     * An icon's id, and every icon filed inside it if it is a folder, to any depth.
+     *
+     * Deleting a folder without this leaves its contents pointing at a folder that is not
+     * there. Nothing draws such an icon - Start shows the top level and a folder page shows
+     * its own children - so they become rows the user can neither see nor reach, and they
+     * outlive everything: they are saved, loaded and saved again for as long as the
+     * launcher is installed. See [pruneStrayIcons], which clears up any that got away.
+     */
+    private fun iconIdsWithContents(icon: DesktopIcon): Set<String> {
+        val ids = mutableSetOf(icon.id)
+        if (icon.type != IconType.FOLDER) return ids
+        // A folder inside a folder is one level more than the shell offers today, but the
+        // walk costs nothing and does not have to be revisited if that changes. Ids already
+        // collected are never followed twice, so a folder somehow filed inside itself is a
+        // deletion rather than a hang.
+        var growing = true
+        while (growing) {
+            val next = desktopIcons.filter { it.parentFolderId in ids && it.id !in ids }
+            growing = next.isNotEmpty()
+            next.forEach { ids.add(it.id) }
+        }
+        return ids
+    }
+
+    /**
+     * Everything the launcher was holding for an app that is no longer installed.
+     *
+     * The icon list is the one model behind every theme - the desktop's icons, the phone
+     * shell's tiles and whatever is filed inside a folder are all rows in it - so a
+     * removal has to happen there rather than on whichever views happen to exist. Sweeping
+     * the views was the old way, and it only ever found what the desktop had built a view
+     * for: an icon inside a folder never gets one, and under WP8.1 the desktop is not on
+     * screen at all, so an uninstalled app kept both its tile and its place in a folder.
+     *
+     * Returns whether anything went, so callers can skip the rebuild that follows.
+     */
+    private fun removeDesktopIconsForPackage(packageName: String): Boolean {
+        // The shell's own programs live under a package prefix no real app can own and are
+        // never installed or uninstalled, so a package broadcast is never about them.
+        if (isSystemApp(packageName)) return false
+
+        // Only apps: a folder, a web shortcut or the Recycle Bin may happen to carry this
+        // package name without being the app that has just gone.
+        val doomed = desktopIcons
+            .filter { it.type == IconType.APP && it.packageName == packageName }
+            .map { it.id }
+            .toSet()
+        if (doomed.isEmpty()) return false
+
+        return try {
+            removeIcons(doomed)
+            saveDesktopIcons()
+            Log.d("MainActivity", "Removed ${doomed.size} icons for uninstalled package: $packageName")
+            true
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error removing icons for: $packageName", e)
+            false
+        }
+    }
+
+    /**
+     * Throws away icons filed in a folder that is not there.
+     *
+     * The safety net under every path that deletes a folder. Those all take the folder's
+     * contents with them now, but a stray costs the user something worse than the row it
+     * occupies: it is invisible, so it can never be removed by hand, and it comes back
+     * with every save. One sweep of the list on load settles the question for good,
+     * including for arrangements that were already carrying strays before any of this.
+     *
+     * A stray folder is taken with its contents, which are not strays themselves - their
+     * parent exists - but are about to be.
+     *
+     * Returns how many rows went.
+     */
+    private fun pruneStrayIcons(): Int {
+        val folders = desktopIcons.filter { it.type == IconType.FOLDER }.map { it.id }.toSet()
+        val strays = desktopIcons.filter {
+            it.parentFolderId != null && it.parentFolderId !in folders
+        }
+        if (strays.isEmpty()) return 0
+
+        val doomed = strays.flatMap { iconIdsWithContents(it) }.toSet()
+        Log.w(
+            "MainActivity",
+            "Dropping ${doomed.size} icons filed in folders that no longer exist: " +
+                strays.joinToString { "${it.name} (${it.parentFolderId})" }
+        )
+        removeIcons(doomed)
+        return doomed.size
+    }
+
+    /**
+     * Drops icons for apps that went while nobody was listening.
+     *
+     * The two live routes - the manifest receiver and the LauncherApps callback - both
+     * need this activity to be up, and the periodic check only looks when the number of
+     * launchable apps has changed, which an uninstall and an install between two resumes
+     * leave exactly as it was. So a pinned app can outlive its package with nothing left
+     * to notice, and the tile it leaves behind is blank and backed by nothing.
+     *
+     * Cheap enough for every resume: one package-manager lookup per distinct app on the
+     * wall, on a list that is dozens of entries at most.
+     */
+    private fun pruneUninstalledIcons(): Int {
+        val packages = desktopIcons
+            .filter { it.type == IconType.APP && !isSystemApp(it.packageName) }
+            .map { it.packageName }
+            .toSet()
+        if (packages.isEmpty()) return 0
+
+        // QUERY_ALL_PACKAGES is held, so "not found" here means genuinely not installed
+        // rather than merely not visible to this app.
+        val gone = packages.filterNot { pkg ->
+            try {
+                packageManager.getApplicationInfo(pkg, 0)
+                true
+            } catch (e: PackageManager.NameNotFoundException) {
+                false
+            } catch (e: Exception) {
+                // Anything else is the package manager being unhelpful, not an answer.
+                Log.w("MainActivity", "Could not check whether $pkg is installed", e)
+                true
+            }
+        }
+        if (gone.isEmpty()) return 0
+
+        val doomed = desktopIcons
+            .filter { it.type == IconType.APP && it.packageName in gone }
+            .map { it.id }
+            .toSet()
+        Log.d("MainActivity", "Dropping ${doomed.size} icons for uninstalled packages: $gone")
+        gone.forEach { pkg ->
+            invalidateIconCache(pkg)
+            wp81IconProvider.invalidate(pkg)
+        }
+        removeIcons(doomed)
+        return doomed.size
+    }
+
+    /**
+     * Puts the icon list back into a state the shells can draw from.
+     *
+     * Two things can be wrong with it, and both are invisible until something goes looking:
+     * a row for an app that is no longer installed, which shows as a tile with no artwork
+     * and nothing behind it, and a row filed in a folder that is not there, which shows as
+     * nothing at all. Run wherever the list has just been read or has just changed
+     * underneath the user.
+     *
+     * Saves once for both, and returns whether the caller has anything to redraw.
+     */
+    private fun tidyDesktopIcons(): Boolean {
+        val removed = try {
+            pruneStrayIcons() + pruneUninstalledIcons()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error tidying the icon list", e)
+            0
+        }
+        if (removed == 0) return false
+        saveDesktopIcons()
+        return true
+    }
+
+    /**
+     * Rebuilds the folder that is open, if one is, after its contents changed underneath it.
+     *
+     * A folder opened into the wall closes itself when the wall is rebuilt, so that one
+     * needs nothing; the folder *page* - which is where a folder inside another folder is
+     * opened - is a surface of its own and would go on showing the tile of an app that no
+     * longer exists.
+     */
+    private fun refreshWP81OpenFolder() {
+        val shell = wp81Shell ?: return
+        if (!shell.isFolderOpen()) return
+        val folderId = wp81OpenFolderId ?: return
+        // Nothing left to look into, and a page showing an empty folder is a page with
+        // nothing on it: back to the wall instead.
+        if (desktopIcons.none { it.parentFolderId == folderId }) {
+            shell.closeFolder()
+            return
+        }
+        reopenWP81Folder(folderId)
+    }
+
     // AppChangeListener implementation
     override fun onAppInstalled(packageName: String) {
         Log.d("MainActivity", "App installed notification: $packageName")
@@ -13703,40 +13978,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Drop the removed app's cached icons, then refresh the app list
             invalidateIconCache(packageName)
             loadInstalledApps()
+
+            // Before the shells are told rather than after. Everything they draw is read
+            // from the icon list, so refreshing first rebuilt the wall around an app that
+            // was still in it: the tile stayed, lost its artwork - nothing can resolve a
+            // glyph for a package that is gone - and sat there blank until something else
+            // happened to rebuild Start.
+            val removed = removeDesktopIconsForPackage(packageName)
+
             refreshWP81ForPackageChange(packageName)
-            
-            // Then remove any desktop icons for the uninstalled app
-            try {
-                val iconsToRemove = mutableListOf<DesktopIconView>()
-                
-                // Find all desktop icons with the matching package name
-                desktopIconViews.forEach { iconView ->
-                    val desktopIcon = iconView.getDesktopIcon()
-                    if (desktopIcon?.packageName == packageName) {
-                        iconsToRemove.add(iconView)
-                    }
-                }
-                
-                // Remove the found icons
-                iconsToRemove.forEach { iconView ->
-                    desktopIconViews.remove(iconView)
-                    desktopContainer.removeView(iconView)
-                    
-                    // Remove from desktopIcons list
-                    val iconToRemove = iconView.getDesktopIcon()
-                    iconToRemove?.let { icon ->
-                        desktopIcons.removeAll { it.id == icon.id }
-                    }
-                }
-                
-                if (iconsToRemove.isNotEmpty()) {
-                    saveDesktopIcons()
-                    Log.d("MainActivity", "Removed ${iconsToRemove.size} desktop icons for uninstalled app: $packageName")
-                }
-                
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error removing desktop icons for: $packageName", e)
-            }
+            // The wall being rebuilt does not reach inside an opened folder, which is
+            // built once from what it held at the time.
+            if (removed) refreshWP81OpenFolder()
         }
     }
     
@@ -13906,30 +14159,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "New apps: $newApps")
             Log.d("MainActivity", "Removed apps: $removedApps")
 
-            // Handle removed apps
+            // Handle removed apps. Through the same routine the broadcast uses, so an
+            // uninstall noticed here is undone exactly as thoroughly as one that arrived
+            // live - icons inside folders included.
+            var swept = false
             removedApps.forEach { packageName ->
-                val iconsToRemove = mutableListOf<DesktopIconView>()
-
-                desktopIconViews.forEach { iconView ->
-                    val desktopIcon = iconView.getDesktopIcon()
-                    if (desktopIcon?.packageName == packageName) {
-                        iconsToRemove.add(iconView)
-                    }
-                }
-
-                iconsToRemove.forEach { iconView ->
-                    desktopIconViews.remove(iconView)
-                    desktopContainer.removeView(iconView)
-
-                    val iconToRemove = iconView.getDesktopIcon()
-                    iconToRemove?.let { icon ->
-                        desktopIcons.removeAll { it.id == icon.id }
-                    }
-                }
-
-                if (iconsToRemove.isNotEmpty()) {
-                    saveDesktopIcons()
-                }
+                invalidateIconCache(packageName)
+                wp81IconProvider.invalidate(packageName)
+                if (removeDesktopIconsForPackage(packageName)) swept = true
+            }
+            if (swept) {
+                refreshWP81Tiles()
+                refreshWP81OpenFolder()
             }
 
             // Update the known apps list with current apps
@@ -14459,7 +14700,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             shell.selectedTile()?.let { tile ->
                 shell.contextMenu.show(
                     tile.label,
-                    wp81TileMenu(tile, inFolder = shell.isFolderOpen()),
+                    // Asked of the tile, not of the screen: a folder opened into the wall
+                    // leaves the folder page shut, so its tiles were offered "unpin from
+                    // start" - a command that could not apply to them and did nothing.
+                    wp81TileMenu(tile, inFolder = wp81TileIsInFolder(tile)),
                     shell.height * 0.45f
                 )
             }
@@ -15877,7 +16121,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Taking a tile out of a folder deletes it; on Start the same act is "unpin".
         if (inFolder && !tile.kind.isBuiltIn) {
             items.add(rocks.gorjan.gokixp.wp81.WP81ContextMenu.Item("remove from folder") {
-                removeSelectedFromWP81Folder()
+                removeWP81TileFromFolder(tile)
             })
         }
 
@@ -16124,12 +16368,26 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * The top-right edit handle's job, which depends on whose tile it is.
      *
      * A tile the user pinned comes off Start; one the shell provides is hidden instead,
-     * because unpinning it would only last until the next refresh rebuilt it.
+     * because unpinning it would only last until the next refresh rebuilt it; and one
+     * inside an opened folder is taken out of the folder, which deletes it - the same
+     * thing the handle does on the folder page.
      */
     private fun unpinOrHideWP81Tile(tile: rocks.gorjan.gokixp.wp81.Tile) {
         val shell = wp81Shell ?: return
-        if (tile.kind.isBuiltIn) hideWP81Tile(tile.id) else shell.startScreen.unpinTile(tile)
+        when {
+            tile.kind.isBuiltIn -> hideWP81Tile(tile.id)
+            // A folder opens into a band inside the wall, and the tiles in that band are
+            // not on the wall: they are in a grid of the folder's own. Unpinning searched
+            // the wall's list, did not find them and returned, so the handle on a tile
+            // inside a folder did nothing whatsoever.
+            wp81TileIsInFolder(tile) -> removeWP81TileFromFolder(tile)
+            else -> shell.startScreen.unpinTile(tile)
+        }
     }
+
+    /** Whether a tile is filed inside a folder rather than pinned to Start. */
+    private fun wp81TileIsInFolder(tile: rocks.gorjan.gokixp.wp81.Tile): Boolean =
+        desktopIcons.firstOrNull { it.id == tile.id }?.parentFolderId != null
 
     /** Human-readable names for the hideable built-ins, for the restore list. */
     private fun wp81BuiltInLabel(id: String): String = when (id) {
@@ -16660,18 +16918,45 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * user put it, and quietly moving it somewhere else means having to go and find it.
      */
     private fun removeSelectedFromWP81Folder() {
+        val tile = wp81Shell?.selectedTile() ?: return
+        removeWP81TileFromFolder(tile)
+    }
+
+    /**
+     * Takes one tile out of the folder it is filed in, wherever that folder is open.
+     *
+     * The folder it belongs to is read off the icon rather than from whichever surface is
+     * showing, because the two disagree: a folder opened into the wall never set the page's
+     * idea of what is open, so this used to return without doing anything - the reason a
+     * tile inside a folder could not be removed at all except from the folder page.
+     */
+    private fun removeWP81TileFromFolder(tile: rocks.gorjan.gokixp.wp81.Tile) {
         val shell = wp81Shell ?: return
-        val tile = shell.selectedTile() ?: return
-        val folderId = wp81OpenFolderId ?: return
         val icon = desktopIcons.firstOrNull { it.id == tile.id } ?: return
+        val folderId = icon.parentFolderId ?: return
         val name = getCustomOrOriginalName(icon.packageName, icon.name)
 
-        desktopIcons.removeAll { it.id == icon.id }
+        // Which surface the folder is being looked into, read before the rebuild: the wall
+        // closes its own gap whenever it is rebuilt, so afterwards there is nothing to ask.
+        val onPage = shell.isFolderOpen() && wp81OpenFolderId == folderId
+        val inWall = shell.startScreen.openFolderId == folderId
+
+        removeIcons(iconIdsWithContents(icon))
         saveDesktopIcons()
 
         shell.exitEditModeEverywhere()
         refreshWP81Tiles()
-        reopenWP81Folder(folderId)
+
+        // Back where the user was, minus one tile. A folder with nothing left in it is
+        // closed instead: there is nothing to look into any more.
+        val empty = desktopIcons.none { it.parentFolderId == folderId }
+        when {
+            onPage && empty -> shell.closeFolder()
+            onPage -> reopenWP81Folder(folderId)
+            inWall && !empty -> shell.startScreen.tiles()
+                .firstOrNull { it.id == folderId }
+                ?.let { openWP81FolderInline(it) }
+        }
         showNotification("Removed", name)
     }
 
@@ -16867,12 +17152,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         //   - the Recycle Bin and My Computer are deliberately not shown here at all, and
         //     deleting them would lose them from the desktop themes too.
         val keep = userTiles.map { it.id }.toSet()
-        desktopIcons.removeAll {
+        // Through iconIdsWithContents rather than in bulk, so unpinning a folder takes
+        // what was filed in it as well: those icons are reachable only through the folder,
+        // so a folder removed without them leaves rows nothing shows and nothing can delete.
+        desktopIcons.filter {
             it.id !in keep &&
                 it.parentFolderId == null &&
                 it.type != IconType.RECYCLE_BIN &&
                 it.type != IconType.MY_COMPUTER
-        }
+        }.forEach { removeIcons(iconIdsWithContents(it)) }
         saveDesktopIcons()
     }
 
