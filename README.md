@@ -11,6 +11,7 @@ This is a Windows inspired launcher for Android 11+, which tries to faithfully r
     - Windows 2000/ME
     - Windows XP
     - Windows Vista
+    - Windows Mobile 8.1
 - Working home screen, with desktop icons that can be renamed and changed (included are a bunch of icons from the era
 -   Working start menu as an app launcher
 -   Gestures:
