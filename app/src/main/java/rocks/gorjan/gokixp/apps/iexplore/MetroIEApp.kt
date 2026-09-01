@@ -65,7 +65,11 @@ class MetroIEApp(
     private val context: Context,
     private val palette: WP81Palette,
     private val onShowNotification: (String, String) -> Unit,
-    private val onUpdateWindowTitle: (String) -> Unit
+    private val onUpdateWindowTitle: (String) -> Unit,
+    /**
+     * Back has run out of page in a tab another app handed over. See [handleBack].
+     */
+    private val onReturnToLinkCaller: () -> Unit = {}
 ) {
 
     /**
@@ -100,6 +104,16 @@ class MetroIEApp(
         /** Set when the page could not be reached, so the error shows again on return. */
         var failedUrl: String? = null
         var failed = false
+
+        /**
+         * This page was opened by another app - a link followed in Reddit or a mail.
+         *
+         * The tab belongs to that app's errand rather than to the browser, and back walks
+         * out of it the way back walks out of anything else that app opened: through the
+         * page's own history, then out of the launcher entirely. Not written down with the
+         * tab, because the app it would send the user to is gone by the next session.
+         */
+        var external = false
     }
 
     private lateinit var root: FrameLayout
@@ -146,7 +160,7 @@ class MetroIEApp(
     /** What the address bar should say once the user stops editing it. */
     private var currentUrl: String = ""
 
-    fun createView(initialUrl: String? = null): View {
+    fun createView(initialUrl: String? = null, fromAnotherApp: Boolean = false): View {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         homepage = prefs.getString(KEY_HOMEPAGE, DEFAULT_HOMEPAGE) ?: DEFAULT_HOMEPAGE
         favourites.clear()
@@ -195,14 +209,15 @@ class MetroIEApp(
         val restored = loadTabs()
         if (restored.isEmpty()) {
             val lastUrl = prefs.getString(InternetExplorerApp.KEY_LAST_URL, null)
-            openTab(initialUrl ?: lastUrl ?: homepage)
+            val opened = openTab(initialUrl ?: lastUrl ?: homepage)
+            if (initialUrl != null) opened?.external = fromAnotherApp
         } else {
             for (saved in restored) restoreTab(saved)
             val active = prefs.getInt(KEY_ACTIVE_TAB, 0).coerceIn(0, tabs.size - 1)
             activate(tabs[active])
             // An address that arrived with the window is a new thing to read, and goes in
             // its own tab on top of what was already there.
-            if (initialUrl != null) openTab(initialUrl)
+            if (initialUrl != null) openTab(initialUrl)?.external = fromAnotherApp
         }
         root.requestFocus()
         return root
@@ -219,10 +234,10 @@ class MetroIEApp(
      * there has to be a limit somewhere regardless - every tab is a live WebView, and a
      * launcher that runs out of memory takes the home screen down with it.
      */
-    private fun openTab(url: String) {
+    private fun openTab(url: String): Tab? {
         if (tabs.size >= MAX_TABS) {
             onShowNotification("Internet Explorer", "Nine pages is as many as it will hold")
-            return
+            return null
         }
         val tab = Tab()
         configure(tab)
@@ -231,6 +246,7 @@ class MetroIEApp(
         activate(tab)
         load(tab, url)
         saveTabs()
+        return tab
     }
 
     /** Puts back a tab read from the last session, without fetching it. See [Tab.pending]. */
@@ -1076,10 +1092,13 @@ class MetroIEApp(
      * In its own tab, the way the phone did it: a link followed from a tile or a news
      * story is a new thing to read, and loading it over whatever was already open throws
      * away a page the user never closed.
+     *
+     * [fromAnotherApp] marks a link handed over by an app outside the launcher, which is
+     * what back needs to know to give that app its screen back. See [Tab.external].
      */
-    fun navigateToUrl(url: String) {
+    fun navigateToUrl(url: String, fromAnotherApp: Boolean = false) {
         closeTabs()
-        openTab(url)
+        openTab(url)?.external = fromAnotherApp
     }
 
     private fun load(tab: Tab, url: String) {
@@ -1111,6 +1130,13 @@ class MetroIEApp(
      * expects to come out of; then it is the page's own history; and then, with more than
      * one page open, closing this one and returning to the last. Only with a single page
      * that has nowhere left to go does it hand back to the shell, which closes the window.
+     *
+     * A page another app handed over is the exception, and comes before the tab that was
+     * open behind it: somebody who followed a link out of Reddit is inside Reddit's errand,
+     * not inside a browsing session of their own, and backing out of the page they were
+     * sent to read belongs to the app that sent them rather than to whatever the browser
+     * happened to have open at the time. The page goes, and the screen goes back where it
+     * came from.
      */
     fun handleBack(): Boolean {
         if (tabsPage.visibility == View.VISIBLE) {
@@ -1135,6 +1161,16 @@ class MetroIEApp(
         }
         if (tab.webView.canGoBack()) {
             tab.webView.goBack()
+            return true
+        }
+        if (tab.external) {
+            onReturnToLinkCaller()
+            // With something else open behind it the browser stays, minus the page it was
+            // lent out for. With nothing behind it there is no browsing session here to
+            // come back to at all, so it goes with the page: unhandled, and the shell
+            // closes the window as it closes any other that has run out of back.
+            if (tabs.size == 1) return false
+            closeTab(tab)
             return true
         }
         if (tabs.size > 1) {

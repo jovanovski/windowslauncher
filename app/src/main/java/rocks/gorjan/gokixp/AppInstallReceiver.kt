@@ -22,6 +22,18 @@ class AppInstallReceiver : BroadcastReceiver() {
         fun setListener(listener: AppChangeListener?) {
             this.listener = listener
         }
+
+        /**
+         * Drops [listener], if it is still the one registered.
+         *
+         * A departing activity must not clear a listener that belongs to the one replacing
+         * it: a theme switch builds the new activity around the same static field, and
+         * nulling it unconditionally on the way out left the launcher deaf to installs and
+         * uninstalls until it was next rebuilt.
+         */
+        fun clearListener(listener: AppChangeListener) {
+            if (this.listener === listener) this.listener = null
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {

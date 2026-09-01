@@ -40,6 +40,14 @@ class ChristmasLightsManager(
     )
 
     fun initialize() {
+        // Whatever was strung up before comes down first, timers included. A bulb's blink
+        // is a runnable reposting itself against that bulb, so initialising twice - which
+        // happens when a theme switch restores the lights and the delayed setup in onCreate
+        // reaches them as well - left the first string blinking away at views that had
+        // already been taken out of the container.
+        handlers.forEach { it.removeCallbacksAndMessages(null) }
+        handlers.clear()
+        lights.clear()
         container.removeAllViews()
 
         // Calculate how many lights we need to fill the screen
@@ -102,6 +110,21 @@ class ChristmasLightsManager(
         handler.postDelayed(toggleRunnable, initialDelay)
     }
 
+    /**
+     * Bulb art, resolved once per colour and shared by every bulb wearing it.
+     *
+     * A string of lights is the same two pictures over and over, and each blink went back
+     * to the resource system for one of them - a lookup and a fresh Drawable per toggle,
+     * several times a second, forever. Held here they are looked up once; the instances
+     * share their constant state, so a string of forty costs two.
+     */
+    private val bulbArt = mutableMapOf<Int, android.graphics.drawable.Drawable?>()
+
+    private fun bulb(resource: Int): android.graphics.drawable.Drawable? =
+        bulbArt.getOrPut(resource) {
+            androidx.appcompat.content.res.AppCompatResources.getDrawable(context, resource)
+        }
+
     private fun toggleLight(lightView: LightView) {
         lightView.isOn = !lightView.isOn
         val drawableRes = if (lightView.isOn) {
@@ -109,7 +132,7 @@ class ChristmasLightsManager(
         } else {
             lightView.color.offDrawable
         }
-        lightView.imageView.setImageResource(drawableRes)
+        lightView.imageView.setImageDrawable(bulb(drawableRes))
     }
 
     fun cleanup() {

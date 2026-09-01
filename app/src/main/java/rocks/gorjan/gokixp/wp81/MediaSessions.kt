@@ -63,7 +63,38 @@ class MediaSessions(private val context: Context) {
     private var onChanged: (() -> Unit)? = null
 
     private val sessionsChanged =
-        MediaSessionManager.OnActiveSessionsChangedListener { onChanged?.invoke() }
+        MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+            // A session that appears after startUpdates needs its own track callback, or
+            // its tile shows whatever was playing when the shell was built and never moves
+            // on. Registrations are held so they can be taken off the *same* controller
+            // objects: getActiveSessions hands back new ones every call, and unregistering
+            // on a fresh object takes nothing off the old one.
+            attachTrackCallbacks(controllers.orEmpty())
+            dirty = true
+            onChanged?.invoke()
+        }
+
+    /** The controllers [trackCallback] is currently registered on. */
+    private val registered = mutableListOf<MediaController>()
+
+    private fun attachTrackCallbacks(current: List<MediaController>) {
+        for (controller in registered) {
+            try {
+                controller.unregisterCallback(trackCallback)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error detaching a media callback", e)
+            }
+        }
+        registered.clear()
+        for (controller in current) {
+            try {
+                controller.registerCallback(trackCallback)
+                registered.add(controller)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error attaching a media callback", e)
+            }
+        }
+    }
 
     /**
      * Starts reporting session changes.
@@ -76,7 +107,8 @@ class MediaSessions(private val context: Context) {
         this.onChanged = onChanged
         try {
             manager?.addOnActiveSessionsChangedListener(sessionsChanged, listenerComponent)
-            for (controller in controllers()) controller.registerCallback(trackCallback)
+            attachTrackCallbacks(controllers())
+            dirty = true
         } catch (e: SecurityException) {
             // Notification access not granted yet; tiles simply show no media.
             Log.d(TAG, "No notification access, media tiles disabled: ${e.message}")
@@ -86,7 +118,9 @@ class MediaSessions(private val context: Context) {
     fun stopUpdates() {
         try {
             manager?.removeOnActiveSessionsChangedListener(sessionsChanged)
-            for (controller in controllers()) controller.unregisterCallback(trackCallback)
+            attachTrackCallbacks(emptyList())
+            cached = emptyMap()
+            dirty = true
         } catch (e: Exception) {
             Log.w(TAG, "Error detaching media listeners", e)
         }
@@ -95,10 +129,12 @@ class MediaSessions(private val context: Context) {
 
     private val trackCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: android.media.MediaMetadata?) {
+            dirty = true
             onChanged?.invoke()
         }
 
         override fun onPlaybackStateChanged(state: PlaybackState?) {
+            dirty = true
             onChanged?.invoke()
         }
     }
@@ -116,6 +152,38 @@ class MediaSessions(private val context: Context) {
      * and a tile reading "unknown" is worse than the tile it replaced.
      */
     fun active(): Map<String, Info> {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!dirty && now - readAt < REREAD_MS) return cached
+        cached = read()
+        readAt = now
+        dirty = false
+        return cached
+    }
+
+    /** The last answer, reused until something says it has changed. See [active]. */
+    private var cached: Map<String, Info> = emptyMap()
+    private var readAt = 0L
+    private var dirty = true
+
+    /**
+     * Reads every session from the system.
+     *
+     * Expensive in a way that is not obvious: `controller.metadata` is a binder call that
+     * hands back a fresh MediaMetadata, and reading any field of it unparcels the whole
+     * Bundle - including the album art. Spotify publishes 960x960, so *every* call
+     * allocated 3.5MB of bitmap, whether or not anything asked for the cover.
+     *
+     * The Start screen asked twice a second by way of the notification refresh, which is
+     * a hundred megabytes a minute of native garbage: the Java heap stays small, so no
+     * collection is provoked, and it piles up in native memory until the phone is swapping.
+     * A heap dump taken during that showed 64 album covers, 63 of them already unreachable.
+     *
+     * So it is read when something has actually changed - a track, a playback state, a
+     * session appearing or going away, all of which already have callbacks - and at most
+     * once every [REREAD_MS] otherwise. Positions do not need it: a tile projects those
+     * from the timestamp the session gave, which is what [Info.currentPositionMs] is for.
+     */
+    private fun read(): Map<String, Info> {
         val result = mutableMapOf<String, Info>()
         for (controller in controllers()) {
             val metadata = controller.metadata ?: continue
@@ -242,5 +310,14 @@ class MediaSessions(private val context: Context) {
 
     companion object {
         private const val TAG = "WP81Media"
+
+        /**
+         * How stale a snapshot may get before it is read again anyway.
+         *
+         * Everything that matters arrives by callback, so this is only a backstop against
+         * a player that changes something without saying so. Long, because reading is what
+         * costs - see [read].
+         */
+        private const val REREAD_MS = 15_000L
     }
 }

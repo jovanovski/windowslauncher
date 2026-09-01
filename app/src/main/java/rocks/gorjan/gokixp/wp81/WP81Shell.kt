@@ -253,6 +253,8 @@ class WP81Shell(
 
     fun openSettings() {
         folderPage.hide()
+        // Whatever was left open last time is folded away before it is shown again.
+        settingsPage.onOpened()
         settingsTransition.playIn()
         refreshNavMode()
     }
@@ -295,7 +297,10 @@ class WP81Shell(
         if (resources.configuration.orientation !=
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
         ) {
-            appList.beginSearch()
+            // Instant, for the same reason the sideways swipe is: this runs while the page
+            // is still crossing, and the two animations on top of each other are the
+            // stutter. The gesture is the movement; search is where it lands.
+            appList.beginSearch(animated = false)
         }
     }
 
@@ -405,6 +410,17 @@ class WP81Shell(
                     kotlin.math.abs(dx) > kotlin.math.abs(dy)
                 ) {
                     dragging = true
+                    // A drag off Start towards the list is somebody going to the list to
+                    // type - so the list is made into a search now, while it is still off
+                    // the edge of the screen, and slides in already being one. Laid out
+                    // rather than animated: the page is the animation, and a second one
+                    // over it - rows rebuilding, letters folding, the field rising - is
+                    // what made the arrival stutter. No keyboard yet; the finger can still
+                    // turn back, and a keyboard over the Start screen would be a promise
+                    // the gesture has not made.
+                    if (pageProgress <= 0.5f && dx < 0f) {
+                        appList.beginSearch(animated = false, showKeyboard = false)
+                    }
                     return true
                 }
             }
@@ -441,7 +457,10 @@ class WP81Shell(
                 // in the right place to type. The arrow and the Start key are for looking
                 // through what is there, and the button at the top of the rail is for
                 // saying so on purpose.
-                if (target == 1f) appList.beginSearch() else appList.endSearch()
+                // Arrived: the layout is already a search - see onInterceptTouchEvent -
+                // so all that is left is the keyboard. Turned back: undo it.
+                if (target == 1f) appList.beginSearch(animated = false)
+                else appList.endSearch(animated = false)
             }
         }
         return true

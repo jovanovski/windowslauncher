@@ -209,22 +209,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Foldable device state
     private var isFoldableUnfolded = false
 
-    // Icon bitmap cache - uses 1/8th of available memory
-    private val iconBitmapCache: LruCache<String, Bitmap> by lazy {
-        val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() // KB
-        val cacheSize = maxMemory / 8 // Use 1/8th of available memory
-        Log.d("MainActivity", "Initializing icon cache with size: ${cacheSize}KB (max memory: ${maxMemory}KB)")
-
-        object : LruCache<String, Bitmap>(cacheSize) {
-            override fun sizeOf(key: String, bitmap: Bitmap): Int {
-                return bitmap.byteCount / 1024 // Size in KB
-            }
-
-        }
-    }
 
     // Watches for apps being added, removed or updated while the launcher is running
     private var launcherAppsCallback: LauncherApps.Callback? = null
+
+    /**
+     * The LauncherApps the callback above is registered on.
+     *
+     * Held because it has to be the *same object* to unregister. LauncherApps is a
+     * per-Context service and [attributionContext] mints a fresh Context on every call, so
+     * asking for the service again in onDestroy handed back a different instance with an
+     * empty callback list: the registration was never removed, the framework went on
+     * holding the callback, and the callback holds this activity. Every theme switch -
+     * which is a recreate - leaked an entire activity that way, with its icon cache, its
+     * view tree and its wallpaper, and left another live callback rebuilding the app list
+     * and the tiles of a screen nobody is looking at on every package change.
+     */
+    private var launcherAppsService: LauncherApps? = null
 
     // Packages whose icons changed, waiting for the coalesced refresh in refreshIconsForPackage
     private val pendingIconRefreshes = mutableSetOf<String>()
@@ -555,6 +556,26 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
          */
         private val RETIRED_SYSTEM_APPS = setOf("system.msn")
 
+        /**
+         * Programs that belong to the phone shell and to nothing else.
+         *
+         * Each is built out of WP8.1's own furniture and has a desktop counterpart that
+         * already does the job - Winamp and Windows Media Player play music, Internet
+         * Explorer reads the web - so on Windows 98, XP or Vista they would be
+         * anachronisms standing next to the real thing. They are left out of the app list
+         * there, and an icon for one is not drawn on the desktop either: the icon itself
+         * survives, because the tile has to be there again the moment the phone shell is.
+         *
+         * The counterpart of the rule that keeps the Recycle Bin and My Computer off Start.
+         */
+        private val WINDOWS_PHONE_ONLY_APPS = setOf(
+            "system.zune", "system.news", "system.welcome", "system.calculator"
+        )
+
+        /** Whether this program exists only under the Windows Phone 8.1 shell. */
+        fun isWindowsPhoneOnlyApp(packageName: String): Boolean =
+            packageName in WINDOWS_PHONE_ONLY_APPS
+
         /** Which of [RETIRED_SYSTEM_APPS] have already been swept out of the user's arrangement. */
         private const val KEY_RETIRED_APPS_PURGED = "retired_system_apps_purged"
         private const val KEY_SOUND_MUTED = "sound_muted"
@@ -658,7 +679,40 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Standard size icons are rendered at
         private const val ICON_SIZE_PX = 288
 
+        /**
+         * Longest edge a bundled wallpaper is decoded to when it is only being previewed.
+         *
+         * The largest thing that shows one is the XP picker's 138x102dp monitor; the phone's
+         * strip is smaller still. See [loadWallpaperPreview].
+         */
+        private const val WALLPAPER_PREVIEW_PX = 512
+
         private var instance: MainActivity? = null
+
+        /**
+         * Every app icon the launcher has squared off, for the life of the process.
+         *
+         * A process-wide cache rather than a field on the activity, because a theme switch
+         * is a recreate: one per activity meant the new one started with nothing and
+         * decoded, scaled and squared every installed app again - a second or so of work
+         * on the way into a theme, and a second full set of icons in memory for as long as
+         * the outgoing activity was still being collected. The contents do not depend on
+         * the theme: system programs take their artwork straight from the theme without
+         * coming through here, and a hand-picked icon is keyed by the file it came from.
+         *
+         * An eighth of the heap, and the memory-pressure callbacks still trim it.
+         */
+        private val iconBitmapCache: LruCache<String, Bitmap> by lazy {
+            val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() // KB
+            val cacheSize = maxMemory / 8 // Use 1/8th of available memory
+            Log.d("MainActivity", "Initializing icon cache with size: ${cacheSize}KB (max memory: ${maxMemory}KB)")
+
+            object : LruCache<String, Bitmap>(cacheSize) {
+                override fun sizeOf(key: String, bitmap: Bitmap): Int {
+                    return bitmap.byteCount / 1024 // Size in KB
+                }
+            }
+        }
 
         fun getInstance(): MainActivity? = instance
 
@@ -1119,8 +1173,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             refreshDesktopIcons()
 
             // Set up Christmas lights if enabled (after taskbar is set up so tray icon can be added)
+            // Desktop themes only: they hang off the taskbar and settle on it, and the phone
+            // shell has neither. Started under it they were invisible and still running -
+            // see applyWindowsPhone81Theme.
             val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
-            if (christmasLightsEnabled) {
+            if (christmasLightsEnabled && !themeManager.isWindowsPhone81()) {
                 initializeChristmasLights()
             }
 
@@ -1380,6 +1437,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.startup_95] = soundPool.load(audioContext, R.raw.startup_95, 1)
         soundIds[R.raw.startup_2000] = soundPool.load(audioContext, R.raw.startup_2000, 1)
         soundIds[R.raw.startup_vista] = soundPool.load(audioContext, R.raw.startup_vista, 1)
+        soundIds[R.raw.startup_8] = soundPool.load(audioContext, R.raw.startup_8, 1)
         soundIds[R.raw.shutdown] = soundPool.load(audioContext, R.raw.shutdown, 1)
         soundIds[R.raw.shutdown_98] = soundPool.load(audioContext, R.raw.shutdown_98, 1)
         soundIds[R.raw.shutdown_2000] = soundPool.load(audioContext, R.raw.shutdown_2000, 1)
@@ -1390,6 +1448,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.ding] = soundPool.load(audioContext, R.raw.ding, 1)
         soundIds[R.raw.ding_vista] = soundPool.load(audioContext, R.raw.ding_vista, 1)
         soundIds[R.raw.bubble] = soundPool.load(audioContext, R.raw.bubble, 1)
+        // The phone's alert. Asked for by showNotification whenever the shell is up, and
+        // never loaded, so playSound had nothing to play and every WP8.1 toast was silent.
+        soundIds[R.raw.bubble_8] = soundPool.load(audioContext, R.raw.bubble_8, 1)
         soundIds[R.raw.charge_on] = soundPool.load(audioContext, R.raw.charge_on, 1)
         soundIds[R.raw.charge_on_vista] = soundPool.load(audioContext, R.raw.charge_on_vista, 1)
         soundIds[R.raw.charge_off] = soundPool.load(audioContext, R.raw.charge_off, 1)
@@ -1675,68 +1736,60 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // would be an anachronism sitting next to Winamp doing the same job. Called Music
         // because that is what the phone called it; the package is still system.zune,
         // which is what everything already pinned is filed under.
-        if (themeManager.isWindowsPhone81()) {
-            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_headphones)?.let { glyph ->
-                systemApps.add(AppInfo(
-                    name = "Music",
-                    exeName = "zune.exe",
-                    packageName = "system.zune",
-                    icon = createSquareDrawable(glyph)
-                ))
-            }
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_headphones)?.let { glyph ->
+            systemApps.add(AppInfo(
+                name = "Music",
+                exeName = "zune.exe",
+                packageName = "system.zune",
+                icon = createSquareDrawable(glyph)
+            ))
         }
 
         // Welcome, which the desktop themes show as a window after an update. Windows
         // Phone only: the desktop has its own, in its own chrome.
-        if (themeManager.isWindowsPhone81()) {
-            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_welcome)?.let { glyph ->
-                val tinted = glyph.mutate()
-                androidx.core.graphics.drawable.DrawableCompat.setTint(
-                    tinted, themeManager.getWP81Accent())
-                systemApps.add(AppInfo(
-                    name = "Welcome",
-                    exeName = "welcome.exe",
-                    packageName = "system.welcome",
-                    icon = createSquareDrawable(tinted)
-                ))
-            }
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_welcome)?.let { glyph ->
+            val tinted = glyph.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                tinted, themeManager.getWP81Accent())
+            systemApps.add(AppInfo(
+                name = "Welcome",
+                exeName = "welcome.exe",
+                packageName = "system.welcome",
+                icon = createSquareDrawable(tinted)
+            ))
         }
 
         // Calculator. Windows Phone only: the desktop themes have no calculator to be a
         // second copy of, and this one is the phone's keypad rather than a program window.
-        if (themeManager.isWindowsPhone81()) {
-            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_calculator)?.let { glyph ->
-                // Drawn white for tiles; the app list is not always dark, so it takes the
-                // accent here rather than vanishing on a Light theme.
-                val tinted = glyph.mutate()
-                androidx.core.graphics.drawable.DrawableCompat.setTint(
-                    tinted, themeManager.getWP81Accent())
-                systemApps.add(AppInfo(
-                    name = "Calculator",
-                    exeName = "calc.exe",
-                    packageName = "system.calculator",
-                    icon = createSquareDrawable(tinted)
-                ))
-            }
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_calculator)?.let { glyph ->
+            // Drawn white for tiles; the app list is not always dark, so it takes the
+            // accent here rather than vanishing on a Light theme.
+            val tinted = glyph.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                tinted, themeManager.getWP81Accent())
+            systemApps.add(AppInfo(
+                name = "Calculator",
+                exeName = "calc.exe",
+                packageName = "system.calculator",
+                icon = createSquareDrawable(tinted)
+            ))
         }
 
         // News, the reader behind the News tile. Windows Phone only, for the same reason
         // Zune is: it is built out of this shell's own furniture and would be an
         // anachronism on a desktop that already has Internet Explorer.
-        if (themeManager.isWindowsPhone81()) {
-            AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_news)?.let { glyph ->
-                // The glyph is drawn white for tiles; the app list is not always dark, so
-                // it takes the accent here rather than vanishing on a Light theme.
-                val tinted = glyph.mutate()
-                androidx.core.graphics.drawable.DrawableCompat.setTint(
-                    tinted, themeManager.getWP81Accent())
-                systemApps.add(AppInfo(
-                    name = "News",
-                    exeName = "news.exe",
-                    packageName = "system.news",
-                    icon = createSquareDrawable(tinted)
-                ))
-            }
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_news)?.let { glyph ->
+            // The glyph is drawn white for tiles; the app list is not always dark, so it
+            // takes the accent here rather than vanishing on a Light theme.
+            val tinted = glyph.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                tinted, themeManager.getWP81Accent())
+            systemApps.add(AppInfo(
+                name = "News",
+                exeName = "news.exe",
+                packageName = "system.news",
+                icon = createSquareDrawable(tinted)
+            ))
         }
 
         // Minesweeper - scale icon to match app icon size
@@ -1796,7 +1849,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ))
         }
 
-        return systemApps
+        // The phone's own programs, kept off every desktop - see WINDOWS_PHONE_ONLY_APPS,
+        // which the desktop icon loader reads too, so the two can never drift apart.
+        return if (themeManager.isWindowsPhone81()) systemApps
+        else systemApps.filterNot { isWindowsPhoneOnlyApp(it.packageName) }
     }
 
     fun launchSystemApp(packageName: String) {
@@ -3616,6 +3672,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * The app that handed the launcher the link the browser is showing, if any.
+     *
+     * Kept for as long as that page is: it is where back goes when the page runs out of
+     * history. See [returnToLinkCaller].
+     */
+    private var linkCallerPackage: String? = null
+
+    /**
+     * Whether the desktop browser's window is standing in for another app's link.
+     *
+     * The phone's browser can say this per tab, because it has tabs; the desktop one is a
+     * single window with a single page in it, so the window is the unit. Set by every
+     * [showInternetExplorerDialog] - a link opened from inside the launcher clears it
+     * again - and cleared when the window closes.
+     */
+    private var ieWindowOpenedByLink = false
+
     private fun setupBackPressHandling() {
         // Modern back press handling for Android 13+ (API 33+)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -3696,9 +3770,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 Log.d("MainActivity", "Back pressed (modern): minimising Zune")
                                 frontWindow.minimize()
                             } else {
-                                // Close the front-most window
+                                // Close the front-most window. If it is the browser showing
+                                // a link from another app and the page has nowhere left to
+                                // go - which is what every branch above just failed to find
+                                // - then closing it is the end of that app's errand, and
+                                // the screen goes back to the app rather than to the desktop.
+                                val leaving = ieWindowOpenedByLink &&
+                                    frontWindow?.windowIdentifier == "system.internet_explorer"
                                 Log.d("MainActivity", "Back pressed (modern): closing front window")
                                 floatingWindowManager.closeFrontWindow()
+                                if (leaving) returnToLinkCaller()
                             }
                         }
                     }
@@ -4802,9 +4883,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        // Get all icons that belong to this folder
+        // Get all icons that belong to this folder, minus any that belong to the phone
+        // shell - a folder window is a desktop window, and the rule there is the desktop's.
         val iconsInFolder = desktopIcons
             .filter { it.parentFolderId == folderIcon.id }
+            .filterNot { isWindowsPhoneOnlyApp(it.packageName) && !themeManager.isWindowsPhone81() }
             .sortedBy { getCustomOrOriginalName(it.packageName, it.name).lowercase() }
 
         Log.d("MainActivity", "Found ${iconsInFolder.size} icons in folder")
@@ -6165,6 +6248,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // later in onCreate - callbacks are delivered on the main thread either way
             launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
             launcherAppsCallback = callback
+            launcherAppsService = launcherApps
             Log.d("MainActivity", "LauncherApps package callback registered")
         } catch (e: Exception) {
             Log.e("MainActivity", "Could not register LauncherApps callback", e)
@@ -6173,11 +6257,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun unregisterLauncherAppsCallback() {
         val callback = launcherAppsCallback ?: return
+        val launcherApps = launcherAppsService
         launcherAppsCallback = null
+        launcherAppsService = null
         try {
-            val launcherApps = attributionContext("system")
-                .getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-            launcherApps.unregisterCallback(callback)
+            // The instance it went on, never a freshly fetched one - see launcherAppsService.
+            launcherApps?.unregisterCallback(callback)
         } catch (e: Exception) {
             Log.w("MainActivity", "Could not unregister LauncherApps callback", e)
         }
@@ -7050,6 +7135,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Get wallpaper preview ImageView
         val wallpaperPreview = contentView.findViewById<ImageView>(R.id.wallpaper_preview)
+        // The monitor mockup the preview goes in is 138x102dp - see
+        // wallpaper_selection_content.xml. Nothing here draws a wallpaper bigger than that.
+        val previewPx = (138 * resources.displayMetrics.density).toInt()
 
         // Load and display current wallpaper in preview
         val (pathKey, uriKey) = getCurrentThemeWallpaperKeys()
@@ -7088,9 +7176,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         } else {
             // Load built-in wallpaper from assets
             try {
-                val inputStream = assets.open(currentWallpaperPath)
-                val currentDrawable = Drawable.createFromStream(inputStream, currentWallpaperPath)
-                inputStream.close()
+                // Sampled down to the monitor mockup it goes in, like every other preview.
+                val currentDrawable = loadWallpaperPreview(currentWallpaperPath, previewPx)
                 if (currentDrawable != null) {
                     wallpaperPreview.setImageDrawable(currentDrawable)
                     configurePreviewForCurrent(isMinimized = currentWallpaperPath.contains("(m)"))
@@ -7151,7 +7238,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Preview the wallpaper instead of showing target dialog immediately
             selectedWallpaper = wallpaper
             pickedCustomUri = null
-            wallpaperPreview.setImageDrawable(wallpaper.drawable)
+            // Decoded here rather than carried by every row: one preview is on screen at a
+            // time, and the other seventy-one would be pictures nothing is looking at.
+            wallpaperPreview.setImageDrawable(
+                wallpaper.drawable ?: wallpaper.filePath?.let {
+                    loadWallpaperPreview(it, previewPx)
+                }
+            )
             configurePreviewForCurrent(isMinimized = wallpaper.name.contains("(m)"))
             playClickSound()
         }
@@ -7404,15 +7497,28 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
-    private fun showInternetExplorerDialog(initialUrl: String? = null, appInfo: AppInfo? = null) {
+    /**
+     * [fromAnotherApp] marks an address that arrived from outside the launcher, which is
+     * what back needs to know to hand the screen back. See [returnToLinkCaller].
+     */
+    private fun showInternetExplorerDialog(
+        initialUrl: String? = null,
+        appInfo: AppInfo? = null,
+        fromAnotherApp: Boolean = false
+    ) {
         // The phone has its own browser: the same engine and the same favourites, with the
         // page given the whole screen and one dark strip along the bottom instead of a
         // toolbar. A window with a title bar and eight buttons across the top would be the
         // one thing in this shell that still looked like a desktop.
         if (themeManager.isWindowsPhone81()) {
-            showMetroIEDialog(initialUrl)
+            // The phone's browser keeps this per tab, because it has tabs; the window-level
+            // flag is not its business and must not be left standing from a desktop theme.
+            ieWindowOpenedByLink = false
+            showMetroIEDialog(initialUrl, fromAnotherApp)
             return
         }
+
+        ieWindowOpenedByLink = fromAnotherApp
 
         // Check if an IE window is already open
         val existingIEWindow = findExistingInternetExplorerWindow()
@@ -7505,6 +7611,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         windowsDialog.setOnCloseListener {
             ieApp.cleanup()
+            ieWindowOpenedByLink = false
         }
 
         // Set context menu reference and show as floating window
@@ -8845,11 +8952,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * place rather than a document, so a second address arriving while it is open is a
      * navigation in the browser that is already there, not another copy of it.
      */
-    private fun showMetroIEDialog(initialUrl: String? = null) {
+    private fun showMetroIEDialog(initialUrl: String? = null, fromAnotherApp: Boolean = false) {
         val open = floatingWindowManager.findWindowByIdentifier("system.internet_explorer")
         if (open != null) {
             floatingWindowManager.findAndFocusWindow("system.internet_explorer")
-            if (initialUrl != null) metroIEAppInstance?.navigateToUrl(initialUrl)
+            if (initialUrl != null) {
+                metroIEAppInstance?.navigateToUrl(initialUrl, fromAnotherApp)
+            }
             return
         }
 
@@ -8860,11 +8969,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             context = this,
             palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
             onShowNotification = { title, message -> showNotification(title, message) },
-            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) }
+            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) },
+            onReturnToLinkCaller = { returnToLinkCaller() }
         )
         metroIEAppInstance = ieApp
 
-        val ieView = ieApp.createView(initialUrl)
+        val ieView = ieApp.createView(initialUrl, fromAnotherApp)
         windowsDialog.setContentView(ieView)
         windowsDialog.setBorderless()
         windowsDialog.setSaveState(false)
@@ -9434,41 +9544,80 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
-    private fun loadWallpapers(): List<WallpaperItem> {
+    /**
+     * The bundled wallpapers, by name - and by picture only where one is going to be drawn.
+     *
+     * [previewPx] is the longest edge the caller is going to draw one at; zero decodes
+     * nothing at all. This used to decode every asset at full resolution unconditionally,
+     * for both callers. Seventy-two wallpapers between 800x600 and 1290x2796 come to some
+     * hundreds of megabytes, and the XP picker - which draws none of them, it is a list of
+     * names - paid it in full every time it opened. It was the largest thing in the heap.
+     */
+    private fun loadWallpapers(previewPx: Int = 0): List<WallpaperItem> {
         val wallpapers = mutableListOf<WallpaperItem>()
 
         // Load all wallpapers from assets in alphabetical order
         try {
             val assetManager = assets
             val wallpaperFiles = (assetManager.list("wallpapers") ?: arrayOf()).sorted()
-            
+
             for (fileName in wallpaperFiles) {
                 if (fileName.matches(".*\\.(png|jpg|jpeg|webp)$".toRegex(RegexOption.IGNORE_CASE)) && fileName != "README.txt") {
-                    try {
-                        val inputStream = assetManager.open("wallpapers/$fileName")
-                        val drawable = Drawable.createFromStream(inputStream, fileName)
-                        inputStream.close()
-                        
-                        if (drawable != null) {
-                            val filePath = "wallpapers/$fileName"
-                            wallpapers.add(WallpaperItem(
-                                name = fileName.substringBeforeLast("."),
-                                drawable = drawable,
-                                isCurrent = false,
-                                filePath = filePath,
-                                isBuiltIn = false
-                            ))
-                        }
-                    } catch (e: Exception) {
-                        Log.w("MainActivity", "Failed to load wallpaper: $fileName", e)
-                    }
+                    val filePath = "wallpapers/$fileName"
+                    wallpapers.add(WallpaperItem(
+                        name = fileName.substringBeforeLast("."),
+                        drawable = if (previewPx > 0) loadWallpaperPreview(filePath, previewPx) else null,
+                        isCurrent = false,
+                        filePath = filePath,
+                        isBuiltIn = false
+                    ))
                 }
             }
         } catch (e: Exception) {
             Log.w("MainActivity", "Failed to load wallpapers", e)
         }
-        
+
         return wallpapers
+    }
+
+    /**
+     * One bundled wallpaper, decoded small enough for a preview and no smaller.
+     *
+     * Every surface that shows these shows them tiny - the XP picker's 138x102dp monitor,
+     * the phone settings page's strip of squares - so they are sampled down on the way in
+     * rather than decoded whole and scaled by the draw. A wallpaper at 1290x2796 is 14MB
+     * held to fill a thumbnail.
+     */
+    private fun loadWallpaperPreview(
+        path: String,
+        maxPx: Int = WALLPAPER_PREVIEW_PX
+    ): Drawable? = try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        assets.open(path).use { BitmapFactory.decodeStream(it, null, bounds) }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(bounds, maxPx, maxPx)
+        }
+        val decoded = assets.open(path).use { BitmapFactory.decodeStream(it, null, options) }
+        // Sampling only halves, so a tall wallpaper still lands well above the square it is
+        // going in - 1344x2992 asked down to 252 comes back 336x748, a megabyte apiece and
+        // seventy of them in the phone's strip. Scaled the rest of the way and the
+        // intermediate dropped, each one costs what it draws.
+        decoded?.let { bitmap ->
+            val longest = maxOf(bitmap.width, bitmap.height)
+            if (longest <= maxPx) return@let bitmap
+            val scale = maxPx / longest.toFloat()
+            val scaled = Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt().coerceAtLeast(1),
+                (bitmap.height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+            if (scaled !== bitmap) bitmap.recycle()
+            scaled
+        }?.toDrawable(resources)
+    } catch (e: Exception) {
+        Log.w("MainActivity", "Failed to load wallpaper preview: $path", e)
+        null
     }
 
     private fun applyCustomWallpaper(wallpaperItem: WallpaperItem) {
@@ -10152,6 +10301,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         else if(themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
             playSound(R.raw.startup_vista)
         }
+        // The phone's own jingle. It shares this branch with XP otherwise, and a Start
+        // screen coming up to the XP chime is the one moment the illusion breaks.
+        else if(themeManager.getSelectedTheme() is AppTheme.WindowsPhone81) {
+            playSound(R.raw.startup_8)
+        }
         else{
             playSound(R.raw.startup)
         }
@@ -10637,6 +10791,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * The data is cleared once it has been read so a rotation or a return to the launcher
      * does not open the same page again - the same reason [handleSharedUrlIntent] clears
      * its extra.
+     *
+     * The app that sent it is written down on the way past, because back out of the page
+     * is a way back to that app. See [returnToLinkCaller].
      */
     private fun handleViewUrlIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
@@ -10646,7 +10803,64 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val url = data.toString()
         intent.data = null
+        linkCallerPackage = callingAppPackage()
         openBrowserBeforeFirstFrame(url)
+    }
+
+    /**
+     * The app that started this activity, as far as Android will say.
+     *
+     * The referrer is what a browser is given in place of a caller: an `android-app://`
+     * address naming the package that asked. Nothing is our own doing - a link followed
+     * inside the launcher comes back round through the same intent filter - so this
+     * launcher is not an answer.
+     */
+    private fun callingAppPackage(): String? {
+        val ref = try {
+            referrer
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not read the intent's referrer", e)
+            null
+        } ?: return null
+        if (ref.scheme != "android-app") return null
+        return ref.host?.takeIf { it.isNotBlank() && it != packageName }
+    }
+
+    /**
+     * Gives the screen back to the app whose link the browser has been showing.
+     *
+     * A link tapped in Reddit puts the reader inside Reddit's errand, and finishing with
+     * the page ends the errand: back belongs to Reddit, not to the launcher's own Start
+     * screen or to whatever else the browser had open. The launcher cannot simply finish
+     * the way an ordinary browser activity would - it is the home screen, and there is
+     * always more of it underneath - so the whole task steps aside instead and uncovers
+     * the app that was there before it.
+     *
+     * Where the system will not move the task (there may be nothing behind it, on a cold
+     * start that the link itself began), the caller is opened by name, which brings its
+     * task forward as it stood rather than starting it over.
+     */
+    private fun returnToLinkCaller() {
+        val caller = linkCallerPackage
+        linkCallerPackage = null
+        ieWindowOpenedByLink = false
+
+        val moved = try {
+            moveTaskToBack(true)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not move the launcher aside", e)
+            false
+        }
+        if (moved) return
+
+        if (caller == null) return
+        try {
+            val back = packageManager.getLaunchIntentForPackage(caller) ?: return
+            back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(back)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not go back to $caller", e)
+        }
     }
 
     /**
@@ -10676,14 +10890,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun openBrowserBeforeFirstFrame(url: String) {
         val root = window?.decorView ?: run {
-            showInternetExplorerDialog(url)
+            showInternetExplorerDialog(url, fromAnotherApp = true)
             return
         }
         root.viewTreeObserver.addOnPreDrawListener(
             object : android.view.ViewTreeObserver.OnPreDrawListener {
                 override fun onPreDraw(): Boolean {
                     root.viewTreeObserver.removeOnPreDrawListener(this)
-                    showInternetExplorerDialog(url)
+                    showInternetExplorerDialog(url, fromAnotherApp = true)
                     root.post { root.invalidate() }
                     return false
                 }
@@ -11032,6 +11246,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
                     // Skip icons that are inside folders - they shouldn't be shown on desktop
                     if (parentFolderId != null) {
+                        return@forEach
+                    }
+
+                    // And the phone's own programs, on a desktop. The row stays in the list
+                    // so the tile is back the moment the phone shell is; what it must not do
+                    // is put Music on a Windows 98 desktop next to Winamp, wearing the
+                    // Internet Explorer icon because no desktop artwork for it exists.
+                    if (isWindowsPhoneOnlyApp(packageName) && !themeManager.isWindowsPhone81()) {
                         return@forEach
                     }
 
@@ -12486,9 +12708,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         Log.d("MainActivity", "Back pressed: minimising Zune")
                         frontWindow.minimize()
                     } else {
-                        // Close the front-most window
+                        // Closing the browser on another app's link, as above.
+                        val leaving = ieWindowOpenedByLink &&
+                            frontWindow?.windowIdentifier == "system.internet_explorer"
                         Log.d("MainActivity", "Back pressed: closing front window")
                         floatingWindowManager.closeFrontWindow()
+                        if (leaving) returnToLinkCaller()
                     }
                 }
             }
@@ -12600,6 +12825,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     override fun onStop() {
         super.onStop()
+        // Nothing on screen to put a dot on. The refresh walks every desktop icon and, on
+        // the phone shell, every tile - notifications, folder previews and media - twice a
+        // second, which is work done behind whatever the user actually opened. It is
+        // started again in onStart, and its first run is immediate, so coming back finds
+        // the dots current.
+        stopNotificationMonitoring()
+
         // With singleTask launch mode and proper manifest settings,
         // the system should handle home screen behavior correctly
 
@@ -12640,6 +12872,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Reload wallpaper when app comes back to foreground
         reloadWallpaperBitmap()
+
+        // And pick the dots back up - see onStop, which puts them down.
+        startNotificationMonitoring()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -12668,6 +12903,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(clockRunnable)
+        stopNotificationMonitoring()
+        // An hour-long timer that nothing cancelled: it held the activity for as long as it
+        // had left to run.
+        stopAutoSync()
 
         // Windows Phone 8.1 shell: the live-tile flip is a repeating post and would
         // otherwise outlive the activity.
@@ -12735,8 +12974,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.d("MainActivity", "SoundPool released")
         }
 
-        // Clean up app install receiver listener
-        AppInstallReceiver.setListener(null)
+        // Clean up app install receiver listener - ours only, for the same reason as above.
+        AppInstallReceiver.clearListener(this)
         unregisterLauncherAppsCallback()
         iconRefreshRunnable?.let { handler.removeCallbacks(it) }
         iconRefreshRunnable = null
@@ -12744,11 +12983,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Stop app checking
         stopPeriodicAppChecking()
 
-        // Clear instance reference
-        instance = null
+        // Only if it is still ours. A theme switch recreates the activity, and the order
+        // is not guaranteed to be the tidy one: where the incoming activity has already
+        // announced itself, the outgoing one clearing this unconditionally left it null,
+        // and NotificationListenerService.notifyMainActivity found nothing to notify - so
+        // notification dots and tile counts stopped updating until the next recreate.
+        if (instance === this) instance = null
 
-        // Clear bitmap caches
-        clearAllBitmapCaches()
+        // The app list goes; the icons stay. This runs on every theme switch, and throwing
+        // away a cache the very next activity is about to rebuild is the work it was put
+        // there to avoid. Actual memory pressure still empties it - see onLowMemory.
+        cachedAppList = null
     }
 
     /**
@@ -13689,7 +13934,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    /**
+     * The dots refresh, held so it can be stopped.
+     *
+     * It used to be a local: a runnable that reposts itself every two seconds, with no
+     * reference kept anywhere, so nothing could ever take it off the queue. Each recreate -
+     * every theme switch - left another one ticking, and because a pending Message holds
+     * its callback, and the callback holds this activity, the whole activity stayed alive
+     * with its view tree, its wallpaper and its shell, being refreshed twice a second for a
+     * screen nobody was looking at. That was the retention path in the heap dump:
+     * Message.next ... Message.callback -> startNotificationMonitoring$updateRunnable$1.
+     */
+    private var notificationMonitorRunnable: Runnable? = null
+
     private fun startNotificationMonitoring() {
+        stopNotificationMonitoring()
+
         // Start periodic refresh of notification dots every 2 seconds
         val updateRunnable = object : Runnable {
             override fun run() {
@@ -13697,6 +13957,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 handler.postDelayed(this, 2000) // 2 seconds
             }
         }
+        notificationMonitorRunnable = updateRunnable
         handler.post(updateRunnable)
         
         // Check if notification listener service is enabled
@@ -13709,6 +13970,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    private fun stopNotificationMonitoring() {
+        notificationMonitorRunnable?.let { handler.removeCallbacks(it) }
+        notificationMonitorRunnable = null
+    }
+
     private fun isNotificationListenerEnabled(): Boolean {
         val packageName = packageName
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
@@ -14491,9 +14757,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         findViewById<View>(R.id.desktop_icons_container)?.visibility = View.VISIBLE
         findViewById<View>(R.id.taskbar_container)?.visibility = View.VISIBLE
-        findViewById<View>(R.id.christmas_wrapper)?.visibility = View.VISIBLE
-        // A Start menu is opened by the Start button, not by arriving on the desktop.
-        findViewById<View>(R.id.start_menu_container)?.visibility = View.GONE
+        // Whatever the phone shell turned off comes back on, if it was on to begin with.
+        if (getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
+        ) {
+            initializeChristmasLights()
+        } else {
+            findViewById<View>(R.id.christmas_wrapper)?.visibility = View.GONE
+        }
+
+        // A Start menu is opened by the Start button, not by arriving on the desktop - but
+        // what has to be hidden for that is the menu, not the container it sits in. The
+        // container is the frame the button makes the menu visible *inside*; hidden, it
+        // took the menu down with it whatever the button did, and since this runs for every
+        // desktop theme on every start, the Start button did nothing at all on XP, Vista
+        // and Classic alike.
+        findViewById<View>(R.id.start_menu_container)?.visibility = View.VISIBLE
+        findViewById<View>(R.id.start_menu)?.visibility = View.GONE
+        isStartMenuVisible = false
 
         // The pointer is a desktop conceit the phone hides; on a desktop it is how the
         // machine is used at all, and its absence is the most disabling half of this.
@@ -14517,7 +14798,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         findViewById<View>(R.id.taskbar_container)?.visibility = View.GONE
         findViewById<View>(R.id.start_menu_container)?.visibility = View.GONE
         findViewById<View>(R.id.gesture_bar_background)?.visibility = View.GONE
-        findViewById<View>(R.id.christmas_wrapper)?.visibility = View.GONE
+        // Off, not hidden. The lights and the snow keep running behind a GONE wrapper: the
+        // snow was still stepping every flake and the lights still swapping bulbs, on a
+        // screen where neither has anywhere to be - which is most of what was on the main
+        // thread. The setting is untouched, so going back to a desktop brings them back.
+        cleanupChristmasLights()
 
         val palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager)
 
@@ -14686,7 +14971,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // Stored, but nothing on screen will change until the switch in
                     // settings goes back off - and a command that silently does nothing is
                     // a command the user will assume is broken.
-                    showNotification("Tile colour", "Saved \u2013 tile colours are hidden")
+                    showNotification("Tile color", "Saved \u2013 tile colors are hidden")
                 } else {
                     // Repainted in place: rebuilding the wall to change one colour would
                     // drop the selection and replay every tile's entrance.
@@ -16431,8 +16716,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         refreshDefaultBrowser = { shell.settingsPage.setDefaultBrowser(isDefaultBrowser()) }
         Thread {
             val items = try {
-                loadWallpapers().mapNotNull { item ->
-                    item.filePath?.let { path -> path to item.drawable }
+                // The strip's squares are 72x120dp - see WP81SettingsView.wallpaperTile.
+                val stripPx = (120 * resources.displayMetrics.density).toInt()
+                loadWallpapers(previewPx = stripPx).mapNotNull { item ->
+                    val drawable = item.drawable ?: return@mapNotNull null
+                    item.filePath?.let { path -> path to drawable }
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "WP8.1: failed to load wallpapers", e)

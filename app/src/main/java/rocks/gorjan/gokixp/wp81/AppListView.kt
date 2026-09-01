@@ -376,43 +376,79 @@ class AppListView(
      * over nothing. The list is faded across that change rather than snapping, since what
      * is being removed is every third row of it.
      */
-    fun beginSearch() {
-        if (searching) return
+    /**
+     * Puts the list into search.
+     *
+     * [animated] is what the user is watching: the rail sliding out, the letters folding
+     * away, the field rising. That is right when search is entered *on* the list - the
+     * button, the jump list's globe - where the movement explains what just happened.
+     *
+     * It is wrong when the list is on its way in from a swipe. There the page is already
+     * moving, and playing a second animation over it meant the rows were rebuilt, the
+     * letters were folding and the field was rising while the whole list slid across:
+     * the arrival stuttered. Off, everything below lands in its finished state, so the
+     * list comes in already being a search - which is what the gesture asked for.
+     *
+     * [showKeyboard] is separate because a swipe can prepare the list before it is certain
+     * the user is going there: the layout can be made ready under a finger that may still
+     * turn back, but a keyboard must not appear until they have arrived.
+     */
+    fun beginSearch(animated: Boolean = true, showKeyboard: Boolean = true) {
+        if (searching) {
+            if (showKeyboard) showSearchKeyboard()
+            return
+        }
         hideJumpList()
         // Set now rather than when the rows are rebuilt: everything below reads it, and
         // search has begun the moment it was asked for.
         searching = true
         // The list spreads into the rail as the button leaves it, so the two are one
         // movement - the gutter slides out and the apps take the width it had.
-        applyListInset(animated = true)
+        applyListInset(animated)
 
         // The rail leaves the way a column leaves: sideways, off its own edge. It is not a
         // button on a page that could fade where it stands.
         searchButton.animate().cancel()
-        searchButton.animate()
-            .translationX(-dp(RING_MARGIN_DP + RING_DP).toFloat())
-            .setDuration(SWAP_MS)
-            .setInterpolator(AccelerateInterpolator())
-            .withEndAction { searchButton.visibility = GONE }
-            .start()
+        if (animated) {
+            searchButton.animate()
+                .translationX(-dp(RING_MARGIN_DP + RING_DP).toFloat())
+                .setDuration(SWAP_MS)
+                .setInterpolator(AccelerateInterpolator())
+                .withEndAction { searchButton.visibility = GONE }
+                .start()
+        } else {
+            searchButton.translationX = -dp(RING_MARGIN_DP + RING_DP).toFloat()
+            searchButton.visibility = GONE
+        }
 
         // Every letter square on screen rolls up into its own top edge and its row closes
         // with it, so the sections fold away instead of vanishing and leaving the apps to
         // lurch up into the space. The rows are only rebuilt once that has finished, by
         // which point the headers are flat and taking no room.
-        collapseLetters { rebuildRows() }
+        if (animated) collapseLetters { rebuildRows() } else rebuildRows()
 
         searchBox.setText("")
         searchBox.visibility = VISIBLE
-        searchBox.alpha = 0f
-        searchBox.translationY = dp(FIELD_RISE_DP).toFloat()
         searchBox.animate().cancel()
-        searchBox.animate()
-            .alpha(1f).translationY(0f)
-            .setDuration(SWAP_MS)
-            .setInterpolator(android.view.animation.DecelerateInterpolator())
-            .start()
+        if (animated) {
+            searchBox.alpha = 0f
+            searchBox.translationY = dp(FIELD_RISE_DP).toFloat()
+            searchBox.animate()
+                .alpha(1f).translationY(0f)
+                .setDuration(SWAP_MS)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        } else {
+            searchBox.alpha = 1f
+            searchBox.translationY = 0f
+        }
 
+        if (showKeyboard) showSearchKeyboard()
+    }
+
+    /** Puts the cursor in the field and asks for the keyboard. */
+    fun showSearchKeyboard() {
+        if (!searching) return
         searchBox.requestFocus()
         searchBox.post {
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
@@ -421,8 +457,14 @@ class AppListView(
         }
     }
 
-    /** The way back out: everything [beginSearch] did, in reverse and on the same clock. */
-    fun endSearch() {
+    /**
+     * The way back out: everything [beginSearch] did, in reverse and on the same clock.
+     *
+     * [animated] off for the same reason it is off on the way in - a swipe that turns back
+     * is already carrying the page across, and the list it is undoing is on its way off the
+     * screen where none of this can be seen anyway.
+     */
+    fun endSearch(animated: Boolean = true) {
         if (!searching && query.isEmpty()) return
         searching = false
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
@@ -432,31 +474,40 @@ class AppListView(
         imm?.hideSoftInputFromWindow(searchBox.windowToken ?: windowToken, 0)
         searchBox.clearFocus()
         query = ""
-        applyListInset(animated = true)
+        applyListInset(animated)
         // Bound rolled up, and unrolled from there. Cleared once they are all out, so a
         // square bound later by an ordinary scroll is simply there.
-        expandLetters = true
+        expandLetters = animated
         rebuildRows()
-        postDelayed({ expandLetters = false }, LETTER_MS)
+        if (animated) postDelayed({ expandLetters = false }, LETTER_MS)
 
         searchBox.animate().cancel()
-        searchBox.animate()
-            .alpha(0f).translationY(dp(FIELD_RISE_DP).toFloat())
-            .setDuration(SWAP_MS)
-            .withEndAction {
-                searchBox.visibility = GONE
-                searchBox.setText("")
-            }
-            .start()
-
-        searchButton.visibility = VISIBLE
         searchButton.animate().cancel()
-        searchButton.animate()
-            .translationX(0f)
-            .setDuration(SWAP_MS)
-            .setInterpolator(DecelerateInterpolator())
-            .withEndAction(null)
-            .start()
+        if (animated) {
+            searchBox.animate()
+                .alpha(0f).translationY(dp(FIELD_RISE_DP).toFloat())
+                .setDuration(SWAP_MS)
+                .withEndAction {
+                    searchBox.visibility = GONE
+                    searchBox.setText("")
+                }
+                .start()
+
+            searchButton.visibility = VISIBLE
+            searchButton.animate()
+                .translationX(0f)
+                .setDuration(SWAP_MS)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction(null)
+                .start()
+        } else {
+            searchBox.visibility = GONE
+            searchBox.setText("")
+            searchBox.alpha = 1f
+            searchBox.translationY = 0f
+            searchButton.visibility = VISIBLE
+            searchButton.translationX = 0f
+        }
     }
 
     /**

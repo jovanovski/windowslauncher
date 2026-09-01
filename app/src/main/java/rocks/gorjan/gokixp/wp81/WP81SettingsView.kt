@@ -123,7 +123,7 @@ class WP81SettingsView(
      * mean visiting every tile that had one.
      */
     private val hideColorsRow =
-        CheckRow("hide custom tile colours") { on -> onHideTileColorsChanged?.invoke(on) }
+        CheckRow("hide custom tile colors") { on -> onHideTileColorsChanged?.invoke(on) }
 
     /**
      * Whether a tile says how many are waiting, or only that something is.
@@ -159,6 +159,9 @@ class WP81SettingsView(
     private var selectedDark: Boolean = palette.isDark
     private var selectedBackground: String? = null
 
+    /** The page's own scroller, so the theme picker can bring itself into view. */
+    private val scroll = ScrollView(context)
+
     init {
         isClickable = true
         column.orientation = LinearLayout.VERTICAL
@@ -179,7 +182,7 @@ class WP81SettingsView(
         backgroundRow.addView(themeRow("Light", false), half())
         column.addView(backgroundRow, wide())
 
-        column.addView(sectionLabel("accent colour"), wide())
+        column.addView(sectionLabel("accent color"), wide())
         buildAccentGrid()
         column.addView(accentGrid, wide())
 
@@ -229,12 +232,17 @@ class WP81SettingsView(
         buildThemePicker()
         column.addView(launcherThemeSection, wide())
 
-        val vertical = ScrollView(context).apply {
-            isFillViewport = true
-            overScrollMode = OVER_SCROLL_NEVER
-            addView(column, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        }
-        addView(vertical, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        scroll.isFillViewport = true
+        scroll.overScrollMode = OVER_SCROLL_NEVER
+        scroll.addView(column, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+
+        // 2. Everything that is not a section heading is stood in from the edge, so the
+        // headings are the only things on the page's own margin and each one visibly has a
+        // group of settings hanging under it. Applied here, once, rather than at each of a
+        // dozen call sites - and added to whatever margin a row already had rather than
+        // replacing it, so the slider and the wallpaper strip keep their own.
+        indentSettingRows()
 
         applyPalette(palette)
     }
@@ -439,6 +447,17 @@ class WP81SettingsView(
         themeExpanded = true
         themeOptions.visibility = View.VISIBLE
         themeChevron.animate().rotation(180f).setDuration(160).start()
+        // The picker sits at the foot of the page, so its options open below the fold: the
+        // row was tapped, something happened off-screen, and the page looked unchanged.
+        // Posted, because how far down they reach is only known once they have been laid
+        // out. Only ever scrolls forward - if the whole list is already on screen there is
+        // nothing to do, and moving the page then would just take the row out from under
+        // the finger that opened it.
+        themeOptions.post {
+            val bottom = launcherThemeSection.bottom + column.paddingBottom
+            val target = (bottom - scroll.height).coerceAtLeast(0)
+            if (target > scroll.scrollY) scroll.smoothScrollTo(0, target)
+        }
     }
 
     private fun collapseThemePicker() {
@@ -508,7 +527,7 @@ class WP81SettingsView(
         accentMoreRow.setOnClickListener { setAccentExpanded(!accentExpanded) }
         TiltEffect.apply(accentMoreRow)
 
-        accentMoreLabel.text = "more colours"
+        accentMoreLabel.text = "more colors"
         accentMoreLabel.textSize = 15f
         accentMoreLabel.typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
         accentMoreRow.addView(accentMoreLabel, LinearLayout.LayoutParams(
@@ -521,24 +540,26 @@ class WP81SettingsView(
         accentGrid.addView(accentMore, wide())
     }
 
+    /**
+     * Called each time the page is shown.
+     *
+     * Both lists start closed. The accent grid used to open itself whenever the colour in
+     * use was not in the first row, which is most of them - so the page opened as a wall of
+     * swatches with the settings under it pushed off the bottom, every time. What is on is
+     * still marked; finding it is a tap on "more colors", and that is the tap the person
+     * who wants to change it was going to make anyway.
+     */
+    fun onOpened() {
+        setAccentExpanded(false)
+        collapseThemePicker()
+        scroll.scrollTo(0, 0)
+    }
+
     private fun setAccentExpanded(expanded: Boolean) {
         accentExpanded = expanded
         accentMore.visibility = if (expanded) View.VISIBLE else View.GONE
         if (expanded) accentChevron.animate().rotation(180f).setDuration(160).start()
         else accentChevron.rotation = 0f
-    }
-
-    /**
-     * Unrolls the rest of the colours when the one in use is among them.
-     *
-     * A page whose only visible row has nothing picked out on it reads as having no accent
-     * set at all. Done on arrival rather than from [repaintAccentSwatches], which also runs
-     * on every tap - rolling the list back open under a user who had just closed it.
-     */
-    private fun revealSelectedAccent() {
-        val hidden = rocks.gorjan.gokixp.theme.ThemeManager.WP81_ACCENTS
-            .indexOfFirst { it.second == selectedAccent } >= ACCENTS_PER_ROW
-        if (hidden && !accentExpanded) setAccentExpanded(true)
     }
 
     private fun repaintAccentSwatches() {
@@ -838,15 +859,37 @@ class WP81SettingsView(
         blurSlider.applyPalette(p)
         repaintThemeRows()
         repaintLauncherThemeRows()
-        revealSelectedAccent()
         repaintAccentSwatches()
         repaintWallpaperTiles()
+    }
+
+    /**
+     * Stands every setting in from the page's left edge, leaving the headings on it.
+     *
+     * The page was one flat column: a heading and the rows under it began at the same
+     * margin, so "tiles" and "start background" read as two more rows rather than as the
+     * names of what followed. An indent is enough to show which is which - the headings
+     * hang out to the left, and each group is visibly a group.
+     */
+    private fun indentSettingRows() {
+        val inset = dp(SECTION_INSET_DP)
+        for (i in 0 until column.childCount) {
+            val child = column.getChildAt(i)
+            // The title bar is the page's own, not a setting; headings mark the edge.
+            if (child === header || child.tag == TAG_SECTION) continue
+            val lp = child.layoutParams as? LinearLayout.LayoutParams ?: continue
+            lp.leftMargin += inset
+            child.layoutParams = lp
+        }
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val TAG_SECTION = "wp81_section"
+
+        /** How far a setting stands in from the heading above it. See indentSettingRows. */
+        private const val SECTION_INSET_DP = 12
 
         /** Swatches to a row, and so also how many stay out when the rest roll up. */
         private const val ACCENTS_PER_ROW = 5

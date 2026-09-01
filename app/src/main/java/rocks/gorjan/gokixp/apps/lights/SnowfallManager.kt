@@ -24,7 +24,42 @@ class SnowfallManager(
     private val snowflakes = mutableListOf<Snowflake>()
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
-    private val updateInterval = 10L // Update every 50ms
+
+    /**
+     * One frame, at the rate the screen actually refreshes.
+     *
+     * It used to be 10ms - a hundred passes a second over every flake on a display that
+     * shows sixty, so nearly half of them were computed and thrown away.
+     */
+    private val updateInterval = 16L
+
+    /**
+     * The snow, drawn as snow rather than built out of widgets.
+     *
+     * Every flake used to be a View of its own, added to the container as it was made and
+     * removed as it melted: two hundred and fifty children in one RelativeLayout, twenty
+     * new ones a second, each addView costing a measure and layout pass over all of them,
+     * and every flake's position set as a view property a hundred times a second. That is
+     * what was eating the main thread - a hundred lines of falling snow drawn the way one
+     * would build a settings page.
+     *
+     * One view now, the size of the container, that paints the lot in onDraw. Positions are
+     * plain numbers; a frame is one invalidate.
+     */
+    private inner class SnowfallView(context: Context) : View(context) {
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+        }
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            for (flake in snowflakes) {
+                val radius = flake.size / 2f
+                canvas.drawCircle(flake.x + radius, flake.y + radius, radius, paint)
+            }
+        }
+    }
+
+    private var snowView: SnowfallView? = null
 
     // Snowflake generation settings
     private val snowflakeGenerationInterval = 50L // Generate new snowflake every 300ms
@@ -89,6 +124,8 @@ class SnowfallManager(
         if (!isRunning) {
             isRunning = true
 
+            ensureCanvas()
+
             // Calculate taskbar position
             calculateTaskbarPosition()
 
@@ -102,6 +139,20 @@ class SnowfallManager(
             handler.post(generateRunnable)
             handler.postDelayed(snowplowRunnable, snowplowInterval) // First snowplow after 10s + 2s delay
         }
+    }
+
+    /** Puts the one view the snow is painted on into the container, once. */
+    private fun ensureCanvas() {
+        if (snowView != null) return
+        val view = SnowfallView(context)
+        snowView = view
+        container.addView(
+            view,
+            RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.MATCH_PARENT,
+                RelativeLayout.LayoutParams.MATCH_PARENT
+            )
+        )
     }
 
     private fun setupSnowplow() {
@@ -194,6 +245,7 @@ class SnowfallManager(
     }
 
     private fun checkSnowplowCollisions() {
+        var swept = false
         snowplow?.let { plow ->
             val plowLeft = plow.x
             val plowRight = plow.x + plow.width
@@ -217,12 +269,13 @@ class SnowfallManager(
                     if (snowflake.isStopped) {
                         stoppedSnowflakes.remove(snowflake)
                     }
+                    swept = true
                     // Remove snowflake
-                    container.removeView(snowflake.view)
                     iterator.remove()
                 }
             }
         }
+        if (swept) snowView?.invalidate()
     }
 
     private fun calculateTaskbarPosition() {
@@ -282,6 +335,7 @@ class SnowfallManager(
     fun resume() {
         if (!isRunning) {
             isRunning = true
+            ensureCanvas()
             handler.post(updateRunnable)
             handler.post(generateRunnable)
             handler.postDelayed(snowplowRunnable, snowplowInterval)
@@ -302,18 +356,7 @@ class SnowfallManager(
         // Random starting X position
         val startX = Random.nextInt(0, screenWidth)
 
-        // Create snowflake view (white circle)
-        val snowflakeView = View(context).apply {
-            layoutParams = RelativeLayout.LayoutParams(sizePx, sizePx)
-            background = createCircleDrawable(sizePx)
-            x = startX.toFloat()
-            y = 0f
-        }
-
-        container.addView(snowflakeView)
-
         val snowflake = Snowflake(
-            view = snowflakeView,
             x = startX.toFloat(),
             y = 0f,
             size = sizePx,
@@ -368,32 +411,27 @@ class SnowfallManager(
 
                 // Remove oldest stopped snowflake if we exceed the limit
                 if (stoppedSnowflakes.size > maxStoppedSnowflakes) {
-                    val oldestStopped = stoppedSnowflakes.removeAt(0)
-                    container.removeView(oldestStopped.view)
-                    toRemove.add(oldestStopped)
+                    toRemove.add(stoppedSnowflakes.removeAt(0))
                 }
             }
 
-            // Update view position
-            snowflake.view.x = snowflake.x
-            snowflake.view.y = snowflake.y
-
             // Remove if off screen (left or right only, not bottom since they stack)
             if (snowflake.x < -snowflake.size || snowflake.x > screenWidth) {
-                container.removeView(snowflake.view)
                 iterator.remove()
             }
         }
 
         // Remove collected snowflakes after iteration
         snowflakes.removeAll(toRemove)
+
+        // One repaint for the whole snowfall, at the end, rather than a property set per
+        // flake as it moves.
+        snowView?.invalidate()
     }
 
     private fun cleanup() {
-        // Remove all snowflake views
-        snowflakes.forEach { snowflake ->
-            container.removeView(snowflake.view)
-        }
+        snowView?.let { container.removeView(it) }
+        snowView = null
         snowflakes.clear()
         stoppedSnowflakes.clear()
 
@@ -425,18 +463,7 @@ class SnowfallManager(
             val snowflakeStates: List<SnowflakeState> = gson.fromJson(json, type)
 
             snowflakeStates.forEach { state ->
-                // Recreate snowflake view
-                val snowflakeView = View(context).apply {
-                    layoutParams = RelativeLayout.LayoutParams(state.size, state.size)
-                    background = createCircleDrawable(state.size)
-                    x = state.x
-                    y = state.y
-                }
-
-                container.addView(snowflakeView)
-
                 val snowflake = Snowflake(
-                    view = snowflakeView,
                     x = state.x,
                     y = state.y,
                     size = state.size,
@@ -463,7 +490,6 @@ class SnowfallManager(
     )
 
     private data class Snowflake(
-        val view: View,
         var x: Float,
         var y: Float,
         val size: Int,

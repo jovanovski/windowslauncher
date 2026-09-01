@@ -57,7 +57,7 @@ class WP81ColorPicker(
 
         heading.typeface = ResourcesCompat.getFont(context, R.font.segoeui_semilight)
         heading.textSize = 30f
-        heading.text = "tile colour"
+        heading.text = "tile color"
         heading.includeFontPadding = false
         heading.setPadding(dp(22), dp(20), dp(22), dp(8))
 
@@ -155,7 +155,7 @@ class WP81ColorPicker(
 
     /** Opens on [current], so the colour the tile is already wearing is the marked one. */
     fun show(forLabel: String, current: Int?) {
-        heading.text = forLabel.lowercase().ifEmpty { "tile colour" }
+        heading.text = forLabel.lowercase().ifEmpty { "tile color" }
         selected = current
         repaintSwatches()
         visibility = VISIBLE

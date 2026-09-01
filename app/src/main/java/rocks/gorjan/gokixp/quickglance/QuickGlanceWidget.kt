@@ -126,6 +126,17 @@ class QuickGlanceWidget @JvmOverloads constructor(
         }
         viewPager.adapter = panelAdapter
 
+        // Once, here - not from updateDotsIndicator, which runs on every panel refresh: a
+        // clock tick, a weather reading, a notification. Registering there added a callback
+        // per refresh and removed none, so the list grew for as long as the launcher had
+        // been up, every swipe ran all of them, and each one walked the dots setting
+        // backgrounds. A heap dump after a day's use had 13,365 of these registered.
+        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateDotSelection(position)
+            }
+        })
+
         contentContainer.addView(viewPager)
         horizontalContainer.addView(contentContainer)
         addView(horizontalContainer)
@@ -258,13 +269,6 @@ class QuickGlanceWidget @JvmOverloads constructor(
             }
             dotsIndicator.addView(dot)
         }
-
-        // Set up page change listener for dots
-        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                updateDotSelection(position)
-            }
-        })
     }
 
     private fun updateDotSelection(position: Int) {
