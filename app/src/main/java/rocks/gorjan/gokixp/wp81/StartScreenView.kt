@@ -410,6 +410,17 @@ class StartScreenView(
         forEachTileView { if (it.tile.id == tileId) it.setPeopleMosaic(favourites, others) }
     }
 
+    /**
+     * Hands the weather tile the forecast it lays across itself, or nothing at all.
+     *
+     * Nothing is how the tile is told to go back to turning its readings over one at a
+     * time, which is what a tile too small for a row of columns does. See
+     * TileView.setForecast.
+     */
+    fun setForecast(tileId: String, columns: List<ForecastPanelView.Column>) {
+        forEachTileView { if (it.tile.id == tileId) it.setForecast(columns) }
+    }
+
     /** Hands every tile the loader it fetches face pictures through. */
     fun setBackdropLoader(loader: (String, (android.graphics.Bitmap?) -> Unit) -> Unit) {
         forEachTileView { it.backdropLoader = loader }
@@ -420,6 +431,17 @@ class StartScreenView(
         var index = 0
         forEachTileView { if (it.tile.id == tileId) index = it.rotationIndex }
         return index
+    }
+
+    /**
+     * Repaints one tile's icon without rebuilding the wall.
+     *
+     * For the live widget that steps aside for a notification and has to say *which kind*
+     * it stepped aside for. Every other tile's icon is settled when the wall is built and
+     * never moves; this one changes with the shade. See MainActivity.refreshWP81People.
+     */
+    fun setGlyph(tileId: String, glyph: MonochromeIconProvider.Glyph?) {
+        forEachTileView { if (it.tile.id == tileId) it.setGlyph(glyph) }
     }
 
     /** Refreshes one live widget's corner marks in place: the front's, and the reverse's. */
@@ -438,6 +460,7 @@ class StartScreenView(
     ): TileView {
         val view = TileView(context, tile, palette)
         view.countsEnabled = countsEnabled
+        view.tileColorsHidden = tileColorsHidden
         view.applySize()
         view.setGlyph(glyphs(tile))
         // The wall's own crop, not a fresh one against the screen. Where there is none yet
@@ -581,6 +604,20 @@ class StartScreenView(
             if (field == value) return
             field = value
             forEachTileView { it.countsEnabled = value }
+        }
+
+    /**
+     * Whether every tile is holding its colour back so the Start photo shows through.
+     *
+     * The wall's rather than each tile's, for the reason [countsEnabled] is: it is one
+     * answer for the whole wall, and a tile built after it was given has to be born
+     * knowing it. See TileView.tileColorsHidden.
+     */
+    var tileColorsHidden: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            forEachTileView { it.tileColorsHidden = value }
         }
 
     /**

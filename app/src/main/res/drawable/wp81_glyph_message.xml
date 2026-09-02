@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_glyph_message
+
+  The speech bubble the shell wears for a text message - in the status bar when one
+  arrives, and on the notification it posts. The same mark as custom_icons_8/appbar.message,
+  which is what the app bar shows, so a message says the same thing in both places.
+
+  Emitted white so callers can tint per accent / light-dark theme; the status bar tints it
+  itself and reads only the shape.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M33,51 L36.4167,61.75 L24,51 L19,51 L19,22 L57,22 L57,51 L33,51 Z" />
+</vector>

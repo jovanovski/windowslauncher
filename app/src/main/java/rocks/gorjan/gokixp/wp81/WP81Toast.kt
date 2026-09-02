@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
@@ -37,6 +38,14 @@ class WP81Toast(
 
     private var onTap: (() -> Unit)? = null
     private var dragStartY = 0f
+
+    /** This gesture has become a push rather than a tap. See [wireFlickToDismiss]. */
+    private var pushing = false
+
+    /** It has already gone far enough to send the band away. */
+    private var pushedAway = false
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val hideRunnable = Runnable { dismiss() }
 
@@ -81,22 +90,51 @@ class WP81Toast(
     private fun wireFlickToDismiss() {
         band.setOnTouchListener { _, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> dragStartY = event.rawY
-                MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_DOWN -> {
+                    dragStartY = event.rawY
+                    pushing = false
+                    pushedAway = false
+                }
+                MotionEvent.ACTION_MOVE -> if (!pushedAway) {
                     val dy = event.rawY - dragStartY
+                    if (!pushing && dy > touchSlop) {
+                        pushing = true
+                        // Being pushed away, not held down.
+                        band.isPressed = false
+                    }
                     // Follows the finger downward only; dragging up does nothing.
                     if (dy > 0) band.translationY = dy
                     if (dy > dp(DISMISS_DP)) {
-                        band.setOnTouchListener(null)
+                        pushedAway = true
                         dismiss()
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                    band.animate().translationY(0f).setDuration(120).start()
+                    if (!pushedAway) band.animate().translationY(0f).setDuration(120).start()
             }
-            false // never consumed, so the click listener still fires
+            // Consumed only once the gesture has become a push, which keeps it away from
+            // the click listener: a band flicked off the screen must not also open what it
+            // was announcing, which is the one thing the person flicking it declined. A
+            // press that never moved is left unconsumed, so the click still hears it.
+            pushing
         }
     }
+
+    /**
+     * How much room to leave under the band, on top of the navigation keys' own.
+     *
+     * A program with a strip of its own along the bottom - the browser's address bar - has
+     * the band land on top of it, which announces something by covering the thing the
+     * announcement is about. Set while such a program is open and put back when it closes.
+     */
+    var lift: Int = 0
+        set(value) {
+            field = value
+            (band.layoutParams as? LayoutParams)?.let {
+                it.bottomMargin = value
+                band.layoutParams = it
+            }
+        }
 
     fun show(title: String, text: String, durationMs: Long, onTap: (() -> Unit)?) {
         this.onTap = onTap

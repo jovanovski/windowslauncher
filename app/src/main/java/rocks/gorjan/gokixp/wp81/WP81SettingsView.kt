@@ -75,6 +75,9 @@ class WP81SettingsView(
     /** Tapping the row that asks the phone to send its links to the launcher. */
     var onDefaultBrowser: (() -> Unit)? = null
 
+    /** Tapping the row that asks the phone for its app history. */
+    var onLastAppAccess: (() -> Unit)? = null
+
     /** Tapping the back arrow beside the title. */
     var onBack: (() -> Unit)? = null
 
@@ -155,6 +158,16 @@ class WP81SettingsView(
      */
     private val defaultBrowserRow = ActionRow("default browser") { onDefaultBrowser?.invoke() }
 
+    /**
+     * What the back key finds when it is pressed twice on Start.
+     *
+     * Back on Start has nowhere to go, so a second quick press returns to the last app.
+     * Which app that was is a question only the phone can answer properly, and answering
+     * it needs an access Android will not let an app prompt for - so this row, like
+     * [defaultBrowserRow], says where things stand and opens the phone's own screen.
+     */
+    private val lastAppRow = ActionRow("back twice for last app") { onLastAppAccess?.invoke() }
+
     private var selectedAccent: Int = palette.accent
     private var selectedDark: Boolean = palette.isDark
     private var selectedBackground: String? = null
@@ -218,6 +231,9 @@ class WP81SettingsView(
 
         column.addView(driftRow.view, wide())
         column.addView(hideColorsRow.view, wide())
+
+        column.addView(sectionLabel("back key"), wide())
+        column.addView(lastAppRow.view, wide())
 
         // Its own section: it is the only thing on this page that is not about what Start
         // looks like, and filing it under the wallpaper's switches would bury it.
@@ -657,6 +673,14 @@ class WP81SettingsView(
         )
     }
 
+    /** Whether the phone is telling the launcher which app was last in front. */
+    fun setLastAppAccess(granted: Boolean) {
+        lastAppRow.setDetail(
+            if (granted) "goes to whatever app you used last"
+            else "only apps opened from start - tap to allow app history"
+        )
+    }
+
     /** Seeds the tile switches, which are not tied to whether a background is set. */
     fun setTileControls(counts: Boolean, columns: Int) {
         countsRow.set(counts)
@@ -855,6 +879,7 @@ class WP81SettingsView(
         countsRow.repaint()
         openLinksRow.repaint()
         defaultBrowserRow.repaint()
+        lastAppRow.repaint()
         repaintColumnRows()
         blurSlider.applyPalette(p)
         repaintThemeRows()

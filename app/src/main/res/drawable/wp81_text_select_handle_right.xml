@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The grip on the right-hand end of a selection. The left one mirrored: the anchor is a
+  quarter of the way across the top edge, and the square quarter is on that side of the
+  disc. See wp81_text_select_handle_left.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="44dp"
+    android:height="22dp"
+    android:viewportWidth="44"
+    android:viewportHeight="22">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 33,11 A 11,11 0 0 1 11,11 L 11,0 L 22,0 A 11,11 0 0 1 33,11 Z" />
+    <path
+        android:fillColor="#FF212021"
+        android:pathData="M 31,11 A 9,9 0 0 1 13,11 L 13,2 L 22,2 A 9,9 0 0 1 31,11 Z" />
+</vector>

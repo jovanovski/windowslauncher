@@ -26,7 +26,81 @@
     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS"/>
     <uses-permission android:name="android.permission.SET_WALLPAPER"/>
     <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <!--
+      What a bluetooth headset is called, for the in-call list of outputs.
+
+      Only ever to read a name. The route itself is Telecom's - see CallCentre.setRoute -
+      and works with or without this; refused, the list says "bluetooth" and everything
+      else is unchanged. Asked for when People is made the phone app, which is the only
+      point at which an in-call screen exists to put a name on. Before Android 12 the old
+      permission covers it and is granted at install.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!--
+      Writing contacts and reading the call log are the People app's, and only its: the
+      shell's own People tile has never needed more than READ_CONTACTS. Both are asked for
+      at the moment they are first needed rather than on first run.
+    -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+    <!--
+      Text messages, on the same terms: asked for by the messages page when it is first
+      opened, and by the box at the foot of a conversation the first time somebody presses
+      send. Reading is what fills the page; sending goes through the platform, which then
+      writes the sent message to the phone's own message store on this app's behalf - see
+      MessageStore for why that means the launcher never has to become the messaging app.
+    -->
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <!--
+      Being handed the messages themselves, which only the phone's messaging app is.
+
+      The role normally grants these outright, the way the phone role grants
+      READ_PHONE_STATE - but a message is delivered as a broadcast that requires them, so
+      an app holding the role without them is one that messages arrive at and are never
+      given to. See ensureMessagePermissions, which asks for any that are missing.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_MMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH"/>
+    <!--
+      Putting the call screen in front of a locked phone.
+
+      A service is not allowed to start an activity out of the blue; a ringing telephone is
+      the case that rule was written to make an exception for, and a full-screen intent on a
+      CATEGORY_CALL notification is how the exception is claimed. See GokiInCallService.
+    -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <!--
+      Telecom sends the missed-call broadcast with READ_PHONE_STATE as its receiver
+      permission, so an app without it is not handed one however loudly it declares the
+      receiver. Never requested: the phone-app role grants it outright, but only to an app
+      that has asked for it here. See MissedCallReceiver.
+    -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <!--
+      Alarms.
+
+      USE_EXACT_ALARM is the one an alarm clock is meant to hold: it is granted at install
+      to an app whose job actually includes being one, with no prompt and no way for it to
+      be taken away behind the user's back - which is the only footing on which an alarm is
+      worth setting. SCHEDULE_EXACT_ALARM is its predecessor and is asked for only up to
+      Android 12L, where USE_EXACT_ALARM did not yet exist; past that the two are mutually
+      exclusive and declaring both would be a downgrade. See AlarmScheduler, which falls
+      back to an inexact alarm rather than throwing if it turns out to hold neither.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <!--
+      A reboot wipes every alarm the system was holding for this app, so it has to be told
+      when one has happened in order to book them all again. See AlarmBootReceiver.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -44,6 +118,14 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        Which app the phone was in last, for back-back on the Windows Phone Start screen.
+        Granted by hand on the phone's Usage access screen, not by a prompt: without it the
+        launcher falls back to the last app it opened itself, which misses the ones opened
+        from a notification or from inside another app.
+    -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Attribution tag declarations -->
     <attribution android:tag="weather"
@@ -74,11 +156,6 @@
             android:screenOrientation="fullUser"
             android:configChanges="orientation|screenSize|screenLayout">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <intent-filter>
                 <!-- This makes it a launcher/home candidate -->
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
@@ -90,6 +167,59 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!--
+              The launcher as the phone.
+
+              An app is only offered the default-phone-app role if it can answer a plain
+              DIAL, so these are not optional decoration - without them People cannot hold
+              the role and cannot have a call screen. A number handed over this way opens
+              the People keypad with it already typed in; see handleDialIntent.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.CALL_BUTTON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!--
+              The launcher as the messaging app.
+
+              One of the four components an app must declare before Android will offer it
+              the messaging role - the other three are below - and, like the DIAL filter
+              above, not optional decoration: without this People cannot hold the role and
+              cannot show a conversation. An `sms:` or `smsto:` link tapped anywhere on the
+              phone lands here and opens that conversation; see handleMessageIntent.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+
+            <!--
+              Asking to see the call log, which is what a missed-call notification is, and
+              what anything else on the phone sends when it wants one shown.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="vnd.android.cursor.dir/calls" />
             </intent-filter>
 
             <!--
@@ -110,6 +240,240 @@
                 <data android:scheme="https" />
             </intent-filter>
         </activity>
+
+        <!--
+          The app icon, per theme.
+
+          android:icon on <application> is baked into the APK and cannot be changed at
+          runtime, so the MAIN/LAUNCHER entry lives on four aliases instead - one per theme,
+          each with its own Windows logo - and ThemeManager.applyLauncherIcon enables
+          exactly one of them. Picking a theme in Settings therefore repaints the icon in
+          the app drawer, in recents and on any home screen that shows it.
+
+          The HOME filter stays on MainActivity above, deliberately: the default-home role
+          is granted to a component, and moving it onto an alias that gets disabled on the
+          next theme change would hand the phone back to whichever launcher came with it.
+
+          Alias names are part of the installed package's identity - renaming one resets
+          its enabled state on update - so they are frozen even if the themes are renamed.
+          Windows XP is the enabled-by-default one because it is ThemeManager's default.
+        -->
+        <activity-alias
+            android:name=".LauncherIconXP"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_xp"
+            android:roundIcon="@mipmap/ic_launcher_xp"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherIcon98"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_98"
+            android:roundIcon="@mipmap/ic_launcher_98"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherIconVista"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vista"
+            android:roundIcon="@mipmap/ic_launcher_vista"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherIconWP8"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_wp8"
+            android:roundIcon="@mipmap/ic_launcher_wp8"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
+          The screen a call is on. Its own task, kept out of recents, and allowed over the
+          lock screen - see InCallActivity for why each of those is needed.
+        -->
+        <activity
+            android:name=".apps.people.InCallActivity"
+            android:exported="false"
+            android:theme="@style/Base.Theme.GokiXP"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
+        <!--
+          What the system binds when this app is the default phone app. Exported and
+          guarded by BIND_INCALL_SERVICE, which only the system holds, so nothing else can
+          reach it.
+        -->
+        <!--
+          Telecom's offer to let the phone app report its own missed calls. Exported
+          because a system broadcast has to be able to reach it; nothing else can, since
+          only Telecom sends this action and it is sent to the default dialler by name.
+        -->
+        <receiver
+            android:name=".apps.people.MissedCallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The buttons on the call notification. Not exported; see CallActionReceiver. -->
+        <receiver
+            android:name=".apps.people.CallActionReceiver"
+            android:exported="false" />
+
+        <!-- And on a message notification. Not exported, for the same reason. -->
+        <receiver
+            android:name=".apps.people.MessageActionReceiver"
+            android:exported="false" />
+
+        <!--
+          A text message arriving.
+
+          Exported and guarded by BROADCAST_SMS, which only the system holds, so nothing
+          else can push a message into this app. Sent to the phone's messaging app alone -
+          which is why every message that arrives here has to be written down and announced
+          by this app or it is lost. See SmsDeliverReceiver.
+        -->
+        <receiver
+            android:name=".apps.people.SmsDeliverReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          A picture message arriving, which this app does not do.
+
+          Declared because the messaging role requires it, and because the push is consumed
+          by whichever app is handed it - so a picture message that arrives while People
+          holds the role reaches nothing else either. It says so rather than dropping it in
+          silence. See MmsDeliverReceiver.
+        -->
+        <receiver
+            android:name=".apps.people.MmsDeliverReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          "Can't talk now" - a call declined with a message, from any dialler on the phone.
+          The fourth component the role requires, and the one that closes the loop with
+          this shell's own call screen. See RespondViaMessageService.
+        -->
+        <service
+            android:name=".apps.people.RespondViaMessageService"
+            android:exported="true"
+            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".apps.people.GokiInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_RINGING"
+                android:value="false" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!--
+          The screen an alarm goes off on. Built on the same terms as the call screen
+          above, and for the same reason: it has to arrive in front of a locked phone.
+        -->
+        <activity
+            android:name=".apps.alarms.AlarmRingActivity"
+            android:exported="false"
+            android:theme="@style/Base.Theme.GokiXP"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
+        <!--
+          What AlarmManager wakes when an alarm comes due. Not exported: everything that
+          reaches it is a pending intent this app handed the system, addressed by name.
+        -->
+        <receiver
+            android:name=".apps.alarms.AlarmReceiver"
+            android:exported="false" />
+
+        <!--
+          The one that does have to be exported, because the broadcasts it listens for come
+          from the system. It only ever rebuilds the schedule; nothing here can make a
+          sound, which is why it is a second receiver rather than a filter on the first.
+        -->
+        <receiver
+            android:name=".apps.alarms.AlarmBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          What holds an alarm while it is ringing. mediaPlayback because that is literally
+          what it is doing - a looping sound on the alarm stream - and it is the type the
+          platform's own clock app uses for this.
+        -->
+        <service
+            android:name=".apps.alarms.AlarmRingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Accessibility Service for screen locking -->
         <service

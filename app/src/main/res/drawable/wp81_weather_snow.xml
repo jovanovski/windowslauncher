@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_weather_snow - snow.
+
+  Flakes where the rain's drops would be: three crossed bars each, which is as much
+  of a flake as this size can hold.
+  Drawn on the same 76x76 grid and at the same 3-4 unit weight as the rest of the WP8.1
+  glyph set, and emitted white so the tile tints it to its accent.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <!-- The cloud, lifted to leave the lower third of the grid to what is
+         falling. The same cloud carries every icon in the set. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M27,30 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M46,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M26,38 L54,38 L54,46 L26,46 Z" />
+    <!-- Two six-pointed flakes, three crossed bars each. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M28,55 L28,69 L32,69 L32,55 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M23,60 L35,67 L37,64 L25,57 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M35,57 L23,64 L25,67 L37,60 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M46,55 L46,69 L50,69 L50,55 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M41,60 L53,67 L55,64 L43,57 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M53,57 L41,64 L43,67 L55,60 Z" />
+</vector>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The single grip under a caret with nothing selected - tapping into a form on a page puts
+  this one up rather than the pair.
+
+  A drop hanging from the middle of the top edge, which is where its anchor is: a 20-wide
+  disc, and two lines from the point down to where they meet it. Tangents rather than a
+  fixed slope, so the sides run into the disc without a crease. The inner shape's point
+  sits lower than the outer one's for the same reason its sides sit inside them - keeping
+  the ring the same 2 wide all the way round a corner means moving the corner itself.
+
+  See wp81_text_select_handle_left for why it is white around near-black.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 10,0 L 3,6.86 A 10,10 0 1 0 17,6.86 Z" />
+    <path
+        android:fillColor="#FF212021"
+        android:pathData="M 10,2.8 L 4.4,8.29 A 8,8 0 1 0 15.6,8.29 Z" />
+</vector>

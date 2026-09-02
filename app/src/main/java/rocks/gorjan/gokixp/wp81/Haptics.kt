@@ -22,11 +22,30 @@ import android.view.View
  * A view that answers a hold by returning true from its long-click listener must NOT call
  * this: the framework gives it this exact tick as soon as the press is claimed, and a
  * second one fired by hand is what makes a hold feel like two knocks.
+ *
+ * The one exception is [key], for a keypad. A command and a keystroke are not the same
+ * event: a command happens once and can afford to be felt, where a keystroke happens
+ * twenty times in a row and the shell's tick under each of them is a drumming rather than
+ * feedback. The platform draws the same distinction and has a separate, lighter waveform
+ * for it, so this hands that one back rather than inventing a weaker buzz of its own.
  */
 object Haptics {
 
     /** Tick, for a view that has just been tapped. See the note above about holds. */
     fun tap(view: View) {
         view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    }
+
+    /**
+     * The lighter tick, for a key on a keypad - a calculator's digits, a dialpad.
+     *
+     * [HapticFeedbackConstants.CLOCK_TICK] is the faintest waveform the framework exposes,
+     * the one a picker fires as a value rolls past under the finger. It is deliberately a
+     * notch under the keyboard's own tap: a keystroke happens twenty times in a row, and
+     * at that rate anything with weight to it stops reading as feedback and starts reading
+     * as the phone buzzing in the hand.
+     */
+    fun key(view: View) {
+        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 }

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_weather_sun - clear sky.
+
+  A disc with eight rays, each one the same bar turned about the centre of the disc.
+  Drawn on the same 76x76 grid and at the same 3-4 unit weight as the rest of the WP8.1
+  glyph set, and emitted white so the tile tints it to its accent.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,38 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z" />
+    <group android:pivotX="38" android:pivotY="38" android:rotation="0">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="45">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="90">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="135">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="180">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="225">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="270">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+    <group android:pivotX="38" android:pivotY="38" android:rotation="315">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M35,8 L41,8 L41,17 L35,17 Z" />
+    </group>
+</vector>

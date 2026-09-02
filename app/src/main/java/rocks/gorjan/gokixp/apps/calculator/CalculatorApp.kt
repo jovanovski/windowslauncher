@@ -2,9 +2,12 @@ package rocks.gorjan.gokixp.apps.calculator
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.text.TextPaint
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -13,6 +16,7 @@ import androidx.annotation.ColorInt
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.ColorUtils
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.wp81.Haptics
 import rocks.gorjan.gokixp.wp81.TiltEffect
 import rocks.gorjan.gokixp.wp81.WP81Palette
 import java.text.DecimalFormatSymbols
@@ -160,6 +164,13 @@ class CalculatorApp(
      * because the two are placed quite differently: a comma sits on the digits' baseline
      * where a divide sign is centred in the key, and letting the platform do each the way
      * it already knows is what keeps them where the phone put them.
+     *
+     * The view is half a gap larger than the key on every side, and paints the key inside
+     * itself rather than filling its bounds. The keypad's black is therefore not a gutter
+     * between targets but the outer edge of the two keys either side of it, and a finger
+     * that lands a few pixels off still presses the key it was aimed at. Nothing about
+     * where the keys are drawn changes - the phone's spacing is what is being kept - only
+     * how far out from each one the touch reaches.
      */
     @SuppressLint("ViewConstructor")
     private inner class KeyView(context: Context, val spec: KeySpec) : ViewGroup(context) {
@@ -185,29 +196,80 @@ class CalculatorApp(
             }
         } else null
 
+        /**
+         * Whether the key is currently painted its pressed fill.
+         *
+         * Kept here rather than read back off the view because a drag across the keypad
+         * sends a move event every few milliseconds, and repainting the background on each
+         * one is a needless invalidate.
+         */
+        private var lit = false
+
+        /** The key itself: one flat rectangle, inset from the view's bounds by [inset]. */
+        private val fill = Paint().apply { color = fillFor(spec.style, pressed = false) }
+
         init {
-            setBackgroundColor(fillFor(spec.style))
+            // A ViewGroup is assumed to have nothing of its own to draw until told
+            // otherwise, and the key is drawn rather than set as a background because a
+            // background fills the whole view - which is exactly what must not happen here.
+            setWillNotDraw(false)
             label?.let { addView(it) }
             icon?.let { addView(it) }
             isClickable = true
-            TiltEffect.apply(this)
+            // The fill is driven off the raw touch stream rather than the view's own
+            // pressed state, which the framework holds back by a tap timeout for any view
+            // inside a container that claims its children might be scrolled - a keypad
+            // that lights up a tenth of a second after the finger lands feels broken. This
+            // way the fill and the tilt turn on together, on the same event.
+            TiltEffect.apply(this) { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> light(true)
+                    MotionEvent.ACTION_MOVE -> light(within(event))
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> light(false)
+                }
+                false
+            }
             setOnClickListener {
+                Haptics.key(it)
                 spec.press()
                 refresh()
             }
         }
 
+        private fun light(on: Boolean) {
+            if (on == lit) return
+            lit = on
+            fill.color = fillFor(spec.style, pressed = on)
+            invalidate()
+        }
+
+        /** How far the painted key sits inside the touchable bounds: half of the gap. */
+        private val inset get() = gap / 2f
+
+        override fun onDraw(canvas: Canvas) {
+            canvas.drawRect(inset, inset, width - inset, height - inset, fill)
+        }
+
+        /** Mirrors the tilt's own test, so a finger dragged off a key drops both at once. */
+        private fun within(event: MotionEvent): Boolean =
+            event.x >= 0 && event.y >= 0 && event.x <= width && event.y <= height
+
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val w = MeasureSpec.getSize(widthMeasureSpec)
             val h = MeasureSpec.getSize(heightMeasureSpec)
+            // Against the painted key rather than the bounds. Both are centred on the same
+            // point so a centred glyph lands identically either way, but a label measured
+            // to the full bounds would be free to set itself out over the black.
+            val innerW = w - gap.toInt()
+            val innerH = h - gap.toInt()
             label?.let {
                 val size = keyW * (if (spec.big) DIGIT_TEXT else LABEL_TEXT)
                 if (kotlin.math.abs(it.textSize - size) > 0.5f) {
                     it.setTextSize(TypedValue.COMPLEX_UNIT_PX, size)
                 }
                 it.measure(
-                    MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(innerW, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(innerH, MeasureSpec.EXACTLY)
                 )
             }
             icon?.let {
@@ -223,7 +285,11 @@ class CalculatorApp(
         override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
             val w = r - l
             val h = b - t
-            label?.layout(0, 0, w, h)
+            label?.let {
+                val left = (w - it.measuredWidth) / 2
+                val top = (h - it.measuredHeight) / 2
+                it.layout(left, top, left + it.measuredWidth, top + it.measuredHeight)
+            }
             icon?.let {
                 val left = (w - it.measuredWidth) / 2
                 val top = (h - it.measuredHeight) / 2
@@ -239,12 +305,20 @@ class CalculatorApp(
      * two fixed greys, which is what lets the same keypad work on the Light theme: on Dark
      * they come out the #1F1F1F and #333333 the phone used, and on Light they come out the
      * matching pair of greys instead of staying black on white.
+     *
+     * A held key is painted [PRESS_LIFT] further along that same line.
      */
     @ColorInt
-    private fun fillFor(style: Style): Int = when (style) {
-        Style.ACCENT -> palette.accent
-        Style.DIGIT -> blend(DIGIT_FILL_ALPHA)
-        Style.FUNCTION -> blend(FUNCTION_FILL_ALPHA)
+    private fun fillFor(style: Style, pressed: Boolean): Int {
+        val base = when (style) {
+            Style.ACCENT -> palette.accent
+            Style.DIGIT -> blend(DIGIT_FILL_ALPHA)
+            Style.FUNCTION -> blend(FUNCTION_FILL_ALPHA)
+        }
+        // A press is one more step along the same line the fills themselves are on, so it
+        // lightens the key on Dark and darkens it on Light without either being spelled
+        // out - and it works on the accent key too, which is not a grey at all.
+        return if (pressed) ColorUtils.blendARGB(base, palette.foreground, PRESS_LIFT) else base
     }
 
     @ColorInt
@@ -283,8 +357,8 @@ class CalculatorApp(
             measureDisplay(w)
             for (key in keys) {
                 key.measure(
-                    MeasureSpec.makeMeasureSpec(spanWidth(key.spec.span), MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(keyH.toInt(), MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(spanWidth(key.spec.span) + gap.toInt(), MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(keyH.toInt() + gap.toInt(), MeasureSpec.EXACTLY)
                 )
             }
             setMeasuredDimension(w, h)
@@ -335,7 +409,16 @@ class CalculatorApp(
             var column = 0
             for (key in keys) {
                 val keyWidth = spanWidth(key.spec.span)
-                key.layout(x.toInt(), y.toInt(), x.toInt() + keyWidth, y.toInt() + keyH.toInt())
+                // Grown by half a gap on each side, which is what makes the grid of keys a
+                // grid of touch targets with nothing dead in between: the cells meet along
+                // the middle of every gap, the outer ones run to the edges of the screen,
+                // and the key is painted back at its own size inside. See [KeyView].
+                key.layout(
+                    (x - margin).toInt(),
+                    (y - margin).toInt(),
+                    (x - margin).toInt() + keyWidth + gap.toInt(),
+                    (y - margin).toInt() + keyH.toInt() + gap.toInt()
+                )
                 column += key.spec.span
                 if (column >= COLUMNS) {
                     column = 0
@@ -375,5 +458,8 @@ class CalculatorApp(
         /** The two key greys, as a fraction of the way from the background to the foreground. */
         const val DIGIT_FILL_ALPHA = 0.122f
         const val FUNCTION_FILL_ALPHA = 0.2f
+
+        /** How far a held key moves towards the foreground. Enough to see, not to flash. */
+        const val PRESS_LIFT = 0.1f
     }
 }

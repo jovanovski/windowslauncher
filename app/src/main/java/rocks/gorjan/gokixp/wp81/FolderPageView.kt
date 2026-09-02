@@ -139,6 +139,21 @@ class MetroPageHeader(
 
     var onBack: (() -> Unit)? = null
 
+    /**
+     * What the title is a way to, where it is a way to anything.
+     *
+     * Most pages are titled after themselves and there is nothing to tap; a page titled
+     * after a *person* is different - the name at the top of a conversation is the one
+     * thing on it that is about them rather than about what was said, so it is where
+     * somebody would reach for their card. Left unset, the title is type like any other.
+     */
+    var onTitle: (() -> Unit)? = null
+        set(value) {
+            field = value
+            title.isClickable = value != null
+            if (value != null) TiltEffect.apply(title)
+        }
+
     private val backArrow = ImageView(context)
     private val title = TextView(context)
 
@@ -168,6 +183,7 @@ class MetroPageHeader(
         title.maxLines = 1
         title.ellipsize = android.text.TextUtils.TruncateAt.END
         title.includeFontPadding = false
+        title.setOnClickListener { onTitle?.invoke() }
         addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
             marginStart = dp(8)
         })

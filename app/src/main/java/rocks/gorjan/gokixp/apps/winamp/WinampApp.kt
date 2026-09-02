@@ -15,6 +15,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.theme.ThemeManager
 import java.util.Locale
+import rocks.gorjan.gokixp.wp81.metroLook
 
 /**
  * Data model for a theme
@@ -1126,7 +1127,12 @@ class WinampApp(
         }
             .setContentTitle(track.title)
             .setContentText("Winamp")
-            .setSmallIcon(ThemeManager(context).getWinampIcon())
+            // The monochrome glyph, not the themed Winamp icon. A small icon is drawn from
+            // its alpha channel and nothing else, so a colour bitmap arrives as a filled
+            // square - which was survivable while this only appeared in the status bar and
+            // is not now that metroLook puts it on the notification as well.
+            .setSmallIcon(R.drawable.wp81_glyph_winamp)
+            .metroLook(context)
             .setStyle(android.app.Notification.MediaStyle()
                 .setMediaSession(mediaSession?.sessionToken))
             .setOngoing(isPlaying)

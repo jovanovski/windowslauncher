@@ -26,6 +26,7 @@ import rocks.gorjan.gokixp.wp81.applyToField
 import rocks.gorjan.gokixp.wp81.TiltEffect
 import rocks.gorjan.gokixp.wp81.WP81Palette
 import java.util.Locale
+import rocks.gorjan.gokixp.wp81.metroLook
 
 /** One song from the device's music library. */
 data class ZuneTrack(
@@ -2629,6 +2630,7 @@ class ZuneApp(
             // own glyph is drawn with air round it, and the system scales that air into the
             // badge along with the mark.
             .setSmallIcon(R.drawable.wp81_notification_music)
+            .metroLook(context)
             .setStyle(
                 android.app.Notification.MediaStyle().setMediaSession(session.sessionToken))
             .setOngoing(isPlaying)

@@ -2,18 +2,32 @@ package rocks.gorjan.gokixp.apps.iexplore
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.Message
+import android.provider.MediaStore
+import android.text.format.Formatter
+import android.util.Base64
 import android.util.Log
+import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -26,9 +40,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.wp81.Haptics
@@ -36,11 +55,21 @@ import rocks.gorjan.gokixp.wp81.MetroPageHeader
 import rocks.gorjan.gokixp.wp81.MetroPageTransition
 import rocks.gorjan.gokixp.wp81.SvgIcon
 import rocks.gorjan.gokixp.wp81.TiltEffect
+import rocks.gorjan.gokixp.wp81.WP81ContextMenu
 import rocks.gorjan.gokixp.wp81.WP81Palette
 import rocks.gorjan.gokixp.wp81.applyToField
 
 /** One open page, as it is written down between sessions. See MetroIEApp.saveTabs. */
 internal data class SavedTab(val url: String, val title: String)
+
+/**
+ * One page this browser has been to. See MetroIEApp.recordVisit.
+ *
+ * The title is the only part that can change after the fact: a page is written down the
+ * moment it finishes loading, and some of them do not say what they are called until
+ * afterwards. See MetroIEApp.noteTitle.
+ */
+internal data class HistoryEntry(val url: String, var title: String, val visited: Long)
 
 /**
  * Internet Explorer, as the phone had it.
@@ -60,11 +89,11 @@ internal data class SavedTab(val url: String, val title: String)
  * favourites, the same home page, the same last address. Switching themes changes what the
  * browser looks like, not what is in it.
  */
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 class MetroIEApp(
     private val context: Context,
     private val palette: WP81Palette,
-    private val onShowNotification: (String, String) -> Unit,
+    private val onShowNotification: (String, String, (() -> Unit)?) -> Unit,
     private val onUpdateWindowTitle: (String) -> Unit,
     /**
      * Back has run out of page in a tab another app handed over. See [handleBack].
@@ -82,7 +111,7 @@ class MetroIEApp(
      * tab goes on loading and is ready when it is reached.
      */
     private inner class Tab {
-        val webView = WebView(context)
+        val webView = WebView(webContext)
         var title: String = ""
         var url: String = ""
 
@@ -121,6 +150,31 @@ class MetroIEApp(
     /** Holds every tab's WebView. Only the current one is visible. */
     private lateinit var pages: FrameLayout
 
+    /**
+     * What the pages are built with, rather than the window's own context.
+     *
+     * The grips either end of a text selection are drawn from the theme the WebView was
+     * given, and every theme in this shell paints its controls black so that the desktop
+     * chrome is not tinted - which had the browser dropping two black grips onto pages
+     * that are themselves black, where there was nothing to see and nothing to take hold
+     * of. The overlay replaces those three drawables and nothing else, and it is put on
+     * the pages alone: the rest of the shell keeps the controls it was drawn with.
+     */
+    private val webContext =
+        ContextThemeWrapper(context, R.style.ThemeOverlay_GokiXP_WP81_PageSelection)
+
+    /** The commands a hold on the page puts up, over the page. See [onPagePressed]. */
+    private lateinit var pressMenu: WP81ContextMenu
+
+    /** Where the last touch landed in the page, so a held one opens its list there. */
+    private var lastPressY = 0f
+
+    /** Downloads this browser started and what they are called, until they land. */
+    private val arriving = mutableMapOf<Long, String>()
+
+    /** Listens for them landing. Built on the first download, and not before. */
+    private var landings: BroadcastReceiver? = null
+
     private val tabs = mutableListOf<Tab>()
     private var current: Tab? = null
 
@@ -132,6 +186,17 @@ class MetroIEApp(
     private lateinit var menuScroller: ScrollView
 
     private lateinit var addressBar: EditText
+
+    /**
+     * Where the browser has been that looks like what is being typed, over the bar.
+     *
+     * Its own strip rather than the menu's: the two are never up at once - taking the
+     * field closes the menu - but they are different things, one a list of commands the
+     * user asked for and one a list of pages that appears as a side effect of typing,
+     * and building them out of the same views made every keystroke rebuild the menu.
+     */
+    private lateinit var suggestionScroller: ScrollView
+    private lateinit var suggestionPanel: LinearLayout
 
     /** The left button: how many pages are open, and the way to them. */
     private lateinit var tabsButton: ImageView
@@ -149,6 +214,11 @@ class MetroIEApp(
     private lateinit var errorPage: LinearLayout
     private lateinit var errorDetail: TextView
 
+    /** What has been fetched, and what still is. Covers the browser like the tabs page. */
+    private lateinit var downloadsPage: FrameLayout
+    private lateinit var downloadsList: LinearLayout
+    private lateinit var downloadsScroller: ScrollView
+
     /** The tabs page, which covers the browser entirely - app bar included. */
     private lateinit var tabsPage: FrameLayout
     private lateinit var tabsGrid: LinearLayout
@@ -156,6 +226,15 @@ class MetroIEApp(
 
     private var homepage: String = DEFAULT_HOMEPAGE
     private val favourites = mutableListOf<Favourite>()
+
+    /**
+     * Everywhere this browser has been, newest first.
+     *
+     * Kept for the address bar rather than as a record: a phone browser has no history
+     * page, and what the list is for is finishing an address somebody has started typing.
+     * Which is also why it is short - see MAX_HISTORY - and why the menu can empty it.
+     */
+    private val history = mutableListOf<HistoryEntry>()
 
     /** What the address bar should say once the user stops editing it. */
     private var currentUrl: String = ""
@@ -165,6 +244,8 @@ class MetroIEApp(
         homepage = prefs.getString(KEY_HOMEPAGE, DEFAULT_HOMEPAGE) ?: DEFAULT_HOMEPAGE
         favourites.clear()
         favourites.addAll(loadFavourites())
+        history.clear()
+        history.addAll(loadHistory())
 
         root = FrameLayout(context).apply {
             setBackgroundColor(palette.background)
@@ -202,6 +283,14 @@ class MetroIEApp(
         tabsPage = buildTabsPage()
         root.addView(tabsPage, FrameLayout.LayoutParams(MATCH, MATCH))
 
+        downloadsPage = buildDownloadsPage()
+        root.addView(downloadsPage, FrameLayout.LayoutParams(MATCH, MATCH))
+
+        // Over everything, including the strip: it dims the whole browser the way a hold
+        // dims the whole screen everywhere else in the shell.
+        pressMenu = WP81ContextMenu(context, palette)
+        root.addView(pressMenu, FrameLayout.LayoutParams(MATCH, MATCH))
+
         // What was open last time. A browser on a phone is a place rather than a document
         // - the pages you left in it are still yours when you come back - and the launcher
         // is restarted often enough (a theme change, a rotation, the system reclaiming it)
@@ -236,7 +325,7 @@ class MetroIEApp(
      */
     private fun openTab(url: String): Tab? {
         if (tabs.size >= MAX_TABS) {
-            onShowNotification("Internet Explorer", "Nine pages is as many as it will hold")
+            notify("Internet Explorer", "Nine pages is as many as it will hold")
             return null
         }
         val tab = Tab()
@@ -514,6 +603,254 @@ class MetroIEApp(
         return cell
     }
 
+    // ---------------------------------------------------------------- the downloads page
+
+    /**
+     * Everything the browser has fetched, and everything it is still fetching.
+     *
+     * A phone browser saves a file and then loses it: the system's own notification is in
+     * a shade nobody opens, the band that replaces it here is gone in seconds, and after
+     * that a downloaded file exists only in a folder the user has to go and find with
+     * another program. IE Mobile answered that with a page of its own under the dots, and
+     * so does this - the same shape as the tabs page, because it is the same kind of thing:
+     * a list of what the browser is holding, reached from the menu and left with back.
+     *
+     * Read from the download manager rather than kept here. It already knows what is
+     * running, what finished and how far along the rest is, and it goes on knowing across
+     * a restart - which a list this browser wrote down itself would not.
+     */
+    private fun buildDownloadsPage(): FrameLayout {
+        val page = FrameLayout(context).apply {
+            visibility = View.GONE
+            setBackgroundColor(palette.background)
+            // Nothing behind it is reachable while it is up.
+            isClickable = true
+        }
+
+        val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+        val header = MetroPageHeader(context, palette)
+        header.setTitle("downloads")
+        header.onBack = { closeDownloads() }
+        column.addView(header, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        downloadsList = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(PAGE_MARGIN_DP), 0, dp(PAGE_MARGIN_DP), dp(20))
+        }
+        downloadsScroller = ScrollView(context).apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            addView(downloadsList, FrameLayout.LayoutParams(MATCH, WRAP))
+        }
+        column.addView(downloadsScroller, LinearLayout.LayoutParams(MATCH, 0, 1f))
+
+        page.addView(column, FrameLayout.LayoutParams(MATCH, MATCH))
+        return page
+    }
+
+    /**
+     * The turn this page arrives and leaves on.
+     *
+     * One per page rather than one per opening: it counts its own turns, which is what
+     * stops an exit that finishes late from hiding a page that has since been opened
+     * again. Built on the first opening, by which time the page itself exists.
+     */
+    private val downloadsTurn by lazy { MetroPageTransition(downloadsPage) }
+
+    private fun openDownloads() {
+        closeMenu()
+        addressBar.clearFocus()
+        hideKeyboard()
+        paintDownloads()
+        downloadsPage.visibility = View.VISIBLE
+        downloadsScroller.scrollTo(0, 0)
+        // Turned in the way the shell's own pages turn. Deferred a frame, like the tabs
+        // page: a view that has been GONE has no height to pivot around yet.
+        downloadsPage.post { downloadsTurn.playIn() }
+    }
+
+    /**
+     * Turns the page back out, rather than taking it away between two frames.
+     *
+     * A page that arrives on the turnstile and leaves by disappearing is half a
+     * transition, and the half that is missing is the one that says where it went.
+     *
+     * The list is emptied at the end of it and not before: the page is still on screen for
+     * as long as it is leaving, and clearing it first would turn a blank rectangle out.
+     */
+    private fun closeDownloads() {
+        if (!downloadsTurn.isOnScreen) return
+        root.removeCallbacks(downloadsTick)
+        downloadsTurn.playOut { downloadsList.removeAllViews() }
+    }
+
+    /**
+     * Draws the list again while anything is still coming in.
+     *
+     * Only while the page is up and only while something is unfinished: a browser that
+     * wakes every second to redraw a list of files that all arrived yesterday is a browser
+     * keeping the screen busy for nothing. See [paintDownloads], which schedules this.
+     */
+    private val downloadsTick = Runnable {
+        if (downloadsTurn.isOnScreen) paintDownloads()
+    }
+
+    private fun paintDownloads() {
+        val items = readDownloads()
+        downloadsList.removeAllViews()
+        if (items.isEmpty()) {
+            downloadsList.addView(TextView(context).apply {
+                text = "nothing has been downloaded yet"
+                typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+                textSize = 15f
+                setTextColor(palette.foregroundSubtle)
+                setPadding(0, dp(20), 0, 0)
+            }, LinearLayout.LayoutParams(MATCH, WRAP))
+        } else {
+            for (item in items) downloadsList.addView(downloadRow(item))
+        }
+
+        root.removeCallbacks(downloadsTick)
+        if (items.any { it.unfinished }) root.postDelayed(downloadsTick, DOWNLOADS_TICK_MS)
+    }
+
+    /** One file: what it is called, how it is getting on, and how far along it is. */
+    private fun downloadRow(item: Download): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(14), 0, dp(14))
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                openDownload(item)
+            }
+            TiltEffect.apply(this)
+        }
+
+        row.addView(TextView(context).apply {
+            text = item.name
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            textSize = 17f
+            setTextColor(palette.foreground)
+            maxLines = 1
+            // From the middle: the tail of a file name is its extension, which is half of
+            // what says what the file is.
+            ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        row.addView(TextView(context).apply {
+            text = describe(item)
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            textSize = 13f
+            setTextColor(palette.foregroundSubtle)
+            setPadding(0, dp(3), 0, 0)
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        // The line, for a file whose size is known and which has not all arrived. Without
+        // a total there is nothing to be a fraction of, and a full bar over a download
+        // that is a tenth done would be a lie; the line is left off and the text says how
+        // much has come in instead.
+        if (item.unfinished && item.total > 0) {
+            val track = FrameLayout(context)
+            track.addView(View(context).apply {
+                setBackgroundColor(palette.accent)
+                pivotX = 0f
+                scaleX = (item.soFar.toFloat() / item.total).coerceIn(0f, 1f)
+            }, FrameLayout.LayoutParams(MATCH, MATCH))
+            row.addView(track, LinearLayout.LayoutParams(MATCH, dp(PROGRESS_DP)).apply {
+                topMargin = dp(10)
+            })
+        }
+        return row
+    }
+
+    private fun describe(item: Download): String = when (item.status) {
+        DownloadManager.STATUS_PENDING -> "waiting to start"
+        DownloadManager.STATUS_PAUSED -> "paused"
+        DownloadManager.STATUS_RUNNING ->
+            if (item.total > 0) "${size(item.soFar)} of ${size(item.total)}"
+            else "${size(item.soFar)} so far"
+        DownloadManager.STATUS_SUCCESSFUL -> size(maxOf(item.total, item.soFar))
+        else -> "did not finish"
+    }
+
+    private fun size(bytes: Long): String =
+        Formatter.formatShortFileSize(context, bytes.coerceAtLeast(0))
+
+    private fun openDownload(item: Download) {
+        if (item.unfinished) {
+            notify("Internet Explorer", "${item.name} has not finished arriving")
+            return
+        }
+        if (item.status != DownloadManager.STATUS_SUCCESSFUL) {
+            notify("Internet Explorer", "${item.name} did not finish downloading")
+            return
+        }
+        val downloads = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val file = downloads.getUriForDownloadedFile(item.id) ?: return
+        open(file, item.mime)
+    }
+
+    /** One row of the download manager's own list. */
+    private data class Download(
+        val id: Long,
+        val name: String,
+        val status: Int,
+        val soFar: Long,
+        val total: Long,
+        val mime: String?,
+        /** When it last moved, which is what puts the newest at the top. */
+        val at: Long
+    ) {
+        val unfinished: Boolean
+            get() = status == DownloadManager.STATUS_PENDING ||
+                status == DownloadManager.STATUS_RUNNING ||
+                status == DownloadManager.STATUS_PAUSED
+    }
+
+    /**
+     * What the download manager is holding for this app, newest first.
+     *
+     * It answers per app, so this is the browser's own list and not the phone's. The
+     * order is put on afterwards rather than asked for: the query's own sort is not part
+     * of the published API.
+     */
+    private fun readDownloads(): List<Download> {
+        val downloads = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        return try {
+            downloads.query(DownloadManager.Query())?.use { row ->
+                val found = mutableListOf<Download>()
+                val id = row.getColumnIndex(DownloadManager.COLUMN_ID)
+                val title = row.getColumnIndex(DownloadManager.COLUMN_TITLE)
+                val status = row.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                val soFar = row.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                val total = row.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                val mime = row.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE)
+                val uri = row.getColumnIndex(DownloadManager.COLUMN_URI)
+                val at = row.getColumnIndex(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP)
+                while (row.moveToNext()) {
+                    found.add(Download(
+                        id = row.getLong(id),
+                        // The title is the file name this browser set when it asked for the
+                        // file; anything else in the list falls back to its address.
+                        name = row.getString(title)?.takeIf { it.isNotBlank() }
+                            ?: row.getString(uri).orEmpty(),
+                        status = row.getInt(status),
+                        soFar = row.getLong(soFar),
+                        total = row.getLong(total),
+                        mime = row.getString(mime),
+                        at = row.getLong(at)
+                    ))
+                }
+                found.sortedByDescending { it.at }.take(MAX_DOWNLOADS)
+            } ?: emptyList()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read the downloads", e)
+            emptyList()
+        }
+    }
+
     // ---------------------------------------------------------------- the page
 
     private fun configure(tab: Tab) {
@@ -531,6 +868,14 @@ class MetroIEApp(
         // about to be white, and flashing black in between is worse than being early.
         webView.setBackgroundColor(Color.WHITE)
         webView.visibility = View.GONE
+
+        // Read on the way past - the page still gets every touch - so that a list opened
+        // by holding a link appears at the link rather than in the middle of the screen.
+        webView.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) lastPressY = event.y
+            false
+        }
+        webView.setOnLongClickListener { onPagePressed(tab) }
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
@@ -561,6 +906,9 @@ class MetroIEApp(
                 tab.loading = false
                 if (url != null) tab.url = url
                 tab.title = view?.title?.takeIf { it.isNotBlank() }.orEmpty()
+                // A page that arrived. One that did not is not somewhere the user has
+                // been, and offering it back to them later would be offering an error.
+                if (url != null && !tab.failed) recordVisit(url, tab.title)
                 if (tab === current) {
                     paintLoading(tab)
                     if (url != null) {
@@ -599,6 +947,7 @@ class MetroIEApp(
 
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 tab.title = title?.takeIf { it.isNotBlank() }.orEmpty()
+                noteTitle(tab.url, tab.title)
                 if (tab === current) {
                     onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
                 }
@@ -645,7 +994,7 @@ class MetroIEApp(
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
             } else {
-                onShowNotification("Internet Explorer", "Nothing on this phone opens that link")
+                notify("Internet Explorer", "Nothing on this phone opens that link")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not open $url", e)
@@ -666,11 +1015,336 @@ class MetroIEApp(
                 .setAllowedOverRoaming(true)
                 .setMimeType(mimetype)
             val downloads = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            downloads.enqueue(request)
-            onShowNotification("Downloading", fileName)
+            watchDownloads()
+            arriving[downloads.enqueue(request)] = fileName
+            notify("Downloading", fileName)
         } catch (e: Exception) {
             Log.e(TAG, "Could not download $url", e)
-            onShowNotification("Internet Explorer", "That file could not be downloaded")
+            notify("Internet Explorer", "That file could not be downloaded")
+        }
+    }
+
+    /**
+     * Says so when a download lands, and offers to open it.
+     *
+     * The download manager puts up a notification of its own, in the shade, behind
+     * whatever the user is looking at - which on a phone shell that has its own way of
+     * saying things is somewhere nobody looks. A file that has finished arriving is
+     * announced the way everything else in here is announced, on the band, and the band is
+     * the thing that opens it: a saved file the user has to go and find is a file they
+     * asked for and did not get.
+     */
+    private fun watchDownloads() {
+        if (landings != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ignored: Context?, intent: Intent?) {
+                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: return
+                // Other apps' downloads land on this broadcast too. Only ours are named.
+                val name = arriving.remove(id) ?: return
+                val downloads =
+                    context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val file = downloads.getUriForDownloadedFile(id)
+                if (file == null) {
+                    notify("Internet Explorer", "$name could not be downloaded")
+                } else {
+                    val mime = downloads.getMimeTypeForDownloadedFile(id)
+                    notify("Saved", "$name is in Downloads") { open(file, mime) }
+                }
+            }
+        }
+        // A system broadcast, so the receiver has to be reachable from outside the app.
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED
+        )
+        landings = receiver
+    }
+
+    /** Hands a saved file to whichever app on the phone reads that kind of thing. */
+    private fun open(file: Uri, mime: String?) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(file, mime ?: "*/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: ActivityNotFoundException) {
+            notify("Internet Explorer", "Nothing on this phone opens that")
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not open $file", e)
+        }
+    }
+
+    // ---------------------------------------------------------------- a press held
+
+    /**
+     * What holding a finger on the page offers, which is decided by what is under it.
+     *
+     * A hold on a link or on a picture is a question about that thing rather than about
+     * the words around it, so it puts up the shell's own command list. A hold on anything
+     * else is not answered here at all: handing the press back to the WebView leaves it
+     * doing what it always did, which is to select the text under the finger.
+     *
+     * A picture inside a link is both, and offers both - the link's commands first,
+     * because something that goes somewhere is the likelier errand. The address it goes to
+     * is the one thing the hit test will not say, and has to be asked for; it arrives on
+     * the handler a message later. See [linkedImageHandler].
+     */
+    private fun onPagePressed(tab: Tab): Boolean {
+        val target = tab.webView.hitTestResult.extra
+        if (target.isNullOrBlank()) return false
+        when (tab.webView.hitTestResult.type) {
+            WebView.HitTestResult.SRC_ANCHOR_TYPE ->
+                showPressMenu(hostOf(target), linkItems(target))
+            WebView.HitTestResult.IMAGE_TYPE ->
+                showPressMenu(hostOf(target), imageItems(target))
+            WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE ->
+                tab.webView.requestFocusNodeHref(linkedImageHandler(target).obtainMessage())
+            else -> return false
+        }
+        return true
+    }
+
+    /** Takes the address a held picture links to, and puts up both sets of commands. */
+    private fun linkedImageHandler(image: String) = object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(msg: Message) {
+            val link = msg.data?.getString("url")?.takeIf { it.isNotBlank() }
+            showPressMenu(
+                hostOf(link ?: image),
+                if (link == null) imageItems(image) else linkItems(link) + imageItems(image)
+            )
+        }
+    }
+
+    private fun linkItems(url: String): List<WP81ContextMenu.Item> = listOf(
+        WP81ContextMenu.Item("open link") { current?.let { load(it, url) } },
+        // And go to it. A page opened behind the one it was opened from is a page the user
+        // has to go to the tabs and find, which is not what asking to open it meant.
+        WP81ContextMenu.Item("open in new tab") { openTab(url) },
+        WP81ContextMenu.Item("share") { shareLink(url, url) }
+    )
+
+    private fun imageItems(src: String): List<WP81ContextMenu.Item> = listOf(
+        WP81ContextMenu.Item("save image") { saveImage(src) },
+        WP81ContextMenu.Item("share image") { shareImage(src) }
+    )
+
+    /**
+     * Puts [items] up over the page, at the height the press was.
+     *
+     * The app bar's own menu and the address field go first: the list belongs to the thing
+     * under the finger, and two menus at once is not something this shell does.
+     *
+     * No buzz of its own. The page claims the press through the view's long click, and the
+     * framework gives the shell's tick as it does; a second one by hand is what makes a
+     * hold feel like two knocks. See wp81.Haptics.
+     */
+    private fun showPressMenu(title: String, items: List<WP81ContextMenu.Item>) {
+        closeMenu()
+        addressBar.clearFocus()
+        hideKeyboard()
+        pressMenu.show(title, items, lastPressY)
+    }
+
+    // ---------------------------------------------------------------- pictures
+
+    /** A picture that has been brought down to the phone, ready to be handed on. */
+    private data class FetchedImage(val file: File, val name: String, val mime: String)
+
+    /**
+     * The page a fetch is being made from.
+     *
+     * Read on the main thread and carried to the one doing the fetching, which cannot go
+     * looking at [current] itself. Both go on the request: a picture asked for with
+     * neither comes back from a good many sites as a refusal or a placeholder, because
+     * what they are checking is that it was asked for by the page it is drawn on.
+     */
+    private data class Caller(val referer: String?, val agent: String?)
+
+    private fun caller() = Caller(current?.url, current?.webView?.settings?.userAgentString)
+
+    /**
+     * Saves the picture at [url] the way the browser saves everything else.
+     *
+     * Through the download manager and into Downloads, alongside the files a page hands
+     * over: one folder rather than two, one list to look in, and the same band announcing
+     * it when it lands. See [download] and [watchDownloads].
+     */
+    private fun saveImage(url: String) {
+        if (!url.startsWith("data:")) {
+            download(url, null, guessMime(url))
+            return
+        }
+        // A picture written into the page itself is already on the phone, and there is no
+        // address for the download manager to go and fetch. It is decoded and written into
+        // the same folder by hand.
+        val from = caller()
+        Thread {
+            val image = fetchImage(url, from)
+            val saved = image?.let { saveToDownloads(it) }
+            image?.file?.delete()
+            onMain {
+                if (saved == null || image == null) {
+                    notify("Internet Explorer", "That picture could not be saved")
+                } else {
+                    notify("Saved", "${image.name} is in Downloads") {
+                        open(saved, image.mime)
+                    }
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * Hands the picture itself to whatever the phone shares with, rather than a link to it.
+     *
+     * Which means fetching it first: the app on the other end may have no network, no
+     * account for the site it came from, or no interest in unwrapping an address into a
+     * picture. Sharing a picture should put the picture in the message.
+     */
+    private fun shareImage(url: String) {
+        val from = caller()
+        Thread {
+            val image = fetchImage(url, from)
+            onMain {
+                if (image == null) {
+                    notify("Internet Explorer", "That picture could not be shared")
+                } else {
+                    sendImage(image)
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * Brings the picture at [url] down into the cache. Off the main thread; null if it
+     * could not be had.
+     */
+    private fun fetchImage(url: String, from: Caller): FetchedImage? = try {
+        val dir = File(context.cacheDir, SHARE_DIR).apply { mkdirs() }
+        // Last time's, which has long since been handed over. These are copies of
+        // something the web still has, and a folder of them that only ever grows is the
+        // one thing they must not become.
+        dir.listFiles()?.forEach { it.delete() }
+        if (url.startsWith("data:")) decodeImage(url, dir) else downloadImage(url, dir, from)
+    } catch (e: Exception) {
+        Log.w(TAG, "Could not fetch the picture at $url", e)
+        null
+    }
+
+    private fun downloadImage(url: String, dir: File, from: Caller): FetchedImage? {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = FETCH_TIMEOUT_MS
+            readTimeout = FETCH_TIMEOUT_MS
+            from.agent?.let { setRequestProperty("User-Agent", it) }
+            from.referer?.let { setRequestProperty("Referer", it) }
+        }
+        try {
+            if (connection.responseCode !in 200..299) return null
+            // What the server says it is, unless it will not say or says something that is
+            // not a picture at all - an error page served with a 200, most often.
+            val mime = connection.contentType?.substringBefore(';')?.trim()
+                ?.takeIf { it.startsWith("image/") } ?: guessMime(url)
+            val name = URLUtil.guessFileName(
+                url, connection.getHeaderField("Content-Disposition"), mime)
+            val file = File(dir, name)
+            connection.inputStream.use { source ->
+                file.outputStream().use { source.copyTo(it) }
+            }
+            return FetchedImage(file, name, mime)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** `data:image/png;base64,...` - the picture is written into the address itself. */
+    private fun decodeImage(url: String, dir: File): FetchedImage? {
+        val comma = url.indexOf(',')
+        if (comma < 0) return null
+        val header = url.substring("data:".length, comma)
+        val mime = header.substringBefore(';').takeIf { it.startsWith("image/") } ?: return null
+        val body = url.substring(comma + 1)
+        val bytes = if (header.contains("base64", ignoreCase = true)) {
+            Base64.decode(body, Base64.DEFAULT)
+        } else {
+            Uri.decode(body).toByteArray()
+        }
+        val name = URLUtil.guessFileName(url, null, mime)
+        val file = File(dir, name).apply { writeBytes(bytes) }
+        return FetchedImage(file, name, mime)
+    }
+
+    /** What kind of picture this is when the server would not say. From the address's tail. */
+    private fun guessMime(url: String): String {
+        val extension = MimeTypeMap.getFileExtensionFromUrl(url).lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            ?.takeIf { it.startsWith("image/") } ?: "image/jpeg"
+    }
+
+    /**
+     * Copies [image] into Downloads.
+     *
+     * Written as pending and only then published, so nothing goes looking at a file that
+     * is still arriving. Off the main thread, like the fetch that produced it.
+     */
+    private fun saveToDownloads(image: FetchedImage): Uri? = try {
+        val resolver = context.contentResolver
+        val record = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, image.name)
+            put(MediaStore.Downloads.MIME_TYPE, image.mime)
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, record)
+        if (uri != null) {
+            resolver.openOutputStream(uri)?.use { sink ->
+                image.file.inputStream().use { it.copyTo(sink) }
+            }
+            resolver.update(uri, ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }, null, null)
+        }
+        uri
+    } catch (e: Exception) {
+        Log.e(TAG, "Could not save ${image.name}", e)
+        null
+    }
+
+    private fun sendImage(image: FetchedImage) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", image.file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = image.mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                // The clip data is what carries the grant to whichever app is picked; the
+                // flag on the chooser is what lets the chooser itself read the picture,
+                // which is how it comes to show a thumbnail of what is about to be sent.
+                clipData = ClipData.newRawUri(image.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(send, null).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not share ${image.name}", e)
+            notify("Internet Explorer", "That picture could not be shared")
+        }
+    }
+
+    /**
+     * Back onto the main thread, if there is still a browser to come back to.
+     *
+     * A fetch outlives the window that started it - somebody can close the browser while a
+     * picture is on its way - and what is waiting on the other side of this draws views
+     * and puts up notifications.
+     */
+    private fun onMain(action: () -> Unit) {
+        val activity = context as? android.app.Activity ?: return
+        if (activity.isFinishing || activity.isDestroyed) return
+        activity.runOnUiThread {
+            if (!activity.isFinishing && !activity.isDestroyed) action()
         }
     }
 
@@ -703,6 +1377,8 @@ class MetroIEApp(
         }
         menuScroller.addView(menuPanel, FrameLayout.LayoutParams(MATCH, WRAP))
         bar.addView(menuScroller, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        bar.addView(buildSuggestions(), LinearLayout.LayoutParams(MATCH, WRAP))
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -777,8 +1453,20 @@ class MetroIEApp(
                     // Whatever was half-typed is thrown away rather than left sitting in
                     // the bar pretending to be where the browser is.
                     setText(currentUrl)
+                    hideSuggestions()
                 }
             }
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                    // Only while the user is the one doing the typing. The bar is also
+                    // told its own text by every page that loads and again by the field
+                    // being left, and neither of those is somebody looking for a page.
+                    if (!addressBar.hasFocus()) return
+                    showSuggestions(s?.toString().orEmpty())
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
         }
         // Fill, ink, caret and selection from the one place the shell describes a text
         // box. This field was where that description came from - it is white under either
@@ -874,9 +1562,167 @@ class MetroIEApp(
             TiltEffect.apply(this)
         }
 
+    // ---------------------------------------------------------------- suggestions
+
+    /**
+     * The list that grows over the bar while an address is being typed.
+     *
+     * Same strip and same near-black as the menu, and capped the same way: it grows
+     * upward from the field, and with the keyboard up there is not much screen left for
+     * it to grow into. See MAX_SUGGESTIONS for why the list is short as well as the box.
+     */
+    private fun buildSuggestions(): View {
+        suggestionPanel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        suggestionScroller = object : ScrollView(context) {
+            override fun onMeasure(widthSpec: Int, heightSpec: Int) {
+                val cap = (root.height - dp(BAR_DP) - dp(24)).coerceAtLeast(dp(120))
+                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST))
+            }
+        }.apply {
+            visibility = View.GONE
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+        }
+        suggestionScroller.addView(suggestionPanel, FrameLayout.LayoutParams(MATCH, WRAP))
+        return suggestionScroller
+    }
+
+    /**
+     * Offers pages that have been read before and look like what is being typed.
+     *
+     * Nothing is fetched to do this. The phone's address bar asked a search engine what
+     * you might have meant, which is a request per keystroke to somewhere else; this
+     * offers the only thing it can offer without telling anyone what is being typed,
+     * which is where this browser has already been. An empty field offers the most
+     * recent pages, because a field somebody has just cleared is somebody looking for
+     * somewhere they have been rather than somewhere new.
+     *
+     * The address of the page already open is never offered: it is what the bar said a
+     * moment ago, and a suggestion to stay where you are is a wasted row.
+     */
+    private fun showSuggestions(typed: String) {
+        val query = typed.trim()
+        val matches = history
+            .asSequence()
+            .filter { it.url != currentUrl }
+            .filter {
+                query.isEmpty() ||
+                    it.url.contains(query, ignoreCase = true) ||
+                    it.title.contains(query, ignoreCase = true)
+            }
+            .take(MAX_SUGGESTIONS)
+            .toList()
+        if (matches.isEmpty()) {
+            hideSuggestions()
+            return
+        }
+        suggestionPanel.removeAllViews()
+        for (entry in matches) suggestionPanel.addView(suggestionRow(entry))
+        suggestionScroller.visibility = View.VISIBLE
+        suggestionScroller.scrollTo(0, 0)
+    }
+
+    private fun hideSuggestions() {
+        if (suggestionScroller.visibility != View.VISIBLE) return
+        suggestionScroller.visibility = View.GONE
+        suggestionPanel.removeAllViews()
+    }
+
+    /**
+     * One page that has been read before: what it is called, and where it is.
+     *
+     * Both lines, because neither is enough on its own - a list of titles cannot be told
+     * apart when three of them are called "Home", and a list of addresses is a list of
+     * strings nobody reads. The address is the fainter of the two, the way every second
+     * line in this shell is.
+     */
+    private fun suggestionRow(entry: HistoryEntry): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(8), dp(22), dp(8))
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                hideSuggestions()
+                addressBar.clearFocus()
+                hideKeyboard()
+                current?.let { tab -> load(tab, entry.url) }
+            }
+            TiltEffect.apply(this)
+        }
+        row.addView(TextView(context).apply {
+            text = entry.title.ifBlank { hostOf(entry.url) }
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+        row.addView(TextView(context).apply {
+            text = entry.url
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
+            textSize = 12f
+            setTextColor(SUGGESTION_URL_COLOUR)
+            maxLines = 1
+            // Cut at the end, where an address matters least: the host is at the front,
+            // and that is what says which site the row is offering.
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(MATCH, WRAP))
+        return row
+    }
+
+    // ---------------------------------------------------------------- history
+
+    /**
+     * Writes down a page that was reached, for the address bar to offer later.
+     *
+     * One row per address rather than one per visit: a list that says you were on the
+     * same news site eleven times is eleven rows of the same suggestion, and the useful
+     * thing about a page you keep returning to is that it comes up first. Returning to
+     * one moves it back to the top instead of adding to it.
+     */
+    private fun recordVisit(url: String, title: String) {
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return
+        history.removeAll { it.url == url }
+        history.add(0, HistoryEntry(url, title, System.currentTimeMillis()))
+        while (history.size > MAX_HISTORY) history.removeAt(history.size - 1)
+        saveHistory()
+    }
+
+    /** A page that said what it was called after it had already been written down. */
+    private fun noteTitle(url: String, title: String) {
+        if (title.isBlank()) return
+        val entry = history.firstOrNull { it.url == url } ?: return
+        if (entry.title == title) return
+        entry.title = title
+        saveHistory()
+    }
+
+    private fun clearHistory() {
+        if (history.isEmpty()) {
+            notify("Internet Explorer", "There is no history to delete")
+            return
+        }
+        history.clear()
+        saveHistory()
+        hideSuggestions()
+        notify("Internet Explorer", "Browsing history deleted")
+    }
+
     // ---------------------------------------------------------------- the menu
 
     private fun openMenu() {
+        // The two strips are never up together. Taking the field closes the menu, and
+        // the dots put the field down - along with the keyboard and the suggestions,
+        // which is also the only way to leave the bar without going anywhere.
+        if (addressBar.hasFocus()) {
+            addressBar.clearFocus()
+            hideKeyboard()
+        }
+        hideSuggestions()
         buildMenu(favouritesOpen = false)
         menuScroller.visibility = View.VISIBLE
         menuCatcher.visibility = View.VISIBLE
@@ -922,8 +1768,10 @@ class MetroIEApp(
             playMenuEntrance()
         })
         menuPanel.addView(menuRow("add to favourites") { addCurrentToFavourites() })
+        menuPanel.addView(menuRow("downloads") { openDownloads() })
         menuPanel.addView(menuRow("share page") { sharePage() })
         menuPanel.addView(menuRow("set as home page") { setHomepageToCurrent() })
+        menuPanel.addView(menuRow("delete history") { clearHistory() })
     }
 
     private fun menuRow(label: String, closes: Boolean = true, action: () -> Unit): View =
@@ -1016,10 +1864,21 @@ class MetroIEApp(
     private fun sharePage() {
         val tab = current ?: return
         val url = tab.webView.url ?: return
+        shareLink(url, tab.title.ifBlank { url })
+    }
+
+    /**
+     * Hands an address to whatever the phone shares with.
+     *
+     * [subject] is what the address is called wherever the receiving app has somewhere to
+     * put a name - a mail's subject line, mostly. The page's own title when there is one;
+     * for a link held on a page there is nothing to go on but the address itself.
+     */
+    private fun shareLink(url: String, subject: String) {
         try {
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, tab.title.ifBlank { url })
+                putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, url)
             }, null).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
         } catch (e: Exception) {
@@ -1032,13 +1891,13 @@ class MetroIEApp(
         homepage = url
         context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_HOMEPAGE, url).apply()
-        onShowNotification("Internet Explorer", "Home page set to ${hostOf(url)}")
+        notify("Internet Explorer", "Home page set to ${hostOf(url)}")
     }
 
     private fun addCurrentToFavourites() {
         val url = liveUrl() ?: return
         if (favourites.any { it.url == url }) {
-            onShowNotification("Internet Explorer", "${hostOf(url)} is already a favourite")
+            notify("Internet Explorer", "${hostOf(url)} is already a favourite")
             return
         }
         favourites.add(0, Favourite(
@@ -1047,7 +1906,18 @@ class MetroIEApp(
             isDefault = false
         ))
         saveFavourites()
-        onShowNotification("Internet Explorer", "${hostOf(url)} added to favourites")
+        notify("Internet Explorer", "${hostOf(url)} added to favourites")
+    }
+
+    /**
+     * Says something on the shell's own band.
+     *
+     * [onTap] is what the band does when it is tapped, which for anything that has just
+     * been saved is to open the thing that was saved. Nothing, for an announcement that is
+     * only an announcement.
+     */
+    private fun notify(title: String, text: String, onTap: (() -> Unit)? = null) {
+        onShowNotification(title, text, onTap)
     }
 
     /** Where the browser actually is, or null if it is nowhere worth remembering. */
@@ -1082,6 +1952,7 @@ class MetroIEApp(
         }
 
         addressBar.clearFocus()
+        hideSuggestions()
         hideKeyboard()
         load(tab, target)
     }
@@ -1139,8 +2010,16 @@ class MetroIEApp(
      * came from.
      */
     fun handleBack(): Boolean {
+        if (pressMenu.isShowing()) {
+            pressMenu.dismiss()
+            return true
+        }
         if (tabsPage.visibility == View.VISIBLE) {
             closeTabs()
+            return true
+        }
+        if (downloadsTurn.isOnScreen) {
+            closeDownloads()
             return true
         }
         if (menuScroller.visibility == View.VISIBLE) {
@@ -1334,7 +2213,45 @@ class MetroIEApp(
             .edit().putString(InternetExplorerApp.KEY_FAVOURITES, Gson().toJson(favourites)).apply()
     }
 
+    private fun loadHistory(): MutableList<HistoryEntry> {
+        val json = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_HISTORY, null) ?: return mutableListOf()
+        return try {
+            val type = object : TypeToken<MutableList<HistoryEntry>>() {}.type
+            Gson().fromJson<MutableList<HistoryEntry>>(json, type)
+                ?.filter { it.url.isNotBlank() }
+                ?.take(MAX_HISTORY)
+                ?.toMutableList()
+                ?: mutableListOf()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unreadable history", e)
+            mutableListOf()
+        }
+    }
+
+    private fun saveHistory() {
+        context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_HISTORY, Gson().toJson(history)).apply()
+    }
+
+    /**
+     * How tall the strip along the bottom is.
+     *
+     * For anything that has to sit clear of it: the shell's toast lands above the
+     * navigation keys, which is on top of this bar, and an announcement that covers the
+     * address bar covers the page's own name along with it.
+     */
+    fun barHeight(): Int = dp(BAR_DP)
+
     fun cleanup() {
+        root.removeCallbacks(downloadsTick)
+        landings?.let {
+            // Nothing left to announce a landing to. The download itself carries on, and
+            // the system's own notification is what says so once the browser is gone.
+            runCatching { context.unregisterReceiver(it) }
+            landings = null
+        }
+        arriving.clear()
         for (tab in tabs) {
             tab.webView.stopLoading()
             tab.webView.destroy()
@@ -1357,6 +2274,32 @@ class MetroIEApp(
         /** What was open last time, and which of them was being read. */
         private const val KEY_TABS = "ie_tabs"
         private const val KEY_ACTIVE_TAB = "ie_active_tab"
+
+        /** Everywhere the browser has been. Emptied by the menu's delete history. */
+        private const val KEY_HISTORY = "ie_history"
+
+        /**
+         * How many pages are remembered.
+         *
+         * The list exists to finish an address somebody is typing, and an address they
+         * are typing is one they have been to lately. Two hundred rows is more than a
+         * phone browser gets through in a month of the kind of use this shell sees, and
+         * it is all written back to one preference on every page load, so it is not a
+         * number that wants to be large.
+         */
+        private const val MAX_HISTORY = 200
+
+        /**
+         * How many are offered at once.
+         *
+         * The list grows up from the address bar with the keyboard already holding the
+         * bottom half of the screen. Six rows is about what is left, and a suggestion
+         * that has to be scrolled to is one nobody was going to take anyway.
+         */
+        private const val MAX_SUGGESTIONS = 6
+
+        /** The address under a suggestion. The bar's own grey, against its near-black. */
+        private const val SUGGESTION_URL_COLOUR = 0xFF9A9A9A.toInt()
 
         /** The app bar's own near-black, which is not the palette's and never was. */
         private const val BAR_COLOUR = 0xFF212021.toInt()
@@ -1409,6 +2352,18 @@ class MetroIEApp(
         private const val GLYPH_INSET_DP = 6
 
         private const val STAGGER_MS = 30L
+
+        /** Where a picture waits between being fetched and being handed on. */
+        private const val SHARE_DIR = "shared_pictures"
+
+        /** How long a picture is given to arrive before the command gives up on it. */
+        private const val FETCH_TIMEOUT_MS = 15_000
+
+        /** How often the downloads page redraws while something is still coming in. */
+        private const val DOWNLOADS_TICK_MS = 900L
+
+        /** As far back as the downloads page goes. It is a recent list, not an archive. */
+        private const val MAX_DOWNLOADS = 50
 
         private const val ICON_DIR = "custom_icons_8"
         private const val NEW_ICON = "$ICON_DIR/appbar.add.svg"

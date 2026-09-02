@@ -1,6 +1,9 @@
 package rocks.gorjan.gokixp.theme
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.content.edit
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
@@ -121,6 +124,74 @@ class ThemeManager(private val context: Context) {
                 putString(KEY_PLUS95_THEME, PLUS95_DEFAULT)
             }
         }
+    }
+
+    // ========== The app's own icon ==========
+
+    /**
+     * Points the launcher entry at the alias carrying [theme]'s Windows logo.
+     *
+     * `android:icon` is baked into the APK and cannot be rewritten at runtime, so the only
+     * way to repaint an app's icon is to change which component answers MAIN/LAUNCHER.
+     * The manifest declares one alias per theme, each with its own logo; exactly one is
+     * left enabled here and the rest are switched off.
+     *
+     * The wanted alias is enabled first so there is never an instant with no launcher
+     * entry at all - a gap the app drawer will happily redraw into. DONT_KILL_APP matters
+     * just as much: without it the system tears the process down, and this runs during a
+     * theme change, with a shell on screen.
+     *
+     * Safe to call on every start. Component state that already agrees is left alone, so
+     * a run that has nothing to do writes nothing - which is the usual case, and worth
+     * having because a fresh install starts on the manifest's defaults rather than on the
+     * theme restored from a backup.
+     */
+    fun applyLauncherIcon(theme: AppTheme = getSelectedTheme()) {
+        val pm = context.packageManager
+        val pkg = context.packageName
+        val wanted = launcherAliasFor(theme)
+
+        // Enabled first, then the others; see above.
+        val aliases = AppTheme.all().map(::launcherAliasFor).sortedByDescending { it == wanted }
+        for (alias in aliases) {
+            val shouldBeEnabled = alias == wanted
+            val component = ComponentName(pkg, pkg + alias)
+            try {
+                val isEnabled = when (pm.getComponentEnabledSetting(component)) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+                    PackageManager.COMPONENT_ENABLED_STATE_DEFAULT -> alias == DEFAULT_LAUNCHER_ALIAS
+                    else -> false
+                }
+                if (isEnabled == shouldBeEnabled) continue
+                pm.setComponentEnabledSetting(
+                    component,
+                    if (shouldBeEnabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+            } catch (e: Exception) {
+                // An icon is not worth failing a theme change over.
+                Log.w("ThemeManager", "Could not set launcher alias $alias", e)
+            }
+        }
+    }
+
+    /**
+     * The manifest alias holding [theme]'s logo.
+     *
+     * Keyed on the theme and not on [DesktopChrome]: Windows Phone 8.1 borrows Vista's
+     * window frames but is emphatically not Vista on the home screen, and this is the
+     * shell's face rather than its chrome.
+     *
+     * The returned names are part of the installed package's identity - renaming one
+     * resets its enabled state on the next update - so they stay put even if the themes
+     * are renamed around them.
+     */
+    private fun launcherAliasFor(theme: AppTheme): String = when (theme) {
+        AppTheme.WindowsXP -> ".LauncherIconXP"
+        AppTheme.WindowsClassic -> ".LauncherIcon98"
+        AppTheme.WindowsVista -> ".LauncherIconVista"
+        AppTheme.WindowsPhone81 -> ".LauncherIconWP8"
     }
 
     // ========== Plus! 95 theme support ==========
@@ -756,6 +827,13 @@ class ThemeManager(private val context: Context) {
             Plus95Theme("tropical_interlude", "Tropical Interlude", 0xFFB0A888.toInt(), "busy.png", "menu.ogg", "start.ogg"),
             Plus95Theme("underwater", "Underwater", 0xFF3868C8.toInt(), "busy.png", "menu.ogg", "start.ogg"),
         )
+
+        /**
+         * The one launcher alias the manifest ships enabled. Anything else reported as
+         * COMPONENT_ENABLED_STATE_DEFAULT is therefore off. Must track android:enabled in
+         * AndroidManifest.xml.
+         */
+        private const val DEFAULT_LAUNCHER_ALIAS = ".LauncherIconXP"
 
         const val CLASSIC_GRAY: Int = 0xFFD3CEC7.toInt()
     }

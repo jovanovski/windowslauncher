@@ -53,6 +53,10 @@ class WP81ContextMenu(
         addView(scrim, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
         heading.typeface = ResourcesCompat.getFont(context, R.font.segoeui_semibold)
+        // Said here as well as in applyPalette: a menu built and shown without the palette
+        // ever changing under it - the browser's is one - would otherwise put its heading
+        // up in whatever colour the window's theme happens to leave on a bare TextView.
+        heading.setTextColor(palette.accent)
         heading.textSize = 12f
         heading.maxLines = 1
         heading.ellipsize = android.text.TextUtils.TruncateAt.END

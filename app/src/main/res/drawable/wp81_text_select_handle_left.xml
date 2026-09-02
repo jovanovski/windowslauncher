@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The grip on the left-hand end of a selection in the phone browser.
+
+  Same geometry as the platform's own: a 44x22 canvas whose anchor - the point the grip
+  hangs from, and where the selection actually ends - is three quarters of the way across
+  the top edge. The disc is 22 across and centred, and the quarter between the anchor and
+  the centre is filled square, so the grip has a corner to put on the last letter.
+
+  Drawn as two solid shapes rather than a fill with a stroke: a stroke would be clipped
+  where the disc touches the canvas edge, and the platform's own asset uses every pixel of
+  it. The outer shape is the inner one grown by 2 on every side.
+
+  White around near-black, and not the accent, because this hangs over an arbitrary web
+  page - the same reason the browser's app bar is the one accent-free surface in the shell
+  (see MetroIEApp.BAR_COLOUR). A single colour cannot be seen against both a white page
+  and a black one; a pair can be seen against either, and against everything in between.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="44dp"
+    android:height="22dp"
+    android:viewportWidth="44"
+    android:viewportHeight="22">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 11,11 A 11,11 0 0 0 33,11 L 33,0 L 22,0 A 11,11 0 0 0 11,11 Z" />
+    <path
+        android:fillColor="#FF212021"
+        android:pathData="M 13,11 A 9,9 0 0 0 31,11 L 31,2 L 22,2 A 9,9 0 0 0 13,11 Z" />
+</vector>

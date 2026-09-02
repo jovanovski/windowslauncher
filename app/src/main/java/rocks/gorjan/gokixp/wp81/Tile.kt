@@ -56,6 +56,17 @@ enum class TileSize(val cols: Int, val rows: Int) {
         get() = this != SMALL
 
     /**
+     * Whether a run of readings can be read side by side rather than turned through.
+     *
+     * Two cells across for the columns and two deep for what goes in one - a label, the
+     * sky, and the figure, stacked. The strips have the width for three columns and the
+     * height for none of it, so they keep turning their readings over; the 1x1 was never
+     * in the question. See ForecastPanelView.
+     */
+    val canShowForecast: Boolean
+        get() = cols >= 2 && rows >= 2
+
+    /**
      * A one-row tile.
      *
      * Its height is spoken for by the content, so the app-name label along the bottom

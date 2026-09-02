@@ -49,6 +49,34 @@ class NotificationListenerService : NotificationListenerService() {
             val image: android.graphics.Bitmap? = null
         )
 
+        /**
+         * The missed calls the user has not dealt with, newest first.
+         *
+         * Read off the shade rather than off the call log, which is the difference between
+         * "you have missed calls" and "you missed some calls at some point": the log keeps
+         * every one of them forever, and the notification is the one that goes away when
+         * the user has seen it. Which is what the People tile is asking about.
+         *
+         * Found by category rather than by package, because who posts these depends on
+         * which app is the phone - the default dialler if it handles them, and Telecom
+         * itself if it does not. The category is the one thing that is true either way.
+         */
+        private var missedCallLines: List<NotificationLine> = emptyList()
+
+        fun missedCalls(): List<NotificationLine> = missedCallLines
+
+        /**
+         * Text messages waiting, for the same tile and on the same terms.
+         *
+         * This app's own, and only its own. Once People holds the messaging role it is the
+         * one thing on the phone that announces an arriving text, so its notifications are
+         * the whole of the answer - and matching by anything broader would put every chat
+         * app on the phone onto a tile that is about this one. See MessageNotifier.
+         */
+        private var messageLines: List<NotificationLine> = emptyList()
+
+        fun messages(): List<NotificationLine> = messageLines
+
         /** Notification lines for [packageName], newest first, or empty. */
         fun getNotificationLines(packageName: String): List<NotificationLine> =
             notificationText[packageName].orEmpty()
@@ -149,6 +177,12 @@ class NotificationListenerService : NotificationListenerService() {
             return
         }
 
+        // A missed call is read by what it is rather than by who sent it, and who sent it
+        // is a system package - which the filter below drops, taking the refresh with it.
+        // So it is answered here, before the filter has a chance to say this notification
+        // is of no interest. See isMissedCall.
+        if (isMissedCall(sbn)) notifyMainActivity()
+
         if (!shouldShowNotification(sbn)) {
             return
         }
@@ -219,6 +253,32 @@ class NotificationListenerService : NotificationListenerService() {
         }
     }
     
+    /**
+     * Whether a notification is a call that went unanswered.
+     *
+     * [android.app.Notification.CATEGORY_MISSED_CALL] is the answer the platform documents
+     * and not the one it gives: Telecom's own `MissedCallNotifierImpl` - which is what
+     * posts these once the default phone app does not handle them itself, and so is what
+     * posts them here - sets no category at all. So the channel is asked as well, and every
+     * app that has one of these names it the same way: `TelecomMissedCalls`,
+     * `phone_missed_call`, `missed_calls`. Both words are required, which is what keeps
+     * "Missed alarms" out.
+     */
+    /** One of this app's own message notifications, arriving or failing to send. */
+    private fun isOurMessage(sbn: StatusBarNotification): Boolean {
+        if (sbn.packageName != packageName) return false
+        val channel = sbn.notification.channelId?.lowercase() ?: return false
+        return channel.contains("message")
+    }
+
+    private fun isMissedCall(sbn: StatusBarNotification): Boolean {
+        if (sbn.notification.category == android.app.Notification.CATEGORY_MISSED_CALL) {
+            return true
+        }
+        val channel = sbn.notification.channelId?.lowercase() ?: return false
+        return channel.contains("missed") && channel.contains("call")
+    }
+
     private fun shouldShowNotification(sbn: StatusBarNotification): Boolean {
         val notification = sbn.notification
 
@@ -272,7 +332,37 @@ class NotificationListenerService : NotificationListenerService() {
     private fun refreshNotificationText() {
         try {
             val grouped = mutableMapOf<String, MutableList<NotificationLine>>()
+            val missed = mutableListOf<NotificationLine>()
+            val texts = mutableListOf<NotificationLine>()
             for (sbn in getActiveNotifications() ?: emptyArray()) {
+                // Gathered here for the same reason the missed calls are: the People tile
+                // has no package to read them from, and these are wanted whole rather than
+                // as part of whatever this launcher's own package happens to be showing.
+                if (isOurMessage(sbn)) {
+                    val bundle = sbn.notification.extras
+                    val who = bundle?.getCharSequence(android.app.Notification.EXTRA_TITLE)
+                        ?.toString()?.trim().orEmpty()
+                    val what = bundle?.getCharSequence(android.app.Notification.EXTRA_TEXT)
+                        ?.toString()?.trim().orEmpty()
+                    if (who.isNotEmpty() || what.isNotEmpty()) {
+                        texts.add(NotificationLine(who, if (what == who) "" else what))
+                    }
+                }
+                // Gathered before the filter below rather than after it: a missed call is
+                // worth surfacing whoever posted it, and Telecom's own is a system
+                // notification of exactly the kind that filter is there to drop.
+                if (isMissedCall(sbn)) {
+                    val bundle = sbn.notification.extras
+                    val who = bundle?.getCharSequence(android.app.Notification.EXTRA_TITLE)
+                        ?.toString()?.trim().orEmpty()
+                    val what = bundle?.getCharSequence(android.app.Notification.EXTRA_TEXT)
+                        ?.toString()?.trim().orEmpty()
+                    if (who.isNotEmpty() || what.isNotEmpty()) {
+                        // Telecom's own says "Missed call" in both lines. Repeating it
+                        // under itself on a tile is a tile saying one thing twice.
+                        missed.add(NotificationLine(who, if (what == who) "" else what))
+                    }
+                }
                 if (!shouldShowNotification(sbn)) continue
 
                 // Skip the group summary. Mail and messaging apps post one summary
@@ -290,6 +380,8 @@ class NotificationListenerService : NotificationListenerService() {
                 grouped.getOrPut(sbn.packageName) { mutableListOf() }
                     .add(NotificationLine(title, text, notificationImage(sbn.notification)))
             }
+            missedCallLines = missed.asReversed().distinct()
+            messageLines = texts.asReversed().distinct()
             notificationText.clear()
             for ((pkg, lines) in grouped) {
                 // Some apps re-post the same content under several ids; identical lines

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_notify_message - the mark a text message wears in the shade
+
+  Derived from Templarian/WindowsIcons (Modern UI Icons), CC BY 3.0.
+  Source: WindowsPhone/svg/appbar.message.svg
+
+  Built the way wp81_notification_music is, and for the reason set out there: the glyphs in
+  this set are drawn on a 76x76 grid with the mark filling about half of it, which is right
+  on a tile - the air keeps it off the tile's edges - and wrong for a notification, where
+  Android scales the whole canvas into a fixed box and the air goes with it. The path is
+  untouched; the viewport is the mark's own bounding box plus two units, and the group
+  shifts the drawing into it.
+
+  Emitted white on transparent: Android draws a small icon from its alpha channel and tints
+  the silhouette itself, so the colour here is only what keeps the shape visible in a
+  preview.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="43.75"
+    android:viewportHeight="43.75">
+    <group
+        android:translateX="-16.12"
+        android:translateY="-20.00">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 33,51L 36.4167,61.75L 24,51L 19,51L 19,22L 57,22L 57,51L 33,51 Z" />
+    </group>
+</vector>

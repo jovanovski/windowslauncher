@@ -111,6 +111,18 @@ class TileView(
     private var hasPeopleMosaic = false
 
     /**
+     * The weather tile's forecast, read across the tile rather than turned through it.
+     * See [setForecast].
+     *
+     * Built on first use, as the other two are: one tile on a wall of forty ever wants
+     * one, and only then at the sizes with room for it.
+     */
+    private var forecastPanel: ForecastPanelView? = null
+
+    /** Whether [forecastPanel] is the front face right now. */
+    private var hasForecast = false
+
+    /**
      * Whose name the label is carrying, while the mosaic has given the tile to one person.
      *
      * The mosaic draws no words of its own: a name on this tile is set in the same type,
@@ -381,6 +393,9 @@ class TileView(
         // at a time, and a tile that spent half its time face-down would be showing them
         // to nobody.
         if (hasPeopleMosaic) return false
+        // And a tile showing the whole forecast at once has nothing to turn over *to*:
+        // the readings it would have turned through are all already on the front.
+        if (hasForecast) return false
         if (!hasFlipContent()) return false
         // A 1x1 app tile has no room for a title and a body; it carries the dot instead.
         // A widget's reverse is a bare reading, which fits anywhere.
@@ -514,6 +529,20 @@ class TileView(
 
     /** What this tile actually fills with. */
     private val fill: Int get() = customAccent ?: palette.accent
+
+    /**
+     * Whether the wall is holding every tile's colour back so the photo shows through.
+     *
+     * Set by the host from the settings switch; not something a tile can work out for
+     * itself, because a tile that was never painted looks exactly the same either way.
+     * What it changes is the ground under the tiles that carry words - see [drawFace].
+     */
+    var tileColorsHidden: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
 
     /**
      * The colour this tile is painted in, custom or the scheme's.
@@ -1374,7 +1403,13 @@ class TileView(
         val show = favourites.isNotEmpty() || others.isNotEmpty()
         // Nothing to show and nothing built to show it in, which is every tile that is
         // not the People tile. Asked on every refresh, so it answers before it builds.
-        if (!show && peopleMosaic == null) return
+        //
+        // Unless there is a live face up. Clearing the wall is also how the tile is told
+        // to stop being a widget - a missed call does exactly that - and the face it was
+        // showing has to come down whether or not a mosaic was ever built to replace. Left
+        // in, the tile sat on "People / looking…" forever, because an empty run does not
+        // take a live face down and there was nothing else that would.
+        if (!show && peopleMosaic == null && !hasLiveContent()) return
         val mosaic = requirePeopleMosaic()
         hasPeopleMosaic = show
         this.favourites = favourites
@@ -1394,6 +1429,14 @@ class TileView(
                 showingBack = false
                 applyNotificationState()
             }
+        } else {
+            // The wall has been taken away - the address book is out of reach, or a missed
+            // call has claimed the tile. Whatever hid the icon when the faces arrived has
+            // to be undone, or the tile is left showing nothing at all: an empty mosaic
+            // over a hidden icon is a blank square of accent.
+            liveBox.visibility = GONE
+            iconRow.visibility = if (isEmptied) GONE else VISIBLE
+            applyNotificationState()
         }
         applyPeopleGrid()
         applyLabelVisibility()
@@ -1472,6 +1515,65 @@ class TileView(
                 label.animate().alpha(1f).setDuration(HERO_LABEL_MS).start()
             }
             frontFace.addView(mosaic, LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        }
+
+    /**
+     * The whole forecast, laid across the tile in place of the faces it would turn over.
+     *
+     * Handed the columns when the tile is wide enough to read them side by side, and an
+     * empty list when it is not - which puts the tile back to whatever it would otherwise
+     * show, exactly as an empty mosaic hands the People tile back. The host decides which
+     * of the two it is, because the readings are its to fetch and the footprint is a
+     * property of the tile; see TileSize.canShowForecast and MainActivity.refreshWP81Weather.
+     *
+     * Like the mosaic, a tile showing this does not turn itself over any more: there is
+     * nothing left to turn over to. See [canTurnOver].
+     */
+    fun setForecast(columns: List<ForecastPanelView.Column>) {
+        val show = columns.isNotEmpty()
+        // Nothing to show and nothing built to show it in, which is every tile but one.
+        // Asked on every weather refresh, so it answers before it builds anything.
+        if (!show && forecastPanel == null) return
+        val panel = requireForecastPanel()
+        hasForecast = show
+        panel.setColumns(columns)
+        panel.visibility = if (show && !isEmptied) VISIBLE else GONE
+        if (show) {
+            // The panel *is* the tile: neither the icon nor the face it was turning
+            // through has anywhere left to sit.
+            iconRow.visibility = GONE
+            liveBox.visibility = GONE
+            // The readings can arrive at a tile that is face-down or halfway through a
+            // turn - the rotation it was showing runs on its own clock - and the panel is
+            // on the front. It is brought back rather than left showing a blank reverse.
+            flipAnimator?.cancel()
+            rotationX = 0f
+            if (showingBack) {
+                showingBack = false
+                applyNotificationState()
+            }
+        } else {
+            // The tile has been made too small to read a row of columns on. What hid the
+            // icon when the panel went up has to be undone, or the tile is left as a blank
+            // square of accent until the run of faces binds its first one.
+            iconRow.visibility = if (isEmptied) GONE else VISIBLE
+            applyNotificationState()
+        }
+        applyLabelVisibility()
+    }
+
+    /**
+     * The forecast panel, made on first use.
+     *
+     * Fills the tile rather than sitting in the middle of it, as the mosaic and the folder
+     * preview do: the columns are the tile, divided up.
+     */
+    private fun requireForecastPanel(): ForecastPanelView =
+        forecastPanel ?: ForecastPanelView(context, palette).also { panel ->
+            forecastPanel = panel
+            panel.visibility = GONE
+            frontFace.addView(panel, LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         }
 
@@ -1914,6 +2016,9 @@ class TileView(
             liveAside.text = face.aside.orEmpty()
         }
         applyLiveTextSizes()
+        // A story's first face goes up after the label has been settled, so this path has
+        // to ask for itself - see [invalidateContentScrim].
+        invalidateContentScrim()
     }
 
     /**
@@ -2510,8 +2615,9 @@ class TileView(
     private fun applyNotificationState() {
         val playing = media != null
         // A live widget owns its own faces; the notification rules below are about app
-        // tiles and would otherwise flip a widget back the moment anything refreshed.
-        if (tile.kind.isLiveWidget) {
+        // tiles and would otherwise flip a widget back the moment anything refreshed. The
+        // exception is a widget standing in as an ordinary tile - see [standingIn].
+        if (tile.kind.isLiveWidget && !standingIn()) {
             mediaFace.visibility = GONE
             frontFace.visibility = if (showingBack) GONE else VISIBLE
             backFace.visibility = if (showingBack) VISIBLE else GONE
@@ -2558,6 +2664,19 @@ class TileView(
     private fun hasLiveContent(): Boolean =
         liveBox.visibility == VISIBLE || rotation.isNotEmpty()
 
+    /**
+     * Whether a live widget is behaving as an ordinary app tile.
+     *
+     * A widget with nothing of its own to show and something waiting for the user is not,
+     * at that moment, a widget: it is an icon with a count beside it, which is what every
+     * other tile on the wall does with a notification and therefore what this one should
+     * do too. The People tile is the case it was written for - a missed call is a thing to
+     * answer, and a wall of faces is the wrong way to say so.
+     */
+    private fun standingIn(): Boolean =
+        tile.kind.isLiveWidget && notifications.isNotEmpty() &&
+            !hasLiveContent() && !hasPeopleMosaic && !hasForecast
+
     private fun applyLabelVisibility() {
         val contentShowing = showingBack || mediaFace.visibility == VISIBLE
         label.visibility = when {
@@ -2574,6 +2693,9 @@ class TileView(
             // corner over to a name while one of them has the whole tile. The 1x1 has room
             // for neither.
             hasPeopleMosaic -> if (tile.size.canShowText) VISIBLE else GONE
+            // The forecast fills the tile corner to corner and names each of its columns.
+            // A "Weather" along the foot of that is the one word on it nobody needs.
+            hasForecast -> GONE
             // Only once it has something to show. A widget whose content has not arrived
             // yet - the weather before the forecast is fetched, the news before the first
             // story - is a tile with an icon on it and nothing else, and it names itself
@@ -2593,6 +2715,9 @@ class TileView(
             tile.size.isStrip && (contentShowing || hasFolderPreview) -> GONE
             else -> VISIBLE
         }
+        // The same question this method opens with - is the tile showing content, or is it
+        // showing itself - is the one the scrim answers, so it is asked here too.
+        invalidateContentScrim()
     }
 
     /**
@@ -2614,8 +2739,8 @@ class TileView(
         val unread = notifications.isNotEmpty() && media == null && !isEditMode
         // The count belongs beside the glyph, so it is only ever asked for on the face
         // that has one.
-        val counted = unread && !showingBack && countsEnabled &&
-            !tile.kind.isLiveWidget && !hasFolderPreview
+        val counted = unread && !showingBack && countsEnabled && !hasFolderPreview &&
+            (!tile.kind.isLiveWidget || standingIn())
         if (counted) countLabel.text = formatCount(notifications.size)
         countLabel.visibility = if (counted) VISIBLE else GONE
 
@@ -2792,6 +2917,7 @@ class TileView(
         }
         folderPreview?.applyPalette(p)
         peopleMosaic?.applyPalette(p)
+        forecastPanel?.applyPalette(p)
     }
 
     /**
@@ -2827,6 +2953,34 @@ class TileView(
             rotation.getOrNull(rotationIndex)?.washed == false -> 0f
             else -> BACKDROP_TINT_ALPHA
         }
+
+    /**
+     * Whether the tile is showing words of its own rather than its icon and its name.
+     *
+     * The label is not one of them: it is the app's name, set along the foot of the tile
+     * where every tile carries one, and it reads over a photograph the way the glyph
+     * does. What needs the ground under it darkened is content - a notification turned
+     * face up, what is playing, a reading, a headline, a row of forecast columns. A
+     * mosaic of faces and a folder's squares are pictures, and cover the tile themselves.
+     */
+    private val showingOwnWords: Boolean
+        get() = backFace.visibility == VISIBLE ||
+            mediaFace.visibility == VISIBLE ||
+            (frontFace.visibility == VISIBLE &&
+                (liveBox.visibility == VISIBLE || hasForecast))
+
+    /**
+     * Repaints the face after what the tile is showing has changed.
+     *
+     * The scrim in [drawFace] is decided from the faces that are up, and a child changing
+     * visibility puts that child back on the render list, not the parent's own drawing -
+     * so without this a tile turned onto its notification kept the ground it was already
+     * drawn with. Only where the scrim is in play at all, which is a handful of tiles on
+     * a wall of forty.
+     */
+    private fun invalidateContentScrim() {
+        if (tileColorsHidden && customAccent == null && startBackground != null) invalidate()
+    }
 
     /**
      * Paints the tile's own face, inside the tile's own bounds.
@@ -2872,12 +3026,18 @@ class TileView(
             // photographs.
             val wash = backdropWash
             if (wash > 0f) {
+                // Black rather than the accent while the colours are held back. A wash is
+                // a tile colour laid over a photograph, so a news story or an album cover
+                // was the one tile that came back as a block of accent the moment every
+                // other tile turned into a window - which is the exact thing the switch
+                // was thrown to be rid of. Black carries the headline just as well.
+                val tint = if (tileColorsHidden) Color.BLACK else fill
                 canvas.drawColor(
                     Color.argb(
-                        (Color.alpha(fill) * wash).toInt(),
-                        Color.red(fill),
-                        Color.green(fill),
-                        Color.blue(fill)
+                        (Color.alpha(tint) * wash).toInt(),
+                        Color.red(tint),
+                        Color.green(tint),
+                        Color.blue(tint)
                     )
                 )
             }
@@ -2895,7 +3055,15 @@ class TileView(
             canvas.translate(-backgroundOffsetX, -backgroundOffsetY)
             canvas.drawBitmap(bmp, backgroundSrc, backgroundDest, backgroundPaint)
             canvas.restoreToCount(saved)
-            // The photo, as it is: no wash over a tile that was left to show it.
+            // The photo, as it is: no wash over a tile that was left to show it - unless
+            // the tile has words on it. A sender and two lines of an email are white text
+            // lying directly on a photograph, and whether they can be read at all is down
+            // to what the photograph happens to be doing behind them. Everywhere else the
+            // tile's own colour is what carries them; here it is a little black instead,
+            // light enough that the picture is still the thing showing through.
+            if (tileColorsHidden && showingOwnWords) {
+                canvas.drawColor(Color.argb((255 * CONTENT_SCRIM_ALPHA).toInt(), 0, 0, 0))
+            }
         } else {
             canvas.drawColor(fill)
         }
@@ -2953,8 +3121,13 @@ class TileView(
         val fraction = (GLYPH_FRACTION / glyphContentRatio).coerceAtMost(MAX_GLYPH_FRACTION)
         val target = (basis * fraction).toInt().coerceAtLeast(1)
         // A widget shows a reading rather than a glyph, so there is nothing here to size:
-        // its mark is the corner one, which is sized against the tile in applyWidgetGlyphSize.
-        if (tile.kind.isLiveWidget) {
+        // its mark is the corner one, which is sized against the tile in
+        // applyWidgetGlyphSize. Unless it is standing in as an ordinary tile, in which case
+        // the glyph in the middle is the whole of what it is showing and wants sizing like
+        // anybody else's - left out, the People tile's icon sat at the size an ImageView
+        // gives an unmeasured drawable, which is a fraction of what the wall around it was
+        // wearing.
+        if (tile.kind.isLiveWidget && !standingIn()) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             return
         }
@@ -3536,5 +3709,16 @@ class TileView(
          * readable over a photograph the tile did not choose and has never seen.
          */
         private const val BACKDROP_TINT_ALPHA = 0.62f
+
+        /**
+         * How far the ground under a tile's own words is darkened, while the colours are
+         * held back and the wallpaper is showing through the tile.
+         *
+         * Lighter than [BACKDROP_TINT_ALPHA]: that one covers a photograph the tile
+         * brought with it and has only the headline to protect, where this lies over the
+         * user's own picture - the thing the switch exists to show - so it goes only as
+         * far as the text needs and no further.
+         */
+        private const val CONTENT_SCRIM_ALPHA = 0.45f
     }
 }

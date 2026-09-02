@@ -19,6 +19,7 @@ import androidx.media.app.NotificationCompat.MediaStyle
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.apps.zune.ZuneLibrary
 import rocks.gorjan.gokixp.apps.zune.ZuneTrack
+import rocks.gorjan.gokixp.wp81.metroLook
 
 /**
  * Zune as a car media source.
@@ -312,6 +313,7 @@ class ZuneCarMediaService : MediaBrowserServiceCompat() {
         val metadata = session.controller?.metadata
         return androidx.core.app.NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.wp81_glyph_computer)
+            .metroLook(this)
             .setContentTitle(metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE) ?: "Music")
             .setContentText(metadata?.getString(MediaMetadataCompat.METADATA_KEY_ARTIST))
             .setStyle(MediaStyle().setMediaSession(session.sessionToken))

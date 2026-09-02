@@ -4,6 +4,7 @@ import android.content.Context
 import rocks.gorjan.gokixp.DesktopIcon
 import rocks.gorjan.gokixp.IconType
 import rocks.gorjan.gokixp.MainActivity
+import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 
@@ -335,49 +336,189 @@ class WP81TileHost(
     }
 
     /**
-     * The three readings the weather tile turns over: now, today's high, tomorrow's.
+     * The same conditions as a mark rather than a word, for a face that has no room for
+     * the word - which is the forecast panel, where three of them stand in a row and the
+     * label under each is already spoken for by which day it is.
      *
-     * A run of faces rather than one reading, which is why this does not come out of
-     * [liveContent] - the caller hands it to setLiveWidgetRotation instead.
+     * Grouped exactly as [weatherWord] groups them, so the tile can never show a cloud
+     * over the word "rain": one WMO reading, one condition, said either way.
      */
-    fun weatherFaces(size: TileSize): List<TileView.LiveFace> {
+    fun weatherGlyph(code: Int): Int? = when (code) {
+        0, 1 -> R.drawable.wp81_weather_sun
+        2 -> R.drawable.wp81_weather_cloudy
+        3 -> R.drawable.wp81_weather_overcast
+        45, 48 -> R.drawable.wp81_weather_fog
+        51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81 -> R.drawable.wp81_weather_rain
+        82 -> R.drawable.wp81_weather_showers
+        71, 73, 75, 77, 85, 86 -> R.drawable.wp81_weather_snow
+        95 -> R.drawable.wp81_weather_thunder
+        96, 99 -> R.drawable.wp81_weather_hail
+        else -> null
+    }
+
+    /**
+     * One of the readings the weather tile shows: the figure, the sky it was taken under,
+     * and which of them it is.
+     *
+     * [name] is the plain word - "now", "today", "tomorrow" - and what each surface makes
+     * of it is its own business: a turning face has a whole tile for it and says "max
+     * today", a column in the panel has a column's width and says "today".
+     */
+    private data class WeatherReading(val temperature: Int, val code: Int, val name: String)
+
+    /**
+     * What there is to say about the weather, in the order the tile says it.
+     *
+     * Now, then today's high while the day can still reach it, then tomorrow's. Once the
+     * afternoon peak is behind us today's figure is one the day has already spent - a
+     * number that can only be higher than the reading beside it, for a reason that has
+     * passed - so it comes out of the run entirely. See [todayHighAhead].
+     *
+     * Empty when there is no cached reading at all, and one long when the forecast has not
+     * arrived with it.
+     */
+    private fun weatherReadings(): List<WeatherReading> {
         val cached = cachedWeatherJson() ?: return emptyList()
-        val small = size == TileSize.SMALL
-        val unit = if (small) "" else weatherUnit()
-
-        fun face(temperature: Int, label: String, code: Int) =
-            TileView.LiveFace(
-                title = "$temperature°$unit",
-                // What the sky is doing, and under it which reading this is. That order
-                // because the weather is what the tile is about and the label is only
-                // which of three it is showing.
-                detail = listOfNotNull(weatherWord(code), label).joinToString("\n")
-            )
-
         return try {
             val current = cached.getJSONObject("current")
-            val now = kotlin.math.round(current.getDouble("temperature_2m")).toInt()
-            val faces = mutableListOf(face(now, "now", current.optInt("weather_code", -1)))
-
+            val readings = mutableListOf(
+                WeatherReading(
+                    kotlin.math.round(current.getDouble("temperature_2m")).toInt(),
+                    current.optInt("weather_code", -1),
+                    "now"
+                )
+            )
             val daily = cached.optJSONObject("daily")
             val highs = daily?.optJSONArray("temperature_2m_max")
             val codes = daily?.optJSONArray("weather_code")
             if (highs != null && codes != null && highs.length() >= 2) {
-                faces += face(
-                    kotlin.math.round(highs.getDouble(0)).toInt(),
-                    if (small) "today" else "max today",
-                    codes.optInt(0, -1)
-                )
-                faces += face(
+                if (todayHighAhead(cached)) {
+                    readings += WeatherReading(
+                        kotlin.math.round(highs.getDouble(0)).toInt(),
+                        codes.optInt(0, -1),
+                        "today"
+                    )
+                }
+                readings += WeatherReading(
                     kotlin.math.round(highs.getDouble(1)).toInt(),
-                    if (small) "tomorrow" else "max tomorrow",
-                    codes.optInt(1, -1)
+                    codes.optInt(1, -1),
+                    "tomorrow"
                 )
             }
-            faces
+            readings
         } catch (e: Exception) {
             android.util.Log.w(TAG, "could not read the weather", e)
             emptyList()
+        }
+    }
+
+    /**
+     * Whether today's high is still to come.
+     *
+     * The daily block carries the figure but not the hour it falls on, so the hourly
+     * temperatures are what separate an afternoon still ahead from one already over: find
+     * the hour today reaches its highest - the last of them, if the peak is flat - and see
+     * whether it is behind the current hour.
+     *
+     * Times come back in the location's own zone (timezone=auto), which is not necessarily
+     * the phone's, so "now" is worked out against the offset the response states rather
+     * than the device clock's.
+     *
+     * True whenever the answer cannot be read - a cache saved before the hourly figures
+     * were asked for, or one left over from another day - which leaves the tile as it was
+     * rather than hiding a face on a guess.
+     */
+    private fun todayHighAhead(cached: org.json.JSONObject): Boolean {
+        return try {
+            val hourly = cached.optJSONObject("hourly") ?: return true
+            val times = hourly.optJSONArray("time") ?: return true
+            val temperatures = hourly.optJSONArray("temperature_2m") ?: return true
+
+            val offsetMillis = cached.optLong("utc_offset_seconds", 0L) * 1000L
+            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH", java.util.Locale.US)
+            stamp.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            // The wall clock where the weather is: UTC formatting of a shifted instant.
+            val now = stamp.format(java.util.Date(System.currentTimeMillis() + offsetMillis))
+            val today = now.substring(0, 10)
+
+            var peak = Double.NEGATIVE_INFINITY
+            var peakHour: String? = null
+            for (i in 0 until minOf(times.length(), temperatures.length())) {
+                val time = times.optString(i)
+                if (!time.startsWith(today)) continue
+                val temperature = temperatures.optDouble(i, Double.NaN)
+                if (temperature.isNaN()) continue
+                // >= rather than >: a peak held over several hours has not passed until
+                // the last hour holding it has.
+                if (temperature >= peak) {
+                    peak = temperature
+                    peakHour = time
+                }
+            }
+
+            // The peak landing on the current hour still counts as ahead - it is being
+            // reached now, not spent.
+            peakHour?.let { it.substring(0, minOf(it.length, 13)) >= now } ?: true
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "could not tell when today's high falls", e)
+            true
+        }
+    }
+
+    /**
+     * The readings the weather tile turns over, one face each.
+     *
+     * What a tile falls back on rather than what it prefers: a tile with two cells or more
+     * shows the lot of them at once and never asks for this - see [weatherPanel]. This is
+     * the 1x1 and the strips, which have room for one reading at a time.
+     *
+     * A run of faces rather than one reading, which is why this does not come out of
+     * [liveContent] - the caller hands it to setLiveWidgetRotation instead.
+     *
+     * Each is labelled. A temperature with no label is a number, and three of them in turn
+     * without labels are numbers that appear to disagree; the 1x1 shortens the labels
+     * rather than dropping them, because "max tomorrow" does not fit across it and
+     * "tomorrow" says the necessary half.
+     */
+    fun weatherFaces(size: TileSize): List<TileView.LiveFace> {
+        val small = size == TileSize.SMALL
+        val unit = if (small) "" else weatherUnit()
+        return weatherReadings().map { reading ->
+            TileView.LiveFace(
+                title = "${reading.temperature}°$unit",
+                // What the sky is doing, and under it which reading this is. That order
+                // because the weather is what the tile is about and the label is only
+                // which of the run it is showing.
+                detail = listOfNotNull(
+                    weatherWord(reading.code),
+                    when {
+                        reading.name == "now" || small -> reading.name
+                        else -> "max ${reading.name}"
+                    }
+                ).joinToString("\n")
+            )
+        }
+    }
+
+    /**
+     * The same readings as columns, for a tile with the width to hold them side by side.
+     *
+     * Nothing is dropped to make them fit: the panel sets itself to the column it has, and
+     * a tile too narrow for that is a tile that should be turning faces instead. The
+     * labels are the plain words - a column is headed by the day, not by what the figure
+     * is of, which the row of them says once by being a row.
+     *
+     * Takes no size, unlike [weatherFaces]: what a column can hold is a question the panel
+     * answers for itself once it knows how wide the tile made it.
+     */
+    fun weatherPanel(): List<ForecastPanelView.Column> {
+        val unit = weatherUnit()
+        return weatherReadings().map { reading ->
+            ForecastPanelView.Column(
+                label = reading.name,
+                glyph = weatherGlyph(reading.code),
+                reading = "${reading.temperature}°$unit"
+            )
         }
     }
 

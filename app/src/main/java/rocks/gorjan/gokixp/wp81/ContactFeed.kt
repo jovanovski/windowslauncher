@@ -152,7 +152,7 @@ object ContactFeed {
                     id = cursor.getString(id) ?: continue,
                     name = display,
                     photoUri = picture,
-                    initials = initialsOf(display)
+                    initials = PeopleStore.initialsOf(display)
                 )
                 val band = when {
                     cursor.getInt(starred) != 0 && picture != null -> starredPictured
@@ -169,24 +169,6 @@ object ContactFeed {
             others = (pictured + named).take(limit)
         )
     }
-
-    /**
-     * One or two letters for somebody with no picture.
-     *
-     * The first letter of the first name and of the last, which is how a name is
-     * abbreviated - and read from code points rather than characters, so a name that
-     * starts outside the basic plane is not cut in half.
-     */
-    private fun initialsOf(name: String): String {
-        val words = name.split(' ', '\t').filter { it.isNotBlank() }
-        if (words.isEmpty()) return ""
-        val first = firstLetter(words.first())
-        val last = if (words.size > 1) firstLetter(words.last()) else ""
-        return (first + last).uppercase()
-    }
-
-    private fun firstLetter(word: String): String =
-        if (word.isEmpty()) "" else String(Character.toChars(word.codePointAt(0)))
 
     /** A tenth of the heap, shared by every tile showing faces. */
     private val cache = object : LruCache<String, Bitmap>(

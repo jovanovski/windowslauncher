@@ -71,6 +71,28 @@
         <item name="wpForegroundSubtle">#99FFFFFF</item>
     </style>
 
+    <!--
+      The theme a web page's own text selection is drawn against.
+
+      The grips either end of a selection come from the theme the WebView was built with,
+      and every theme in here sets colorControlActivated to black so that the desktop
+      chrome is not tinted - which leaves the browser dropping two black grips onto pages
+      that are themselves black. They are given here instead, drawn to be seen against a
+      page of any colour. Applied to the WebView alone, not to the window: nothing else in
+      the shell should stop being black because the browser needs its grips visible.
+
+      colorControlActivated is set as well as the three drawables. It is what tints the
+      platform's own grips, and it is the one that has to be right if a WebView build ever
+      reads it instead of them. IE's blue, from the phone.
+    -->
+    <style name="ThemeOverlay.GokiXP.WP81.PageSelection" parent="">
+        <item name="android:textSelectHandleLeft">@drawable/wp81_text_select_handle_left</item>
+        <item name="android:textSelectHandleRight">@drawable/wp81_text_select_handle_right</item>
+        <item name="android:textSelectHandle">@drawable/wp81_text_select_handle_middle</item>
+        <item name="colorControlActivated">#61ADDA</item>
+        <item name="android:colorControlActivated">#61ADDA</item>
+    </style>
+
     <!-- Windows Classic Theme -->
     <style name="Theme.GokiXP.Classic" parent="Base.Theme.GokiXP">
         <item name="primaryFontFamily">@font/micross_font_family</item>
