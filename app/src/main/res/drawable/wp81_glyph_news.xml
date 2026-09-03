@@ -2,10 +2,10 @@
 <!--
   wp81_glyph_news - the News live tile.
 
-  A folded newspaper: the sheet behind, the front page over it with a masthead rule, a
-  boxed lead story and column rules. Drawn on the same 76x76 grid and with the same 3-4
-  unit stroke weight as the icons derived from Templarian/WindowsIcons (Modern UI Icons,
-  CC BY 3.0), so it sits with them rather than beside them.
+  appbar.newspaper from Templarian/WindowsIcons (Modern UI Icons, CC BY 3.0), the set the
+  rest of this shell's marks come from: a paper rolled at the spine, with a masthead rule,
+  a boxed lead story and column rules on the page. Kept on the source's own 76x76 grid so
+  it sits at the same weight as everything beside it.
 
   Emitted white so callers can tint per accent / light-dark theme.
 -->
@@ -14,24 +14,7 @@
     android:height="24dp"
     android:viewportWidth="76"
     android:viewportHeight="76">
-    <!-- The sheet behind, showing along the right edge and the foot. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M 56,24L 62,24L 62,56L 20,56L 20,52L 56,52L 56,24 Z" />
-    <!-- The front page. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 14,20L 56,20L 56,50L 14,50L 14,20 Z M 18,24L 18,46L 52,46L 52,24L 18,24 Z" />
-    <!-- Masthead rule. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 21,27L 49,27L 49,30L 21,30L 21,27 Z" />
-    <!-- The lead story, boxed. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 21,33L 33,33L 33,43L 21,43L 21,33 Z" />
-    <!-- Column rules beside it. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M 36,33L 49,33L 49,35L 36,35L 36,33 Z M 36,37L 49,37L 49,39L 36,39L 36,37 Z M 36,41L 49,41L 49,43L 36,43L 36,41 Z" />
+        android:pathData="M 27,48C 27,50 26.5,53 25.5,53L 52,53C 54.5,53 55,50.5 55,48L 55,25L 27,25L 27,48 Z M 59,48C 59,52.3723 56,57 52.5,57L 21,57C 18.3766,57 16,52.8723 16,48.5L 16,27L 23,27L 23,21L 59,21L 59,48 Z M 20,31L 20,49C 20,51.6234 20.6255,53.25 21.5,53.25C 22.3744,53.25 23,51.6234 23,49L 23,31L 20,31 Z M 41,34L 53,34L 53,48L 41,48L 41,34 Z M 29,28L 53,28L 53,31L 29,31L 29,28 Z M 29,34L 39,34L 39,36L 29,36L 29,34 Z M 29,38L 39,38L 39,40L 29,40L 29,38 Z M 29,42L 39,42L 39,44L 29,44L 29,42 Z M 29,46L 39,46L 39,48L 29,48L 29,46 Z" />
 </vector>

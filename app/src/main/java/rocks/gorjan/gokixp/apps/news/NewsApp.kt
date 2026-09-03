@@ -190,30 +190,17 @@ class NewsApp(
 
         val list = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val chosen = enabledFeeds().toMutableSet()
+        // A tickable square each, and several of them can be on at once - which is what
+        // the square says. These used to be a plain filled block that meant the same thing
+        // whether it was a switch or one of a set; the shell has one answer to that now.
         for (source in rocks.gorjan.gokixp.wp81.NewsSources.ALL) {
-            val marker = View(context)
-            val row = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(11), 0, dp(11))
-                isClickable = true
-                setOnClickListener {
-                    if (!chosen.add(source.id)) chosen.remove(source.id)
-                    marker.setBackgroundColor(
-                        if (source.id in chosen) palette.accent else palette.inactive)
-                    onFeedsChanged(chosen.toSet())
-                }
-                TiltEffect.apply(this)
+            val row = rocks.gorjan.gokixp.wp81.MetroChoiceRow(
+                context, palette, source.name, round = false)
+            row.set(source.id in chosen)
+            row.onPicked = { on ->
+                if (on) chosen.add(source.id) else chosen.remove(source.id)
+                onFeedsChanged(chosen.toSet())
             }
-            marker.setBackgroundColor(
-                if (source.id in chosen) palette.accent else palette.inactive)
-            row.addView(marker, LinearLayout.LayoutParams(dp(20), dp(20)))
-            row.addView(TextView(context).apply {
-                text = source.name
-                typeface = font(R.font.segoeui_semilight)
-                textSize = 17f
-                setTextColor(palette.foreground)
-            }, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dp(14) })
             list.addView(row, wide())
         }
         page.addView(ScrollView(context).apply {

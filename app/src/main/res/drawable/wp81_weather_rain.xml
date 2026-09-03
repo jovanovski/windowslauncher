@@ -1,38 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  wp81_weather_rain - rain.
+  wp81_weather_rain - rain, in any of its strengths.
 
-  Three drops off the foot of the cloud.
-  Drawn on the same 76x76 grid and at the same 3-4 unit weight as the rest of the WP8.1
-  glyph set, and emitted white so the tile tints it to its accent.
+  From the Weather set by Good Ware (flaticon.com/authors/good-ware): the pack's own paths,
+  unedited and unscaled, emitted white so callers can tint per accent and per light/dark
+  theme.
+
+  The only thing not taken from the file is the viewport, which is refitted to a square
+  around what the mark actually draws. The pack does not agree with itself about that -
+  most of the marks fill their box and the fog sits in the middle of one an eighth larger
+  than it needs - so a mark's size on screen would otherwise depend on how much empty room
+  its author happened to leave around it. Fitted this way they are one set again, at the
+  proportions the set was drawn in.
+
+  Nothing here is optically retouched. If one of these reads small beside the others, that
+  is the pack's own drawing and the place to change it is the pack.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="76"
-    android:viewportHeight="76">
-    <!-- The cloud, lifted to leave the lower third of the grid to what is
-         falling. The same cloud carries every icon in the set. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M27,30 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M18,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M46,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M26,38 L54,38 L54,46 L26,46 Z" />
-    <!-- Three drops, all leaning the same way. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M26,53 L22,67 L26,69 L30,55 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M38,53 L34,67 L38,69 L42,55 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M50,53 L46,67 L50,69 L54,55 Z" />
+    android:viewportWidth="326.000"
+    android:viewportHeight="326.000">
+    <group
+        android:translateX="0.000"
+        android:translateY="-0.136">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M71.2,226.6c-0.4-0.8-0.8-1.2-1.6-1.6c-2-1.2-5.2-0.8-6.4,1.6c-1.6,2.8-3.6,5.6-6,8.8c-10.4,15.2-25.6,37.6-25.6,50.8 c0,9.6,4,18.4,10.4,24.8c6.4,6.4,15.2,10.4,24.8,10.4c9.6,0,18.4-4,24.8-10c0,0,0,0,0.4-0.4c6.4-6.4,10.4-15.2,10.4-24.8 c0-13.2-15.2-35.6-25.6-50.8C74.8,232.2,72.8,229.4,71.2,226.6z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M263.2,226.6c-0.4-0.4-0.8-1.2-1.6-1.6c-2-1.2-5.2-0.8-6.4,1.6c-1.6,2.8-3.6,5.6-6,8.8c-10.4,15.2-25.6,37.6-25.6,50.8 c0.4,9.6,4.4,18.4,10.8,24.8c6.4,6.4,15.2,10.4,24.8,10.4c9.6,0,18.4-4,24.8-10.4c6.4-6.4,10.4-15.2,10.4-24.8 c0-13.2-15.2-35.6-25.6-50.8C266.8,232.2,264.8,229.4,263.2,226.6z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M167.2,226.6c-0.4-0.4-0.8-1.2-1.6-1.6c-2-1.2-5.2-0.8-6.4,1.6c-1.6,2.8-3.6,5.6-6,8.8c-10.4,15.2-25.6,37.6-25.6,50.8 c0,9.6,4,18.4,10.4,24.8c6.4,6.4,15.2,10.4,24.8,10.4c10,0,18.8-4,25.2-10.4c6.4-6.4,10.4-15.2,10.4-24.8 c0-13.2-15.2-35.6-25.6-50.8C170.8,232.2,168.8,229.4,167.2,226.6z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M306.8,87c-11.6-11.6-28-18.8-46-18.8c-9.2,0-18.4,2-26.8,5.6c-8.4,3.6-16,9.2-22,16c-4.4,4.8-11.6,5.2-16.4,1.2 c-4.8-4.4-5.2-11.6-1.2-16.4c8.4-9.6,18.4-16.8,29.6-22c2-0.8,3.6-1.6,5.6-2.4c-6.8-12-16-22.4-26.8-30 c-14.4-10-31.6-15.6-50-15.6c-21.6,0-42,8-57.2,21.2C80,39,69.2,57.8,66,79.4c-0.4,3.2-2.4,6.4-5.2,8c-2,1.2-4,2-6.4,2 c-14.8,0-28.4,6-38.4,16S0,128.6,0,143.8c0,14.8,6,28.4,16,38.4c10.4,9.6,23.6,15.6,38.8,15.6h206.4c18,0,34-7.2,46-18.8 c11.6-11.6,18.8-28,18.8-46S318.8,99,306.8,87z" />
+    </group>
 </vector>

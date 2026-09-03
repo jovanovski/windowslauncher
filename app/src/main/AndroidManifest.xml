@@ -519,8 +519,26 @@
             android:name="androidx.car.app.minCarApiLevel"
             android:value="5" />
 
+        <!--
+          TEMPORARILY DISABLED. Restore by setting android:enabled back to "true".
+
+          Android Auto 17.4 has an "external dialer" feature: at projection start the host
+          asks Telecom for the default dialer package and then looks for a Car App Library
+          app inside that same package - its own log lines are "Found templated app for
+          phone dialer %s" and, when there is none, DIALER_FALLBACK_REASON_NO_PROJECTION_
+          APP_FOUND. This app is both at once, so the host stopped listing the Start screen
+          as its own entry on the head unit and folded it into the Phone slot instead,
+          wearing this app's icon. Declaring NAVIGATION does not protect it; the launcher
+          keys on the package, and the dialer claims the package first.
+
+          Disabled rather than deleted so the car behaves normally - Google Dialer on the
+          Phone tile, no Windows tiles - while the collision is worked out. Nothing else
+          here needs to change: with no resolvable CarAppService the automotive_app_desc
+          meta-data above cannot produce an entry on its own.
+        -->
         <service
             android:name=".car.GokiCarAppService"
+            android:enabled="false"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />

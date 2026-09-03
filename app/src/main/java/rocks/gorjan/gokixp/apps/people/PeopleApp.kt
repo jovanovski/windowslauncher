@@ -1259,15 +1259,20 @@ class PeopleApp(
         }
         for (phone in detail.phones) {
             column.addView(
-                actionRow("call ${phone.label}", phone.value) { place(phone.value) }, wide())
-            column.addView(
-                actionRow("text ${phone.label}", phone.value) {
-                    showThread(phone.value, person)
-                }, wide())
+                reachRow(phone, listOf(
+                    reachKey(CALL_ICON) { place(phone.value) },
+                    reachKey(MESSAGE_ICON) { showThread(phone.value, person) }
+                )),
+                wide()
+            )
         }
-        for (email in detail.emails) {
+        for (address in detail.emails) {
             column.addView(
-                actionRow("email ${email.label}", email.value) { email(email.value) }, wide())
+                reachRow(address, listOf(
+                    reachKey(EMAIL_ICON) { email(address.value) }
+                )),
+                wide()
+            )
         }
 
         // Which account this person is filed under, in the small type a footnote gets. It
@@ -1320,27 +1325,46 @@ class PeopleApp(
         pushOverlay(page)
     }
 
-    /** A command and what it applies to: the verb on top, the value beneath it. */
-    private fun actionRow(verb: String, value: String, onTap: () -> Unit): View {
+    /**
+     * A way of reaching somebody, and the keys for the things done with it.
+     *
+     * The verbs used to be the rows: "call mobile" over the number, and then "text mobile"
+     * over the very same number again - which is the number said twice to offer two
+     * things, and a person with three of them a page of six rows that reads as a list of
+     * near-duplicates. So the number is the row now and the verbs are keys beside it,
+     * which is also the only arrangement in which the two are plainly about the same
+     * number rather than about two that happen to match.
+     *
+     * An address takes the same shape for one key rather than two, so that a page of
+     * numbers and addresses is one column of rows and one column of keys, instead of two
+     * kinds of row that happen to be about the same person.
+     *
+     * The words are left inert on purpose. Everything that can be done here is under a
+     * key, and a row that quietly did one of them when tapped would be a further thing to
+     * know about with nothing on screen to say which it was.
+     */
+    private fun reachRow(entry: PeopleStore.Entry, keys: List<View>): View {
         val row = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(11), 0, dp(11))
-            isClickable = true
-            setOnClickListener {
-                Haptics.tap(it)
-                onTap()
-            }
-            TiltEffect.apply(this)
         }
-        row.addView(TextView(context).apply {
-            text = verb
+
+        // The number or address large and its kind underneath, which is the other way up
+        // from the rows this replaced - the verb was the command and the value a fact
+        // about it, and with the verbs gone the value is what the row is for.
+        val words = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        words.addView(TextView(context).apply {
+            text = entry.value
             typeface = font(R.font.segoeui_regular)
             textSize = 19f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setTextColor(palette.foreground)
             includeFontPadding = false
         }, wide())
-        row.addView(TextView(context).apply {
-            text = value
+        words.addView(TextView(context).apply {
+            text = entry.label
             typeface = font(R.font.segoeui_regular)
             textSize = 13f
             maxLines = 1
@@ -1348,8 +1372,58 @@ class PeopleApp(
             setTextColor(palette.foregroundSubtle)
             setPadding(0, dp(3), 0, 0)
         }, wide())
+        row.addView(words, LinearLayout.LayoutParams(0, WRAP, 1f))
+
+        // Rings, which is what a command looks like in this shell - the app bar is a row
+        // of them, and these are the same command in the same clothes, put next to the
+        // thing it applies to instead of at the foot of the page. Added last and against
+        // the end of the row, so a row with one ring keeps it under the last ring of the
+        // rows with two.
+        for ((index, key) in keys.withIndex()) {
+            row.addView(
+                key,
+                LinearLayout.LayoutParams(dp(REACH_KEY_DP), dp(REACH_KEY_DP)).apply {
+                    marginStart = dp(if (index == 0) REACH_KEY_INSET_DP else REACH_KEY_GAP_DP)
+                }
+            )
+        }
         return row
     }
+
+    /**
+     * One of the rings on a [reachRow].
+     *
+     * The app bar's own button, built here rather than borrowed from [MetroAppBar]: that
+     * one is nailed to a strip, and it draws itself white because the strip it sits on is
+     * always near-black. A profile is the palette's own background, which is white under
+     * the Light theme, so the ring and the glyph are both tinted with the foreground - the
+     * ring shape is drawn white precisely so a tint can decide what colour it really is,
+     * which is how the bar marks a command that is in force.
+     *
+     * Not built out of [footKey] either, for the tick: the foot of the keypad is part of
+     * the keypad and takes the light keystroke one, where these are commands on a page and
+     * take the shell's own. See Haptics, which draws exactly that line.
+     */
+    private fun reachKey(icon: String, onTap: () -> Unit): View =
+        ImageView(context).apply {
+            setBackgroundResource(R.drawable.wp81_appbar_circle)
+            backgroundTintList =
+                android.content.res.ColorStateList.valueOf(palette.foreground)
+            setImageDrawable(rocks.gorjan.gokixp.wp81.SvgIcon.fromAsset(context, icon))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(REACH_GLYPH_INSET_DP), dp(REACH_GLYPH_INSET_DP),
+                dp(REACH_GLYPH_INSET_DP), dp(REACH_GLYPH_INSET_DP))
+            imageTintList =
+                android.content.res.ColorStateList.valueOf(palette.foreground)
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            clipToOutline = true
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                onTap()
+            }
+            TiltEffect.apply(this)
+        }
 
     private fun confirmDelete(person: PeopleStore.Contact, page: View) {
         ask(
@@ -2293,6 +2367,10 @@ class PeopleApp(
         const val SAVE_ICON = "$ICON_DIR/appbar.check.svg"
         const val CANCEL_ICON = "$ICON_DIR/appbar.cancel.svg"
         const val CALL_ICON = "$ICON_DIR/appbar.phone.svg"
+        /** Texting, drawn as the call screen draws it - see CallScreen's own MESSAGE_ICON. */
+        const val MESSAGE_ICON = "$ICON_DIR/appbar.message.svg"
+        /** Mail. The hard-edged envelope, which is the one drawn as this shell draws. */
+        const val EMAIL_ICON = "$ICON_DIR/appbar.email.hardedge.svg"
         const val BACKSPACE_ICON = "$ICON_DIR/appbar.arrow.left.svg"
 
         /**
@@ -2347,6 +2425,17 @@ class PeopleApp(
         const val KEYPAD_MARGIN_DP = 16
         const val KEY_GAP_DP = 8
         const val FOOT_DP = 62
+
+        /**
+         * The rings beside a number or an address on a profile, at the app bar's own
+         * size and with its glyph sitting the same way inside them. See reachRow.
+         */
+        const val REACH_KEY_DP = 44
+        const val REACH_GLYPH_INSET_DP = 5
+
+        /** Between the words and the first ring, and between the rings. */
+        const val REACH_KEY_INSET_DP = 14
+        const val REACH_KEY_GAP_DP = 14
         const val KEY_FILL_ALPHA = 0.122f
 
         /** How many digits are typed before the keypad starts guessing who they belong to. */

@@ -60,6 +60,16 @@ class WP81Shell(
     val colorPicker = WP81ColorPicker(context, palette)
     val inputDialog = WP81InputDialog(context, palette)
     val toast = WP81Toast(context, palette)
+
+    /**
+     * The task switcher, opened by holding the back key.
+     *
+     * Built here so it swaps palettes and answers back with the rest of the shell, but the
+     * host lifts it out of this view afterwards - like the toast, and for the same reason:
+     * the shell draws below the floating-window container, and a switcher that could not be
+     * seen over an open program is a switcher that cannot do the one thing it is for.
+     */
+    val recents = WP81RecentsView(context, palette)
     private val windowBackdrop = View(context)
 
     /** 0 = Start screen, 1 = app list. */
@@ -71,6 +81,15 @@ class WP81Shell(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     var onSearch: (() -> Unit)? = null
+
+    /**
+     * Holding the back key.
+     *
+     * The switcher's contents are the host's to work out - it is the only thing that knows
+     * what this shell's own programs are, or what the phone will say about the rest - so
+     * this only reports the gesture. See [recents].
+     */
+    var onRecents: (() -> Unit)? = null
 
     init {
         setBackgroundColor(palette.background)
@@ -121,6 +140,14 @@ class WP81Shell(
             bottomMargin = dp(WP81NavBar.HEIGHT_DP)
         })
 
+        // The switcher clears the keys too, unlike the real one - which filled a display
+        // that had the three keys in hardware below it. Here they are drawn, and back is
+        // how the switcher is left, so covering them would leave no way out of it.
+        recents.visibility = GONE
+        addView(recents, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
+            bottomMargin = dp(WP81NavBar.HEIGHT_DP)
+        })
+
         // Added last so they dim and cover everything, navigation bar included - WP8.1's
         // context menus and prompts take over the whole screen.
         addView(contextMenu, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -140,7 +167,17 @@ class WP81Shell(
         // Only once there - with nothing to return from - does it take on its second job
         // and page to the app list. To the list itself, not into a search of it: a key
         // pressed to see what is installed should not answer with a keyboard over it.
-        navBar.onStart = { if (isOnStartPage()) goToAppList() else goToStart() }
+        //
+        // The switcher is a place the user can be even though the shell has not moved, so
+        // the Start key means Start from inside it too - and closing it is all that takes.
+        navBar.onStart = {
+            when {
+                closeRecents() -> Unit
+                isOnStartPage() -> goToAppList()
+                else -> goToStart()
+            }
+        }
+        navBar.onRecents = { onRecents?.invoke() }
         // The app bar follows what the user is doing: arranging tiles or filling a folder
         // each bring up the commands for that job, above the keys rather than instead of
         // them.
@@ -154,7 +191,23 @@ class WP81Shell(
 
     // ---------------------------------------------------------------- paging
 
+    /**
+     * Takes the switcher down if it is up. Returns true if there was one to take down.
+     *
+     * Written as a question with an answer rather than as a plain `hide()` because every
+     * caller is deciding what a key press means, and "was the switcher open" is the first
+     * half of that decision in all of them.
+     */
+    fun closeRecents(): Boolean {
+        if (!recents.isShowing()) return false
+        recents.hide()
+        return true
+    }
+
     fun goToStart(animated: Boolean = true) {
+        // Going anywhere at all closes the switcher: it is a thing held over wherever the
+        // user was, and the moment they are somewhere else it is over the wrong place.
+        closeRecents()
         appList.hideJumpList()
         if (appList.isSearching()) appList.endSearch()
         folderPage.hide()
@@ -487,6 +540,11 @@ class WP81Shell(
      * the activity falls through to its own window handling otherwise.
      */
     fun handleBack(): Boolean {
+        // First of all, because it is the only thing here that can be over a program as
+        // well as over the shell - so unlike everything below it, "is it open" cannot be
+        // narrowed down by where the user was. The host asks this same question ahead of
+        // its own window handling for that reason; see MainActivity's back dispatch.
+        if (closeRecents()) return true
         if (isPicking()) {
             // Backing out of picking returns to whatever asked for it.
             val cancelled = onPickerCancelled
@@ -536,6 +594,7 @@ class WP81Shell(
         iconPicker.applyPalette(p)
         inputDialog.applyPalette(p)
         toast.applyPalette(p)
+        recents.applyPalette(p)
     }
 
     companion object {

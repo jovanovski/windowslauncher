@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What is inside the window the launcher puts up when it is still the phone's phone or
+  messaging app under a theme that has neither. See DefaultAppsGate.
+
+  Laid out like the shell's other message boxes - icon on the left, words beside it,
+  buttons underneath - so it reads as one of this launcher's own dialogs whichever
+  desktop chrome it is inflated into. The message and which buttons are shown are set in
+  code, because both depend on which of the two roles is actually held.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="18dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="18dp"
+    android:paddingBottom="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/gate_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="2dp"
+            android:src="@drawable/dialog_warning_xp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/gate_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="?primaryFontFamily"
+                android:text="Calls and messages have nowhere to go"
+                android:textColor="@color/black"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/gate_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:fontFamily="?primaryFontFamily"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/black"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/gate_dialer_button"
+        style="?winButtonStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Choose a phone app" />
+
+    <TextView
+        android:id="@+id/gate_sms_button"
+        style="?winButtonStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Choose a messaging app" />
+
+    <TextView
+        android:id="@+id/gate_theme_button"
+        style="?winButtonStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Go back to Windows Phone 8" />
+
+    <!-- Only ever filled in when a button could not do what it offered. See showProblem. -->
+    <TextView
+        android:id="@+id/gate_problem"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fontFamily="?primaryFontFamily"
+        android:textColor="#8b0000"
+        android:textSize="11sp"
+        android:visibility="gone" />
+</LinearLayout>

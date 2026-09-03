@@ -3,6 +3,7 @@ package rocks.gorjan.gokixp.wp81
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.RectF
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -54,6 +55,7 @@ class MonochromeIconProvider(private val context: Context) {
     }
 
     private val ratioCache = mutableMapOf<String, Float>()
+    private val inkCache = mutableMapOf<String, RectF?>()
 
     /**
      * Forgets cached measurements for a package.
@@ -63,6 +65,7 @@ class MonochromeIconProvider(private val context: Context) {
      */
     fun invalidate(packageName: String) {
         ratioCache.keys.removeAll { it.endsWith(":$packageName") }
+        inkCache.keys.removeAll { it.endsWith(":$packageName") }
     }
 
     /**
@@ -74,11 +77,23 @@ class MonochromeIconProvider(private val context: Context) {
      */
     fun invalidateAll() {
         ratioCache.clear()
+        inkCache.clear()
     }
 
     /** Cached [measureContentRatio]; measuring means rasterising, so do it once per app. */
     fun ratioFor(key: String, drawable: Drawable): Float =
         ratioCache.getOrPut(key) { measureContentRatio(drawable) }
+
+    /**
+     * Cached [measureInk]. Null is a real answer - artwork that drew nothing - and is
+     * cached as one, so a blank drawable is not rasterised again on every bind.
+     */
+    fun inkFor(key: String, drawable: Drawable): RectF? {
+        if (inkCache.containsKey(key)) return inkCache[key]
+        val ink = measureInk(drawable)
+        inkCache[key] = ink
+        return ink
+    }
 
     /**
      * The Android 13+ themed-icon layer, or null when the platform is older or the app
@@ -99,37 +114,63 @@ class MonochromeIconProvider(private val context: Context) {
     companion object {
         private const val TAG = "WP81Icons"
 
+        /**
+         * The largest canvas the ink is measured on.
+         *
+         * Artwork is measured at its own intrinsic size wherever that fits under this,
+         * because some of it does not survive being measured anywhere else: a themed layer
+         * that comes back as an InsetDrawable carries insets in *pixels*, chosen for the
+         * canvas the artist drew on, and rasterising it into a smaller box eats the whole
+         * picture. Google Drive's measured as a blank square for exactly that reason.
+         * The cap is only there to keep a 1536px icon from asking for a 9MB bitmap.
+         */
+        private const val PROBE_MAX_PX = 512
+
+        /** The canvas for artwork that will not say how large it is. */
         private const val PROBE_PX = 72
 
-        /** Anything below this is treated as unmeasurable and left unscaled. */
+        /**
+         * The least of its canvas a mark may be said to cover.
+         *
+         * A floor, not a rejection. This used to hand back 1f - "fills its canvas" - for
+         * anything sparser, which is the opposite of the truth and had callers *shrink*
+         * the very glyphs that needed blowing up: Reddit's themed layer covers 14% of what
+         * it is drawn on, and came out as a speck.
+         */
         private const val MIN_RATIO = 0.2f
 
         /**
-         * How much of its own canvas a drawable's visible content actually covers, from 0
-         * to 1.
+         * How much of its own canvas a drawable's visible content covers, from 0 to 1,
+         * measured on the longer edge - which is what FIT_CENTER fits to.
          *
          * Source artwork pads itself wildly differently: an adaptive icon's monochrome
          * layer sits inside the central 72dp safe zone of a 108dp canvas and so covers
          * about two thirds, while a notification small icon or a flat app logo fills its
          * bounds. Drawn at a single fixed size, those land at visibly different optical
          * sizes on neighbouring tiles.
-         *
-         * Rather than guessing per source - which mis-sizes any app that does not follow
-         * the convention - this rasterises the drawable once and measures the alpha
-         * bounding box, so the caller can scale each glyph to a consistent optical size.
          */
         fun measureContentRatio(drawable: Drawable): Float {
+            val ink = measureInk(drawable) ?: return 1f
+            val (w, h) = canvasOf(drawable)
+            val ratio = maxOf(ink.width() * w, ink.height() * h) / maxOf(w, h)
+            return ratio.coerceIn(MIN_RATIO, 1f)
+        }
+
+        /**
+         * Where the visible ink actually sits inside a drawable's own canvas, as fractions
+         * of it, or null when the artwork drew nothing at all.
+         *
+         * The whole box rather than one number, so a caller can put the *ink* where it
+         * wants it at the size it wants: artwork is padded differently by every source and
+         * is not always centred in what padding it has, and neither of those can be
+         * corrected for by scaling alone. Rasterises, so cache it - see [inkFor].
+         */
+        fun measureInk(drawable: Drawable): RectF? {
             return try {
-                // Measured through the *same* transform the tile draws with. The ImageView
-                // uses FIT_CENTER, which preserves aspect; measuring inside a forced square
-                // stretched any non-square icon before the bounding box was taken, so its
-                // content was mis-measured and it ended up scaled to the wrong size - which
-                // is how one app's glyph came out visibly bigger than its neighbours'.
-                val intrinsicW = drawable.intrinsicWidth.takeIf { it > 0 } ?: PROBE_PX
-                val intrinsicH = drawable.intrinsicHeight.takeIf { it > 0 } ?: PROBE_PX
-                val scale = PROBE_PX / maxOf(intrinsicW, intrinsicH).toFloat()
-                val boxW = (intrinsicW * scale).toInt().coerceAtLeast(1)
-                val boxH = (intrinsicH * scale).toInt().coerceAtLeast(1)
+                val (iw, ih) = canvasOf(drawable)
+                val scale = minOf(1f, PROBE_MAX_PX / maxOf(iw, ih))
+                val boxW = (iw * scale).toInt().coerceAtLeast(1)
+                val boxH = (ih * scale).toInt().coerceAtLeast(1)
 
                 val bmp = Bitmap.createBitmap(boxW, boxH, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bmp)
@@ -152,16 +193,31 @@ class MonochromeIconProvider(private val context: Context) {
                         }
                     }
                 }
-                if (right < left || bottom < top) return 1f
+                if (right < left || bottom < top) return null
 
-                // Against the longer edge of the box, which is what FIT_CENTER fits to.
-                val ratio = maxOf(right - left + 1, bottom - top + 1) /
-                    maxOf(boxW, boxH).toFloat()
-                if (ratio < MIN_RATIO) 1f else ratio
+                RectF(
+                    left / boxW.toFloat(),
+                    top / boxH.toFloat(),
+                    (right + 1) / boxW.toFloat(),
+                    (bottom + 1) / boxH.toFloat()
+                )
             } catch (e: Exception) {
                 Log.w(TAG, "Could not measure glyph content", e)
-                1f
+                null
             }
         }
+
+        /**
+         * The canvas a drawable draws on, which is its intrinsic size where it has one.
+         *
+         * Aspect is kept rather than squared off: the artwork is drawn through a transform
+         * that preserves it, and measuring inside a forced square stretched any non-square
+         * icon before its box was taken - which is how one app's glyph came out visibly
+         * bigger than its neighbours'.
+         */
+        fun canvasOf(drawable: Drawable): Pair<Float, Float> = Pair(
+            (drawable.intrinsicWidth.takeIf { it > 0 } ?: PROBE_PX).toFloat(),
+            (drawable.intrinsicHeight.takeIf { it > 0 } ?: PROBE_PX).toFloat()
+        )
     }
 }

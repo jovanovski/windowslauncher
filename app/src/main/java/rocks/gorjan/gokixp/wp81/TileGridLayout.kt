@@ -82,6 +82,27 @@ class TileGridLayout @JvmOverloads constructor(
             requestLayout()
         }
 
+    /**
+     * Empty height kept above the first row, which the rows are pushed down by.
+     *
+     * The same problem as [bottomReservePx] at the other end - the selected tile's unpin
+     * handle is centred on its top-right corner and so reaches above the row it is on -
+     * and it cannot be solved the same way. Height added under the last row is room the
+     * wall can grow into; there is no growing upwards, because the first row starts at this
+     * layout's own top edge and above that is the scroller's, which clips. So this one
+     * moves the tiles instead: every row is placed [topReservePx] lower, and the air that
+     * leaves at the top of the wall is where the handle goes.
+     *
+     * It is air the phone had anyway. Tiles butted up against the status bar is not what
+     * Start looked like.
+     */
+    var topReservePx = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
+
     /** Resolved top-left cell of each child, parallel to child index. */
     private val placements = mutableListOf<Placement>()
 
@@ -200,7 +221,8 @@ class TileGridLayout @JvmOverloads constructor(
     /** Pixel bounds of a placement, relative to this view. */
     fun boundsOf(p: Placement): android.graphics.Rect {
         val left = marginPx + p.col * (cellPx + gapPx)
-        val top = p.row * (cellPx + gapPx) + if (p.row >= bandRow) bandHeight else 0
+        val top = topReservePx + p.row * (cellPx + gapPx) +
+            if (p.row >= bandRow) bandHeight else 0
         return android.graphics.Rect(
             left, top,
             left + spanPx(p.cols), top + spanPx(p.rows)
@@ -379,7 +401,7 @@ class TileGridLayout @JvmOverloads constructor(
         } ?: run { bandFullHeight = 0 }
 
         val height = if (rows == 0) 0 else rows * cellPx + (rows - 1) * gapPx
-        setMeasuredDimension(width, height + bandHeight + bottomReservePx)
+        setMeasuredDimension(width, topReservePx + height + bandHeight + bottomReservePx)
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
@@ -394,7 +416,7 @@ class TileGridLayout @JvmOverloads constructor(
         // is simply not drawn - which is what makes the contents appear to come down out
         // of the tile rather than to be squashed into the gap.
         bandView?.let { band ->
-            val top = bandRow * (cellPx + gapPx)
+            val top = topReservePx + bandRow * (cellPx + gapPx)
             band.layout(0, top, width, top + bandHeight)
         }
     }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  wp81_weather_fog - fog.
+  wp81_weather_cloud - a sky with nothing but cloud.
 
   From the Weather set by Good Ware (flaticon.com/authors/good-ware): the pack's own paths,
   unedited and unscaled, emitted white so callers can tint per accent and per light/dark
@@ -19,22 +19,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="20.080"
-    android:viewportHeight="20.080">
+    android:viewportWidth="332.000"
+    android:viewportHeight="332.000">
     <group
-        android:translateX="-1.960"
-        android:translateY="-2.460">
+        android:translateX="0.000"
+        android:translateY="-0.138">
         <path
             android:fillColor="#FFFFFFFF"
-            android:pathData="m21 6h-9c-.6 0-1-.4-1-1s.4-1 1-1h9c.6 0 1 .4 1 1s-.4 1-1 1zm-13 0h-3c-.6 0-1-.4-1-1s.4-1 1-1h3c.6 0 1 .4 1 1s-.4 1-1 1z" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="m19 11h-1c-.6 0-1-.4-1-1s.4-1 1-1h1c.6 0 1 .4 1 1s-.4 1-1 1zm-5 0h-11c-.6 0-1-.4-1-1s.4-1 1-1h11c.6 0 1 .4 1 1s-.4 1-1 1z" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="m21 16h-7c-.6 0-1-.4-1-1s.4-1 1-1h7c.6 0 1 .4 1 1s-.4 1-1 1zm-11 0h-5c-.6 0-1-.4-1-1s.4-1 1-1h5c.6 0 1 .4 1 1s-.4 1-1 1z" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="m19 21h-3c-.6 0-1-.4-1-1s.4-1 1-1h3c.6 0 1 .4 1 1s-.4 1-1 1zm-7 0h-9c-.6 0-1-.4-1-1s.4-1 1-1h9c.6 0 1 .4 1 1s-.4 1-1 1z" />
+            android:pathData="M312.4,150.6c-12-12-29.2-19.6-47.6-19.6c-9.6,0-19.2,2-27.6,6c-8.8,4-16.4,9.6-22.8,16.8c-3.6,4.4-10.4,4.8-14.4,0.8 c-4.4-3.6-4.8-10.4-0.8-14.4c8.4-9.6,18.4-16.8,29.6-22c2.4-1.2,4.8-2,7.2-2.8c-6.8-13.2-16.8-24.4-28.8-32.4 c-14.8-10.4-32.8-16.4-52-16.4c-22.4,0-43.2,8-59.2,22c-16,13.6-27.2,33.2-30.4,55.2c-0.4,2.8-2,5.6-4.4,7.2h-0.4 c-1.2,0.8-2.8,1.2-4.4,1.2c-15.6,0-30,6.4-40,16.4C6,179,0,193,0,208.6c0,15.6,6.4,30,16.4,40c8.8,10.4,23.2,16.8,38.8,16.8h209.6 c18.8,0,35.6-7.6,47.6-19.6s19.6-29.2,19.6-47.6C332,179.4,324.4,162.6,312.4,150.6z" />
     </group>
 </vector>

@@ -3,12 +3,14 @@ package rocks.gorjan.gokixp.wp81
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Matrix
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
 import rocks.gorjan.gokixp.AppInfo
@@ -21,9 +23,9 @@ import rocks.gorjan.gokixp.R
  * Everything that makes it that page - the letter squares, the jump grid behind them, the
  * held letter at the top, the search band that takes the rail's place - is
  * [MetroIndexList], which the People hub's own list is built on too. What is left here is
- * the part that is about *apps*: a row is an icon and a name, the shell's own programs
- * wear a glyph on a square of the accent, and a search that matches nothing installed is
- * handed on to the web.
+ * the part that is about *apps*: a row is an icon and a name, an app with flat artwork
+ * wears it in white on a square of the accent, and a search that matches nothing installed
+ * is handed on to the web.
  */
 @SuppressLint("ViewConstructor")
 class AppListView(
@@ -45,11 +47,11 @@ class AppListView(
     /**
      * The mark to draw for one of the shell's own Metro apps, or null for anything else.
      *
-     * Windows Phone drew its own programs as a flat white glyph on a square of the accent,
-     * and everything installed from a shop as that app's own icon. This is the first half
-     * of that: an app the host recognises as one of the shell's hands back the drawable to
-     * use, and the row paints the square round it. The host decides which those are - it is
-     * the only thing that knows what a package opens into.
+     * The host decides which apps are the shell's own - it is the only thing that knows
+     * what a package opens into - and hands back the drawable to draw. Everything else is
+     * asked of [MonochromeIconProvider], which finds the app's own flat artwork where it
+     * has any; see [glyphOf]. This outranks the provider, because a glyph written for this
+     * shell says what the program *is* where a themed icon only says who made it.
      */
     var metroGlyph: ((AppInfo) -> Int?)? = null
 
@@ -81,7 +83,85 @@ class AppListView(
     }
 
     fun setApps(apps: List<AppInfo>) {
+        // A fresh list is the one moment the art can have changed underneath the cache:
+        // it is what an install, an uninstall, a chosen icon and a theme swap all end in.
+        glyphs.clear()
         setItems(apps.sortedBy { it.name.lowercase() })
+    }
+
+    /**
+     * The mark for one app, resolved once and kept.
+     *
+     * Resolving means asking the package manager for the app's icon and rasterising it to
+     * measure - far too much to do on every bind of a list that recycles its rows under a
+     * flicked finger. Emptied whenever the list is set again, which is what every change
+     * to an app's artwork ends in. See [setApps].
+     */
+    private val glyphs = mutableMapOf<String, MonochromeIconProvider.Glyph?>()
+
+    private fun glyphOf(app: AppInfo): MonochromeIconProvider.Glyph? {
+        if (glyphs.containsKey(app.packageName)) return glyphs[app.packageName]
+        val resolved = resolveGlyph(app)
+        glyphs[app.packageName] = resolved
+        return resolved
+    }
+
+    private fun resolveGlyph(app: AppInfo): MonochromeIconProvider.Glyph? {
+        metroGlyph?.invoke(app)?.let { res ->
+            val drawable = AppCompatResources.getDrawable(context, res) ?: return null
+            return MonochromeIconProvider.Glyph.Monochrome(
+                drawable, iconProvider.ratioFor("res:$res", drawable))
+        }
+        return iconProvider.glyphFor(app.packageName, app.icon)
+    }
+
+    /**
+     * Puts one glyph on its accent square at [GLYPH_DP], wherever its ink happens to sit
+     * inside the artwork it arrived in.
+     *
+     * Nothing about the source is taken on trust. Every source pads itself differently - a
+     * themed layer keeps the adaptive-icon safe zone, a notification silhouette fills its
+     * bounds, this shell's own glyphs cover about half of theirs - and some pad so heavily
+     * that the mark is a speck in the middle of a mostly empty picture. Worse, the padding
+     * is not always symmetrical, so the ink is not always in the middle of it. So the
+     * measured ink box is what gets placed: its longer side is scaled to [GLYPH_DP] and its
+     * centre put at the square's centre, which makes every mark in the list the same size
+     * and on the same axis whatever it was drawn on.
+     *
+     * Placed by matrix rather than by padding, because a glyph that covers a seventh of its
+     * canvas needs a canvas seven times the square to show at the right size, and no amount
+     * of padding can give it one. What hangs over the edge is that artwork's own margin,
+     * and the square clips it.
+     */
+    private fun placeGlyph(
+        view: ImageView,
+        drawable: android.graphics.drawable.Drawable,
+        packageName: String
+    ) {
+        // Keyed by package, which is what the provider forgets by when an app's artwork
+        // changes - and what this list resolves one glyph per, so the two stay in step.
+        val ink = iconProvider.inkFor("ink:$packageName", drawable)
+        val canvasW = drawable.intrinsicWidth.toFloat()
+        val canvasH = drawable.intrinsicHeight.toFloat()
+        // Artwork that drew nothing, or that will not say how large it is: an ImageView
+        // ignores the matrix for a drawable with no intrinsic size, so there is nothing to
+        // place and the plain fit is the only honest answer.
+        if (ink == null || canvasW <= 0f || canvasH <= 0f) {
+            view.scaleType = ImageView.ScaleType.FIT_CENTER
+            return
+        }
+        val inkW = ink.width() * canvasW
+        val inkH = ink.height() * canvasH
+        val scale = dp(GLYPH_DP) / maxOf(inkW, inkH)
+        val centre = dp(ICON_DP) / 2f
+        view.scaleType = ImageView.ScaleType.MATRIX
+        view.imageMatrix = Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(
+                centre - scale * (ink.left * canvasW + inkW / 2f),
+                centre - scale * (ink.top * canvasH + inkH / 2f)
+            )
+        }
     }
 
     override fun letterOf(item: AppInfo): Char = bucketOf(item.name)
@@ -162,22 +242,32 @@ class AppListView(
             bound = item
             name.text = item.name
             name.setTextColor(palette.foreground)
-            // The shell's own programs are drawn the way the phone drew the ones that came
-            // with it: the glyph in white on a square of the accent. Everything installed
-            // from a shop keeps its own icon, as WP8.1 did - the square is what tells the
-            // two apart at a glance, and it is the same square those apps' tiles wear.
-            val glyph = metroGlyph?.invoke(item)
-            if (glyph != null) {
-                icon.setImageResource(glyph)
-                icon.imageTintList = ColorStateList.valueOf(palette.onAccent())
-                icon.setBackgroundColor(palette.accent)
-                val inset = dp(GLYPH_INSET_DP)
-                icon.setPadding(inset, inset, inset, inset)
-            } else {
-                icon.setImageDrawable(item.icon)
-                icon.imageTintList = null
-                icon.background = null
-                icon.setPadding(0, 0, 0, 0)
+            // Flat artwork - this shell's own glyph, an app's themed monochrome layer, or
+            // its notification silhouette - is drawn the way the phone drew the programs it
+            // came with: white on a square of the accent. An app with none of those keeps
+            // the icon it was installed with, unboxed, which is also what WP8.1 did with
+            // art a developer had not drawn for a tile.
+            when (val glyph = glyphOf(item)) {
+                is MonochromeIconProvider.Glyph.Monochrome -> {
+                    icon.setImageDrawable(glyph.drawable)
+                    icon.imageTintList = ColorStateList.valueOf(palette.onAccent())
+                    icon.setBackgroundColor(palette.accent)
+                    placeGlyph(icon, glyph.drawable, item.packageName)
+                }
+                // The app's own icon, filling the slot rather than sitting on a square: it
+                // is a picture, not a mark, and there is nothing for it to line up with.
+                is MonochromeIconProvider.Glyph.FullColor -> {
+                    icon.scaleType = ImageView.ScaleType.FIT_CENTER
+                    icon.setImageDrawable(glyph.drawable)
+                    icon.imageTintList = null
+                    icon.background = null
+                }
+                null -> {
+                    icon.scaleType = ImageView.ScaleType.FIT_CENTER
+                    icon.setImageDrawable(null)
+                    icon.imageTintList = null
+                    icon.background = null
+                }
             }
         }
     }
@@ -189,13 +279,13 @@ class AppListView(
         const val ICON_DP = 42
 
         /**
-         * How far a Metro app's glyph sits inside its accent square.
+         * How large the *visible* mark on an accent square is, whatever it was drawn on.
          *
-         * A hair. These marks are drawn with their own air - the shape covers about half of
-         * the canvas it is centred on - so an inset on top of that is air twice over. What
-         * is left keeps the glyph off the square's own edge and no more: a 40dp glyph on
-         * the 42dp square.
+         * Every mark is put at this size rather than at whatever its own padding happened
+         * to give; see [placeGlyph]. Twenty-four of the square's forty-two: four more than
+         * where this shell's own glyphs sat on their own, which was a mark with more square
+         * around it than the square needed.
          */
-        const val GLYPH_INSET_DP = 1
+        const val GLYPH_DP = 24
     }
 }

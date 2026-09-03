@@ -105,7 +105,12 @@ class MissedCallReceiver : BroadcastReceiver() {
             if (deep) rocks.gorjan.gokixp.wp81.PeopleStore.nameNumbers(context, listOf(it))[it]
             else rocks.gorjan.gokixp.wp81.PeopleStore.lookupNow(context, it)
         }
+        // Their picture if they have one, the handset on the accent if not - see
+        // glyphFace. Left null, this is where the shade puts its own grey circle with the
+        // small icon badged into the corner of it, which is a face-shaped hole with a
+        // stamp on it; the mark alone at least says what has been missed.
         val photo = facePhoto(context, caller?.photoUri)
+            ?: glyphFace(context, R.drawable.wp81_notify_missed_call)
         val who = caller?.name?.takeIf { it.isNotBlank() } ?: number
         ensureChannel(context)
 

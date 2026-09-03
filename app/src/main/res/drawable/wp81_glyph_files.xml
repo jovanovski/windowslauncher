@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_glyph_files - the Files app.
+
+  appbar.cabinet.files from Templarian/WindowsIcons (Modern UI Icons, CC BY 3.0), the set
+  the rest of this shell's marks come from, traced as a vector rather than converted to
+  PNGs: a filing cabinet with a document standing in it. Kept on the source's own 76x76
+  grid so it sits at the same weight as everything beside it.
+
+  Emitted white so callers can tint per accent / light-dark theme.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="76"
+    android:viewportHeight="76">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 19,38L 19,22L 24,22L 24,20L 29,20L 29,19L 46.75,19L 57,29.25L 57,38L 59,38L 59,57L 58.5833,57L 17.4167,57L 17,57L 17,38L 19,38 Z M 24,38L 24,25L 22,25L 22,38L 24,38 Z M 27,23L 27,38L 29,38L 29,23L 27,23 Z M 43,46L 43,49L 33,49L 33,46L 43,46 Z M 54,38L 54,33L 43,33L 43,22L 32,22L 32,38L 54,38 Z M 46,22.75L 46,30L 53.25,30L 46,22.75 Z M 21,42L 21,53L 55,53L 55,42L 21,42 Z" />
+</vector>

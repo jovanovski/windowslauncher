@@ -380,21 +380,45 @@ class CalculatorApp(
                 readout.setPadding(0, 0, padEnd, padBottom)
             }
 
-            val max = keyW * DISPLAY_TEXT
-            scratch.set(readout.paint)
-            scratch.textSize = max
-            val wanted = scratch.measureText(readout.text.toString())
-            val room = (width - padEnd).toFloat()
-            val size = if (wanted <= room || wanted <= 0f) max else {
-                (max * room / wanted).coerceAtLeast(max * DISPLAY_MIN_SCALE)
-            }
-            if (kotlin.math.abs(readout.textSize - size) > 0.5f) {
-                readout.setTextSize(TypedValue.COMPLEX_UNIT_PX, size)
-            }
+            // Set outright rather than only when it differs by half a pixel: half a pixel
+            // over the size the number was measured to fit at is a size it does not fit
+            // at, and TextView already ignores a set that changes nothing.
+            readout.setTextSize(
+                TypedValue.COMPLEX_UNIT_PX,
+                fitSize(readout.text.toString(), (width - padEnd).toFloat())
+            )
             readout.measure(
                 MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(displayHeight, MeasureSpec.EXACTLY)
             )
+        }
+
+        /**
+         * The largest size [text] fits [room] at - and one it genuinely fits at.
+         *
+         * Text is very nearly as wide as it is tall, so a single proportion lands within a
+         * fraction of a pixel of the size that fills the width exactly. Which side of it
+         * the fraction falls on is not knowable from here: advances are rounded, and the
+         * width the view compares against is a ceiling of the same measurement.
+         *
+         * A hair too wide is not a hair clipped. The view holds one line, and a line that
+         * does not fit is a line the platform wraps - leaving a number broken across lines
+         * with only one of them ever drawn, which is how 11000 / 61.6 came to read "9".
+         * So the proportion is a first guess, aimed deliberately short of the width, and
+         * it is measured again to confirm it fits before it is used.
+         */
+        private fun fitSize(text: String, room: Float): Float {
+            val max = keyW * DISPLAY_TEXT
+            val least = max * DISPLAY_MIN_SCALE
+            scratch.set(readout.paint)
+            var size = max
+            repeat(FIT_TRIES) {
+                scratch.textSize = size
+                val wanted = scratch.measureText(text)
+                if (wanted <= room || size <= least) return size
+                size = (size * (room / wanted) * FIT_MARGIN).coerceAtLeast(least)
+            }
+            return size
         }
 
         private fun spanWidth(span: Int) = (span * keyW + (span - 1) * gap).toInt()
@@ -454,6 +478,15 @@ class CalculatorApp(
 
         /** How small a long number may be shrunk before it is allowed to clip. */
         const val DISPLAY_MIN_SCALE = 0.34f
+
+        /**
+         * How far short of the width the number is aimed, and how many goes it gets at it.
+         *
+         * A shade under a fifth of a per cent: too small to see, and more than the
+         * rounding that would otherwise leave the number a pixel too wide for its line.
+         */
+        const val FIT_MARGIN = 0.995f
+        const val FIT_TRIES = 4
 
         /** The two key greys, as a fraction of the way from the background to the foreground. */
         const val DIGIT_FILL_ALPHA = 0.122f

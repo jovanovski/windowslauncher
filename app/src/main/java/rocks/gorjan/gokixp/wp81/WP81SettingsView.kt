@@ -124,6 +124,10 @@ class WP81SettingsView(
      * same as unpainting them: the colours are kept, and the switch is here, beside the
      * picture it is in the way of, rather than in the tile menu where undoing it would
      * mean visiting every tile that had one.
+     *
+     * Always offered, unlike the background's own switches: a wall of painted tiles is
+     * worth putting back to the accent on a plain Start screen too, and a switch that
+     * appears only once a picture is set is one the user has no way of finding.
      */
     private val hideColorsRow =
         CheckRow("hide custom tile colors") { on -> onHideTileColorsChanged?.invoke(on) }
@@ -230,6 +234,7 @@ class WP81SettingsView(
         })
 
         column.addView(driftRow.view, wide())
+        hideColorsRow.setVisible(true)
         column.addView(hideColorsRow.view, wide())
 
         column.addView(sectionLabel("back key"), wide())
@@ -266,38 +271,14 @@ class WP81SettingsView(
     /**
      * The mark beside a setting, in the shape that says what kind of setting it is.
      *
-     * Round is one of a set - dark or light, three columns or four - where choosing this
-     * one unchooses its neighbour. Square is a switch, which answers only for itself. Both
-     * used to be the same filled square, so the page said nothing about which choices were
-     * exclusive and which were not, and a row of them read as a list of things that were
-     * all somehow on.
-     *
-     * Off is an outline either way. On fills it: the round one with a dot inside its ring,
-     * the way a radio button has shown it since Windows had them, the square one solid
-     * with a tick.
+     * [MetroMarker]'s, which is where it lives now that the Weather app and the News
+     * reader draw their choices with it too - see that file for what round and square
+     * each mean. Kept as a method here because a dozen call sites below say
+     * `markerDrawable(round = ..., on = ...)` and none of them need to know where it
+     * comes from.
      */
-    private fun markerDrawable(round: Boolean, on: Boolean): Drawable {
-        val frame = GradientDrawable().apply {
-            shape = if (round) GradientDrawable.OVAL else GradientDrawable.RECTANGLE
-            // The square fills; the circle keeps its middle for the dot.
-            setColor(if (on && !round) palette.accent else Color.TRANSPARENT)
-            setStroke(dp(2), if (on) palette.accent else palette.foregroundSubtle)
-        }
-        if (!on) return frame
-        val inner: Drawable = if (round) {
-            GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(palette.accent)
-            }
-        } else {
-            ResourcesCompat.getDrawable(resources, R.drawable.ic_check_windows, null)
-                ?.mutate()?.apply { setTint(palette.onAccent()) } ?: return frame
-        }
-        val inset = if (round) dp(5) else dp(3)
-        return LayerDrawable(arrayOf(frame, inner)).apply {
-            setLayerInset(1, inset, inset, inset, inset)
-        }
-    }
+    private fun markerDrawable(round: Boolean, on: Boolean): Drawable =
+        MetroMarker.drawable(context, palette, round, on)
 
     private fun wide() = LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -699,7 +680,6 @@ class WP81SettingsView(
         blurSlider.value = blur
         driftRow.setVisible(hasBackground)
         driftRow.set(drift)
-        hideColorsRow.setVisible(hasBackground)
         hideColorsRow.set(hideTileColors)
     }
 

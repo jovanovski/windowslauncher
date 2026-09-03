@@ -261,10 +261,18 @@ class InternetExplorerApp(
         }
 
         // Handle file downloads using DownloadManager
-        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            // blob: and data: are the page's own memory rather than an address, and the
+            // download manager cannot reach into this process to read them.
+            if (!URLUtil.isNetworkUrl(url)) {
+                Log.w("InternetExplorerApp", "Nothing to fetch for $url")
+                onShowNotification("Download Failed", "That file cannot be saved from here")
+                return@setDownloadListener
+            }
             try {
-                // Get filename from content disposition or URL
-                val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+                // Read from the Content-Disposition where there is one, rather than
+                // guessing at the address. See downloadFileName.
+                val fileName = downloadFileName(url, contentDisposition, mimetype)
 
                 val request = DownloadManager.Request(Uri.parse(url))
                     .setTitle(fileName)
@@ -274,6 +282,9 @@ class InternetExplorerApp(
                     .setAllowedOverMetered(true)
                     .setAllowedOverRoaming(true)
                     .setMimeType(mimetype)
+                    // The session the page was using, without which anything behind a
+                    // sign-in or a bot check answers with a refusal. See asThePageAsked.
+                    .asThePageAsked(url, userAgent, webView.url)
 
                 val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 downloadManager.enqueue(request)
@@ -726,7 +737,7 @@ class InternetExplorerApp(
      */
     private fun downloadImage(imageUrl: String) {
         try {
-            val fileName = URLUtil.guessFileName(imageUrl, null, null)
+            val fileName = downloadFileName(imageUrl, null, null)
             val request = DownloadManager.Request(Uri.parse(imageUrl))
                 .setTitle(fileName)
                 .setDescription("Downloading image from Internet Explorer")
@@ -734,6 +745,9 @@ class InternetExplorerApp(
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
+                // An image behind a sign-in is only there for the session that is
+                // looking at it, the same as any other file. See asThePageAsked.
+                .asThePageAsked(imageUrl, webView?.settings?.userAgentString, webView?.url)
 
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             downloadManager.enqueue(request)

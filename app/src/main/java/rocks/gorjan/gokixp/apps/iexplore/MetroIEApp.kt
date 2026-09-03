@@ -12,7 +12,9 @@ import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Environment
 import android.os.Handler
@@ -239,9 +241,29 @@ class MetroIEApp(
     /** What the address bar should say once the user stops editing it. */
     private var currentUrl: String = ""
 
+    /**
+     * Whether sites are being asked for the version they would send a computer.
+     *
+     * One setting for the whole browser rather than one per tab, which is how the phone
+     * had it: IE's settings offered "website preference - mobile version or desktop
+     * version" and meant it about the browser. A page that has to be asked again is asked
+     * again on every tab at once, so switching tabs never switches the answer.
+     */
+    private var desktopMode = false
+
+    /**
+     * What the WebView calls itself when it is left alone.
+     *
+     * Read off the first page built rather than asked for up front: it is a property of
+     * the WebView, and building one to ask costs a WebView. Kept because turning desktop
+     * mode back off has to put back exactly what was there, not an approximation of it.
+     */
+    private var mobileAgent: String? = null
+
     fun createView(initialUrl: String? = null, fromAnotherApp: Boolean = false): View {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         homepage = prefs.getString(KEY_HOMEPAGE, DEFAULT_HOMEPAGE) ?: DEFAULT_HOMEPAGE
+        desktopMode = prefs.getBoolean(KEY_DESKTOP_MODE, false)
         favourites.clear()
         favourites.addAll(loadFavourites())
         history.clear()
@@ -792,6 +814,40 @@ class MetroIEApp(
         open(file, item.mime)
     }
 
+    /**
+     * Why a download that started did not arrive, in words rather than in a number.
+     *
+     * The download manager keeps a reason on the row: an HTTP status when the server
+     * answered, and one of its own codes when nothing came back at all. Somebody who has
+     * just watched a file fail is owed the difference between a site that said no and a
+     * phone with no room left, because only one of those is worth trying again.
+     */
+    private fun whyNot(downloads: DownloadManager, id: Long): String {
+        val reason = try {
+            downloads.query(DownloadManager.Query().setFilterById(id))?.use { row ->
+                val column = row.getColumnIndex(DownloadManager.COLUMN_REASON)
+                if (column >= 0 && row.moveToFirst()) row.getInt(column) else 0
+            } ?: 0
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read why download $id failed", e)
+            0
+        }
+        Log.w(TAG, "Download $id failed with reason $reason")
+        return when (reason) {
+            401, 403 -> "could not be downloaded - the site would not hand it over"
+            404, 410 -> "is not there any more"
+            in 500..599 -> "could not be downloaded - the site is having trouble"
+            DownloadManager.ERROR_INSUFFICIENT_SPACE -> "would not fit on this phone"
+            DownloadManager.ERROR_DEVICE_NOT_FOUND,
+            DownloadManager.ERROR_FILE_ERROR,
+            DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "could not be saved"
+            DownloadManager.ERROR_TOO_MANY_REDIRECTS,
+            DownloadManager.ERROR_HTTP_DATA_ERROR,
+            DownloadManager.ERROR_CANNOT_RESUME -> "did not finish downloading"
+            else -> "could not be downloaded"
+        }
+    }
+
     /** One row of the download manager's own list. */
     private data class Download(
         val id: Long,
@@ -857,8 +913,11 @@ class MetroIEApp(
         val webView = tab.webView
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        // Both already what a desktop page needs: a page with no viewport of its own is
+        // laid out at its full width and then zoomed out to fit, rather than cropped.
         webView.settings.loadWithOverviewMode = true
         webView.settings.useWideViewPort = true
+        applyDesktopMode(webView)
         // Pinch to zoom, without the pair of grey +/- buttons that come with it by
         // default and that no phone browser has had since about 2011.
         webView.settings.builtInZoomControls = true
@@ -954,8 +1013,8 @@ class MetroIEApp(
             }
         }
 
-        webView.setDownloadListener { url, _, contentDisposition, mimetype, _ ->
-            download(url, contentDisposition, mimetype)
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            download(url, Caller(tab.url, userAgent), contentDisposition, mimetype)
         }
     }
 
@@ -1002,9 +1061,19 @@ class MetroIEApp(
         return true
     }
 
-    private fun download(url: String, contentDisposition: String?, mimetype: String?) {
+    /** Asks the download manager for a file. See [asThePageAsked]. */
+    private fun download(
+        url: String, from: Caller, contentDisposition: String?, mimetype: String?
+    ) {
+        // blob: and data: are the page's own memory rather than an address, and the
+        // download manager has no way to reach into this process and read them.
+        if (!URLUtil.isNetworkUrl(url)) {
+            Log.w(TAG, "Nothing to fetch for $url")
+            notify("Internet Explorer", "That file cannot be saved from here")
+            return
+        }
+        val fileName = downloadFileName(url, contentDisposition, mimetype)
         try {
-            val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
             val request = DownloadManager.Request(Uri.parse(url))
                 .setTitle(fileName)
                 .setDescription("Downloading from Internet Explorer")
@@ -1014,9 +1083,15 @@ class MetroIEApp(
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
                 .setMimeType(mimetype)
+                .asThePageAsked(url, from.agent, from.referer)
             val downloads = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             watchDownloads()
-            arriving[downloads.enqueue(request)] = fileName
+            val id = downloads.enqueue(request)
+            arriving[id] = fileName
+            // Where it is being fetched from, to go with the reason if it fails. Without
+            // the query, which on a share link is the part that is the key to the file.
+            val at = Uri.parse(url)
+            Log.d(TAG, "Download $id is $fileName from ${at.host}${at.path}")
             notify("Downloading", fileName)
         } catch (e: Exception) {
             Log.e(TAG, "Could not download $url", e)
@@ -1045,7 +1120,7 @@ class MetroIEApp(
                     context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 val file = downloads.getUriForDownloadedFile(id)
                 if (file == null) {
-                    notify("Internet Explorer", "$name could not be downloaded")
+                    notify("Internet Explorer", "$name ${whyNot(downloads, id)}")
                 } else {
                     val mime = downloads.getMimeTypeForDownloadedFile(id)
                     notify("Saved", "$name is in Downloads") { open(file, mime) }
@@ -1155,10 +1230,11 @@ class MetroIEApp(
     /**
      * The page a fetch is being made from.
      *
-     * Read on the main thread and carried to the one doing the fetching, which cannot go
-     * looking at [current] itself. Both go on the request: a picture asked for with
-     * neither comes back from a good many sites as a refusal or a placeholder, because
-     * what they are checking is that it was asked for by the page it is drawn on.
+     * Read on the main thread and carried to whatever does the fetching - a thread, or
+     * the download manager in another process - neither of which can go looking at
+     * [current] itself. Both go on the request: a file asked for with neither comes back
+     * from a good many sites as a refusal or a placeholder, because what they are checking
+     * is that it was asked for by the page it belongs to.
      */
     private data class Caller(val referer: String?, val agent: String?)
 
@@ -1173,7 +1249,7 @@ class MetroIEApp(
      */
     private fun saveImage(url: String) {
         if (!url.startsWith("data:")) {
-            download(url, null, guessMime(url))
+            download(url, caller(), null, guessMime(url))
             return
         }
         // A picture written into the page itself is already on the phone, and there is no
@@ -1712,6 +1788,51 @@ class MetroIEApp(
         notify("Internet Explorer", "Browsing history deleted")
     }
 
+    // ---------------------------------------------------------------- desktop mode
+
+    /**
+     * Tells [webView] which of itself to admit to.
+     *
+     * A site picks its mobile layout off the user agent, so that is the whole of the
+     * setting: nothing else about the WebView changes, and a page that has been told it is
+     * on a computer lays itself out as one. The address is reloaded rather than left,
+     * because the version being asked for was decided when the page was fetched.
+     */
+    private fun applyDesktopMode(webView: WebView) {
+        val settings = webView.settings
+        if (mobileAgent == null) mobileAgent = settings.userAgentString
+        settings.userAgentString =
+            if (desktopMode) desktopAgent(mobileAgent ?: "") else mobileAgent
+    }
+
+    /**
+     * The computer this browser says it is.
+     *
+     * Built out of the phone's own user agent rather than written down, so the Chrome
+     * version in it is the version that is actually drawing the page. A made-up one goes
+     * stale the first time WebView updates underneath, and a site reading it then serves a
+     * workaround for a browser nobody is running. Everything that says phone comes out -
+     * the Android platform, the `wv` that marks a WebView, the word Mobile - and a plain
+     * Linux desktop goes in its place.
+     */
+    private fun desktopAgent(from: String): String =
+        PLATFORM.replaceFirst(from, "(X11; Linux x86_64)")
+            .replace("Version/4.0 ", "")
+            .replace(" Mobile ", " ")
+
+    private fun toggleDesktopMode() {
+        desktopMode = !desktopMode
+        context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_DESKTOP_MODE, desktopMode).apply()
+        // Every tab, not only the one in front: the setting is the browser's, and a tab
+        // that kept the old answer until it was next touched would be a second setting.
+        for (tab in tabs) applyDesktopMode(tab.webView)
+        current?.let { tab ->
+            // A tab that has never fetched anything has nothing to ask again for.
+            if (tab.pending == null && tab.url.isNotBlank()) tab.webView.reload()
+        }
+    }
+
     // ---------------------------------------------------------------- the menu
 
     private fun openMenu() {
@@ -1759,9 +1880,14 @@ class MetroIEApp(
         }
 
         val tab = current
-        if (tab?.webView?.canGoForward() == true) {
-            menuPanel.addView(menuRow("forward") { tab.webView.goForward() })
-        }
+        // Always on the list, and dimmed where there is nothing ahead. A row that comes
+        // and goes moves everything under it, so the one time the user has gone back and
+        // wants forward is the one time every other command is in the wrong place.
+        menuPanel.addView(
+            menuRow("forward", enabled = tab?.webView?.canGoForward() == true) {
+                tab?.webView?.goForward()
+            }
+        )
         menuPanel.addView(menuRow("home") { current?.let { load(it, homepage) } })
         menuPanel.addView(menuRow("favourites", closes = false) {
             buildMenu(favouritesOpen = true)
@@ -1771,25 +1897,85 @@ class MetroIEApp(
         menuPanel.addView(menuRow("downloads") { openDownloads() })
         menuPanel.addView(menuRow("share page") { sharePage() })
         menuPanel.addView(menuRow("set as home page") { setHomepageToCurrent() })
+        menuPanel.addView(
+            menuRow("desktop mode", closes = false, ticked = desktopMode) {
+                toggleDesktopMode()
+                // Rebuilt in place rather than closed, so the box is seen to tick. The
+                // list does not move under the finger: the row is where it was.
+                buildMenu(favouritesOpen = false)
+            }
+        )
         menuPanel.addView(menuRow("delete history") { clearHistory() })
     }
 
-    private fun menuRow(label: String, closes: Boolean = true, action: () -> Unit): View =
-        TextView(context).apply {
+    /**
+     * One command on the list, and for a setting the box saying where it stands.
+     *
+     * [ticked] is a state rather than an absence of one, so a row that has it keeps it
+     * either way: a box that vanished when the setting went off would leave the words
+     * sliding sideways every time it was worked, and there would be nothing on the list
+     * to say the setting exists.
+     */
+    private fun menuRow(
+        label: String, closes: Boolean = true, enabled: Boolean = true,
+        ticked: Boolean? = null, action: () -> Unit
+    ): View {
+        val row = TextView(context).apply {
             // Lowercase, like every command list in this shell.
             text = label.lowercase()
             typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
             textSize = 16f
-            setTextColor(Color.WHITE)
+            // Greyed rather than gone, the way the phone greyed a command it was keeping
+            // in place. It does not tilt and it does not answer, so there is nothing to
+            // learn from pressing it beyond what the colour already said.
+            setTextColor(if (enabled) Color.WHITE else DISABLED_TEXT)
             setPadding(dp(22), dp(12), dp(22), dp(12))
-            isClickable = true
-            setOnClickListener {
-                Haptics.tap(it)
-                if (closes) closeMenu()
-                action()
+            isClickable = enabled
+            if (enabled) {
+                setOnClickListener {
+                    Haptics.tap(it)
+                    if (closes) closeMenu()
+                    action()
+                }
+                TiltEffect.apply(this)
             }
-            TiltEffect.apply(this)
         }
+        if (ticked == null) return row
+        row.setCompoundDrawablesRelative(tickBox(ticked), null, null, null)
+        row.compoundDrawablePadding = dp(TICK_GAP_DP)
+        return row
+    }
+
+    /**
+     * The box beside a setting on the menu.
+     *
+     * Drawn here rather than taken from the shell's own MetroMarker, which colours
+     * itself out of the palette. This strip is the one surface in the phone that does not
+     * follow the palette - see the note on the class - and a light theme's marker on it
+     * would be a dark grey outline on near-black. White on the black strip, filled white
+     * with the tick knocked out of it, is the same box in the same two states.
+     */
+    private fun tickBox(on: Boolean): Drawable {
+        val size = dp(TICK_SIZE_DP)
+        val frame = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(if (on) Color.WHITE else Color.TRANSPARENT)
+            setStroke(dp(2), Color.WHITE)
+        }
+        val box = if (!on) frame else {
+            val tick = ResourcesCompat
+                .getDrawable(context.resources, R.drawable.ic_check_windows, null)
+                ?.mutate()?.apply { setTint(Color.BLACK) }
+            if (tick == null) frame else LayerDrawable(arrayOf(frame, tick)).apply {
+                setLayerInset(1, dp(3), dp(3), dp(3), dp(3))
+            }
+        }
+        // Set here rather than left to the intrinsic size, which a layered box takes from
+        // whichever layer is largest - so the ticked one would come out a hair wider than
+        // the empty one and the words beside it would step sideways as it was worked.
+        box.setBounds(0, 0, size, size)
+        return box
+    }
 
     /** A favourite, with the means to get rid of it on the same row. */
     private fun favouriteRow(favourite: Favourite): View {
@@ -2267,6 +2453,19 @@ class MetroIEApp(
 
         private const val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
         private const val WRAP = FrameLayout.LayoutParams.WRAP_CONTENT
+
+        /** A command the menu is holding open but cannot run yet. */
+        private const val DISABLED_TEXT = 0x66FFFFFF.toInt()
+
+        /** The tick box on a menu row, and the space between it and the words. */
+        private const val TICK_SIZE_DP = 18
+        private const val TICK_GAP_DP = 14
+
+        /** The bracketed platform at the head of a user agent. See [desktopAgent]. */
+        private val PLATFORM = Regex("""\([^)]*\)""")
+
+        /** Whether sites are asked for their desktop version. */
+        private const val KEY_DESKTOP_MODE = "ie_desktop_mode"
 
         private const val DEFAULT_HOMEPAGE = "https://news.google.com"
         private const val KEY_HOMEPAGE = "ie_homepage"

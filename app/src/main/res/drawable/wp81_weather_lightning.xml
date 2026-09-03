@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  wp81_weather_lightning - thunder.
+
+  From the Weather set by Good Ware (flaticon.com/authors/good-ware): the pack's own paths,
+  unedited and unscaled, emitted white so callers can tint per accent and per light/dark
+  theme.
+
+  The only thing not taken from the file is the viewport, which is refitted to a square
+  around what the mark actually draws. The pack does not agree with itself about that -
+  most of the marks fill their box and the fog sits in the middle of one an eighth larger
+  than it needs - so a mark's size on screen would otherwise depend on how much empty room
+  its author happened to leave around it. Fitted this way they are one set again, at the
+  proportions the set was drawn in.
+
+  Nothing here is optically retouched. If one of these reads small beside the others, that
+  is the pack's own drawing and the place to change it is the pack.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="333.200"
+    android:viewportHeight="333.200">
+    <group
+        android:translateX="0.000"
+        android:translateY="0.000">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M313.6,121.522c-12.4-12-29.2-19.6-48-19.6c-9.6,0-19.2,2-27.6,6c-8.8,4-16.4,9.6-22.8,16.8c-3.6,4.4-10.4,4.8-14.4,0.8 c-4.4-3.6-4.8-10.4-0.8-14.4c8.4-9.6,18.4-16.8,29.6-22c2.4-1.2,4.8-2,7.2-2.8c-6.8-13.2-16.8-24.4-28.8-32.4 c-14.8-10.4-32.8-16.4-52-16.4c-22.4,0-43.2,8-59.2,22c-16,13.6-27.2,33.2-30.4,55.2c-0.4,3.2-2.4,5.6-4.8,7.2 c-1.6,0.8-3.2,1.6-5.2,1.6c-15.6,0-30,6.4-40,16.4c-10.4,10.4-16.4,24.4-16.4,40c0,15.6,6.4,30,16.4,40s24.4,16.4,40,16.4h56.4 c-0.4-3.2,0.4-6.8,1.6-10l31.2-64c3.2-6.8,9.6-11.2,17.2-11.2h36.4c3.2,0,6.4,0.8,9.6,2.8c8.8,5.2,12,16.8,6.8,25.6l-9.2,15.2 c2.8,0.8,5.6,2,8,4c7.6,6.8,8.4,18.8,1.6,26.4l-10,11.2h60c18.8,0,35.6-7.6,47.6-19.6s19.6-29.2,19.6-47.6 C333.2,150.722,325.6,133.522,313.6,121.522z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M203.2,211.522c-0.4-0.4-1.2-0.8-2-0.8h-22.8l22.8-38.8c0.8-1.2,0.4-3.2-1.2-4c-0.4-0.4-0.8-0.4-1.6-0.4h-35.6v-0.4 c-1.2,0-2.4,0.8-2.8,2l-31.2,64.8c-0.8,1.6,0,3.2,1.2,4c0.4,0,0.8,0.4,1.2,0.4H150l-20.8,53.6c-0.4,1.6,0,3.2,1.6,3.6 c1.2,0.4,2.4,0,3.2-0.8l69.6-79.2C204.8,214.322,204.4,212.322,203.2,211.522z" />
+    </group>
+</vector>

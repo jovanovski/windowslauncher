@@ -2,6 +2,7 @@ package rocks.gorjan.gokixp.apps.calculator
 
 import java.math.BigDecimal
 import java.math.MathContext
+import java.math.RoundingMode
 import java.text.DecimalFormatSymbols
 import kotlin.math.abs
 
@@ -244,6 +245,13 @@ class CalculatorEngine(
      * printing what the double actually is would be honest and useless. Rounding to
      * fifteen significant figures - one short of a double's worth - is what hides the
      * representation error, and is what desk calculators have always done.
+     *
+     * What survives that is then cut, not rounded, to [DECIMALS] places. A division rarely
+     * comes out even, and the fifteen figures it can be trusted to are fifteen figures of
+     * a number nobody reads past the sixth of: 11000 / 61.6 is 178.571428, and the digits
+     * after that are noise the display would have to be shrunk to fit. Cut rather than
+     * rounded because the sixth place of an answer that goes on is a place the answer is
+     * being truncated at, and rounding it up would show a last digit the sum did not have.
      */
     private fun format(v: Double): String {
         if (!v.isFinite()) return CANNOT_DIVIDE
@@ -252,7 +260,9 @@ class CalculatorEngine(
         if (magnitude >= SCIENTIFIC_ABOVE || magnitude < SCIENTIFIC_BELOW) {
             return scientific(v)
         }
-        val rounded = BigDecimal(v).round(MathContext(SIGNIFICANT)).stripTrailingZeros()
+        val rounded = BigDecimal(v).round(MathContext(SIGNIFICANT))
+            .setScale(DECIMALS, RoundingMode.DOWN)
+            .stripTrailingZeros()
         return group(rounded.toPlainString())
     }
 
@@ -300,8 +310,19 @@ class CalculatorEngine(
         /** What the keypad will accept; past this the display cannot show it anyway. */
         const val MAX_DIGITS = 16
 
+        /** How many decimal places a result is shown to, past which it is cut. */
+        const val DECIMALS = 6
+
         const val SCIENTIFIC_ABOVE = 1e16
-        const val SCIENTIFIC_BELOW = 1e-10
+
+        /**
+         * Below this a result is written in exponent form.
+         *
+         * Which is [DECIMALS] places: a number smaller than the last place shown would be
+         * cut to nothing, and a calculator that answers a sum with 0 when the answer is
+         * not zero is lying rather than rounding.
+         */
+        const val SCIENTIFIC_BELOW = 1e-6
 
         const val CANNOT_DIVIDE = "Cannot divide by zero"
     }

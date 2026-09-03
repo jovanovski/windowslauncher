@@ -2,47 +2,39 @@
 <!--
   wp81_weather_snow - snow.
 
-  Flakes where the rain's drops would be: three crossed bars each, which is as much
-  of a flake as this size can hold.
-  Drawn on the same 76x76 grid and at the same 3-4 unit weight as the rest of the WP8.1
-  glyph set, and emitted white so the tile tints it to its accent.
+  From the Weather set by Good Ware (flaticon.com/authors/good-ware): the pack's own paths,
+  unedited and unscaled, emitted white so callers can tint per accent and per light/dark
+  theme.
+
+  The only thing not taken from the file is the viewport, which is refitted to a square
+  around what the mark actually draws. The pack does not agree with itself about that -
+  most of the marks fill their box and the fog sits in the middle of one an eighth larger
+  than it needs - so a mark's size on screen would otherwise depend on how much empty room
+  its author happened to leave around it. Fitted this way they are one set again, at the
+  proportions the set was drawn in.
+
+  Nothing here is optically retouched. If one of these reads small beside the others, that
+  is the pack's own drawing and the place to change it is the pack.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="76"
-    android:viewportHeight="76">
-    <!-- The cloud, lifted to leave the lower third of the grid to what is
-         falling. The same cloud carries every icon in the set. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M27,30 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M18,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M46,38 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M26,38 L54,38 L54,46 L26,46 Z" />
-    <!-- Two six-pointed flakes, three crossed bars each. -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M28,55 L28,69 L32,69 L32,55 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M23,60 L35,67 L37,64 L25,57 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M35,57 L23,64 L25,67 L37,60 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M46,55 L46,69 L50,69 L50,55 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M41,60 L53,67 L55,64 L43,57 Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M53,57 L41,64 L43,67 L55,60 Z" />
+    android:viewportWidth="512.000"
+    android:viewportHeight="512.000">
+    <group
+        android:translateX="0.000"
+        android:translateY="0.000">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="m450.517 131.342c.322-3.501.483-6.929.483-10.342 0-66.167-53.833-121-120-121-44.473 0-85.342 25.283-105.894 64.219-9.521-2.798-19.248-4.219-29.106-4.219-52.31 0-95.815 39.452-103.594 91.015-50.273-1.099-92.406 39.887-92.406 89.985 0 49.629 41.371 90 91 90h315c57.891 0 106-47.109 106-105 0-40.928-24.848-77.549-61.483-94.658z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="m191.049 473.5c4.156 7.196 13.354 9.617 20.493 5.493l29.458-17.009v35.016c0 8.291 6.709 15 15 15s15-6.709 15-15v-35.016l29.458 17.009c7.152 4.133 16.344 1.69 20.493-5.493 4.146-7.178 1.685-16.348-5.493-20.493l-29.454-17.007 29.454-17.007c7.178-4.146 9.639-13.315 5.493-20.493-4.16-7.192-13.345-9.668-20.493-5.493l-29.458 17.009v-34.016c0-8.291-6.709-15-15-15s-15 6.709-15 15v34.016l-29.458-17.009c-7.192-4.175-16.348-1.699-20.493 5.493-4.146 7.178-1.685 16.348 5.493 20.493l29.454 17.007-29.454 17.007c-7.178 4.145-9.639 13.315-5.493 20.493z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="m61 466c0 8.291 6.709 15 15 15s15-6.709 15-15v-19.014l16.465 9.507c7.152 4.133 16.344 1.69 20.493-5.493 4.146-7.178 1.685-16.348-5.493-20.493l-16.463-9.507 16.463-9.507c7.178-4.146 9.639-13.315 5.493-20.493-4.175-7.207-13.359-9.639-20.493-5.493l-16.465 9.507v-19.014c0-8.291-6.709-15-15-15s-15 6.709-15 15v19.014l-16.465-9.507c-7.192-4.146-16.362-1.714-20.493 5.493-4.146 7.178-1.685 16.348 5.493 20.493l16.463 9.507-16.463 9.507c-7.178 4.146-9.639 13.315-5.493 20.493 4.156 7.196 13.354 9.617 20.493 5.493l16.465-9.507z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="m487.958 391c-4.146-7.207-13.359-9.639-20.493-5.493l-16.465 9.507v-19.014c0-8.291-6.709-15-15-15s-15 6.709-15 15v19.014l-16.465-9.507c-7.192-4.146-16.333-1.714-20.493 5.493-4.146 7.178-1.685 16.348 5.493 20.493l16.463 9.507-16.463 9.507c-7.178 4.146-9.639 13.315-5.493 20.493 4.156 7.196 13.354 9.617 20.493 5.493l16.465-9.507v19.014c0 8.291 6.709 15 15 15s15-6.709 15-15v-19.014l16.465 9.507c7.152 4.133 16.344 1.69 20.493-5.493 4.146-7.178 1.685-16.348-5.493-20.493l-16.463-9.507 16.463-9.507c7.178-4.145 9.639-13.315 5.493-20.493z" />
+    </group>
 </vector>

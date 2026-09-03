@@ -10,9 +10,9 @@ import rocks.gorjan.gokixp.R
 /**
  * 3D Pinball Space Cadet — a self-contained web game bundled in the app's assets.
  *
- * Modeled on the Internet Explorer WebView configuration and the Midtown2 app-class
- * pattern (a plain controller that takes an inflated content view via [setupApp] and
- * releases resources in [cleanup]). The game and all of its assets live under
+ * Modeled on the Internet Explorer WebView configuration and the app-class pattern
+ * used by the other bundled programs (a plain controller that takes an inflated
+ * content view via [setupApp] and releases resources in [cleanup]). The game and all of its assets live under
  * app/src/main/assets/pinball/, so relative paths inside index.htm resolve against
  * the file:///android_asset/pinball/ base URL.
  */

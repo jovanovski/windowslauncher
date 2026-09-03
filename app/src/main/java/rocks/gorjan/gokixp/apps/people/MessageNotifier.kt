@@ -48,7 +48,12 @@ object MessageNotifier {
     fun post(context: Context, address: String, body: String) {
         val person = PeopleStore.lookupNow(context, address)
         val who = person?.name?.takeIf { it.isNotBlank() } ?: address
+        // Their picture if they have one, the speech bubble on the accent if not - see
+        // glyphFace. Left null, this is where the shade puts its own grey circle with the
+        // small icon badged into the corner of it, which is a face-shaped hole with a
+        // stamp on it; the mark alone at least says what has arrived.
         val face = facePhoto(context, person?.photoUri)
+            ?: glyphFace(context, R.drawable.wp81_notify_message)
         ensureChannel(context)
 
         val them = Person.Builder()

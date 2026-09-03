@@ -318,43 +318,27 @@ class WP81TileHost(
         null
     }
 
-    fun weatherUnit(): String = prefs.getString("weather_unit", "C") ?: "C"
+    fun weatherUnit(): String = WeatherStore.unit(context)
 
-    fun weatherWord(code: Int): String? = when (code) {
-        0, 1 -> "sunny"
-        2 -> "cloudy"
-        3 -> "overcast"
-        45, 48 -> "fog"
-        51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81 -> "rain"
-        // Violent showers: rain hard enough to be its own kind of weather.
-        82 -> "storm"
-        71, 73, 75, 77, 85, 86 -> "snow"
-        95 -> "t.storm"
-        96, 99 -> "hail"
-        // No reading yet, and a guess at the sky is worse than saying nothing about it.
-        else -> null
-    }
+    /**
+     * The one word a tile face has room for.
+     *
+     * The grouping itself is [WeatherCodes]'s, and so is the mark below - the Weather app
+     * that opens out of this tile reads them from there too, and a table copied into two
+     * files is a table that will be edited in one of them.
+     */
+    fun weatherWord(code: Int): String? = WeatherCodes.word(code)
 
     /**
      * The same conditions as a mark rather than a word, for a face that has no room for
      * the word - which is the forecast panel, where three of them stand in a row and the
      * label under each is already spoken for by which day it is.
      *
-     * Grouped exactly as [weatherWord] groups them, so the tile can never show a cloud
-     * over the word "rain": one WMO reading, one condition, said either way.
+     * [night] is only ever true for the reading taken now: a forecast for tomorrow is
+     * about tomorrow's daylight, whatever hour it is being read at.
      */
-    fun weatherGlyph(code: Int): Int? = when (code) {
-        0, 1 -> R.drawable.wp81_weather_sun
-        2 -> R.drawable.wp81_weather_cloudy
-        3 -> R.drawable.wp81_weather_overcast
-        45, 48 -> R.drawable.wp81_weather_fog
-        51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81 -> R.drawable.wp81_weather_rain
-        82 -> R.drawable.wp81_weather_showers
-        71, 73, 75, 77, 85, 86 -> R.drawable.wp81_weather_snow
-        95 -> R.drawable.wp81_weather_thunder
-        96, 99 -> R.drawable.wp81_weather_hail
-        else -> null
-    }
+    fun weatherGlyph(code: Int, night: Boolean = false): Int? =
+        WeatherCodes.glyph(code, night)
 
     /**
      * One of the readings the weather tile shows: the figure, the sky it was taken under,
@@ -364,7 +348,13 @@ class WP81TileHost(
      * of it is its own business: a turning face has a whole tile for it and says "max
      * today", a column in the panel has a column's width and says "today".
      */
-    private data class WeatherReading(val temperature: Int, val code: Int, val name: String)
+    private data class WeatherReading(
+        val temperature: Int,
+        val code: Int,
+        val name: String,
+        /** Whether this reading was taken after dark. Only ever true of "now". */
+        val night: Boolean = false
+    )
 
     /**
      * What there is to say about the weather, in the order the tile says it.
@@ -381,11 +371,17 @@ class WP81TileHost(
         val cached = cachedWeatherJson() ?: return emptyList()
         return try {
             val current = cached.getJSONObject("current")
+            // The cache is metric whoever wrote it - see WeatherStore - so every figure
+            // out of it is converted here rather than at the point it is drawn. The tile
+            // used to append the letter without doing the arithmetic, which meant a phone
+            // set to Fahrenheit showed the Celsius number with "F" after it.
+            val unit = weatherUnit()
             val readings = mutableListOf(
                 WeatherReading(
-                    kotlin.math.round(current.getDouble("temperature_2m")).toInt(),
+                    WeatherStore.temperature(current.getDouble("temperature_2m"), unit),
                     current.optInt("weather_code", -1),
-                    "now"
+                    "now",
+                    night = current.optInt("is_day", 1) == 0
                 )
             )
             val daily = cached.optJSONObject("daily")
@@ -394,13 +390,13 @@ class WP81TileHost(
             if (highs != null && codes != null && highs.length() >= 2) {
                 if (todayHighAhead(cached)) {
                     readings += WeatherReading(
-                        kotlin.math.round(highs.getDouble(0)).toInt(),
+                        WeatherStore.temperature(highs.getDouble(0), unit),
                         codes.optInt(0, -1),
                         "today"
                     )
                 }
                 readings += WeatherReading(
-                    kotlin.math.round(highs.getDouble(1)).toInt(),
+                    WeatherStore.temperature(highs.getDouble(1), unit),
                     codes.optInt(1, -1),
                     "tomorrow"
                 )
@@ -516,7 +512,7 @@ class WP81TileHost(
         return weatherReadings().map { reading ->
             ForecastPanelView.Column(
                 label = reading.name,
-                glyph = weatherGlyph(reading.code),
+                glyph = weatherGlyph(reading.code, reading.night),
                 reading = "${reading.temperature}°$unit"
             )
         }

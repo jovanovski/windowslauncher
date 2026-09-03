@@ -80,6 +80,21 @@ class MetroPanorama(
 
 
 
+    /**
+     * What the title is a way to, where it is a way to anything.
+     *
+     * Most panoramas are titled after the program and there is nothing to tap. One titled
+     * after *what is being shown* is different - a weather app headed with the name of a
+     * town is headed with the one thing on the page that could have been another town, so
+     * it is where somebody would reach to change it. Left unset, the title is type.
+     */
+    var onTitle: (() -> Unit)? = null
+        set(value) {
+            field = value
+            titleLabel.isClickable = value != null
+            if (value != null) TiltEffect.apply(titleLabel)
+        }
+
     /** Where the panorama is, measured in pages: 1.5 is halfway between the second and third. */
     private var offset = 0f
 
@@ -89,6 +104,7 @@ class MetroPanorama(
         orientation = VERTICAL
 
         titleLabel.setTextColor(palette.foreground)
+        titleLabel.setOnClickListener { onTitle?.invoke() }
         titleRow.addView(titleLabel, FrameLayout.LayoutParams(WRAP, WRAP).apply {
             topMargin = dp(APP_TITLE_TOP_DP)
             bottomMargin = dp(APP_TITLE_BOTTOM_DP)

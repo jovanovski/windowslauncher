@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -18,7 +19,8 @@ import rocks.gorjan.gokixp.R
  * depending on the page is a key you have to look at before pressing, and these stand in
  * for keys you could find without looking. On Start back has nowhere to go and does
  * nothing, which is what it did on the phone too. Settings is reached by holding Start,
- * along with the shell's other commands.
+ * along with the shell's other commands, and the task switcher by holding back - both on
+ * the key whose tap already means the nearest thing to them.
  *
  * Commands that belong to what the user is doing - recolouring a tile, filling a folder -
  * are not here: they slide up on [WP81SecondaryBar], which is the app bar WP8.1 put above
@@ -41,7 +43,18 @@ class WP81NavBar(
     var onStartLongPress: (() -> Unit)? = null
     var onSearch: (() -> Unit)? = null
 
-    private val backButton = button(R.drawable.wp81_nav_back) { onBack?.invoke() }
+    /**
+     * Holding the back key: the task switcher.
+     *
+     * The gesture the phone itself used, on the key it used. Back is where it belongs
+     * because the switcher is what back means taken further - one press goes back a step,
+     * a hold goes back to a whole app - and because it is the only one of the three keys
+     * whose hold was not already spoken for. See [WP81RecentsView].
+     */
+    var onRecents: (() -> Unit)? = null
+
+    private val backButton =
+        button(R.drawable.wp81_nav_back, onHold = { onRecents?.invoke() }) { onBack?.invoke() }
     private val startButton = button(R.drawable.wp81_nav_windows) { onStart?.invoke() }
         .apply {
             isLongClickable = true
@@ -77,9 +90,31 @@ class WP81NavBar(
     private fun spacer(): View =
         View(context).apply { layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f) }
 
+    /**
+     * The strip swallows whatever misses a key.
+     *
+     * Without this, a touch that landed on the black between the keys fell through to the
+     * desktop underneath, which is still there behind the shell and still watching for the
+     * hold that opens its own right-click menu - so holding the bottom bar of a Windows
+     * Phone raised a Windows 95 context menu. The bar is a piece of the phone's hardware,
+     * not a window onto the desktop: nothing behind it should hear a finger on it.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean = true
+
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
-    private fun button(iconRes: Int, onClick: () -> Unit): ImageView =
+    private fun button(
+        iconRes: Int,
+        /**
+         * What a full second on this key means, or null for a key that only taps.
+         *
+         * Taken here rather than set by the caller afterwards, because a view has one
+         * touch listener and [TiltEffect] is already using it - see [applyHold].
+         */
+        onHold: (() -> Unit)? = null,
+        onClick: () -> Unit
+    ): ImageView =
         ImageView(context).apply {
             setImageResource(iconRes)
             // Sized explicitly rather than by padding, so the glyph does not shrink when
@@ -98,8 +133,65 @@ class WP81NavBar(
                 Haptics.tap(it)
                 onClick()
             }
-            TiltEffect.apply(this)
+            if (onHold == null) TiltEffect.apply(this) else applyHold(this, onHold)
         }
+
+    /**
+     * A key that means one thing tapped and another held.
+     *
+     * Not [View.setOnLongClickListener], which the Start key uses: the framework's long
+     * press fires at its own timeout and this key is pressed dozens of times a session as
+     * plain back, so the threshold wants to be this shell's own decision rather than the
+     * platform's. It is nonetheless set close to it. A second was tried first, on the
+     * reasoning that a slow deliberate back press should never open the switcher by
+     * accident, and it was simply too long: a hold that outlasts the user's certainty that
+     * anything is going to happen reads as the phone having missed the press.
+     *
+     * The tilt is already on this view's one touch listener, so the timer rides along
+     * inside it rather than replacing it - see [TiltEffect.apply].
+     *
+     * A completed hold spends the gesture: the release that follows is swallowed, so the
+     * key does not also go back on the way out of a switcher it has just opened. That is
+     * also why the tick is fired by hand here. A view that claims a long press is given
+     * the shell's tick by the framework; nothing is being claimed here, because nothing
+     * framework-side is involved, so the buzz that says the hold has landed has to be
+     * asked for. See [Haptics].
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun applyHold(key: ImageView, onHold: () -> Unit) {
+        var fired = false
+        val timer = Runnable {
+            fired = true
+            Haptics.tap(key)
+            onHold()
+        }
+        TiltEffect.apply(key) { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    fired = false
+                    view.postDelayed(timer, HOLD_MS)
+                    false
+                }
+                // A finger that has wandered off the key is on its way somewhere else -
+                // the system's own gesture strip is directly below these - and is no
+                // longer holding anything.
+                MotionEvent.ACTION_MOVE -> {
+                    if (event.x < 0 || event.y < 0 ||
+                        event.x > view.width || event.y > view.height
+                    ) view.removeCallbacks(timer)
+                    false
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.removeCallbacks(timer)
+                    // Consuming the release means View.onTouchEvent never sees it, so the
+                    // pressed state it set on the way down is cleared here instead.
+                    if (fired) view.isPressed = false
+                    fired
+                }
+                else -> false
+            }
+        }
+    }
 
     fun applyPalette(p: WP81Palette) {
         palette = p
@@ -113,5 +205,8 @@ class WP81NavBar(
 
         /** Glyph edge. Deliberately large - these are the only navigation on screen. */
         private const val GLYPH_DP = 46
+
+        /** How long the back key has to be held to mean the switcher. See [applyHold]. */
+        private const val HOLD_MS = 200L
     }
 }

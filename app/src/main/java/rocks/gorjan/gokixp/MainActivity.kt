@@ -344,6 +344,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * has open over itself before the window treats it as a way out, and the clock in each
      * of them has to be stopped when the window closes.
      */
+    /**
+     * Files, when the shell is wearing Windows Phone.
+     *
+     * Held for the reason the rest of them are: the back key has to reach the folder it is
+     * standing in, the prompt over it and the select mode it may be in, before the window
+     * treats the key as a way out of the app.
+     */
+    private var metroFilesAppInstance:
+        rocks.gorjan.gokixp.apps.files.MetroFilesApp? = null
+
     private var metroMinesweeperInstance:
         rocks.gorjan.gokixp.apps.minesweeper.MetroMinesweeperApp? = null
     private var metroSolitaireInstance:
@@ -418,6 +428,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * that matters; this only decides when the question gets asked.
      */
     private fun requestDialerRole() {
+        // Only the phone shell has anywhere to take a call. See enforceDefaultAppRoles,
+        // which is what stands between a desktop theme and a role already held.
+        if (themeManager.getSelectedTheme() !is AppTheme.WindowsPhone81) {
+            showNotification("People", "Only Windows Phone 8 has a phone app")
+            return
+        }
         val roles = getSystemService(android.app.role.RoleManager::class.java)
         if (roles == null || !roles.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
             showNotification("People", "This device has no phone app to be")
@@ -463,6 +479,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * dialog is the consent that matters; this only decides when it gets asked.
      */
     private fun requestSmsRole() {
+        // And only the phone shell has anywhere to read a message. As above.
+        if (themeManager.getSelectedTheme() !is AppTheme.WindowsPhone81) {
+            showNotification("People", "Only Windows Phone 8 has a messaging app")
+            return
+        }
         val roles = getSystemService(android.app.role.RoleManager::class.java)
         if (roles == null || !roles.isRoleAvailable(android.app.role.RoleManager.ROLE_SMS)) {
             showNotification("People", "This device has no messaging app to be")
@@ -505,6 +526,146 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             this, wanted.toTypedArray(), PEOPLE_PERMISSION_REQUEST_CODE)
     }
 
+    // ========== The phone and messaging roles, and the one theme that can hold them ==========
+
+    /**
+     * Whether this app is the phone's dialler.
+     *
+     * Asked of the system every time rather than remembered, for the same reason
+     * [isDefaultBrowser] is: the user can hand the role to something else from Android's
+     * own screens at any moment, and a flag of ours that says otherwise is a flag that
+     * lies about which app the next call is going to.
+     */
+    private fun holdsDialerRole(): Boolean = try {
+        getSystemService(android.app.role.RoleManager::class.java)
+            ?.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER) == true
+    } catch (e: Exception) {
+        Log.w("MainActivity", "Could not ask about the phone role", e)
+        false
+    }
+
+    /** Whether this app is the phone's messaging app. Read on the same terms as above. */
+    private fun holdsSmsRole(): Boolean = try {
+        getSystemService(android.app.role.RoleManager::class.java)
+            ?.isRoleHeld(android.app.role.RoleManager.ROLE_SMS) == true
+    } catch (e: Exception) {
+        Log.w("MainActivity", "Could not ask about the messaging role", e)
+        false
+    }
+
+    /** The wall, while it is up. Null the rest of the time. See [enforceDefaultAppRoles]. */
+    private var defaultAppsGate: DefaultAppsGate? = null
+
+    /**
+     * The system's default-apps screen, come back from.
+     *
+     * Only a prompt to look again: whether the role was actually given away is read from
+     * the system, not from the result, which on this screen says nothing either way.
+     * A user who leaves it by swiping home rather than by backing out of it produces no
+     * result at all - [onResume] covers that, and covers this one a second time, harmlessly.
+     */
+    private val defaultAppsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        enforceDefaultAppRoles()
+    }
+
+    /**
+     * Puts the wall up, or takes it down.
+     *
+     * The launcher may be the phone's phone app and its messaging app, but only under
+     * Windows Phone 8.1: People, the call screen and the conversation view are that
+     * shell's, and no desktop theme has anything of the sort. Holding either role under a
+     * desktop theme therefore means every call and every text message on the device is
+     * being routed to a shell with nowhere to put it - and a message delivered to this app
+     * is a message no other app is given, so one arriving now is one nobody ever sees. See
+     * SmsDeliverReceiver.
+     *
+     * So it is not a warning to be dismissed. The launcher is covered until the roles are
+     * somewhere they can be answered, which is either another app or Windows Phone 8.1.
+     *
+     * Called on every resume, which is what makes it self-clearing: the way out of here is
+     * Android's own screens, and coming back from one is a resume.
+     */
+    private fun enforceDefaultAppRoles() {
+        val theme = themeManager.getSelectedTheme()
+        val dialerHeld = holdsDialerRole()
+        val smsHeld = holdsSmsRole()
+
+        if (theme is AppTheme.WindowsPhone81 || (!dialerHeld && !smsHeld)) {
+            hideDefaultAppsGate()
+            return
+        }
+
+        val root = findViewById<RelativeLayout>(R.id.root_container) ?: return
+        val gate = defaultAppsGate ?: DefaultAppsGate(
+            context = this,
+            theme = theme,
+            onChoosePhoneApp = {
+                openDefaultAppChooser(android.app.role.RoleManager.ROLE_DIALER)
+            },
+            onChooseMessagingApp = {
+                openDefaultAppChooser(android.app.role.RoleManager.ROLE_SMS)
+            },
+            // The other way out, and on some phones the only one: a device with no second
+            // messaging app installed has no other app to give the role to, and Android
+            // will not simply take it back.
+            onReturnToPhoneTheme = { applyTheme(AppTheme.WindowsPhone81) }
+        ).also { created ->
+            defaultAppsGate = created
+            // Above everything, including the floating windows (50dp) and the shutdown
+            // splash (1000dp), so nothing the launcher can be left showing draws over it.
+            created.elevation = 2000f * resources.displayMetrics.density
+            root.addView(
+                created,
+                RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.MATCH_PARENT,
+                    RelativeLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+            playSound(R.raw.warning_xp)
+        }
+        gate.update(dialerHeld, smsHeld)
+    }
+
+    private fun hideDefaultAppsGate() {
+        defaultAppsGate?.let { gate ->
+            (gate.parent as? ViewGroup)?.removeView(gate)
+        }
+        defaultAppsGate = null
+    }
+
+    /**
+     * Opens Android's own list of the apps that can hold [roleName].
+     *
+     * A role cannot be handed back: the only thing an app may do is ask for one, and this
+     * app is trying to be rid of it. So this is the settings screen and nothing else, tried
+     * most specific first - the page for that single role, then the whole default-apps
+     * list, which is where every phone that has the one also has the other.
+     */
+    private fun openDefaultAppChooser(roleName: String) {
+        val screens = listOf(
+            // Not in the SDK, but what Android's own settings use to link to one role's
+            // page, and what lands the user on the right list rather than on a list of
+            // lists. Resolved before it is launched, so a phone without it costs nothing.
+            Intent("android.intent.action.MANAGE_DEFAULT_APP")
+                .putExtra("android.intent.extra.ROLE_NAME", roleName),
+            Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+        )
+        for (screen in screens) {
+            if (packageManager.resolveActivity(screen, 0) == null) continue
+            try {
+                defaultAppsLauncher.launch(screen)
+                return
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Could not open the default-apps screen", e)
+            }
+        }
+        val message = "This phone has no default apps screen. Its own settings are the " +
+            "only way to change this."
+        defaultAppsGate?.showProblem(message) ?: showNotification("Default apps", message)
+    }
+
     private val notepadCameraPickerLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
         if (success) {
             // Camera captured successfully, URI is already set
@@ -515,7 +676,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private var pendingCameraUri: Uri? = null
-    private var pendingMidtown2App: rocks.gorjan.gokixp.apps.midtown2.Midtown2App? = null
 
     // Preferences export/import launchers
     private var pendingExportJson: String? = null
@@ -703,11 +863,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val NOTIFICATION_DURATION_MS = 7000L
 
         /**
-         * How high the phone's toast sits, in dp.
+         * How high the phone's toast and its task switcher sit, in dp.
          *
-         * One step above floating_windows_container's 50dp, which is what puts the band
-         * over an open program rather than behind it. See liftWP81Toast.
+         * Both are above floating_windows_container's 50dp, which is what puts them over
+         * an open program rather than behind it, and the toast is above the switcher: a
+         * program announcing something while the switcher is up is still worth reading.
+         * See liftWP81Overlays.
          */
+        private const val RECENTS_ELEVATION_DP = 55f
         private const val TOAST_ELEVATION_DP = 60f
 
         /** Icons handed to the picker per batch, so the grid fills as it decodes. */
@@ -741,7 +904,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
          */
         private val WINDOWS_PHONE_ONLY_APPS = setOf(
             "system.zune", "system.news", "system.welcome", "system.calculator",
-            "system.people", "system.alarms"
+            "system.people", "system.alarms", "system.weather", "system.files"
         )
 
         /** Whether this program exists only under the Windows Phone 8.1 shell. */
@@ -841,15 +1004,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         /** Set once the offer of usage access has been made, so it is made only once. */
         private const val KEY_ASKED_USAGE_ACCESS = "asked_usage_access"
 
-        /**
-         * How far back to read the phone's app history for the last app used.
-         *
-         * A day covers every ordinary case in one short scan. The week is only reached
-         * when that finds nothing at all - a phone picked up the morning after - and is
-         * as far back as Android keeps events anyway.
-         */
-        private const val USAGE_LOOKBACK_MS = 24L * 60 * 60 * 1000
-        private const val USAGE_LOOKBACK_LONG_MS = 7L * 24 * 60 * 60 * 1000
+        // How far back the phone's app history is read went with the reading of it, into
+        // rocks.gorjan.gokixp.wp81.RecentAppsStore.
+
         private const val AIRCARE_URL = "https://getaircare.com"
 
         // Screensaver types
@@ -859,7 +1016,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val DEFAULT_SCREENSAVER_TIMEOUT = 30 // Default 30 seconds
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
-        private const val MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE = 1004
 
         /** Asked for by the Photos tile, the first time it is tapped. */
         private const val PHOTOS_PERMISSION_REQUEST_CODE = 1005
@@ -1422,6 +1578,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         handleCallHistoryIntent(intent)
         handleMessageIntent(intent)
         handleAlarmsIntent(intent)
+        handleWeatherIntent(intent)
 
         // Initialize app detection
         initializeAppDetection()
@@ -1937,9 +2094,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showAlarmsDialog()
         }
 
-        // Register Midtown Madness 2
-        systemAppActions["system.midtown2"] = { appInfo ->
-            showMidtown2Dialog()
+        // Weather, on the same terms. It is also what the Start screen's weather tile
+        // opens, the way the News tile opens News - see openWP81Weather.
+        systemAppActions["system.weather"] = { _ ->
+            showWeatherDialog()
+        }
+
+        // Files, on the same terms again. Windows Phone only: the desktop themes reach the
+        // same storage through My Computer, in their own chrome - see WINDOWS_PHONE_ONLY_APPS.
+        systemAppActions["system.files"] = { _ ->
+            showFilesDialog()
         }
 
         Log.d("MainActivity", "System apps initialized: ${systemAppActions.size} apps")
@@ -2108,6 +2272,41 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ))
         }
 
+        // Weather, the forecast behind the weather tile. Windows Phone only, for the same
+        // reason News is: it is built out of this shell's own furniture, and the desktop
+        // themes show their weather in the taskbar readout instead.
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_weather)?.let { glyph ->
+            // The glyph is drawn white for tiles; the app list is not always dark, so it
+            // takes the accent here rather than vanishing on a Light theme.
+            val tinted = glyph.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                tinted, themeManager.getWP81Accent())
+            systemApps.add(AppInfo(
+                name = "Weather",
+                exeName = "weather.exe",
+                packageName = "system.weather",
+                icon = createSquareDrawable(tinted)
+            ))
+        }
+
+        // Files, the app Windows Phone 8.1 finally got in 2014 - a plain list of what is
+        // on the phone. Windows Phone only: the desktop themes have My Computer, which is
+        // the same storage in a window with drive letters on it, and two file managers in
+        // one app list is one more than anybody needs.
+        AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_files)?.let { glyph ->
+            // The glyph is drawn white for tiles; the app list is not always dark, so it
+            // takes the accent here rather than vanishing on a Light theme.
+            val tinted = glyph.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(
+                tinted, themeManager.getWP81Accent())
+            systemApps.add(AppInfo(
+                name = "Files",
+                exeName = "files.exe",
+                packageName = "system.files",
+                icon = createSquareDrawable(tinted)
+            ))
+        }
+
         // Minesweeper - scale icon to match app icon size
         val minesweeperDrawable = AppCompatResources.getDrawable(this,themeManager.getMinesweeperIcon())
         if (minesweeperDrawable != null) {
@@ -2153,18 +2352,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ))
         }
 
-        // Midtown Madness 2 - scale icon to match app icon size
-        val midtown2Drawable = AppCompatResources.getDrawable(this, R.drawable.midtown2)
-        if (midtown2Drawable != null) {
-            systemApps.add(AppInfo(
-                name = "Midtown Madness 2",
-                exeName = "midtown2.exe",
-                packageName = "system.midtown2",
-                icon = createSquareDrawable(midtown2Drawable),
-                minWindowWidthDp = 360
-            ))
-        }
-
         // The phone's own programs, kept off every desktop - see WINDOWS_PHONE_ONLY_APPS,
         // which the desktop icon loader reads too, so the two can never drift apart - and
         // the desktop's own, kept off the phone.
@@ -2177,6 +2364,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Find the AppInfo for this system app
         val systemApps = getSystemAppsList()
         val appInfo = systemApps.find { it.packageName == packageName }
+
+        // Noted before anything is opened, and noted whether the window is new or was
+        // already standing behind something else - going back into a program is being in
+        // it, which is the whole of what the switcher is recording.
+        //
+        // Here rather than at each of the two dozen tiles, rows and menu items that open
+        // one of these, for the same reason the last launched app is noted on startActivity
+        // rather than at every launch site: this is the one door they all go through. These
+        // programs are windows inside this activity, so the phone's own history never sees
+        // them - see RecentAppsStore.
+        wp81Recents.noteSystemApp(packageName)
 
         // Check if this app is already open and bring it to front if so
         if (floatingWindowManager.findAndFocusWindow(packageName)) {
@@ -2250,77 +2448,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Handler(Looper.getMainLooper()).postDelayed({
             setCursorNormal()
         }, 100) // Small delay to ensure window is fully rendered
-    }
-
-    private fun showMidtown2Dialog() {
-        // Set cursor to busy while loading
-        setCursorBusy()
-
-        // Defer the actual loading to allow cursor to render
-        Handler(Looper.getMainLooper()).post {
-            createAndShowMidtown2Dialog()
-        }
-    }
-
-    private fun createAndShowMidtown2Dialog() {
-        // Request location permission if not granted
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
-                MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE
-            )
-        }
-
-        // Create Windows-style dialog with correct theme from start
-        val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.windowIdentifier = "system.midtown2"  // Set identifier for tracking
-        windowsDialog.setTitle("Midtown Madness 2")
-        windowsDialog.setTaskbarIcon(R.drawable.midtown2)
-
-        // Inflate the midtown2 content
-        val contentView = layoutInflater.inflate(R.layout.program_midtown2, null)
-
-        // Create Midtown2 app instance
-        val midtown2App = rocks.gorjan.gokixp.apps.midtown2.Midtown2App(
-            context = this,
-            onRequestLocationPermission = {
-                requestPermissions(
-                    arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
-                    MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE
-                )
-            },
-            onShowNotification = { title, description, onTap ->
-                showNotification(title, description, onTap)
-            },
-            onSoundPlay = { playClickSound() }
-        )
-
-        // Store reference for permission callback
-        pendingMidtown2App = midtown2App
-
-        // Setup the app
-        midtown2App.setupApp(contentView)
-
-        windowsDialog.setContentView(contentView)
-        // Use a good size for the map
-        windowsDialog.setWindowSize(380, 500)
-        windowsDialog.setMaximizable(true)
-
-        // Cleanup on close
-        windowsDialog.setOnCloseListener {
-            midtown2App.cleanup()
-            pendingMidtown2App = null
-        }
-
-        // Set context menu reference and show as floating window
-        windowsDialog.setContextMenuView(contextMenu)
-        floatingWindowManager.showWindow(windowsDialog)
-
-        // Set cursor back to normal after window is shown and loaded
-        Handler(Looper.getMainLooper()).postDelayed({
-            setCursorNormal()
-            windowsDialog.maximizeWindow()
-        }, 1000) // Small delay to ensure window is fully rendered
     }
 
     private fun openCalendarApp() {
@@ -2608,6 +2735,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.calculator" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_calculator)
                 "system.people" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_people)
                 "system.alarms" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_clock)
+                "system.weather" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_weather)
+                "system.files" -> AppCompatResources.getDrawable(this, R.drawable.wp81_glyph_files)
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
                 else -> null
             }
@@ -4017,6 +4146,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Reset the gesture flag when back is completed
 
                 when {
+                    // Nothing gets past the default-apps wall, back included: it is up
+                    // because the phone's calls and messages are arriving somewhere they
+                    // cannot be answered, and backing out of it would leave them there.
+                    // See enforceDefaultAppRoles.
+                    defaultAppsGate != null -> {
+                        Log.d("MainActivity", "Back pressed (modern): held by the default-apps wall")
+                    }
+                    // The task switcher, which is the one part of the shell that is drawn
+                    // over the windows rather than under them - so unlike everything below
+                    // it, an open window does not own back ahead of it. See
+                    // liftWP81Overlays.
+                    wp81Shell?.closeRecents() == true -> {
+                        Log.d("MainActivity", "Back pressed (modern): closing the task switcher")
+                    }
                     // WP8.1 shell, but only when nothing is open on top of it: dismiss the
                     // jump list, leave tile edit mode, or page back from the app list to
                     // Start. A window on screen owns back before the shell does.
@@ -4059,6 +4202,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 newsAppInstance?.handleBack() == true
                             ) {
                                 Log.d("MainActivity", "Back pressed (modern): handled by News")
+                            } else if (frontWindow?.windowIdentifier == "system.weather" &&
+                                weatherAppInstance?.handleBack() == true
+                            ) {
+                                // A day, the place search, the settings or a command list
+                                // was open over the panorama. Backing out of one of those
+                                // is a step inside the app rather than a way out of it.
+                                Log.d("MainActivity", "Back pressed (modern): handled by Weather")
                             } else if (frontWindow?.windowIdentifier == "system.alarms" &&
                                 alarmsAppInstance?.handleBack() == true
                             ) {
@@ -4073,6 +4223,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // open over the panorama. Backing out of one of those is a
                                 // step inside the app rather than a way out of it.
                                 Log.d("MainActivity", "Back pressed (modern): handled by People")
+                            } else if (frontWindow?.windowIdentifier == "system.files" &&
+                                metroFilesAppInstance?.handleBack() == true
+                            ) {
+                                // A prompt, a hold menu, select mode or a folder above the
+                                // one being shown. Backing out of any of those is a step
+                                // inside the app rather than a way out of it.
+                                Log.d("MainActivity", "Back pressed (modern): handled by Files")
                             } else if (frontWindow?.windowIdentifier == "system.notepad" &&
                                 metroNotepadAppInstance?.handleBack() == true
                             ) {
@@ -9146,6 +9303,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private var alarmsAppInstance: rocks.gorjan.gokixp.apps.alarms.AlarmsApp? = null
 
+    private var weatherAppInstance: rocks.gorjan.gokixp.apps.weather.WeatherApp? = null
+
     /**
      * Opens Calculator.
      *
@@ -9487,6 +9646,134 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
+     * Opens Weather.
+     *
+     * Full-screen and chromeless like Zune, News, People and Alarms: it is a phone app,
+     * and the panorama it is built on needs the screen to itself. One window only, and an
+     * open one is rebound rather than replaced - there is one forecast on the phone, and a
+     * second view of it would disagree with the first the moment either refreshed.
+     *
+     * The permission is not demanded on the way in. The app opens either way and says on
+     * the page itself that the phone has not been allowed to give its position, with the
+     * offer to allow it - somebody who has pinned Lisbon has said nothing about wanting
+     * to be located, and would be asked for nothing.
+     */
+    private fun showWeatherDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.weather")) {
+            // It may have been behind something for a while, and the hourly update - or
+            // the tile's own tick - can have replaced the forecast underneath it.
+            weatherAppInstance?.bind()
+            return
+        }
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.weather"
+
+        val weather = rocks.gorjan.gokixp.apps.weather.WeatherApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            onNotify = { title, message -> showNotification(title, message) },
+            onAskForLocation = { handleWeatherTempRefresh() },
+            // A forecast fetched in here is the phone's forecast, so the wall behind the
+            // window is brought up to date with it rather than left until the next tick.
+            onWeatherChanged = { refreshWP81Weather() }
+        )
+        weatherAppInstance = weather
+
+        val view = weather.createView()
+        windowsDialog.setContentView(view)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_weather)
+        windowsDialog.setTitle("Weather")
+        windowsDialog.setOnCloseListener {
+            weather.cleanup()
+            weatherAppInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(view)
+    }
+
+    /**
+     * Opens Files.
+     *
+     * Full-screen and chromeless like the rest of the phone's own programs. One window
+     * only: there is one filesystem, and a second view of it would be showing a folder
+     * that the first one had just emptied.
+     */
+    private fun showFilesDialog() {
+        if (floatingWindowManager.findAndFocusWindow("system.files")) {
+            // It may have been sitting behind something while a download landed or a
+            // photo was taken, and the folder it is standing in has moved on without it.
+            metroFilesAppInstance?.refresh()
+            return
+        }
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.files"
+
+        val files = rocks.gorjan.gokixp.apps.files.MetroFilesApp(
+            context = this,
+            palette = rocks.gorjan.gokixp.wp81.WP81Palette.from(themeManager),
+            onOpen = { file -> openFileFromFiles(file) },
+            onNotify = { title, message -> showNotification(title, message) }
+        )
+        metroFilesAppInstance = files
+
+        val view = files.createView()
+        windowsDialog.setContentView(view)
+        windowsDialog.setBorderless()
+        windowsDialog.setSaveState(false)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setTaskbarIcon(R.drawable.wp81_glyph_files)
+        windowsDialog.setTitle("Files")
+        windowsDialog.setOnCloseListener {
+            files.cleanup()
+            metroFilesAppInstance = null
+        }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+        turnWP81PageIn(view)
+    }
+
+    /**
+     * A file tapped in Files, handed to whatever opens that kind of file.
+     *
+     * Out to the phone rather than into one of this launcher's own windows, and
+     * deliberately: Windows Phone's Files app had no viewers of its own either - it handed
+     * a picture to Photos and a song to Music and got out of the way. The windows that
+     * could take one here are Vista-framed programs from the desktop themes, and opening a
+     * photograph in one of those from underneath the phone shell would be the anachronism
+     * that everything else in this shell is arranged to avoid.
+     */
+    private fun openFileFromFiles(file: java.io.File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", file
+            )
+            val type = android.webkit.MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+            val view = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, type)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            // The chooser rather than the intent itself: a file manager is exactly where
+            // somebody wants to say which app opens this one, and a default set from a
+            // tap in some other app months ago is not that answer.
+            val chooser = Intent.createChooser(view, "Open with")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(chooser)
+        } catch (e: Exception) {
+            // Commonest on a memory card: the provider is declared over the phone's own
+            // storage, and a card is a volume it does not cover.
+            Log.w("MainActivity", "Could not open ${file.name}", e)
+            showNotification("Files", "Nothing on this phone opens ${file.name}")
+        }
+    }
+
+    /**
      * Opens Alarms because something outside the launcher asked for it.
      *
      * The status bar's alarm icon is the one that does: tapping it goes to whichever app
@@ -9497,6 +9784,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (intent?.action != rocks.gorjan.gokixp.apps.alarms.AlarmScheduler.ACTION_SHOW_ALARMS) return
         intent.action = Intent.ACTION_MAIN
         showAlarmsDialog()
+    }
+
+    /**
+     * Opens Weather because a rain warning in the shade was tapped.
+     *
+     * The action is cleared on the way through for the same reason the alarms one is: the
+     * intent outlives the tap, and a launcher brought to the front again later would
+     * otherwise open the app a second time on an intent nobody had just acted on.
+     */
+    private fun handleWeatherIntent(intent: Intent?) {
+        if (intent?.action != rocks.gorjan.gokixp.apps.weather.RainNotifier.ACTION_SHOW_WEATHER) return
+        intent.action = Intent.ACTION_MAIN
+        showWeatherDialog()
     }
 
     /**
@@ -13215,6 +13515,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onBackPressed() {
         // Custom back button behavior for home screen launcher
         when {
+            // The default-apps wall owns back before anything else does, as above.
+            defaultAppsGate != null -> {
+                Log.d("MainActivity", "Back pressed (legacy): held by the default-apps wall")
+            }
+            // The switcher first, as above: it is drawn over the windows, so an open
+            // window does not own back ahead of it.
+            wp81Shell?.closeRecents() == true -> {
+                Log.d("MainActivity", "Back pressed (legacy): closing the task switcher")
+            }
             // WP8.1 shell, but only when nothing is open on top of it. A window on screen
             // owns back before the shell does.
             floatingWindowManager.getFrontVisibleWindow() == null &&
@@ -13250,6 +13559,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         // Navigate back in folder history
                         Log.d("MainActivity", "Back pressed: navigating back in My Computer")
                         mcApp.navigateBackPublic()
+                    } else if (frontWindow?.windowIdentifier == "system.files" &&
+                        metroFilesAppInstance?.handleBack() == true
+                    ) {
+                        // A prompt, a hold menu, select mode or a folder above this one.
+                        Log.d("MainActivity", "Back pressed (legacy): handled by Files")
                     } else if (frontWindow?.windowIdentifier == "system.notepad" &&
                         metroNotepadAppInstance?.handleBack() == true
                     ) {
@@ -13264,6 +13578,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         metroSolitaireInstance?.handleBack() == true
                     ) {
                         Log.d("MainActivity", "Back pressed (legacy): handled by Solitaire")
+                    } else if (frontWindow?.windowIdentifier == "system.weather" &&
+                        weatherAppInstance?.handleBack() == true
+                    ) {
+                        Log.d("MainActivity", "Back pressed (legacy): handled by Weather")
                     } else if (frontWindow?.windowIdentifier == "system.alarms" &&
                         alarmsAppInstance?.handleBack() == true
                     ) {
@@ -13377,6 +13695,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // And the same for the phone shell's settings page, which the user can now come
         // back to rather than being put on Start - see wp81ReturningToWhatWasOpen.
         refreshWP81SettingsPermissions()
+
+        // Last, because it covers everything above it: the launcher cannot be used while
+        // it is the phone's phone or messaging app under a theme that has neither. Here
+        // rather than in onCreate so that coming back from Android's default-apps screen
+        // takes the wall down again, however the user left it.
+        enforceDefaultAppRoles()
     }
 
     /**
@@ -13519,6 +13843,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // screen, so it is nearly always already running when an sms: link is tapped.
         handleMessageIntent(intent)
         handleAlarmsIntent(intent)
+        handleWeatherIntent(intent)
     }
 
     override fun onDestroy() {
@@ -13996,7 +14321,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun fetchLocationAndWeather() {
         val weatherTemp = findViewById<TextView>(R.id.weather_temp)
         weatherTemp?.text = "..."
-        
+
+        // A place chosen by hand in the Weather app is the phone's weather from then on:
+        // the taskbar reading, the Start screen's tile and the app all show one forecast,
+        // and going to the radio here would fetch a second one for a place nobody asked
+        // about. It also means a pinned place works with location switched off entirely.
+        rocks.gorjan.gokixp.wp81.WeatherStore.selected(this)?.let { place ->
+            if (!place.isHere && !place.latitude.isNaN()) {
+                fetchWeatherData(place.latitude, place.longitude)
+                return
+            }
+        }
+
         val locationContext =
             attributionContext("weather")
         val locationManager = locationContext.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
@@ -14022,6 +14358,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 
                 // If we have a cached location, use it immediately
                 if (lastKnownLocation != null) {
+                    // Written down as well as used: the Weather app draws its "my
+                    // location" against the last fix the phone had, and indoors there may
+                    // never be another one.
+                    rocks.gorjan.gokixp.wp81.WeatherStore.rememberHere(
+                        this, lastKnownLocation.latitude, lastKnownLocation.longitude)
+                    // And put a town to it, off this thread: the Weather app is headed
+                    // with the name rather than with "my location".
+                    rocks.gorjan.gokixp.wp81.WeatherStore.nameHereLater(
+                        this, lastKnownLocation.latitude, lastKnownLocation.longitude)
                     fetchWeatherData(lastKnownLocation.latitude, lastKnownLocation.longitude)
                     return
                 }
@@ -14029,6 +14374,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Only if no cached location is available, request fresh location
                 val locationListener = object : android.location.LocationListener {
                     override fun onLocationChanged(location: android.location.Location) {
+                        rocks.gorjan.gokixp.wp81.WeatherStore.rememberHere(
+                            this@MainActivity, location.latitude, location.longitude)
+                        rocks.gorjan.gokixp.wp81.WeatherStore.nameHereLater(
+                            this@MainActivity, location.latitude, location.longitude)
                         fetchWeatherData(location.latitude, location.longitude)
                         locationManager.removeUpdates(this)
                     }
@@ -14069,20 +14418,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 try {
                     Log.d("MainActivity", "Weather fetch attempt ${attempt + 1}/$maxRetries")
                     
-                    // Two days of daily figures alongside the current reading: index 0 is
-                    // today, index 1 tomorrow, which is what the Start screen's weather
-                    // tile turns over to show. Costs nothing extra - one request either
-                    // way - and everything downstream reads the same cached response.
-                    //
-                    // The hourly temperatures are what say *when* today's high falls. A
-                    // daily maximum on its own cannot tell an afternoon still to come from
-                    // one already over, and the tile drops the "max today" face once the
-                    // peak has passed - see WP81TileHost.weatherFaces.
-                    val url = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
-                            "&current=temperature_2m,weather_code" +
-                            "&hourly=temperature_2m" +
-                            "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                            "&forecast_days=2&timezone=auto"
+                    // One request, and everything on the phone reads what it brings
+                    // back: this readout, the Start screen's weather tile, the Quick
+                    // Glance widget and the Weather app. Asking for a week of daily
+                    // figures and the hours inside it costs exactly the same single call
+                    // as asking for the current temperature alone, and it is what stops
+                    // the app having to fetch a second forecast that disagrees with this
+                    // one. What is on the list, and why each of it is, is WeatherStore's.
+                    val url =
+                        rocks.gorjan.gokixp.wp81.WeatherStore.forecastUrl(latitude, longitude)
                     val connection = URL(url).openConnection() as HttpURLConnection
                     connection.requestMethod = "GET"
                     connection.connectTimeout = 10000 + (attempt * 2000) // Increase timeout with retries
@@ -14113,6 +14457,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 if (::quickGlanceWidget.isInitialized) {
                                     quickGlanceWidget.refreshData()
                                 }
+                                // And the Start screen's weather tile, which would
+                                // otherwise sit on the old reading until the next tick.
+                                refreshWP81Weather()
+                                // An open Weather app is looking at the forecast that has
+                                // just been replaced underneath it.
+                                weatherAppInstance?.bind()
                             }
                             // Also fetch AQI data
                             fetchAqiData(latitude, longitude)
@@ -14178,12 +14528,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Weather data caching methods
     private fun saveWeatherData(weatherResponse: String) {
         try {
-            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            prefs.edit().apply {
-                putString(KEY_WEATHER_DATA, weatherResponse)
-                putLong(KEY_WEATHER_TIMESTAMP, System.currentTimeMillis())
-                apply()
-            }
+            // Through WeatherStore rather than straight into preferences: it writes the
+            // same two keys this always did, and also notes the reading against the place
+            // it was taken for, which is what the Weather app's places list is a column of.
+            rocks.gorjan.gokixp.wp81.WeatherStore.save(this, weatherResponse)
             Log.d("MainActivity", "Weather data saved to SharedPreferences")
         } catch (e: Exception) {
             Log.e("MainActivity", "Error saving weather data", e)
@@ -14537,14 +14885,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // The tile is the same book. A contact permission granted in the app
                     // is the moment the wall on Start can fill itself in too.
                     refreshWP81People(force = true)
-                }
-            }
-
-            MIDTOWN2_LOCATION_PERMISSION_REQUEST_CODE -> {
-                val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-                pendingMidtown2App?.onPermissionResult(granted)
-                if (!granted) {
-                    Log.d("Midtown2", "Location permission denied")
                 }
             }
         }
@@ -15334,6 +15674,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val wp81IconProvider by lazy {
         rocks.gorjan.gokixp.wp81.MonochromeIconProvider(this)
     }
+
+    /**
+     * Where the user has been, from the phone's history and from this launcher's own.
+     *
+     * Not only the phone shell's: it is also what back-back on Start reads to find the last
+     * app, and [launchSystemApp] writes to it under every theme, because when a program was
+     * last opened is a fact about the launcher rather than about whichever shell is drawing
+     * at the time. See [rocks.gorjan.gokixp.wp81.RecentAppsStore].
+     */
+    private val wp81Recents by lazy {
+        rocks.gorjan.gokixp.wp81.RecentAppsStore(this) { hasUsageAccess() }
+    }
     private var wp81LiveTileRunnable: Runnable? = null
     private val wp81Handler = Handler(Looper.getMainLooper())
 
@@ -15382,10 +15734,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         "system.solitare" to R.drawable.wp81_glyph_solitaire,
         "system.pinball" to R.drawable.wp81_glyph_pinball,
         "system.clock" to R.drawable.wp81_glyph_clock,
-        "system.midtown2" to R.drawable.wp81_glyph_midtown,
         "system.calculator" to R.drawable.wp81_glyph_calculator,
         "system.people" to R.drawable.wp81_glyph_people,
-        "system.alarms" to R.drawable.wp81_glyph_clock
+        "system.alarms" to R.drawable.wp81_glyph_clock,
+        "system.weather" to R.drawable.wp81_glyph_weather,
+        "system.files" to R.drawable.wp81_glyph_files
     )
 
     /**
@@ -15410,7 +15763,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         "system.people",
         "system.minesweeper",
         "system.solitare",
-        "system.alarms"
+        "system.alarms",
+        "system.weather",
+        "system.files"
     )
 
     /**
@@ -15421,43 +15776,57 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * all want the same thing: a screen that looks like nothing else was ever on it.
      */
     /**
-     * Puts the phone's toast above the windows rather than inside the shell.
+     * Puts the two things that have to be seen over a program above the windows rather
+     * than inside the shell.
      *
-     * WP81Shell builds the band as its own topmost child, which is right for everything
-     * the shell itself announces and wrong the moment a program is open: the shell draws
-     * at elevation 0 and floating_windows_container at 50dp, so a toast raised from inside
-     * a window - a download that has landed, a picture that has been saved - played its
-     * sound behind the program and was never seen. Elevation only orders a view against
-     * its own siblings, so being topmost in the shell cannot lift it over the container
-     * beside the shell; it has to be moved out to sit next to that container instead.
+     * WP81Shell builds both as its own children, which is right for everything the shell
+     * itself draws and wrong the moment a program is open: the shell draws at elevation 0
+     * and floating_windows_container at 50dp, so a toast raised from inside a window - a
+     * download that has landed, a picture that has been saved - played its sound behind the
+     * program and was never seen. Elevation only orders a view against its own siblings, so
+     * being topmost in the shell cannot lift it over the container beside the shell; it has
+     * to be moved out to sit next to that container instead.
      *
-     * Kept at the navigation keys' height, which is where WP81Shell had it: the band is
-     * within reach of a thumb and never covers the keys.
+     * The task switcher has exactly the same problem and it matters more there: the whole
+     * point of it is to get out of the program you are in, and one that opened behind that
+     * program would be a key that appeared to do nothing.
+     *
+     * Both are kept at the navigation keys' height, which is where WP81Shell had them: the
+     * toast stays within reach of a thumb, and the switcher leaves the keys uncovered -
+     * back is the way out of it.
      */
-    private fun liftWP81Toast(shell: rocks.gorjan.gokixp.wp81.WP81Shell) {
-        val toast = shell.toast
-        (toast.parent as? ViewGroup)?.removeView(toast)
+    private fun liftWP81Overlays(shell: rocks.gorjan.gokixp.wp81.WP81Shell) {
         val density = resources.displayMetrics.density
-        toast.elevation = TOAST_ELEVATION_DP * density
-        findViewById<RelativeLayout>(R.id.main_background)?.addView(
-            toast,
-            RelativeLayout.LayoutParams(
-                RelativeLayout.LayoutParams.MATCH_PARENT,
-                RelativeLayout.LayoutParams.MATCH_PARENT
-            ).apply {
-                bottomMargin =
-                    (rocks.gorjan.gokixp.wp81.WP81NavBar.HEIGHT_DP * density).toInt()
-            }
-        )
+        val root = findViewById<RelativeLayout>(R.id.main_background) ?: return
+        // The switcher first, so the toast still lands on top of it - a program announcing
+        // something while the switcher is up is still worth reading.
+        for ((view, elevationDp) in listOf(
+            shell.recents to RECENTS_ELEVATION_DP,
+            shell.toast to TOAST_ELEVATION_DP
+        )) {
+            (view.parent as? ViewGroup)?.removeView(view)
+            view.elevation = elevationDp * density
+            root.addView(
+                view,
+                RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.MATCH_PARENT,
+                    RelativeLayout.LayoutParams.MATCH_PARENT
+                ).apply {
+                    bottomMargin =
+                        (rocks.gorjan.gokixp.wp81.WP81NavBar.HEIGHT_DP * density).toInt()
+                }
+            )
+        }
     }
 
     private fun restoreDesktopAfterWP81() {
         wp81Shell?.let { shell ->
             stopWP81LiveTiles()
             (shell.parent as? ViewGroup)?.removeView(shell)
-            // The band does not live in the shell - see liftWP81Toast - so it does not go
-            // when the shell goes, and has to be taken down itself.
+            // Neither the band nor the switcher lives in the shell - see liftWP81Overlays -
+            // so neither goes when the shell goes, and both have to be taken down here.
             (shell.toast.parent as? ViewGroup)?.removeView(shell.toast)
+            (shell.recents.parent as? ViewGroup)?.removeView(shell.recents)
         }
         wp81Shell = null
 
@@ -15544,7 +15913,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     RelativeLayout.LayoutParams.MATCH_PARENT
                 )
             )
-            liftWP81Toast(created)
+            liftWP81Overlays(created)
             wireWP81Shell(created)
         }
 
@@ -15668,6 +16037,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             searchTheWebFor(query)
         }
         shell.navBar.onBack = { onBackPressedDispatcher.onBackPressed() }
+        // Holding it: the task switcher. See WP81NavBar.applyHold for why the hold is timed
+        // by hand rather than left to the framework's long press.
+        shell.onRecents = { openWP81Recents() }
+        wireWP81Recents(shell)
         // Folders are made by holding one tile over another, as on the phone, so there is
         // no "new folder" command any more. "Remove from folder" is on the tile's own
         // command list, where the rest of the once-a-tile things live.
@@ -15777,6 +16150,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         shell.navBar.onStart = {
             when {
+                // The switcher stands over whatever the user was in, program windows
+                // included, so it is the innermost thing on screen and goes first.
+                shell.closeRecents() -> Unit
                 minimiseWP81Windows() -> Unit
                 // To the list, not into a search of it - the same thing the arrow under
                 // the wall does. A key pressed to see what is installed should not answer
@@ -16840,7 +17216,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             ?: return "--" to "Weather \u00b7 tap to refresh"
         return try {
             val current = cached.getJSONObject("current")
-            val temperature = kotlin.math.round(current.getDouble("temperature_2m")).toInt()
+            // The cache is metric whoever wrote it - see WeatherStore - so the figure is
+            // converted before the letter is put after it. Without this a phone set to
+            // Fahrenheit showed the Celsius number with an F beside it.
+            val temperature = convertTemperature(current.getDouble("temperature_2m"))
             val code = current.optInt("weather_code", -1)
             // The 1x1 drops the unit. C or F is a footnote next to the number itself, and
             // on the one tile where the reading has to carry the whole face, the degree
@@ -16937,7 +17316,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Index 1 is tomorrow. A response that only carries today has nothing to show.
             if (highs.length() < 2 || codes.length() < 2) return null
 
-            val high = kotlin.math.round(highs.getDouble(1)).toInt()
+            val high = convertTemperature(highs.getDouble(1))
             val code = codes.getInt(1)
             val small = size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
             val unit = if (small) "" else getWeatherUnit()
@@ -16981,6 +17360,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * again, and the size is read here rather than remembered.
      */
     private fun refreshWP81Weather() {
+        // First, and outside everything below it. What follows gives up as soon as it
+        // finds no weather tile on the wall, and somebody who has taken the tile off has
+        // said nothing about wanting no warning when it is about to rain.
+        considerRainNotification()
         val shell = wp81Shell ?: return
         val tile = shell.startScreen.tiles()
             .firstOrNull { it.kind == rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER }
@@ -17001,6 +17384,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (faces.isEmpty()) return
         shell.startScreen.setLiveWidgetRotation(
             tile.id, faces, rocks.gorjan.gokixp.wp81.TileView.LiveStyle.READING)
+    }
+
+    /**
+     * Asks whether rain is close enough to be worth saying something about.
+     *
+     * Hung off the weather tile's refresh rather than given a job of its own: the forecast
+     * is already being read there, and a second thing waking up to read the same cache
+     * would be a second thing to go wrong. Cheap by design - see RainNotifier, which
+     * mostly decides not to speak.
+     */
+    private fun considerRainNotification() {
+        try {
+            rocks.gorjan.gokixp.apps.weather.RainNotifier.consider(this)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "could not check the forecast for rain", e)
+        }
     }
 
     /** The WMO code from the cached reading, or -1 if there is none. */
@@ -17043,40 +17442,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * WMO weather code to plain words.
      *
-     * Grouped rather than enumerated one-for-one: a tile has room for "light snow", not for
-     * distinguishing dense freezing drizzle from moderate freezing drizzle.
+     * [rocks.gorjan.gokixp.wp81.WeatherCodes]'s table, which is the same one the Weather
+     * app and the tile's own marks read: a tile captioned "snow" under a page captioned
+     * "showers" would be one grouping copied into two files.
      */
-    private fun wp81WeatherCondition(code: Int): String = when (code) {
-        0 -> "Clear"
-        1 -> "Mainly clear"
-        2 -> "Partly cloudy"
-        3 -> "Overcast"
-        45, 48 -> "Fog"
-        51, 53, 55 -> "Drizzle"
-        56, 57 -> "Freezing drizzle"
-        61, 63, 65 -> "Rain"
-        66, 67 -> "Freezing rain"
-        71, 73, 75, 77 -> "Snow"
-        80, 81, 82 -> "Showers"
-        85, 86 -> "Snow showers"
-        95 -> "Thunderstorm"
-        96, 99 -> "Thunderstorm, hail"
-        else -> "Weather"
-    }
-
-    /** Opens whatever the user set as their weather app, or refreshes if none is set. */
-    private fun openWeatherAppOrRefresh() {
-        val packageName = getWeatherApp()
-        if (packageName != null) {
-            packageManager.getLaunchIntentForPackage(packageName)?.let {
-                it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(it)
-                return
-            }
-        }
-        refreshWeatherIfNeeded()
-        showNotification("Weather", "Refreshing\u2026")
-    }
+    private fun wp81WeatherCondition(code: Int): String =
+        rocks.gorjan.gokixp.wp81.WeatherCodes.condition(code)
 
     /** Matches the bands the desktop AQI readout colours by. */
     private fun wp81AqiLabel(aqi: Int): String = wp81TileHost.aqiLabel(aqi)
@@ -17156,6 +17527,126 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return wp81IconProvider.glyphFor(tile.packageName, getAppIcon(tile.packageName))
     }
 
+    // ---------------------------------------------------------------- task switcher
+
+    /**
+     * Hooks up the switcher's three answers, once, when the shell is built.
+     *
+     * Separate from [openWP81Recents], which is called every time the key is held: the
+     * callbacks belong to the view and outlive any one showing of it.
+     */
+    private fun wireWP81Recents(shell: rocks.gorjan.gokixp.wp81.WP81Shell) {
+        shell.recents.onOpen = { card ->
+            // Down before the app comes up. The switcher is over everything, program
+            // windows included, so left standing it would be covering whatever the tap
+            // had just opened.
+            shell.closeRecents()
+            if (isSystemApp(card.id)) {
+                // The same door every other way into these programs uses, so a card
+                // resumes a window that is already open rather than building a second one.
+                launchSystemApp(card.id)
+            } else {
+                packageManager.getLaunchIntentForPackage(card.id)?.let {
+                    it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(it)
+                } ?: run {
+                    // Uninstalled since the history was read. Taken off the list rather
+                    // than left there to fail again next time.
+                    Log.d("MainActivity", "WP8.1 switcher: ${card.id} is gone; dropping it")
+                    wp81Recents.dismiss(card.id)
+                    showNotification("Recent apps", "${card.label} is no longer installed")
+                }
+            }
+        }
+        shell.recents.onDismiss = { card -> wp81Recents.dismiss(card.id) }
+        shell.recents.onGrantAccess = {
+            // The switcher goes with the user to Android's own settings screen: they are
+            // leaving to answer a question this screen asked, and coming back to a stale
+            // list held over from before the answer would be the wrong thing to return to.
+            shell.closeRecents()
+            requestUsageAccess()
+        }
+    }
+
+    /**
+     * Opens the switcher on whatever the two histories say between them.
+     *
+     * The cards are painted here rather than in the view for a reason the app list already
+     * had: which glyph an app wears, what a tile of it is painted and what the user has
+     * renamed it to are questions this class answers for the Start screen, and a second
+     * answer worked out in the view is how a program comes to look like one thing on a
+     * tile and another on a card. Each entry is turned back into a [rocks.gorjan.gokixp.wp81.Tile]
+     * so [wp81GlyphFor] and [wp81ColorFor] - which is what paints the wall - answer for it
+     * too, including a tile that inherits its colour from the folder it is filed in.
+     */
+    private fun openWP81Recents() {
+        val shell = wp81Shell ?: return
+        val startedAt = android.os.SystemClock.uptimeMillis()
+        // The list this shell offers, which is where the phone-only and desktop-only rules
+        // have already been applied - so a Phone Dialer opened yesterday on the desktop is
+        // not offered here. See getSystemAppsList.
+        val systemApps = getSystemAppsList().associateBy { it.packageName }
+        val listedAt = android.os.SystemClock.uptimeMillis()
+        val hidden = getHiddenApps()
+        val visits = wp81Recents.recents(systemApps.keys)
+        val scannedAt = android.os.SystemClock.uptimeMillis()
+        val cards = visits.mapNotNull { visit ->
+            val system = systemApps[visit.id]
+            // Hidden from the app list means hidden here too: the switcher is another way
+            // of naming what is on the phone, and one that quietly ignored the setting
+            // would be a hole in it.
+            if (system == null && visit.id in hidden) return@mapNotNull null
+            val label = when {
+                system != null -> getCustomOrOriginalName(visit.id, system.name)
+                else -> androidAppLabel(visit.id) ?: return@mapNotNull null
+            }
+            val tile = rocks.gorjan.gokixp.wp81.Tile(
+                // A pinned app's tile is filed under its package, but an app migrated from
+                // the desktop is filed under the icon it came from - and that identifier is
+                // what a tile colour is stored against. Falling back to the package covers
+                // everything that is not on Start at all, which simply has no colour.
+                id = desktopIcons.firstOrNull { it.packageName == visit.id }?.id ?: visit.id,
+                label = label,
+                packageName = visit.id,
+                size = rocks.gorjan.gokixp.wp81.TileSize.MEDIUM,
+                index = 0,
+                kind = if (system != null) rocks.gorjan.gokixp.wp81.Tile.Kind.SYSTEM_APP
+                else rocks.gorjan.gokixp.wp81.Tile.Kind.APP
+            )
+            rocks.gorjan.gokixp.wp81.WP81RecentsView.Card(
+                id = visit.id,
+                label = label,
+                glyph = wp81GlyphFor(tile),
+                color = wp81ColorFor(tile)
+            )
+        }
+        shell.recents.show(cards, hasUsageAccess())
+        // The switcher is the one surface reached by holding a key, so every millisecond
+        // between the buzz and the cards is a millisecond the user spends wondering whether
+        // the hold registered. Logged rather than guessed at: the work here is a usage-stats
+        // scan and a rebuild of the system app list, and which of them is the expensive one
+        // is not something to have an opinion about.
+        Log.d("MainActivity", "Recents: apps=${listedAt - startedAt}ms " +
+            "scan=${scannedAt - listedAt}ms cards=${android.os.SystemClock.uptimeMillis() - scannedAt}ms " +
+            "(${cards.size} cards)")
+    }
+
+    /**
+     * What an installed app calls itself, or null if it is not installed any more.
+     *
+     * Asked of the package manager one at a time rather than taken from the cached app
+     * list, because the switcher shows at most ten apps and the cached list is loaded off
+     * the main thread when the shell arrives - which is far too late for a key that has
+     * just been held.
+     */
+    private fun androidAppLabel(packageName: String): String? = try {
+        val info = packageManager.getApplicationInfo(packageName, 0)
+        getCustomOrOriginalName(packageName, info.loadLabel(packageManager).toString())
+    } catch (e: Exception) {
+        Log.d("MainActivity", "WP8.1 switcher: no such package $packageName")
+        null
+    }
+
     /**
      * Back pressed on Start, where a single press has nowhere to go.
      *
@@ -17214,48 +17705,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * a link inside another app, is somewhere the user was just as much as a tile they
      * tapped. Null when the access has not been granted, or when nothing in the window
      * qualifies - the caller falls back on what the launcher opened itself.
+     *
+     * The scan itself lives in [rocks.gorjan.gokixp.wp81.RecentAppsStore], which reads the
+     * same history into an ordered list for the task switcher. One app or ten is the same
+     * walk over the same events, and two copies of it would drift.
      */
-    private fun lastForegroundApp(): String? {
-        if (!hasUsageAccess()) return null
-        val usage = getSystemService(android.app.usage.UsageStatsManager::class.java)
-            ?: return null
-        return try {
-            val now = System.currentTimeMillis()
-            lastForegroundApp(usage, now - USAGE_LOOKBACK_MS, now)
-                ?: lastForegroundApp(usage, now - USAGE_LOOKBACK_LONG_MS, now)
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Could not read the phone's app history: ${e.message}")
-            null
-        }
-    }
-
-    private fun lastForegroundApp(
-        usage: android.app.usage.UsageStatsManager,
-        from: Long,
-        to: Long
-    ): String? {
-        val events = usage.queryEvents(from, to)
-        val event = android.app.usage.UsageEvents.Event()
-        // Whether a package can be opened at all is asked of the package manager once per
-        // package rather than once per event; a day of history is a few thousand events.
-        val launchable = HashMap<String, Boolean>()
-        var last: String? = null
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            // The moment an activity came to the front. Events arrive oldest first, so the
-            // last one that qualifies is the most recent.
-            if (event.eventType != android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) continue
-            val pkg = event.packageName ?: continue
-            if (pkg == packageName) continue
-            // Keyboards, dialogs and the system's own screens come through here too, and
-            // none of them is an app the user would say they had been in.
-            if (launchable.getOrPut(pkg) {
-                    packageManager.getLaunchIntentForPackage(pkg) != null
-                }
-            ) last = pkg
-        }
-        return last
-    }
+    private fun lastForegroundApp(): String? = wp81Recents.lastForegroundApp()
 
     /**
      * Offers the access, once, from wherever the user just felt the lack of it.
@@ -17385,7 +17840,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK -> openPhoneClockApp()
             rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> openCalendarApp()
-            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> openWeatherAppOrRefresh()
+            // The forecast, not another refresh. A tile shows one reading at a time and
+            // tapping it asks for the rest of it - the same relation the News tile has to
+            // the reader it opens. What the user set as their weather app on the desktop
+            // is deliberately not consulted: that setting is about the taskbar readout,
+            // which is a number in a corner with nowhere of its own to go, and this tile
+            // is the Weather app's own tile.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> showWeatherDialog()
             // The reader, not the story. A tile shows one headline at a time and tapping
             // it is a request for the rest of them; the story on the face is one tap
             // further in, where the whole front page is on offer.

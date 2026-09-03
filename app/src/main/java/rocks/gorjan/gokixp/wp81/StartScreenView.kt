@@ -315,6 +315,13 @@ class StartScreenView(
         grid.bottomReservePx =
             (TileView.HANDLE_OVERHANG_DP * resources.displayMetrics.density).toInt()
 
+        // And the same room above the first row, for the unpin handle on the other corner.
+        // Not clipping is no help there: the wall starts at the top of the scroller, and
+        // what hangs above the first row is outside the scroller itself rather than merely
+        // outside the grid. So the rows start a handle's reach down instead - see
+        // TileGridLayout.topReservePx.
+        grid.topReservePx = grid.bottomReservePx
+
         content.orientation = LinearLayout.VERTICAL
         content.clipChildren = false
         content.addView(grid, LinearLayout.LayoutParams(
