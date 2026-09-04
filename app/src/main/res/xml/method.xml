@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the system needs to know about the keyboard.
+
+  One subtype per language. A subtype is how a single input method offers more than one
+  language: it is what the phone's own language switcher lists, and what the globe key on
+  the keyboard cycles through, so a layout that is not declared here can be selected inside
+  the keyboard but is invisible to everything outside it.
+
+  `supportsSwitchingToNextInputMethod` is what lets the globe in the navigation bar move on
+  from this keyboard rather than dead-ending on it. `languageTag` is the modern spelling of
+  `imeSubtypeLocale`; both are given because the old one is what older code reads and the new
+  one is what `InputMethodSubtype.getLanguageTag()` returns - declare only the old and that
+  method hands back an empty string.
+
+  Every language the keyboard ships a layout for has one, whether or not the user has turned
+  it on - a subtype that is not declared cannot be enabled later, and the settings list is
+  what narrows this down to the handful somebody actually reads.
+
+  English is marked ASCII-capable, which is not decoration. Android will refuse to hand a
+  password field to an input method that cannot promise plain Latin letters, and a keyboard
+  that only declared Macedonian would be silently replaced on every login screen on the
+  phone.
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="rocks.gorjan.gokixp.wp81.keyboard.KeyboardSettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:label="English"
+        android:imeSubtypeLocale="en_US"
+        android:languageTag="en-US"
+        android:imeSubtypeMode="keyboard" android:isAsciiCapable="true" />
+    <subtype
+        android:label="Deutsch"
+        android:imeSubtypeLocale="de"
+        android:languageTag="de"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Français"
+        android:imeSubtypeLocale="fr"
+        android:languageTag="fr"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Español"
+        android:imeSubtypeLocale="es"
+        android:languageTag="es"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Italiano"
+        android:imeSubtypeLocale="it"
+        android:languageTag="it"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Português"
+        android:imeSubtypeLocale="pt"
+        android:languageTag="pt"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Nederlands"
+        android:imeSubtypeLocale="nl"
+        android:languageTag="nl"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Polski"
+        android:imeSubtypeLocale="pl"
+        android:languageTag="pl"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Čeština"
+        android:imeSubtypeLocale="cs"
+        android:languageTag="cs"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Slovenčina"
+        android:imeSubtypeLocale="sk"
+        android:languageTag="sk"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Română"
+        android:imeSubtypeLocale="ro"
+        android:languageTag="ro"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Magyar"
+        android:imeSubtypeLocale="hu"
+        android:languageTag="hu"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Türkçe"
+        android:imeSubtypeLocale="tr"
+        android:languageTag="tr"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Svenska"
+        android:imeSubtypeLocale="sv"
+        android:languageTag="sv"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Dansk"
+        android:imeSubtypeLocale="da"
+        android:languageTag="da"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Norsk"
+        android:imeSubtypeLocale="nb"
+        android:languageTag="nb"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Suomi"
+        android:imeSubtypeLocale="fi"
+        android:languageTag="fi"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Ελληνικά"
+        android:imeSubtypeLocale="el"
+        android:languageTag="el"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Русский"
+        android:imeSubtypeLocale="ru"
+        android:languageTag="ru"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Українська"
+        android:imeSubtypeLocale="uk"
+        android:languageTag="uk"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Српски"
+        android:imeSubtypeLocale="sr"
+        android:languageTag="sr"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="Македонски"
+        android:imeSubtypeLocale="mk"
+        android:languageTag="mk"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

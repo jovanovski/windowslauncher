@@ -1,5 +1,10 @@
 <resources>
     <string name="app_name">Windows Launcher</string>
+
+    <!-- The keyboard, as the system's input-method list and language switcher name it. -->
+    <string name="keyboard_name">Windows Phone Keyboard</string>
+    <string name="keyboard_subtype_en">English</string>
+    <string name="keyboard_subtype_mk">Македонски</string>
     <string name="action_settings">Settings</string>
     <string name="taskbar_widget_description">Windows XP-style taskbar widget with clock and system tray</string>
     <string name="accessibility_service_description">Allows the app to lock the screen using the shutdown button while preserving biometric unlock</string>

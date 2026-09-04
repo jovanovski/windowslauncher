@@ -28,12 +28,16 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.webkit.CookieManager
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
@@ -50,6 +54,7 @@ import com.google.gson.reflect.TypeToken
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.math.abs
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.wp81.Haptics
@@ -61,8 +66,14 @@ import rocks.gorjan.gokixp.wp81.WP81ContextMenu
 import rocks.gorjan.gokixp.wp81.WP81Palette
 import rocks.gorjan.gokixp.wp81.applyToField
 
-/** One open page, as it is written down between sessions. See MetroIEApp.saveTabs. */
-internal data class SavedTab(val url: String, val title: String)
+/**
+ * One open page, as it is written down between sessions. See MetroIEApp.saveTabs.
+ *
+ * [lastUsed] is when the tab was last looked at, which is what decides whether it is
+ * still worth putting back. Zero means a tab written down before the browser kept that
+ * clock: it is not stale, it is unknown, and it is restored and stamped afresh.
+ */
+internal data class SavedTab(val url: String, val title: String, val lastUsed: Long = 0L)
 
 /**
  * One page this browser has been to. See MetroIEApp.recordVisit.
@@ -120,12 +131,21 @@ class MetroIEApp(
         /**
          * An address read back from a previous session that has not been loaded yet.
          *
-         * Restoring nine tabs means nine WebViews, and fetching nine pages the moment the
-         * launcher comes back would spend the phone's first few seconds on eight pages
-         * nobody is looking at. A restored tab is a name and an address until it is
+         * Restoring a dozen tabs means a dozen WebViews, and fetching all of them the
+         * moment the launcher comes back would spend the phone's first few seconds on
+         * pages nobody is looking at. A restored tab is a name and an address until it is
          * reached; the one being reached loads at once. See [activate].
          */
         var pending: String? = null
+
+        /**
+         * When this page was last looked at.
+         *
+         * What [pruneStaleTabs] goes on. Set when the tab is opened, when it is switched
+         * to, and when something is loaded in it - a tab being read is a tab in use, even
+         * if it has been the current one for an hour.
+         */
+        var lastUsed: Long = System.currentTimeMillis()
 
         /** The last picture of this page, for the tabs grid. Captured on the way out. */
         var thumbnail: Bitmap? = null
@@ -145,6 +165,27 @@ class MetroIEApp(
          * tab, because the app it would send the user to is gone by the next session.
          */
         var external = false
+
+        /**
+         * Nothing this page does is written down. IE's InPrivate, as the phone had it.
+         *
+         * A property of the tab rather than of the browser, which is the whole point of
+         * it: a private page and an ordinary one are open at the same time and neither
+         * changes what the other does, so looking something up quietly does not mean
+         * putting the rest of the session away first.
+         *
+         * What it means here is that the tab is absent from everything the browser keeps
+         * - the history the address bar offers back, the last address, and the set of
+         * pages a restart puts back - and that the page is fetched rather than answered
+         * out of what has already been fetched. See [recordVisit] and [configure].
+         *
+         * What it cannot mean is a cookie jar of its own. Android gives every WebView in
+         * a process the same cookie and storage store, and separating them needs a second
+         * profile that the system WebView only grew recently; a site signed in to in an
+         * ordinary tab is still signed in here. This is InPrivate in the sense the address
+         * bar cares about - the browser forgets - rather than a sandbox.
+         */
+        var inPrivate = false
     }
 
     private lateinit var root: FrameLayout
@@ -206,6 +247,9 @@ class MetroIEApp(
     /** Reload, or stop while a page is coming in. Lives in the address bar itself. */
     private lateinit var reloadButton: ImageView
 
+    /** The mark saying this page is not being written down. See [paintPrivate]. */
+    private lateinit var privateBadge: TextView
+
     /** The blue line over the address bar. Scaled from the left rather than resized. */
     private lateinit var progressFill: View
 
@@ -235,6 +279,9 @@ class MetroIEApp(
      * Kept for the address bar rather than as a record: a phone browser has no history
      * page, and what the list is for is finishing an address somebody has started typing.
      * Which is also why it is short - see MAX_HISTORY - and why the menu can empty it.
+     *
+     * Because the bar is the only place the list is ever seen, it is also the only place
+     * a single page can be taken out of it: a hold on what is being offered. See [forget].
      */
     private val history = mutableListOf<HistoryEntry>()
 
@@ -321,14 +368,14 @@ class MetroIEApp(
         if (restored.isEmpty()) {
             val lastUrl = prefs.getString(InternetExplorerApp.KEY_LAST_URL, null)
             val opened = openTab(initialUrl ?: lastUrl ?: homepage)
-            if (initialUrl != null) opened?.external = fromAnotherApp
+            if (initialUrl != null) opened.external = fromAnotherApp
         } else {
             for (saved in restored) restoreTab(saved)
             val active = prefs.getInt(KEY_ACTIVE_TAB, 0).coerceIn(0, tabs.size - 1)
             activate(tabs[active])
             // An address that arrived with the window is a new thing to read, and goes in
             // its own tab on top of what was already there.
-            if (initialUrl != null) openTab(initialUrl)?.external = fromAnotherApp
+            if (initialUrl != null) openTab(initialUrl).external = fromAnotherApp
         }
         root.requestFocus()
         return root
@@ -339,18 +386,24 @@ class MetroIEApp(
     /**
      * Opens a page in a tab of its own and goes to it.
      *
-     * Nine is the ceiling, which is what the button can say: there is a card for one
-     * through nine and nothing past it, so a tenth page would be open without the bar
-     * being able to admit it. IE Mobile stopped at six for the same kind of reason, and
-     * there has to be a limit somewhere regardless - every tab is a live WebView, and a
-     * launcher that runs out of memory takes the home screen down with it.
+     * Nine is the ceiling - the card glyphs on the bar count no higher, and every tab is
+     * a live WebView, so a launcher that lets them pile up takes the home screen down
+     * with it. The tenth page does not get refused, though: a browser that will not open
+     * a link is worse than one that quietly lets go of the oldest thing in it, so the
+     * ninth is followed by the first being closed. The set behaves like the phone's own
+     * back stack - a fixed number of slots that the newest page rolls into.
+     *
+     * The one being dropped is the first in the list, which is the page opened longest
+     * ago, current or not: if it is the one on screen it is on its way to the background
+     * anyway, since the new tab is what gets activated. Time takes the rest - see
+     * [pruneStaleTabs].
      */
-    private fun openTab(url: String): Tab? {
-        if (tabs.size >= MAX_TABS) {
-            notify("Internet Explorer", "Nine pages is as many as it will hold")
-            return null
-        }
+    private fun openTab(url: String, inPrivate: Boolean = false): Tab {
+        while (tabs.size >= MAX_TABS) closeTab(tabs.first())
         val tab = Tab()
+        // Set before the WebView is configured: what a private page is allowed to keep is
+        // decided when its settings are written, not afterwards. See [Tab.inPrivate].
+        tab.inPrivate = inPrivate
         configure(tab)
         tabs.add(tab)
         pages.addView(tab.webView, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -367,6 +420,7 @@ class MetroIEApp(
         tab.url = saved.url
         tab.title = saved.title
         tab.pending = saved.url
+        if (saved.lastUsed > 0L) tab.lastUsed = saved.lastUsed
         tabs.add(tab)
         pages.addView(tab.webView, FrameLayout.LayoutParams(MATCH, MATCH))
     }
@@ -382,8 +436,10 @@ class MetroIEApp(
             it.webView.visibility = View.GONE
         }
         current = tab
+        tab.lastUsed = System.currentTimeMillis()
         tab.webView.visibility = View.VISIBLE
         showAddress(tab.url)
+        paintPrivate(tab)
         showError(if (tab.failed) tab.failedUrl else null)
         paintLoading(tab)
         onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
@@ -418,7 +474,33 @@ class MetroIEApp(
         saveTabs()
     }
 
-    /** The mark on the left button: one card per open page, and nine for nine or more. */
+    /**
+     * Closes the tabs nobody has been back to in two days.
+     *
+     * With no ceiling on how many pages can be open, what keeps the grid from filling up
+     * with a month of half-finished errands is time rather than a count. Two days is the
+     * line: a page opened since then is still one you meant to come back to, and an older
+     * one is a card in the way with a live WebView behind it.
+     *
+     * The current tab is never taken, whatever its clock says - it is the page on screen.
+     * Neither is the last one: closing that would leave the browser with nothing in it,
+     * which [closeTab] would answer by opening the home page, and a launcher that swaps
+     * your last tab for a home page while you are not looking has lost it rather than
+     * tidied it. Run when the tabs page is reached, which is the one place the whole
+     * set is on screen; a session that has been left running long enough for a tab to
+     * go stale is rarer than one that is restarted, and a restart drops them earlier
+     * still - see [loadTabs], which does not put them back at all.
+     */
+    private fun pruneStaleTabs() {
+        val cutoff = System.currentTimeMillis() - TAB_LIFETIME_MS
+        val stale = tabs.filter { it !== current && it.lastUsed < cutoff }
+        for (tab in stale) {
+            if (tabs.size <= 1) break
+            closeTab(tab)
+        }
+    }
+
+    /** The mark on the left button: one card per open page, up to the nine there are. */
     private fun paintTabsButton() {
         val shown = tabs.size.coerceIn(1, CARD_ICONS)
         tabsButton.setImageDrawable(SvgIcon.fromAsset(context, "$ICON_DIR/appbar.card.$shown.svg"))
@@ -476,6 +558,10 @@ class MetroIEApp(
         tabsGrid = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(PAGE_MARGIN_DP), 0, dp(PAGE_MARGIN_DP), dp(20))
+            // A card thrown aside travels further than the column it sits in is wide, and
+            // clipped at the page margin it would stop dead an inch short of the edge
+            // instead of leaving. The scroller still clips, so it leaves at the screen.
+            clipChildren = false
         }
         tabsScroller = ScrollView(context).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -511,6 +597,7 @@ class MetroIEApp(
         addressBar.clearFocus()
         hideKeyboard()
         current?.let { capture(it) }
+        pruneStaleTabs()
         buildTabsGrid()
         tabsPage.visibility = View.VISIBLE
         tabsScroller.scrollTo(0, 0)
@@ -532,7 +619,10 @@ class MetroIEApp(
         var row: LinearLayout? = null
         tabs.forEachIndexed { index, tab ->
             if (index % TABS_PER_ROW == 0) {
-                row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+                row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    clipChildren = false
+                }
                 tabsGrid.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
             }
             row?.addView(tabCell(tab), LinearLayout.LayoutParams(0, WRAP, 1f).apply {
@@ -556,7 +646,10 @@ class MetroIEApp(
                 closeTabs()
                 activate(tab)
             }
-            TiltEffect.apply(this)
+            // The tilt and the flick share the card's one touch listener - see
+            // TiltEffect.apply, which exists for exactly this. Setting a second listener
+            // afterwards would silently replace the first.
+            TiltEffect.apply(this, flickToClose(this, cell, tab))
             // The page it is standing in for is white until it says otherwise, and an
             // empty frame on a black background reads as a hole rather than a page.
             setBackgroundColor(if (tab.thumbnail != null) Color.WHITE else palette.inactive)
@@ -591,6 +684,26 @@ class MetroIEApp(
             }, FrameLayout.LayoutParams(MATCH, MATCH))
         }
 
+        // The same mark the address bar carries, on the card. With the browser covered
+        // over by this page there is nothing else on screen to say which of these is the
+        // one that is not being written down, and a private tab that cannot be told from
+        // an ordinary one is a private tab somebody types the wrong thing into.
+        if (tab.inPrivate) {
+            shot.addView(TextView(context).apply {
+                text = "InPrivate"
+                typeface = ResourcesCompat.getFont(context, R.font.segoeui_semibold)
+                textSize = 9f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setBackgroundColor(PRIVATE_COLOUR)
+            }, FrameLayout.LayoutParams(
+                dp(PRIVATE_DP), dp(PRIVATE_HEIGHT_DP),
+                Gravity.BOTTOM or Gravity.START).apply {
+                marginStart = dp(6)
+                bottomMargin = dp(6)
+            })
+        }
+
         // On the corner of the card, half on and half off, like the tile handles: it sits
         // over an arbitrary screenshot and a ringed disc is the only thing that reads
         // against all of them.
@@ -623,6 +736,105 @@ class MetroIEApp(
             setPadding(0, dp(6), 0, 0)
         }, LinearLayout.LayoutParams(MATCH, WRAP))
         return cell
+    }
+
+    /**
+     * A card thrown aside, which closes the page that was on it.
+     *
+     * The cross in the corner is a small mark on a card that is mostly picture, and until
+     * now it was the only way off a tab. Throwing the card away is what this shell already
+     * means by being rid of something - it is how the task switcher closes an app, and the
+     * gesture is the same one down to the spring back - so it belongs here too. The cross
+     * stays: a swipe is the wrong hand often enough, and it is what the phone had.
+     *
+     * Sideways rather than the switcher's upward, because these cards sit two across in a
+     * column that scrolls and up is already the scroll. Which way the finger went is what
+     * decides who gets the gesture: more across than along and the card takes it, and the
+     * list is told at that moment to stop watching for a scroll of its own.
+     *
+     * [card] is what was pressed and what the tilt is on. [cell] is that picture together
+     * with the name under it, and it is the one that moves - a thumbnail sliding out from
+     * under its own title is half a card leaving.
+     */
+    private fun flickToClose(card: View, cell: View, tab: Tab): (View, MotionEvent) -> Boolean {
+        val slop = ViewConfiguration.get(context).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var claimed = false
+        return { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX
+                    downY = event.rawY
+                    claimed = false
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    if (!claimed && abs(dx) > slop && abs(dx) > abs(dy)) {
+                        claimed = true
+                        card.parent?.requestDisallowInterceptTouchEvent(true)
+                        // Over the card beside it rather than under. Z rather than the
+                        // child order, which in a row *is* the layout order: bringing the
+                        // card to the front would swap the two of them where they sit.
+                        cell.translationZ = dp(1).toFloat()
+                    }
+                    if (claimed) {
+                        // The tilt runs first and is still answering the finger's position
+                        // inside the card, which fights a card that is on its way out. It
+                        // is flattened on every step rather than once when the flick is
+                        // claimed, because it would otherwise start again.
+                        TiltEffect.reset(card)
+                        cell.translationX = dx
+                        val travel = (cell.width * SWIPE_TRAVEL).coerceAtLeast(1f)
+                        cell.alpha = (1f - abs(dx) / travel).coerceIn(SWIPE_FADE_FLOOR, 1f)
+                    }
+                    claimed
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!claimed) {
+                        false
+                    } else {
+                        // The card never sees this release, so it is left believing it is
+                        // still held unless it is told otherwise.
+                        card.isPressed = false
+                        val dx = event.rawX - downX
+                        val far = abs(dx) > cell.width * SWIPE_TRAVEL
+                        if (event.actionMasked == MotionEvent.ACTION_UP && far) {
+                            throwOff(cell, tab, dx)
+                        } else {
+                            cell.animate()
+                                .translationX(0f).alpha(1f)
+                                .setDuration(SPRING_MS)
+                                .setInterpolator(DecelerateInterpolator())
+                                .withEndAction { cell.translationZ = 0f }
+                                .start()
+                        }
+                        true
+                    }
+                }
+                else -> false
+            }
+        }
+    }
+
+    /** Sees a thrown card the rest of the way off, and closes the page behind it. */
+    private fun throwOff(cell: View, tab: Tab, dx: Float) {
+        cell.animate()
+            .alpha(0f)
+            // On from where the finger left it rather than back to nought first, so the
+            // card carries on the way it was thrown instead of starting the journey again.
+            .translationX(cell.translationX + (if (dx > 0) 1f else -1f) * cell.width * LEAVE_FRACTION)
+            .setDuration(THROW_MS)
+            .setInterpolator(AccelerateInterpolator())
+            .withEndAction {
+                closeTab(tab)
+                // And the gap closes up: everything after it moves back one place, and the
+                // odd card at the end is still the odd card at the end.
+                buildTabsGrid()
+            }
+            .start()
     }
 
     // ---------------------------------------------------------------- the downloads page
@@ -918,6 +1130,15 @@ class MetroIEApp(
         webView.settings.loadWithOverviewMode = true
         webView.settings.useWideViewPort = true
         applyDesktopMode(webView)
+        if (tab.inPrivate) {
+            // Nothing is answered out of what the browser already fetched. A page opened
+            // privately that came out of the cache of an ordinary session is a page the
+            // user was trying not to be in the middle of.
+            webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+            // The one part of the cookie store that *is* the view's own to refuse. The
+            // rest of it is shared with every other tab - see [Tab.inPrivate].
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
+        }
         // Pinch to zoom, without the pair of grey +/- buttons that come with it by
         // default and that no phone browser has had since about 2011.
         webView.settings.builtInZoomControls = true
@@ -967,12 +1188,13 @@ class MetroIEApp(
                 tab.title = view?.title?.takeIf { it.isNotBlank() }.orEmpty()
                 // A page that arrived. One that did not is not somewhere the user has
                 // been, and offering it back to them later would be offering an error.
-                if (url != null && !tab.failed) recordVisit(url, tab.title)
+                // A private one is not written down at all, which is what private means.
+                if (url != null && !tab.failed && !tab.inPrivate) recordVisit(url, tab.title)
                 if (tab === current) {
                     paintLoading(tab)
                     if (url != null) {
                         showAddress(url)
-                        saveLastUrl(url)
+                        if (!tab.inPrivate) saveLastUrl(url)
                     }
                     onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
                 }
@@ -1006,7 +1228,7 @@ class MetroIEApp(
 
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 tab.title = title?.takeIf { it.isNotBlank() }.orEmpty()
-                noteTitle(tab.url, tab.title)
+                if (!tab.inPrivate) noteTitle(tab.url, tab.title)
                 if (tab === current) {
                     onUpdateWindowTitle(tab.title.ifBlank { "Internet Explorer" })
                 }
@@ -1572,8 +1794,29 @@ class MetroIEApp(
             TiltEffect.apply(this)
         }
 
+        // IE's own mark for a page it is not writing down, in IE's own blue, inside the
+        // field at the end the address starts from - which is where the eye already is
+        // when it goes to read where the browser is. Laid over the field rather than put
+        // beside it: the strip's three slots are full, and a fourth that appears and
+        // disappears would move the address bar sideways every time a tab was switched.
+        // The field gives up the width instead. See [paintPrivate].
+        privateBadge = TextView(context).apply {
+            visibility = View.GONE
+            text = "InPrivate"
+            typeface = ResourcesCompat.getFont(context, R.font.segoeui_semibold)
+            textSize = 9f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setBackgroundColor(PRIVATE_COLOUR)
+        }
+
         val field = FrameLayout(context)
         field.addView(addressBar, FrameLayout.LayoutParams(MATCH, MATCH))
+        field.addView(privateBadge, FrameLayout.LayoutParams(
+            dp(PRIVATE_DP), dp(PRIVATE_HEIGHT_DP),
+            Gravity.START or Gravity.CENTER_VERTICAL).apply {
+            marginStart = dp(3)
+        })
         field.addView(reloadButton, FrameLayout.LayoutParams(
             dp(RELOAD_DP), dp(RELOAD_DP), Gravity.END or Gravity.CENTER_VERTICAL).apply {
             marginEnd = dp(3)
@@ -1727,6 +1970,10 @@ class MetroIEApp(
                 hideKeyboard()
                 current?.let { tab -> load(tab, entry.url) }
             }
+            setOnLongClickListener {
+                onSuggestionPressed(entry, it)
+                true
+            }
             TiltEffect.apply(this)
         }
         row.addView(TextView(context).apply {
@@ -1766,6 +2013,50 @@ class MetroIEApp(
         history.add(0, HistoryEntry(url, title, System.currentTimeMillis()))
         while (history.size > MAX_HISTORY) history.removeAt(history.size - 1)
         saveHistory()
+    }
+
+    /**
+     * A hold on a page the bar is offering back, which is the one place history is seen.
+     *
+     * There is no history page in this browser - see the note on [history] - so this is
+     * where a page that should not have been written down is got rid of, and it is got
+     * rid of the way everything else in this shell is: held, and told to go.
+     *
+     * The field keeps the caret through it. Clearing the focus is what puts the address
+     * back in the bar and takes the suggestions down with it, so a list that lost its
+     * focus to open this menu would have nothing left to delete a row from.
+     */
+    private fun onSuggestionPressed(entry: HistoryEntry, row: View) {
+        closeMenu()
+        // The keyboard goes, though: the menu dims the whole screen, and half a screen of
+        // keys sitting lit underneath the dimming is the one thing that does not dim.
+        hideKeyboard()
+        val there = IntArray(2).also { row.getLocationInWindow(it) }
+        val here = IntArray(2).also { root.getLocationInWindow(it) }
+        pressMenu.show(
+            entry.title.ifBlank { hostOf(entry.url) },
+            listOf(WP81ContextMenu.Item("delete") { forget(entry) }),
+            (there[1] - here[1]).toFloat()
+        )
+    }
+
+    /**
+     * Takes one page out of the list, and so off the offer.
+     *
+     * The list is rebuilt against what is still in the bar rather than simply closed: the
+     * row that was held has gone and the ones under it move up, which is the answer to
+     * "delete this one". Closing the whole list would read as the browser having done
+     * something larger than it was asked to.
+     */
+    private fun forget(entry: HistoryEntry) {
+        // By address rather than by the row that was held. The list holds one entry per
+        // address - see [recordVisit] - and a background tab finishing on that same page
+        // between the hold and the tap replaces the entry with an equal-looking new one,
+        // which a delete of the held object would miss and leave the row standing.
+        history.removeAll { it.url == entry.url }
+        saveHistory()
+        if (addressBar.hasFocus()) showSuggestions(addressBar.text.toString())
+        else hideSuggestions()
     }
 
     /** A page that said what it was called after it had already been written down. */
@@ -1889,6 +2180,12 @@ class MetroIEApp(
             }
         )
         menuPanel.addView(menuRow("home") { current?.let { load(it, homepage) } })
+        // The phone kept this on the tabs page, beside the plus. It is on the command
+        // list instead because that bar carries one unlabelled button, and "another tab,
+        // but not written down" is not something a glyph says: it has to be read.
+        menuPanel.addView(menuRow("new InPrivate tab", verbatim = true) {
+            openTab(homepage, inPrivate = true)
+        })
         menuPanel.addView(menuRow("favourites", closes = false) {
             buildMenu(favouritesOpen = true)
             playMenuEntrance()
@@ -1918,11 +2215,14 @@ class MetroIEApp(
      */
     private fun menuRow(
         label: String, closes: Boolean = true, enabled: Boolean = true,
-        ticked: Boolean? = null, action: () -> Unit
+        ticked: Boolean? = null, verbatim: Boolean = false, action: () -> Unit
     ): View {
         val row = TextView(context).apply {
-            // Lowercase, like every command list in this shell.
-            text = label.lowercase()
+            // Lowercase, like every command list in this shell - these are verbs, and a
+            // verb with a capital on it reads as a heading. [verbatim] is for the one row
+            // that is not only verbs: InPrivate is a name, and IE spelled it with both of
+            // its capitals wherever it appeared, this menu included.
+            text = if (verbatim) label else label.lowercase()
             typeface = ResourcesCompat.getFont(context, R.font.segoeui_regular)
             textSize = 16f
             // Greyed rather than gone, the way the phone greyed a command it was keeping
@@ -2155,17 +2455,35 @@ class MetroIEApp(
      */
     fun navigateToUrl(url: String, fromAnotherApp: Boolean = false) {
         closeTabs()
-        openTab(url)?.external = fromAnotherApp
+        openTab(url).external = fromAnotherApp
     }
 
     private fun load(tab: Tab, url: String) {
         tab.failed = false
         tab.url = url
+        tab.lastUsed = System.currentTimeMillis()
         if (tab === current) {
             showError(null)
             showAddress(url)
         }
         tab.webView.loadUrl(url)
+    }
+
+    /**
+     * Says whether the page being looked at is one the browser is not writing down.
+     *
+     * The mark and the room for it are one thing: an address that ran under the badge
+     * would be an address the badge was hiding, so the field's own text starts after it
+     * for exactly as long as it is up.
+     */
+    private fun paintPrivate(tab: Tab) {
+        privateBadge.visibility = if (tab.inPrivate) View.VISIBLE else View.GONE
+        addressBar.setPadding(
+            if (tab.inPrivate) dp(PRIVATE_DP) + dp(6) else dp(10),
+            dp(8),
+            dp(RELOAD_DP) + dp(4),
+            dp(8)
+        )
     }
 
     /** Puts [url] in the bar, unless the user is in the middle of typing over it. */
@@ -2348,14 +2666,22 @@ class MetroIEApp(
      * address; its history and its scroll position belong to a WebView that will not
      * outlive the process, and pretending otherwise would mean promising a restored tab
      * behaves like one that never went away.
+     *
+     * A private tab is not written down at all, and so does not come back: a page the
+     * browser was asked to forget is not one to be found waiting the next morning.
      */
     private fun saveTabs() {
         // A tab with nowhere to go yet is not written down - there is nothing to put back
         // - and the position is taken against the list that *is* written, so dropping one
         // does not leave the mark pointing at the tab beside it.
-        val kept = tabs.filter { it.url.isNotBlank() && !it.url.startsWith("about:") }
+        val kept = tabs.filter {
+            it.url.isNotBlank() && !it.url.startsWith("about:") && !it.inPrivate
+        }
         context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_TABS, Gson().toJson(kept.map { SavedTab(it.url, it.title) }))
+            .putString(
+                KEY_TABS,
+                Gson().toJson(kept.map { SavedTab(it.url, it.title, it.lastUsed) })
+            )
             .putInt(KEY_ACTIVE_TAB, kept.indexOf(current).coerceAtLeast(0))
             .apply()
     }
@@ -2365,8 +2691,14 @@ class MetroIEApp(
             .getString(KEY_TABS, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<SavedTab>>() {}.type
+            // Anything left alone for two days is not put back at all - there is no
+            // point restoring a WebView for it only for [pruneStaleTabs] to close it a
+            // moment later. A tab written down before the browser kept this clock has a
+            // zero on it, which is unknown rather than old, and is kept.
+            val cutoff = System.currentTimeMillis() - TAB_LIFETIME_MS
             Gson().fromJson<List<SavedTab>>(json, type)
                 ?.filter { it.url.isNotBlank() }
+                ?.filter { it.lastUsed <= 0L || it.lastUsed >= cutoff }
                 ?.take(MAX_TABS)
                 ?: emptyList()
         } catch (e: Exception) {
@@ -2506,6 +2838,17 @@ class MetroIEApp(
         /** The loading line. IE's blue, from the phone. */
         private const val PROGRESS_COLOUR = 0xFF61ADDA.toInt()
 
+        /**
+         * The InPrivate mark: IE's own darker blue, and the box it sits in.
+         *
+         * Not the loading line's. That one is a hairline over white and can afford to be
+         * pale; this one is a filled box with white words in it, and the same blue behind
+         * them at 9sp would be a label nobody can read.
+         */
+        private const val PRIVATE_COLOUR = 0xFF0F5C9E.toInt()
+        private const val PRIVATE_DP = 54
+        private const val PRIVATE_HEIGHT_DP = 20
+
         private const val BAR_DP = 62
         private const val BUTTON_DP = 44
         private const val ADDRESS_DP = 40
@@ -2526,6 +2869,27 @@ class MetroIEApp(
         private const val DOT_DP = 5
         private const val REMOVE_DP = 32
 
+        /**
+         * How far across a card has to be thrown before letting go of it means it.
+         *
+         * A fraction of the card rather than a distance, so the throw feels the same on
+         * any phone. Further than the task switcher asks of its own cards - see
+         * WP81RecentsView.DISMISS_TRAVEL - because a card here is half the width of one
+         * there, and the same fraction of half the room is a card that leaves while it
+         * was only being scrolled past.
+         */
+        private const val SWIPE_TRAVEL = 0.30f
+
+        /** How faint a card being thrown is allowed to get before it is let go of. */
+        private const val SWIPE_FADE_FLOOR = 0.2f
+
+        /** Putting back a card that was not thrown far enough. */
+        private const val SPRING_MS = 160L
+
+        /** Seeing off one that was, and how much further it carries before it is gone. */
+        private const val THROW_MS = 170L
+        private const val LEAVE_FRACTION = 0.35f
+
         /** The tabs page: two cards across, at the shell's own page margin. */
         private const val TABS_PER_ROW = 2
         private const val PAGE_MARGIN_DP = 22
@@ -2538,8 +2902,17 @@ class MetroIEApp(
         /** Cards in the set, and so the most pages the button could ever say. */
         private const val CARD_ICONS = 9
 
-        /** See openTab. The button's ceiling is the browser's. */
+        /** See openTab. The button's ceiling is the browser's, and the tenth rolls in. */
         private const val MAX_TABS = CARD_ICONS
+
+        /**
+         * How long a page is kept after it was last looked at. See pruneStaleTabs.
+         *
+         * Two days, which is the width of "I will get back to this": a tab from this
+         * morning or last night is still live, and one from the week before last is
+         * something you finished with and never closed.
+         */
+        private const val TAB_LIFETIME_MS = 48L * 60L * 60L * 1000L
 
         /**
          * How far the mark sits inside the ring.

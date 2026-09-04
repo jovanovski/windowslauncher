@@ -48,6 +48,26 @@ object CallCentre {
      */
     var service: InCallService? = null
 
+    /**
+     * Whether the call screen is what the user is looking at.
+     *
+     * The notification is the call screen's stand-in rather than its companion: it is
+     * there so a call can be reached from a locked phone or from another app, and while
+     * the screen itself is up there is nothing left for it to say - a second copy of the
+     * call, sitting in the shade behind the thing it is a copy of. So it goes while the
+     * screen is showing and comes back the moment it is left, which is what this is for.
+     *
+     * Set by [InCallActivity], which is the only thing that knows, and read by
+     * [GokiInCallService], which is the only thing that acts on it. Announced like any
+     * other change to the calls, because to the notification it is one.
+     */
+    var screenShowing: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            announce()
+        }
+
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
     private val calls = mutableListOf<Call>()

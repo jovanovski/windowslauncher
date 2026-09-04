@@ -20,7 +20,7 @@ class CallActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ACTION_ANSWER -> CallCentre.answer()
+            ACTION_ANSWER -> answer(context)
             ACTION_DECLINE -> CallCentre.reject()
             ACTION_HANG_UP -> CallCentre.hangUp()
             // Toggles rather than settings, because the button is a button and there is
@@ -28,6 +28,27 @@ class CallActionReceiver : BroadcastReceiver() {
             ACTION_SPEAKER -> CallCentre.speaker = !CallCentre.speaker
             ACTION_MUTE -> CallCentre.muted = !CallCentre.muted
             ACTION_CALL_BACK -> callBack(context, intent.getStringExtra(EXTRA_NUMBER))
+        }
+    }
+
+    /**
+     * Answers, and puts the call screen in front of whoever answered.
+     *
+     * Tapping answer on the notification means the call screen was not what was on screen -
+     * another app, or the shade pulled down over it - and an answered call with nothing to
+     * show for it is a conversation with no way to mute, hang up or reach the keypad. The
+     * notification's own full-screen intent covers the phone that is locked or asleep; this
+     * is the same arrival for one that is awake and busy with something else.
+     *
+     * A receiver may start an activity here because the user has just tapped a notification
+     * of this app's, which is one of the few things that lifts the background start rules.
+     */
+    private fun answer(context: Context) {
+        CallCentre.answer()
+        try {
+            context.startActivity(InCallActivity.intentFor(context))
+        } catch (e: Exception) {
+            Log.w(TAG, "Answered, but the call screen would not open", e)
         }
     }
 

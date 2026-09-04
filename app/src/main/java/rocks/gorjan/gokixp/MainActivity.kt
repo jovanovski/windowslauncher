@@ -813,6 +813,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         /** How often the Windows Phone 8.1 Start screen refreshes and flips its live tiles. */
         private const val WP81_LIVE_TILE_INTERVAL_MS = 12_000L
 
+        /**
+         * How far ahead the clock and calendar tiles look for an alarm.
+         *
+         * A day: the mark says "there is one coming" about the stretch those two tiles
+         * are already describing, and a week's notice of Tuesday's alarm would leave it
+         * permanently lit for anyone who repeats one.
+         */
+        private const val WP81_ALARM_HORIZON_MS = 24L * 60 * 60 * 1000
+
         // Stable ids for the built-in live widgets, so they never collide with a real
         // package name or a desktop icon id.
         /**
@@ -15692,8 +15701,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /** Latest next-event summary for the Calendar live widget, or null when there is none. */
     private var wp81NextCalendarEvent: Pair<String, Long>? = null
 
-    /** Tomorrow, as the calendar tile's reverse says it: how many, and the first of them. */
-    private var wp81TomorrowEvents: Pair<Int, String?> = 0 to null
     private var wp81CalendarProvider:
         rocks.gorjan.gokixp.quickglance.CalendarDataProvider? = null
     /**
@@ -15972,6 +15979,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             refreshWP81Weather()
         }
         shell.startScreen.onTileUnpin = { tile -> unpinOrHideWP81Tile(tile) }
+        // The foot mark is Alarms' - it wears that app's icon and is about that app's
+        // alarms - so it opens Alarms rather than the tile it happens to be standing on.
+        shell.startScreen.onAlarmMarkTap = { showAlarmsDialog() }
         // The arrow under the wall goes where the leftward swipe goes.
         // The arrow pages to the list and stops there. It used to drop into search as
         // well, which put a keyboard over the very list the arrow had just been pressed to
@@ -16937,6 +16947,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             liveWidget = { tile -> wp81LiveWidgetContent(tile) },
             widgetGlyphs = { tile -> wp81WidgetGlyphFor(tile) },
             widgetBacks = { tile -> wp81LiveWidgetBack(tile) },
+            alarmMarks = { tile -> wp81AlarmMarkFor(tile) },
             tileColors = { tile -> wp81ColorFor(tile) }
         ) { tile -> wp81GlyphFor(tile) }
         // The entrance is for arriving at Start, not for keeping it up to date. Every
@@ -17087,65 +17098,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "${android.provider.CalendarContract.Instances.BEGIN} ASC"
         )?.use { cursor ->
             while (cursor.moveToNext()) {
-                // All-day entries are not appointments - see queryWP81TomorrowEvents.
-                if (cursor.getInt(2) != 0) continue
-                val title = cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
-                return title to cursor.getLong(1)
-            }
-        }
-        return null
-    }
-
-    private fun refreshWP81TomorrowEvents() {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
-                this, android.Manifest.permission.READ_CALENDAR
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            wp81TomorrowEvents = 0 to null
-            return
-        }
-        Thread {
-            val found = try {
-                queryWP81TomorrowEvents()
-            } catch (e: Exception) {
-                Log.w("MainActivity", "WP8.1: could not read tomorrow's calendar", e)
-                0 to null
-            }
-            runOnUiThread { wp81TomorrowEvents = found }
-        }.start()
-    }
-
-    private fun queryWP81TomorrowEvents(): Pair<Int, String?> {
-        val start = java.util.Calendar.getInstance().apply {
-            add(java.util.Calendar.DAY_OF_YEAR, 1)
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }
-        val end = (start.clone() as java.util.Calendar).apply {
-            add(java.util.Calendar.DAY_OF_YEAR, 1)
-        }
-
-        val uri = android.provider.CalendarContract.Instances.CONTENT_URI.buildUpon()
-            .appendPath(start.timeInMillis.toString())
-            .appendPath(end.timeInMillis.toString())
-            .build()
-
-        var count = 0
-        var first: String? = null
-        contentResolver.query(
-            uri,
-            arrayOf(
-                android.provider.CalendarContract.Instances.TITLE,
-                android.provider.CalendarContract.Instances.BEGIN,
-                android.provider.CalendarContract.Instances.ALL_DAY
-            ),
-            null,
-            null,
-            "${android.provider.CalendarContract.Instances.BEGIN} ASC"
-        )?.use { cursor ->
-            while (cursor.moveToNext()) {
                 // All-day entries are not appointments: birthdays, holidays and the
                 // fortnight somebody blocked out as leave would have the tile reporting a
                 // full day when there is nothing to actually be anywhere for. They also
@@ -17156,13 +17108,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // provider honours a selection on Instances, and this cannot be argued
                 // with.
                 if (cursor.getInt(2) != 0) continue
-                count++
-                if (first == null) {
-                    first = cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() }
-                }
+                val title = cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+                return title to cursor.getLong(1)
             }
         }
-        return count to first
+        return null
     }
 
     /**
@@ -17263,36 +17213,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // index it is. Nothing is held back for a reverse.
             rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_AQI -> null
 
-            // Today on the front, tomorrow on the reverse - the one thing a calendar can
-            // tell you that looking at it cannot. Counted rather than listed: a tile has
-            // room for one appointment, and which one that is matters less than knowing
-            // whether tomorrow is empty or full.
-            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> {
-                val (count, first) = wp81TomorrowEvents
-                val small = tile.size == rocks.gorjan.gokixp.wp81.TileSize.SMALL
-                val tomorrow = java.util.Calendar.getInstance()
-                    .apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
-                // Tomorrow's date, set out exactly as today's is, with what tomorrow
-                // holds above it: the first appointment by name, and under it how many
-                // follow. Named rather than counted, because the first one is what decides
-                // what kind of day it is - and the count only appears when there is one to
-                // give, since a second line saying "and 0 more" is a line saying nothing.
-                val weekdayPattern =
-                    if (tile.size == rocks.gorjan.gokixp.wp81.TileSize.WIDE) "EEEE" else "EEE"
-                val weekday = java.text.SimpleDateFormat(weekdayPattern, locale)
-                    .format(tomorrow.time).lowercase(locale)
-                val caption = when {
-                    small -> null
-                    count == 0 || first.isNullOrBlank() -> "no events"
-                    count > 1 -> "$first\nand ${count - 1} more"
-                    else -> first
-                }
-                rocks.gorjan.gokixp.wp81.TileView.Reading(
-                    number = tomorrow.get(java.util.Calendar.DAY_OF_MONTH).toString(),
-                    caption = caption,
-                    aside = weekday
-                )
-            }
+            // One-sided, like the index. What a calendar tile is for is the day you
+            // are standing in - the date, and the next thing on it - and a face that
+            // turns over to another day makes the reader wait to find out which day the
+            // number they are looking at belongs to.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR -> null
 
             else -> null
         }
@@ -17427,6 +17352,42 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS ->
             R.drawable.wp81_glyph_news to R.drawable.wp81_glyph_news
         else -> null to null
+    }
+
+    /**
+     * The mark at the foot of the clock and the calendar: an alarm is coming.
+     *
+     * Alarms is the app that knows, so it is Alarms' own icon, exactly as the mark it puts
+     * in the status bar is - a foot mark and a line in the shade that came from the same
+     * program should look like they did.
+     *
+     * The two tiles between them are what the phone says about the day it is in - the hour
+     * and the date, the next thing on it - and an alarm inside the day is part of that
+     * answer. Only this shell's own alarms: the mark wears Alarms' icon, and wearing it
+     * for something set in another app would be pointing at the wrong program.
+     *
+     * Read from the store each time rather than cached. It is a short JSON array in the
+     * preferences this shell has open anyway, the answer changes the moment an alarm is
+     * set or goes off, and a cache would only be somewhere for a stale mark to sit.
+     */
+    private fun wp81AlarmMarkFor(tile: rocks.gorjan.gokixp.wp81.Tile): Int? = when (tile.kind) {
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CLOCK,
+        rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_CALENDAR ->
+            R.drawable.wp81_glyph_clock.takeIf { wp81AlarmDueWithinDay() }
+
+        else -> null
+    }
+
+    /** Whether any of the shell's alarms next goes off inside the coming day. */
+    private fun wp81AlarmDueWithinDay(): Boolean {
+        val now = System.currentTimeMillis()
+        val horizon = now + WP81_ALARM_HORIZON_MS
+        return rocks.gorjan.gokixp.apps.alarms.AlarmStore.all(this).any { alarm ->
+            // Its next occurrence, which is what an alarm turned off, snoozed or sitting
+            // one morning out has none of - see AlarmScheduler.nextTrigger.
+            val at = rocks.gorjan.gokixp.apps.alarms.AlarmScheduler.nextTrigger(alarm, now)
+            at != null && at <= horizon
+        }
     }
 
     /**
@@ -19043,7 +19004,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         refreshWP81NewsFeeds()
         refreshWP81News()
         refreshWP81TodayEvent()
-        refreshWP81TomorrowEvents()
 
         // Media sessions are read through the notification listener this launcher already
         // runs, so no extra permission - but nothing shows until notification access is on.
@@ -19057,10 +19017,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         wp81CalendarProvider = rocks.gorjan.gokixp.quickglance.CalendarDataProvider(this).also {
             it.startUpdates { data ->
                 // The provider is the signal, not the content: it notices the calendar
-                // moving, and both days are then re-read for what a tile actually shows -
-                // a name and a time, rather than "in twenty minutes".
+                // moving, and today is then re-read for what a tile actually shows - a
+                // name and a time, rather than "in twenty minutes".
                 refreshWP81TodayEvent()
-                refreshWP81TomorrowEvents()
                 wp81Shell?.startScreen?.let { start ->
                     wp81LiveWidgetContent(
                         start.tiles().firstOrNull { t ->
@@ -19094,6 +19053,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         val (frontGlyph, backGlyph) = wp81WidgetGlyphFor(tile)
                         start.setWidgetGlyph(tile.id, frontGlyph, backGlyph)
                         start.setWidgetBack(tile.id, wp81LiveWidgetBack(tile))
+                        // An alarm set, gone off or turned off while Start is up is a
+                        // change nothing announces, so the mark is re-asked with the rest.
+                        start.setAlarmMark(tile.id, wp81AlarmMarkFor(tile))
                     }
                 }
                 wp81Handler.postDelayed(this, WP81_LIVE_TILE_INTERVAL_MS)

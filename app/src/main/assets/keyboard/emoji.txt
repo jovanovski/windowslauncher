@@ -1,0 +1,3773 @@
+😀	0	grinning face
+😃	0	grinning face with big eyes
+😄	0	grinning face with smiling eyes
+😁	0	beaming face with smiling eyes
+😆	0	grinning squinting face
+😅	0	grinning face with sweat
+🤣	0	rolling on the floor laughing
+😂	0	face with tears of joy
+🙂	0	slightly smiling face
+🙃	0	upside-down face
+🫠	0	melting face
+😉	0	winking face
+😊	0	smiling face with smiling eyes
+😇	0	smiling face with halo
+🥰	0	smiling face with hearts
+😍	0	smiling face with heart-eyes
+🤩	0	star-struck
+😘	0	face blowing a kiss
+😗	0	kissing face
+☺️	0	smiling face
+😚	0	kissing face with closed eyes
+😙	0	kissing face with smiling eyes
+🥲	0	smiling face with tear
+😋	0	face savoring food
+😛	0	face with tongue
+😜	0	winking face with tongue
+🤪	0	zany face
+😝	0	squinting face with tongue
+🤑	0	money-mouth face
+🤗	0	smiling face with open hands
+🤭	0	face with hand over mouth
+🫢	0	face with open eyes and hand over mouth
+🫣	0	face with peeking eye
+🤫	0	shushing face
+🤔	0	thinking face
+🫡	0	saluting face
+🤐	0	zipper-mouth face
+🤨	0	face with raised eyebrow
+😐	0	neutral face
+😑	0	expressionless face
+😶	0	face without mouth
+🫥	0	dotted line face
+😶‍🌫️	0	face in clouds
+😏	0	smirking face
+😒	0	unamused face
+🙄	0	face with rolling eyes
+😬	0	grimacing face
+😮‍💨	0	face exhaling
+🤥	0	lying face
+🫨	0	shaking face
+🙂‍↔️	0	head shaking horizontally
+🙂‍↕️	0	head shaking vertically
+😌	0	relieved face
+😔	0	pensive face
+😪	0	sleepy face
+🤤	0	drooling face
+😴	0	sleeping face
+😷	0	face with medical mask
+🤒	0	face with thermometer
+🤕	0	face with head-bandage
+🤢	0	nauseated face
+🤮	0	face vomiting
+🤧	0	sneezing face
+🥵	0	hot face
+🥶	0	cold face
+🥴	0	woozy face
+😵	0	face with crossed-out eyes
+😵‍💫	0	face with spiral eyes
+🤯	0	exploding head
+🤠	0	cowboy hat face
+🥳	0	partying face
+🥸	0	disguised face
+😎	0	smiling face with sunglasses
+🤓	0	nerd face
+🧐	0	face with monocle
+😕	0	confused face
+🫤	0	face with diagonal mouth
+😟	0	worried face
+🙁	0	slightly frowning face
+☹️	0	frowning face
+😮	0	face with open mouth
+😯	0	hushed face
+😲	0	astonished face
+😳	0	flushed face
+🥺	0	pleading face
+🥹	0	face holding back tears
+😦	0	frowning face with open mouth
+😧	0	anguished face
+😨	0	fearful face
+😰	0	anxious face with sweat
+😥	0	sad but relieved face
+😢	0	crying face
+😭	0	loudly crying face
+😱	0	face screaming in fear
+😖	0	confounded face
+😣	0	persevering face
+😞	0	disappointed face
+😓	0	downcast face with sweat
+😩	0	weary face
+😫	0	tired face
+🥱	0	yawning face
+😤	0	face with steam from nose
+😡	0	enraged face
+😠	0	angry face
+🤬	0	face with symbols on mouth
+😈	0	smiling face with horns
+👿	0	angry face with horns
+💀	0	skull
+☠️	0	skull and crossbones
+💩	0	pile of poo
+🤡	0	clown face
+👹	0	ogre
+👺	0	goblin
+👻	0	ghost
+👽	0	alien
+👾	0	alien monster
+🤖	0	robot
+😺	0	grinning cat
+😸	0	grinning cat with smiling eyes
+😹	0	cat with tears of joy
+😻	0	smiling cat with heart-eyes
+😼	0	cat with wry smile
+😽	0	kissing cat
+🙀	0	weary cat
+😿	0	crying cat
+😾	0	pouting cat
+🙈	0	see-no-evil monkey
+🙉	0	hear-no-evil monkey
+🙊	0	speak-no-evil monkey
+💌	0	love letter
+💘	0	heart with arrow
+💝	0	heart with ribbon
+💖	0	sparkling heart
+💗	0	growing heart
+💓	0	beating heart
+💞	0	revolving hearts
+💕	0	two hearts
+💟	0	heart decoration
+❣️	0	heart exclamation
+💔	0	broken heart
+❤️‍🔥	0	heart on fire
+❤️‍🩹	0	mending heart
+❤️	0	red heart
+🩷	0	pink heart
+🧡	0	orange heart
+💛	0	yellow heart
+💚	0	green heart
+💙	0	blue heart
+🩵	0	light blue heart
+💜	0	purple heart
+🤎	0	brown heart
+🖤	0	black heart
+🩶	0	grey heart
+🤍	0	white heart
+💋	0	kiss mark
+💯	0	hundred points
+💢	0	anger symbol
+💥	0	collision
+💫	0	dizzy
+💦	0	sweat droplets
+💨	0	dashing away
+🕳️	0	hole
+💬	0	speech balloon
+👁️‍🗨️	0	eye in speech bubble
+🗨️	0	left speech bubble
+🗯️	0	right anger bubble
+💭	0	thought balloon
+💤	0	zzz
+👋	1	waving hand
+👋🏻	1	waving hand: light skin tone
+👋🏼	1	waving hand: medium-light skin tone
+👋🏽	1	waving hand: medium skin tone
+👋🏾	1	waving hand: medium-dark skin tone
+👋🏿	1	waving hand: dark skin tone
+🤚	1	raised back of hand
+🤚🏻	1	raised back of hand: light skin tone
+🤚🏼	1	raised back of hand: medium-light skin tone
+🤚🏽	1	raised back of hand: medium skin tone
+🤚🏾	1	raised back of hand: medium-dark skin tone
+🤚🏿	1	raised back of hand: dark skin tone
+🖐️	1	hand with fingers splayed
+🖐🏻	1	hand with fingers splayed: light skin tone
+🖐🏼	1	hand with fingers splayed: medium-light skin tone
+🖐🏽	1	hand with fingers splayed: medium skin tone
+🖐🏾	1	hand with fingers splayed: medium-dark skin tone
+🖐🏿	1	hand with fingers splayed: dark skin tone
+✋	1	raised hand
+✋🏻	1	raised hand: light skin tone
+✋🏼	1	raised hand: medium-light skin tone
+✋🏽	1	raised hand: medium skin tone
+✋🏾	1	raised hand: medium-dark skin tone
+✋🏿	1	raised hand: dark skin tone
+🖖	1	vulcan salute
+🖖🏻	1	vulcan salute: light skin tone
+🖖🏼	1	vulcan salute: medium-light skin tone
+🖖🏽	1	vulcan salute: medium skin tone
+🖖🏾	1	vulcan salute: medium-dark skin tone
+🖖🏿	1	vulcan salute: dark skin tone
+🫱	1	rightwards hand
+🫱🏻	1	rightwards hand: light skin tone
+🫱🏼	1	rightwards hand: medium-light skin tone
+🫱🏽	1	rightwards hand: medium skin tone
+🫱🏾	1	rightwards hand: medium-dark skin tone
+🫱🏿	1	rightwards hand: dark skin tone
+🫲	1	leftwards hand
+🫲🏻	1	leftwards hand: light skin tone
+🫲🏼	1	leftwards hand: medium-light skin tone
+🫲🏽	1	leftwards hand: medium skin tone
+🫲🏾	1	leftwards hand: medium-dark skin tone
+🫲🏿	1	leftwards hand: dark skin tone
+🫳	1	palm down hand
+🫳🏻	1	palm down hand: light skin tone
+🫳🏼	1	palm down hand: medium-light skin tone
+🫳🏽	1	palm down hand: medium skin tone
+🫳🏾	1	palm down hand: medium-dark skin tone
+🫳🏿	1	palm down hand: dark skin tone
+🫴	1	palm up hand
+🫴🏻	1	palm up hand: light skin tone
+🫴🏼	1	palm up hand: medium-light skin tone
+🫴🏽	1	palm up hand: medium skin tone
+🫴🏾	1	palm up hand: medium-dark skin tone
+🫴🏿	1	palm up hand: dark skin tone
+🫷	1	leftwards pushing hand
+🫷🏻	1	leftwards pushing hand: light skin tone
+🫷🏼	1	leftwards pushing hand: medium-light skin tone
+🫷🏽	1	leftwards pushing hand: medium skin tone
+🫷🏾	1	leftwards pushing hand: medium-dark skin tone
+🫷🏿	1	leftwards pushing hand: dark skin tone
+🫸	1	rightwards pushing hand
+🫸🏻	1	rightwards pushing hand: light skin tone
+🫸🏼	1	rightwards pushing hand: medium-light skin tone
+🫸🏽	1	rightwards pushing hand: medium skin tone
+🫸🏾	1	rightwards pushing hand: medium-dark skin tone
+🫸🏿	1	rightwards pushing hand: dark skin tone
+👌	1	ok hand
+👌🏻	1	ok hand: light skin tone
+👌🏼	1	ok hand: medium-light skin tone
+👌🏽	1	ok hand: medium skin tone
+👌🏾	1	ok hand: medium-dark skin tone
+👌🏿	1	ok hand: dark skin tone
+🤌	1	pinched fingers
+🤌🏻	1	pinched fingers: light skin tone
+🤌🏼	1	pinched fingers: medium-light skin tone
+🤌🏽	1	pinched fingers: medium skin tone
+🤌🏾	1	pinched fingers: medium-dark skin tone
+🤌🏿	1	pinched fingers: dark skin tone
+🤏	1	pinching hand
+🤏🏻	1	pinching hand: light skin tone
+🤏🏼	1	pinching hand: medium-light skin tone
+🤏🏽	1	pinching hand: medium skin tone
+🤏🏾	1	pinching hand: medium-dark skin tone
+🤏🏿	1	pinching hand: dark skin tone
+✌️	1	victory hand
+✌🏻	1	victory hand: light skin tone
+✌🏼	1	victory hand: medium-light skin tone
+✌🏽	1	victory hand: medium skin tone
+✌🏾	1	victory hand: medium-dark skin tone
+✌🏿	1	victory hand: dark skin tone
+🤞	1	crossed fingers
+🤞🏻	1	crossed fingers: light skin tone
+🤞🏼	1	crossed fingers: medium-light skin tone
+🤞🏽	1	crossed fingers: medium skin tone
+🤞🏾	1	crossed fingers: medium-dark skin tone
+🤞🏿	1	crossed fingers: dark skin tone
+🫰	1	hand with index finger and thumb crossed
+🫰🏻	1	hand with index finger and thumb crossed: light skin tone
+🫰🏼	1	hand with index finger and thumb crossed: medium-light skin tone
+🫰🏽	1	hand with index finger and thumb crossed: medium skin tone
+🫰🏾	1	hand with index finger and thumb crossed: medium-dark skin tone
+🫰🏿	1	hand with index finger and thumb crossed: dark skin tone
+🤟	1	love-you gesture
+🤟🏻	1	love-you gesture: light skin tone
+🤟🏼	1	love-you gesture: medium-light skin tone
+🤟🏽	1	love-you gesture: medium skin tone
+🤟🏾	1	love-you gesture: medium-dark skin tone
+🤟🏿	1	love-you gesture: dark skin tone
+🤘	1	sign of the horns
+🤘🏻	1	sign of the horns: light skin tone
+🤘🏼	1	sign of the horns: medium-light skin tone
+🤘🏽	1	sign of the horns: medium skin tone
+🤘🏾	1	sign of the horns: medium-dark skin tone
+🤘🏿	1	sign of the horns: dark skin tone
+🤙	1	call me hand
+🤙🏻	1	call me hand: light skin tone
+🤙🏼	1	call me hand: medium-light skin tone
+🤙🏽	1	call me hand: medium skin tone
+🤙🏾	1	call me hand: medium-dark skin tone
+🤙🏿	1	call me hand: dark skin tone
+👈	1	backhand index pointing left
+👈🏻	1	backhand index pointing left: light skin tone
+👈🏼	1	backhand index pointing left: medium-light skin tone
+👈🏽	1	backhand index pointing left: medium skin tone
+👈🏾	1	backhand index pointing left: medium-dark skin tone
+👈🏿	1	backhand index pointing left: dark skin tone
+👉	1	backhand index pointing right
+👉🏻	1	backhand index pointing right: light skin tone
+👉🏼	1	backhand index pointing right: medium-light skin tone
+👉🏽	1	backhand index pointing right: medium skin tone
+👉🏾	1	backhand index pointing right: medium-dark skin tone
+👉🏿	1	backhand index pointing right: dark skin tone
+👆	1	backhand index pointing up
+👆🏻	1	backhand index pointing up: light skin tone
+👆🏼	1	backhand index pointing up: medium-light skin tone
+👆🏽	1	backhand index pointing up: medium skin tone
+👆🏾	1	backhand index pointing up: medium-dark skin tone
+👆🏿	1	backhand index pointing up: dark skin tone
+🖕	1	middle finger
+🖕🏻	1	middle finger: light skin tone
+🖕🏼	1	middle finger: medium-light skin tone
+🖕🏽	1	middle finger: medium skin tone
+🖕🏾	1	middle finger: medium-dark skin tone
+🖕🏿	1	middle finger: dark skin tone
+👇	1	backhand index pointing down
+👇🏻	1	backhand index pointing down: light skin tone
+👇🏼	1	backhand index pointing down: medium-light skin tone
+👇🏽	1	backhand index pointing down: medium skin tone
+👇🏾	1	backhand index pointing down: medium-dark skin tone
+👇🏿	1	backhand index pointing down: dark skin tone
+☝️	1	index pointing up
+☝🏻	1	index pointing up: light skin tone
+☝🏼	1	index pointing up: medium-light skin tone
+☝🏽	1	index pointing up: medium skin tone
+☝🏾	1	index pointing up: medium-dark skin tone
+☝🏿	1	index pointing up: dark skin tone
+🫵	1	index pointing at the viewer
+🫵🏻	1	index pointing at the viewer: light skin tone
+🫵🏼	1	index pointing at the viewer: medium-light skin tone
+🫵🏽	1	index pointing at the viewer: medium skin tone
+🫵🏾	1	index pointing at the viewer: medium-dark skin tone
+🫵🏿	1	index pointing at the viewer: dark skin tone
+👍	1	thumbs up
+👍🏻	1	thumbs up: light skin tone
+👍🏼	1	thumbs up: medium-light skin tone
+👍🏽	1	thumbs up: medium skin tone
+👍🏾	1	thumbs up: medium-dark skin tone
+👍🏿	1	thumbs up: dark skin tone
+👎	1	thumbs down
+👎🏻	1	thumbs down: light skin tone
+👎🏼	1	thumbs down: medium-light skin tone
+👎🏽	1	thumbs down: medium skin tone
+👎🏾	1	thumbs down: medium-dark skin tone
+👎🏿	1	thumbs down: dark skin tone
+✊	1	raised fist
+✊🏻	1	raised fist: light skin tone
+✊🏼	1	raised fist: medium-light skin tone
+✊🏽	1	raised fist: medium skin tone
+✊🏾	1	raised fist: medium-dark skin tone
+✊🏿	1	raised fist: dark skin tone
+👊	1	oncoming fist
+👊🏻	1	oncoming fist: light skin tone
+👊🏼	1	oncoming fist: medium-light skin tone
+👊🏽	1	oncoming fist: medium skin tone
+👊🏾	1	oncoming fist: medium-dark skin tone
+👊🏿	1	oncoming fist: dark skin tone
+🤛	1	left-facing fist
+🤛🏻	1	left-facing fist: light skin tone
+🤛🏼	1	left-facing fist: medium-light skin tone
+🤛🏽	1	left-facing fist: medium skin tone
+🤛🏾	1	left-facing fist: medium-dark skin tone
+🤛🏿	1	left-facing fist: dark skin tone
+🤜	1	right-facing fist
+🤜🏻	1	right-facing fist: light skin tone
+🤜🏼	1	right-facing fist: medium-light skin tone
+🤜🏽	1	right-facing fist: medium skin tone
+🤜🏾	1	right-facing fist: medium-dark skin tone
+🤜🏿	1	right-facing fist: dark skin tone
+👏	1	clapping hands
+👏🏻	1	clapping hands: light skin tone
+👏🏼	1	clapping hands: medium-light skin tone
+👏🏽	1	clapping hands: medium skin tone
+👏🏾	1	clapping hands: medium-dark skin tone
+👏🏿	1	clapping hands: dark skin tone
+🙌	1	raising hands
+🙌🏻	1	raising hands: light skin tone
+🙌🏼	1	raising hands: medium-light skin tone
+🙌🏽	1	raising hands: medium skin tone
+🙌🏾	1	raising hands: medium-dark skin tone
+🙌🏿	1	raising hands: dark skin tone
+🫶	1	heart hands
+🫶🏻	1	heart hands: light skin tone
+🫶🏼	1	heart hands: medium-light skin tone
+🫶🏽	1	heart hands: medium skin tone
+🫶🏾	1	heart hands: medium-dark skin tone
+🫶🏿	1	heart hands: dark skin tone
+👐	1	open hands
+👐🏻	1	open hands: light skin tone
+👐🏼	1	open hands: medium-light skin tone
+👐🏽	1	open hands: medium skin tone
+👐🏾	1	open hands: medium-dark skin tone
+👐🏿	1	open hands: dark skin tone
+🤲	1	palms up together
+🤲🏻	1	palms up together: light skin tone
+🤲🏼	1	palms up together: medium-light skin tone
+🤲🏽	1	palms up together: medium skin tone
+🤲🏾	1	palms up together: medium-dark skin tone
+🤲🏿	1	palms up together: dark skin tone
+🤝	1	handshake
+🤝🏻	1	handshake: light skin tone
+🤝🏼	1	handshake: medium-light skin tone
+🤝🏽	1	handshake: medium skin tone
+🤝🏾	1	handshake: medium-dark skin tone
+🤝🏿	1	handshake: dark skin tone
+🫱🏻‍🫲🏼	1	handshake: light skin tone, medium-light skin tone
+🫱🏻‍🫲🏽	1	handshake: light skin tone, medium skin tone
+🫱🏻‍🫲🏾	1	handshake: light skin tone, medium-dark skin tone
+🫱🏻‍🫲🏿	1	handshake: light skin tone, dark skin tone
+🫱🏼‍🫲🏻	1	handshake: medium-light skin tone, light skin tone
+🫱🏼‍🫲🏽	1	handshake: medium-light skin tone, medium skin tone
+🫱🏼‍🫲🏾	1	handshake: medium-light skin tone, medium-dark skin tone
+🫱🏼‍🫲🏿	1	handshake: medium-light skin tone, dark skin tone
+🫱🏽‍🫲🏻	1	handshake: medium skin tone, light skin tone
+🫱🏽‍🫲🏼	1	handshake: medium skin tone, medium-light skin tone
+🫱🏽‍🫲🏾	1	handshake: medium skin tone, medium-dark skin tone
+🫱🏽‍🫲🏿	1	handshake: medium skin tone, dark skin tone
+🫱🏾‍🫲🏻	1	handshake: medium-dark skin tone, light skin tone
+🫱🏾‍🫲🏼	1	handshake: medium-dark skin tone, medium-light skin tone
+🫱🏾‍🫲🏽	1	handshake: medium-dark skin tone, medium skin tone
+🫱🏾‍🫲🏿	1	handshake: medium-dark skin tone, dark skin tone
+🫱🏿‍🫲🏻	1	handshake: dark skin tone, light skin tone
+🫱🏿‍🫲🏼	1	handshake: dark skin tone, medium-light skin tone
+🫱🏿‍🫲🏽	1	handshake: dark skin tone, medium skin tone
+🫱🏿‍🫲🏾	1	handshake: dark skin tone, medium-dark skin tone
+🙏	1	folded hands
+🙏🏻	1	folded hands: light skin tone
+🙏🏼	1	folded hands: medium-light skin tone
+🙏🏽	1	folded hands: medium skin tone
+🙏🏾	1	folded hands: medium-dark skin tone
+🙏🏿	1	folded hands: dark skin tone
+✍️	1	writing hand
+✍🏻	1	writing hand: light skin tone
+✍🏼	1	writing hand: medium-light skin tone
+✍🏽	1	writing hand: medium skin tone
+✍🏾	1	writing hand: medium-dark skin tone
+✍🏿	1	writing hand: dark skin tone
+💅	1	nail polish
+💅🏻	1	nail polish: light skin tone
+💅🏼	1	nail polish: medium-light skin tone
+💅🏽	1	nail polish: medium skin tone
+💅🏾	1	nail polish: medium-dark skin tone
+💅🏿	1	nail polish: dark skin tone
+🤳	1	selfie
+🤳🏻	1	selfie: light skin tone
+🤳🏼	1	selfie: medium-light skin tone
+🤳🏽	1	selfie: medium skin tone
+🤳🏾	1	selfie: medium-dark skin tone
+🤳🏿	1	selfie: dark skin tone
+💪	1	flexed biceps
+💪🏻	1	flexed biceps: light skin tone
+💪🏼	1	flexed biceps: medium-light skin tone
+💪🏽	1	flexed biceps: medium skin tone
+💪🏾	1	flexed biceps: medium-dark skin tone
+💪🏿	1	flexed biceps: dark skin tone
+🦾	1	mechanical arm
+🦿	1	mechanical leg
+🦵	1	leg
+🦵🏻	1	leg: light skin tone
+🦵🏼	1	leg: medium-light skin tone
+🦵🏽	1	leg: medium skin tone
+🦵🏾	1	leg: medium-dark skin tone
+🦵🏿	1	leg: dark skin tone
+🦶	1	foot
+🦶🏻	1	foot: light skin tone
+🦶🏼	1	foot: medium-light skin tone
+🦶🏽	1	foot: medium skin tone
+🦶🏾	1	foot: medium-dark skin tone
+🦶🏿	1	foot: dark skin tone
+👂	1	ear
+👂🏻	1	ear: light skin tone
+👂🏼	1	ear: medium-light skin tone
+👂🏽	1	ear: medium skin tone
+👂🏾	1	ear: medium-dark skin tone
+👂🏿	1	ear: dark skin tone
+🦻	1	ear with hearing aid
+🦻🏻	1	ear with hearing aid: light skin tone
+🦻🏼	1	ear with hearing aid: medium-light skin tone
+🦻🏽	1	ear with hearing aid: medium skin tone
+🦻🏾	1	ear with hearing aid: medium-dark skin tone
+🦻🏿	1	ear with hearing aid: dark skin tone
+👃	1	nose
+👃🏻	1	nose: light skin tone
+👃🏼	1	nose: medium-light skin tone
+👃🏽	1	nose: medium skin tone
+👃🏾	1	nose: medium-dark skin tone
+👃🏿	1	nose: dark skin tone
+🧠	1	brain
+🫀	1	anatomical heart
+🫁	1	lungs
+🦷	1	tooth
+🦴	1	bone
+👀	1	eyes
+👁️	1	eye
+👅	1	tongue
+👄	1	mouth
+🫦	1	biting lip
+👶	1	baby
+👶🏻	1	baby: light skin tone
+👶🏼	1	baby: medium-light skin tone
+👶🏽	1	baby: medium skin tone
+👶🏾	1	baby: medium-dark skin tone
+👶🏿	1	baby: dark skin tone
+🧒	1	child
+🧒🏻	1	child: light skin tone
+🧒🏼	1	child: medium-light skin tone
+🧒🏽	1	child: medium skin tone
+🧒🏾	1	child: medium-dark skin tone
+🧒🏿	1	child: dark skin tone
+👦	1	boy
+👦🏻	1	boy: light skin tone
+👦🏼	1	boy: medium-light skin tone
+👦🏽	1	boy: medium skin tone
+👦🏾	1	boy: medium-dark skin tone
+👦🏿	1	boy: dark skin tone
+👧	1	girl
+👧🏻	1	girl: light skin tone
+👧🏼	1	girl: medium-light skin tone
+👧🏽	1	girl: medium skin tone
+👧🏾	1	girl: medium-dark skin tone
+👧🏿	1	girl: dark skin tone
+🧑	1	person
+🧑🏻	1	person: light skin tone
+🧑🏼	1	person: medium-light skin tone
+🧑🏽	1	person: medium skin tone
+🧑🏾	1	person: medium-dark skin tone
+🧑🏿	1	person: dark skin tone
+👱	1	person: blond hair
+👱🏻	1	person: light skin tone, blond hair
+👱🏼	1	person: medium-light skin tone, blond hair
+👱🏽	1	person: medium skin tone, blond hair
+👱🏾	1	person: medium-dark skin tone, blond hair
+👱🏿	1	person: dark skin tone, blond hair
+👨	1	man
+👨🏻	1	man: light skin tone
+👨🏼	1	man: medium-light skin tone
+👨🏽	1	man: medium skin tone
+👨🏾	1	man: medium-dark skin tone
+👨🏿	1	man: dark skin tone
+🧔	1	person: beard
+🧔🏻	1	person: light skin tone, beard
+🧔🏼	1	person: medium-light skin tone, beard
+🧔🏽	1	person: medium skin tone, beard
+🧔🏾	1	person: medium-dark skin tone, beard
+🧔🏿	1	person: dark skin tone, beard
+🧔‍♂️	1	man: beard
+🧔🏻‍♂️	1	man: light skin tone, beard
+🧔🏼‍♂️	1	man: medium-light skin tone, beard
+🧔🏽‍♂️	1	man: medium skin tone, beard
+🧔🏾‍♂️	1	man: medium-dark skin tone, beard
+🧔🏿‍♂️	1	man: dark skin tone, beard
+🧔‍♀️	1	woman: beard
+🧔🏻‍♀️	1	woman: light skin tone, beard
+🧔🏼‍♀️	1	woman: medium-light skin tone, beard
+🧔🏽‍♀️	1	woman: medium skin tone, beard
+🧔🏾‍♀️	1	woman: medium-dark skin tone, beard
+🧔🏿‍♀️	1	woman: dark skin tone, beard
+👨‍🦰	1	man: red hair
+👨🏻‍🦰	1	man: light skin tone, red hair
+👨🏼‍🦰	1	man: medium-light skin tone, red hair
+👨🏽‍🦰	1	man: medium skin tone, red hair
+👨🏾‍🦰	1	man: medium-dark skin tone, red hair
+👨🏿‍🦰	1	man: dark skin tone, red hair
+👨‍🦱	1	man: curly hair
+👨🏻‍🦱	1	man: light skin tone, curly hair
+👨🏼‍🦱	1	man: medium-light skin tone, curly hair
+👨🏽‍🦱	1	man: medium skin tone, curly hair
+👨🏾‍🦱	1	man: medium-dark skin tone, curly hair
+👨🏿‍🦱	1	man: dark skin tone, curly hair
+👨‍🦳	1	man: white hair
+👨🏻‍🦳	1	man: light skin tone, white hair
+👨🏼‍🦳	1	man: medium-light skin tone, white hair
+👨🏽‍🦳	1	man: medium skin tone, white hair
+👨🏾‍🦳	1	man: medium-dark skin tone, white hair
+👨🏿‍🦳	1	man: dark skin tone, white hair
+👨‍🦲	1	man: bald
+👨🏻‍🦲	1	man: light skin tone, bald
+👨🏼‍🦲	1	man: medium-light skin tone, bald
+👨🏽‍🦲	1	man: medium skin tone, bald
+👨🏾‍🦲	1	man: medium-dark skin tone, bald
+👨🏿‍🦲	1	man: dark skin tone, bald
+👩	1	woman
+👩🏻	1	woman: light skin tone
+👩🏼	1	woman: medium-light skin tone
+👩🏽	1	woman: medium skin tone
+👩🏾	1	woman: medium-dark skin tone
+👩🏿	1	woman: dark skin tone
+👩‍🦰	1	woman: red hair
+👩🏻‍🦰	1	woman: light skin tone, red hair
+👩🏼‍🦰	1	woman: medium-light skin tone, red hair
+👩🏽‍🦰	1	woman: medium skin tone, red hair
+👩🏾‍🦰	1	woman: medium-dark skin tone, red hair
+👩🏿‍🦰	1	woman: dark skin tone, red hair
+🧑‍🦰	1	person: red hair
+🧑🏻‍🦰	1	person: light skin tone, red hair
+🧑🏼‍🦰	1	person: medium-light skin tone, red hair
+🧑🏽‍🦰	1	person: medium skin tone, red hair
+🧑🏾‍🦰	1	person: medium-dark skin tone, red hair
+🧑🏿‍🦰	1	person: dark skin tone, red hair
+👩‍🦱	1	woman: curly hair
+👩🏻‍🦱	1	woman: light skin tone, curly hair
+👩🏼‍🦱	1	woman: medium-light skin tone, curly hair
+👩🏽‍🦱	1	woman: medium skin tone, curly hair
+👩🏾‍🦱	1	woman: medium-dark skin tone, curly hair
+👩🏿‍🦱	1	woman: dark skin tone, curly hair
+🧑‍🦱	1	person: curly hair
+🧑🏻‍🦱	1	person: light skin tone, curly hair
+🧑🏼‍🦱	1	person: medium-light skin tone, curly hair
+🧑🏽‍🦱	1	person: medium skin tone, curly hair
+🧑🏾‍🦱	1	person: medium-dark skin tone, curly hair
+🧑🏿‍🦱	1	person: dark skin tone, curly hair
+👩‍🦳	1	woman: white hair
+👩🏻‍🦳	1	woman: light skin tone, white hair
+👩🏼‍🦳	1	woman: medium-light skin tone, white hair
+👩🏽‍🦳	1	woman: medium skin tone, white hair
+👩🏾‍🦳	1	woman: medium-dark skin tone, white hair
+👩🏿‍🦳	1	woman: dark skin tone, white hair
+🧑‍🦳	1	person: white hair
+🧑🏻‍🦳	1	person: light skin tone, white hair
+🧑🏼‍🦳	1	person: medium-light skin tone, white hair
+🧑🏽‍🦳	1	person: medium skin tone, white hair
+🧑🏾‍🦳	1	person: medium-dark skin tone, white hair
+🧑🏿‍🦳	1	person: dark skin tone, white hair
+👩‍🦲	1	woman: bald
+👩🏻‍🦲	1	woman: light skin tone, bald
+👩🏼‍🦲	1	woman: medium-light skin tone, bald
+👩🏽‍🦲	1	woman: medium skin tone, bald
+👩🏾‍🦲	1	woman: medium-dark skin tone, bald
+👩🏿‍🦲	1	woman: dark skin tone, bald
+🧑‍🦲	1	person: bald
+🧑🏻‍🦲	1	person: light skin tone, bald
+🧑🏼‍🦲	1	person: medium-light skin tone, bald
+🧑🏽‍🦲	1	person: medium skin tone, bald
+🧑🏾‍🦲	1	person: medium-dark skin tone, bald
+🧑🏿‍🦲	1	person: dark skin tone, bald
+👱‍♀️	1	woman: blond hair
+👱🏻‍♀️	1	woman: light skin tone, blond hair
+👱🏼‍♀️	1	woman: medium-light skin tone, blond hair
+👱🏽‍♀️	1	woman: medium skin tone, blond hair
+👱🏾‍♀️	1	woman: medium-dark skin tone, blond hair
+👱🏿‍♀️	1	woman: dark skin tone, blond hair
+👱‍♂️	1	man: blond hair
+👱🏻‍♂️	1	man: light skin tone, blond hair
+👱🏼‍♂️	1	man: medium-light skin tone, blond hair
+👱🏽‍♂️	1	man: medium skin tone, blond hair
+👱🏾‍♂️	1	man: medium-dark skin tone, blond hair
+👱🏿‍♂️	1	man: dark skin tone, blond hair
+🧓	1	older person
+🧓🏻	1	older person: light skin tone
+🧓🏼	1	older person: medium-light skin tone
+🧓🏽	1	older person: medium skin tone
+🧓🏾	1	older person: medium-dark skin tone
+🧓🏿	1	older person: dark skin tone
+👴	1	old man
+👴🏻	1	old man: light skin tone
+👴🏼	1	old man: medium-light skin tone
+👴🏽	1	old man: medium skin tone
+👴🏾	1	old man: medium-dark skin tone
+👴🏿	1	old man: dark skin tone
+👵	1	old woman
+👵🏻	1	old woman: light skin tone
+👵🏼	1	old woman: medium-light skin tone
+👵🏽	1	old woman: medium skin tone
+👵🏾	1	old woman: medium-dark skin tone
+👵🏿	1	old woman: dark skin tone
+🙍	1	person frowning
+🙍🏻	1	person frowning: light skin tone
+🙍🏼	1	person frowning: medium-light skin tone
+🙍🏽	1	person frowning: medium skin tone
+🙍🏾	1	person frowning: medium-dark skin tone
+🙍🏿	1	person frowning: dark skin tone
+🙍‍♂️	1	man frowning
+🙍🏻‍♂️	1	man frowning: light skin tone
+🙍🏼‍♂️	1	man frowning: medium-light skin tone
+🙍🏽‍♂️	1	man frowning: medium skin tone
+🙍🏾‍♂️	1	man frowning: medium-dark skin tone
+🙍🏿‍♂️	1	man frowning: dark skin tone
+🙍‍♀️	1	woman frowning
+🙍🏻‍♀️	1	woman frowning: light skin tone
+🙍🏼‍♀️	1	woman frowning: medium-light skin tone
+🙍🏽‍♀️	1	woman frowning: medium skin tone
+🙍🏾‍♀️	1	woman frowning: medium-dark skin tone
+🙍🏿‍♀️	1	woman frowning: dark skin tone
+🙎	1	person pouting
+🙎🏻	1	person pouting: light skin tone
+🙎🏼	1	person pouting: medium-light skin tone
+🙎🏽	1	person pouting: medium skin tone
+🙎🏾	1	person pouting: medium-dark skin tone
+🙎🏿	1	person pouting: dark skin tone
+🙎‍♂️	1	man pouting
+🙎🏻‍♂️	1	man pouting: light skin tone
+🙎🏼‍♂️	1	man pouting: medium-light skin tone
+🙎🏽‍♂️	1	man pouting: medium skin tone
+🙎🏾‍♂️	1	man pouting: medium-dark skin tone
+🙎🏿‍♂️	1	man pouting: dark skin tone
+🙎‍♀️	1	woman pouting
+🙎🏻‍♀️	1	woman pouting: light skin tone
+🙎🏼‍♀️	1	woman pouting: medium-light skin tone
+🙎🏽‍♀️	1	woman pouting: medium skin tone
+🙎🏾‍♀️	1	woman pouting: medium-dark skin tone
+🙎🏿‍♀️	1	woman pouting: dark skin tone
+🙅	1	person gesturing no
+🙅🏻	1	person gesturing no: light skin tone
+🙅🏼	1	person gesturing no: medium-light skin tone
+🙅🏽	1	person gesturing no: medium skin tone
+🙅🏾	1	person gesturing no: medium-dark skin tone
+🙅🏿	1	person gesturing no: dark skin tone
+🙅‍♂️	1	man gesturing no
+🙅🏻‍♂️	1	man gesturing no: light skin tone
+🙅🏼‍♂️	1	man gesturing no: medium-light skin tone
+🙅🏽‍♂️	1	man gesturing no: medium skin tone
+🙅🏾‍♂️	1	man gesturing no: medium-dark skin tone
+🙅🏿‍♂️	1	man gesturing no: dark skin tone
+🙅‍♀️	1	woman gesturing no
+🙅🏻‍♀️	1	woman gesturing no: light skin tone
+🙅🏼‍♀️	1	woman gesturing no: medium-light skin tone
+🙅🏽‍♀️	1	woman gesturing no: medium skin tone
+🙅🏾‍♀️	1	woman gesturing no: medium-dark skin tone
+🙅🏿‍♀️	1	woman gesturing no: dark skin tone
+🙆	1	person gesturing ok
+🙆🏻	1	person gesturing ok: light skin tone
+🙆🏼	1	person gesturing ok: medium-light skin tone
+🙆🏽	1	person gesturing ok: medium skin tone
+🙆🏾	1	person gesturing ok: medium-dark skin tone
+🙆🏿	1	person gesturing ok: dark skin tone
+🙆‍♂️	1	man gesturing ok
+🙆🏻‍♂️	1	man gesturing ok: light skin tone
+🙆🏼‍♂️	1	man gesturing ok: medium-light skin tone
+🙆🏽‍♂️	1	man gesturing ok: medium skin tone
+🙆🏾‍♂️	1	man gesturing ok: medium-dark skin tone
+🙆🏿‍♂️	1	man gesturing ok: dark skin tone
+🙆‍♀️	1	woman gesturing ok
+🙆🏻‍♀️	1	woman gesturing ok: light skin tone
+🙆🏼‍♀️	1	woman gesturing ok: medium-light skin tone
+🙆🏽‍♀️	1	woman gesturing ok: medium skin tone
+🙆🏾‍♀️	1	woman gesturing ok: medium-dark skin tone
+🙆🏿‍♀️	1	woman gesturing ok: dark skin tone
+💁	1	person tipping hand
+💁🏻	1	person tipping hand: light skin tone
+💁🏼	1	person tipping hand: medium-light skin tone
+💁🏽	1	person tipping hand: medium skin tone
+💁🏾	1	person tipping hand: medium-dark skin tone
+💁🏿	1	person tipping hand: dark skin tone
+💁‍♂️	1	man tipping hand
+💁🏻‍♂️	1	man tipping hand: light skin tone
+💁🏼‍♂️	1	man tipping hand: medium-light skin tone
+💁🏽‍♂️	1	man tipping hand: medium skin tone
+💁🏾‍♂️	1	man tipping hand: medium-dark skin tone
+💁🏿‍♂️	1	man tipping hand: dark skin tone
+💁‍♀️	1	woman tipping hand
+💁🏻‍♀️	1	woman tipping hand: light skin tone
+💁🏼‍♀️	1	woman tipping hand: medium-light skin tone
+💁🏽‍♀️	1	woman tipping hand: medium skin tone
+💁🏾‍♀️	1	woman tipping hand: medium-dark skin tone
+💁🏿‍♀️	1	woman tipping hand: dark skin tone
+🙋	1	person raising hand
+🙋🏻	1	person raising hand: light skin tone
+🙋🏼	1	person raising hand: medium-light skin tone
+🙋🏽	1	person raising hand: medium skin tone
+🙋🏾	1	person raising hand: medium-dark skin tone
+🙋🏿	1	person raising hand: dark skin tone
+🙋‍♂️	1	man raising hand
+🙋🏻‍♂️	1	man raising hand: light skin tone
+🙋🏼‍♂️	1	man raising hand: medium-light skin tone
+🙋🏽‍♂️	1	man raising hand: medium skin tone
+🙋🏾‍♂️	1	man raising hand: medium-dark skin tone
+🙋🏿‍♂️	1	man raising hand: dark skin tone
+🙋‍♀️	1	woman raising hand
+🙋🏻‍♀️	1	woman raising hand: light skin tone
+🙋🏼‍♀️	1	woman raising hand: medium-light skin tone
+🙋🏽‍♀️	1	woman raising hand: medium skin tone
+🙋🏾‍♀️	1	woman raising hand: medium-dark skin tone
+🙋🏿‍♀️	1	woman raising hand: dark skin tone
+🧏	1	deaf person
+🧏🏻	1	deaf person: light skin tone
+🧏🏼	1	deaf person: medium-light skin tone
+🧏🏽	1	deaf person: medium skin tone
+🧏🏾	1	deaf person: medium-dark skin tone
+🧏🏿	1	deaf person: dark skin tone
+🧏‍♂️	1	deaf man
+🧏🏻‍♂️	1	deaf man: light skin tone
+🧏🏼‍♂️	1	deaf man: medium-light skin tone
+🧏🏽‍♂️	1	deaf man: medium skin tone
+🧏🏾‍♂️	1	deaf man: medium-dark skin tone
+🧏🏿‍♂️	1	deaf man: dark skin tone
+🧏‍♀️	1	deaf woman
+🧏🏻‍♀️	1	deaf woman: light skin tone
+🧏🏼‍♀️	1	deaf woman: medium-light skin tone
+🧏🏽‍♀️	1	deaf woman: medium skin tone
+🧏🏾‍♀️	1	deaf woman: medium-dark skin tone
+🧏🏿‍♀️	1	deaf woman: dark skin tone
+🙇	1	person bowing
+🙇🏻	1	person bowing: light skin tone
+🙇🏼	1	person bowing: medium-light skin tone
+🙇🏽	1	person bowing: medium skin tone
+🙇🏾	1	person bowing: medium-dark skin tone
+🙇🏿	1	person bowing: dark skin tone
+🙇‍♂️	1	man bowing
+🙇🏻‍♂️	1	man bowing: light skin tone
+🙇🏼‍♂️	1	man bowing: medium-light skin tone
+🙇🏽‍♂️	1	man bowing: medium skin tone
+🙇🏾‍♂️	1	man bowing: medium-dark skin tone
+🙇🏿‍♂️	1	man bowing: dark skin tone
+🙇‍♀️	1	woman bowing
+🙇🏻‍♀️	1	woman bowing: light skin tone
+🙇🏼‍♀️	1	woman bowing: medium-light skin tone
+🙇🏽‍♀️	1	woman bowing: medium skin tone
+🙇🏾‍♀️	1	woman bowing: medium-dark skin tone
+🙇🏿‍♀️	1	woman bowing: dark skin tone
+🤦	1	person facepalming
+🤦🏻	1	person facepalming: light skin tone
+🤦🏼	1	person facepalming: medium-light skin tone
+🤦🏽	1	person facepalming: medium skin tone
+🤦🏾	1	person facepalming: medium-dark skin tone
+🤦🏿	1	person facepalming: dark skin tone
+🤦‍♂️	1	man facepalming
+🤦🏻‍♂️	1	man facepalming: light skin tone
+🤦🏼‍♂️	1	man facepalming: medium-light skin tone
+🤦🏽‍♂️	1	man facepalming: medium skin tone
+🤦🏾‍♂️	1	man facepalming: medium-dark skin tone
+🤦🏿‍♂️	1	man facepalming: dark skin tone
+🤦‍♀️	1	woman facepalming
+🤦🏻‍♀️	1	woman facepalming: light skin tone
+🤦🏼‍♀️	1	woman facepalming: medium-light skin tone
+🤦🏽‍♀️	1	woman facepalming: medium skin tone
+🤦🏾‍♀️	1	woman facepalming: medium-dark skin tone
+🤦🏿‍♀️	1	woman facepalming: dark skin tone
+🤷	1	person shrugging
+🤷🏻	1	person shrugging: light skin tone
+🤷🏼	1	person shrugging: medium-light skin tone
+🤷🏽	1	person shrugging: medium skin tone
+🤷🏾	1	person shrugging: medium-dark skin tone
+🤷🏿	1	person shrugging: dark skin tone
+🤷‍♂️	1	man shrugging
+🤷🏻‍♂️	1	man shrugging: light skin tone
+🤷🏼‍♂️	1	man shrugging: medium-light skin tone
+🤷🏽‍♂️	1	man shrugging: medium skin tone
+🤷🏾‍♂️	1	man shrugging: medium-dark skin tone
+🤷🏿‍♂️	1	man shrugging: dark skin tone
+🤷‍♀️	1	woman shrugging
+🤷🏻‍♀️	1	woman shrugging: light skin tone
+🤷🏼‍♀️	1	woman shrugging: medium-light skin tone
+🤷🏽‍♀️	1	woman shrugging: medium skin tone
+🤷🏾‍♀️	1	woman shrugging: medium-dark skin tone
+🤷🏿‍♀️	1	woman shrugging: dark skin tone
+🧑‍⚕️	1	health worker
+🧑🏻‍⚕️	1	health worker: light skin tone
+🧑🏼‍⚕️	1	health worker: medium-light skin tone
+🧑🏽‍⚕️	1	health worker: medium skin tone
+🧑🏾‍⚕️	1	health worker: medium-dark skin tone
+🧑🏿‍⚕️	1	health worker: dark skin tone
+👨‍⚕️	1	man health worker
+👨🏻‍⚕️	1	man health worker: light skin tone
+👨🏼‍⚕️	1	man health worker: medium-light skin tone
+👨🏽‍⚕️	1	man health worker: medium skin tone
+👨🏾‍⚕️	1	man health worker: medium-dark skin tone
+👨🏿‍⚕️	1	man health worker: dark skin tone
+👩‍⚕️	1	woman health worker
+👩🏻‍⚕️	1	woman health worker: light skin tone
+👩🏼‍⚕️	1	woman health worker: medium-light skin tone
+👩🏽‍⚕️	1	woman health worker: medium skin tone
+👩🏾‍⚕️	1	woman health worker: medium-dark skin tone
+👩🏿‍⚕️	1	woman health worker: dark skin tone
+🧑‍🎓	1	student
+🧑🏻‍🎓	1	student: light skin tone
+🧑🏼‍🎓	1	student: medium-light skin tone
+🧑🏽‍🎓	1	student: medium skin tone
+🧑🏾‍🎓	1	student: medium-dark skin tone
+🧑🏿‍🎓	1	student: dark skin tone
+👨‍🎓	1	man student
+👨🏻‍🎓	1	man student: light skin tone
+👨🏼‍🎓	1	man student: medium-light skin tone
+👨🏽‍🎓	1	man student: medium skin tone
+👨🏾‍🎓	1	man student: medium-dark skin tone
+👨🏿‍🎓	1	man student: dark skin tone
+👩‍🎓	1	woman student
+👩🏻‍🎓	1	woman student: light skin tone
+👩🏼‍🎓	1	woman student: medium-light skin tone
+👩🏽‍🎓	1	woman student: medium skin tone
+👩🏾‍🎓	1	woman student: medium-dark skin tone
+👩🏿‍🎓	1	woman student: dark skin tone
+🧑‍🏫	1	teacher
+🧑🏻‍🏫	1	teacher: light skin tone
+🧑🏼‍🏫	1	teacher: medium-light skin tone
+🧑🏽‍🏫	1	teacher: medium skin tone
+🧑🏾‍🏫	1	teacher: medium-dark skin tone
+🧑🏿‍🏫	1	teacher: dark skin tone
+👨‍🏫	1	man teacher
+👨🏻‍🏫	1	man teacher: light skin tone
+👨🏼‍🏫	1	man teacher: medium-light skin tone
+👨🏽‍🏫	1	man teacher: medium skin tone
+👨🏾‍🏫	1	man teacher: medium-dark skin tone
+👨🏿‍🏫	1	man teacher: dark skin tone
+👩‍🏫	1	woman teacher
+👩🏻‍🏫	1	woman teacher: light skin tone
+👩🏼‍🏫	1	woman teacher: medium-light skin tone
+👩🏽‍🏫	1	woman teacher: medium skin tone
+👩🏾‍🏫	1	woman teacher: medium-dark skin tone
+👩🏿‍🏫	1	woman teacher: dark skin tone
+🧑‍⚖️	1	judge
+🧑🏻‍⚖️	1	judge: light skin tone
+🧑🏼‍⚖️	1	judge: medium-light skin tone
+🧑🏽‍⚖️	1	judge: medium skin tone
+🧑🏾‍⚖️	1	judge: medium-dark skin tone
+🧑🏿‍⚖️	1	judge: dark skin tone
+👨‍⚖️	1	man judge
+👨🏻‍⚖️	1	man judge: light skin tone
+👨🏼‍⚖️	1	man judge: medium-light skin tone
+👨🏽‍⚖️	1	man judge: medium skin tone
+👨🏾‍⚖️	1	man judge: medium-dark skin tone
+👨🏿‍⚖️	1	man judge: dark skin tone
+👩‍⚖️	1	woman judge
+👩🏻‍⚖️	1	woman judge: light skin tone
+👩🏼‍⚖️	1	woman judge: medium-light skin tone
+👩🏽‍⚖️	1	woman judge: medium skin tone
+👩🏾‍⚖️	1	woman judge: medium-dark skin tone
+👩🏿‍⚖️	1	woman judge: dark skin tone
+🧑‍🌾	1	farmer
+🧑🏻‍🌾	1	farmer: light skin tone
+🧑🏼‍🌾	1	farmer: medium-light skin tone
+🧑🏽‍🌾	1	farmer: medium skin tone
+🧑🏾‍🌾	1	farmer: medium-dark skin tone
+🧑🏿‍🌾	1	farmer: dark skin tone
+👨‍🌾	1	man farmer
+👨🏻‍🌾	1	man farmer: light skin tone
+👨🏼‍🌾	1	man farmer: medium-light skin tone
+👨🏽‍🌾	1	man farmer: medium skin tone
+👨🏾‍🌾	1	man farmer: medium-dark skin tone
+👨🏿‍🌾	1	man farmer: dark skin tone
+👩‍🌾	1	woman farmer
+👩🏻‍🌾	1	woman farmer: light skin tone
+👩🏼‍🌾	1	woman farmer: medium-light skin tone
+👩🏽‍🌾	1	woman farmer: medium skin tone
+👩🏾‍🌾	1	woman farmer: medium-dark skin tone
+👩🏿‍🌾	1	woman farmer: dark skin tone
+🧑‍🍳	1	cook
+🧑🏻‍🍳	1	cook: light skin tone
+🧑🏼‍🍳	1	cook: medium-light skin tone
+🧑🏽‍🍳	1	cook: medium skin tone
+🧑🏾‍🍳	1	cook: medium-dark skin tone
+🧑🏿‍🍳	1	cook: dark skin tone
+👨‍🍳	1	man cook
+👨🏻‍🍳	1	man cook: light skin tone
+👨🏼‍🍳	1	man cook: medium-light skin tone
+👨🏽‍🍳	1	man cook: medium skin tone
+👨🏾‍🍳	1	man cook: medium-dark skin tone
+👨🏿‍🍳	1	man cook: dark skin tone
+👩‍🍳	1	woman cook
+👩🏻‍🍳	1	woman cook: light skin tone
+👩🏼‍🍳	1	woman cook: medium-light skin tone
+👩🏽‍🍳	1	woman cook: medium skin tone
+👩🏾‍🍳	1	woman cook: medium-dark skin tone
+👩🏿‍🍳	1	woman cook: dark skin tone
+🧑‍🔧	1	mechanic
+🧑🏻‍🔧	1	mechanic: light skin tone
+🧑🏼‍🔧	1	mechanic: medium-light skin tone
+🧑🏽‍🔧	1	mechanic: medium skin tone
+🧑🏾‍🔧	1	mechanic: medium-dark skin tone
+🧑🏿‍🔧	1	mechanic: dark skin tone
+👨‍🔧	1	man mechanic
+👨🏻‍🔧	1	man mechanic: light skin tone
+👨🏼‍🔧	1	man mechanic: medium-light skin tone
+👨🏽‍🔧	1	man mechanic: medium skin tone
+👨🏾‍🔧	1	man mechanic: medium-dark skin tone
+👨🏿‍🔧	1	man mechanic: dark skin tone
+👩‍🔧	1	woman mechanic
+👩🏻‍🔧	1	woman mechanic: light skin tone
+👩🏼‍🔧	1	woman mechanic: medium-light skin tone
+👩🏽‍🔧	1	woman mechanic: medium skin tone
+👩🏾‍🔧	1	woman mechanic: medium-dark skin tone
+👩🏿‍🔧	1	woman mechanic: dark skin tone
+🧑‍🏭	1	factory worker
+🧑🏻‍🏭	1	factory worker: light skin tone
+🧑🏼‍🏭	1	factory worker: medium-light skin tone
+🧑🏽‍🏭	1	factory worker: medium skin tone
+🧑🏾‍🏭	1	factory worker: medium-dark skin tone
+🧑🏿‍🏭	1	factory worker: dark skin tone
+👨‍🏭	1	man factory worker
+👨🏻‍🏭	1	man factory worker: light skin tone
+👨🏼‍🏭	1	man factory worker: medium-light skin tone
+👨🏽‍🏭	1	man factory worker: medium skin tone
+👨🏾‍🏭	1	man factory worker: medium-dark skin tone
+👨🏿‍🏭	1	man factory worker: dark skin tone
+👩‍🏭	1	woman factory worker
+👩🏻‍🏭	1	woman factory worker: light skin tone
+👩🏼‍🏭	1	woman factory worker: medium-light skin tone
+👩🏽‍🏭	1	woman factory worker: medium skin tone
+👩🏾‍🏭	1	woman factory worker: medium-dark skin tone
+👩🏿‍🏭	1	woman factory worker: dark skin tone
+🧑‍💼	1	office worker
+🧑🏻‍💼	1	office worker: light skin tone
+🧑🏼‍💼	1	office worker: medium-light skin tone
+🧑🏽‍💼	1	office worker: medium skin tone
+🧑🏾‍💼	1	office worker: medium-dark skin tone
+🧑🏿‍💼	1	office worker: dark skin tone
+👨‍💼	1	man office worker
+👨🏻‍💼	1	man office worker: light skin tone
+👨🏼‍💼	1	man office worker: medium-light skin tone
+👨🏽‍💼	1	man office worker: medium skin tone
+👨🏾‍💼	1	man office worker: medium-dark skin tone
+👨🏿‍💼	1	man office worker: dark skin tone
+👩‍💼	1	woman office worker
+👩🏻‍💼	1	woman office worker: light skin tone
+👩🏼‍💼	1	woman office worker: medium-light skin tone
+👩🏽‍💼	1	woman office worker: medium skin tone
+👩🏾‍💼	1	woman office worker: medium-dark skin tone
+👩🏿‍💼	1	woman office worker: dark skin tone
+🧑‍🔬	1	scientist
+🧑🏻‍🔬	1	scientist: light skin tone
+🧑🏼‍🔬	1	scientist: medium-light skin tone
+🧑🏽‍🔬	1	scientist: medium skin tone
+🧑🏾‍🔬	1	scientist: medium-dark skin tone
+🧑🏿‍🔬	1	scientist: dark skin tone
+👨‍🔬	1	man scientist
+👨🏻‍🔬	1	man scientist: light skin tone
+👨🏼‍🔬	1	man scientist: medium-light skin tone
+👨🏽‍🔬	1	man scientist: medium skin tone
+👨🏾‍🔬	1	man scientist: medium-dark skin tone
+👨🏿‍🔬	1	man scientist: dark skin tone
+👩‍🔬	1	woman scientist
+👩🏻‍🔬	1	woman scientist: light skin tone
+👩🏼‍🔬	1	woman scientist: medium-light skin tone
+👩🏽‍🔬	1	woman scientist: medium skin tone
+👩🏾‍🔬	1	woman scientist: medium-dark skin tone
+👩🏿‍🔬	1	woman scientist: dark skin tone
+🧑‍💻	1	technologist
+🧑🏻‍💻	1	technologist: light skin tone
+🧑🏼‍💻	1	technologist: medium-light skin tone
+🧑🏽‍💻	1	technologist: medium skin tone
+🧑🏾‍💻	1	technologist: medium-dark skin tone
+🧑🏿‍💻	1	technologist: dark skin tone
+👨‍💻	1	man technologist
+👨🏻‍💻	1	man technologist: light skin tone
+👨🏼‍💻	1	man technologist: medium-light skin tone
+👨🏽‍💻	1	man technologist: medium skin tone
+👨🏾‍💻	1	man technologist: medium-dark skin tone
+👨🏿‍💻	1	man technologist: dark skin tone
+👩‍💻	1	woman technologist
+👩🏻‍💻	1	woman technologist: light skin tone
+👩🏼‍💻	1	woman technologist: medium-light skin tone
+👩🏽‍💻	1	woman technologist: medium skin tone
+👩🏾‍💻	1	woman technologist: medium-dark skin tone
+👩🏿‍💻	1	woman technologist: dark skin tone
+🧑‍🎤	1	singer
+🧑🏻‍🎤	1	singer: light skin tone
+🧑🏼‍🎤	1	singer: medium-light skin tone
+🧑🏽‍🎤	1	singer: medium skin tone
+🧑🏾‍🎤	1	singer: medium-dark skin tone
+🧑🏿‍🎤	1	singer: dark skin tone
+👨‍🎤	1	man singer
+👨🏻‍🎤	1	man singer: light skin tone
+👨🏼‍🎤	1	man singer: medium-light skin tone
+👨🏽‍🎤	1	man singer: medium skin tone
+👨🏾‍🎤	1	man singer: medium-dark skin tone
+👨🏿‍🎤	1	man singer: dark skin tone
+👩‍🎤	1	woman singer
+👩🏻‍🎤	1	woman singer: light skin tone
+👩🏼‍🎤	1	woman singer: medium-light skin tone
+👩🏽‍🎤	1	woman singer: medium skin tone
+👩🏾‍🎤	1	woman singer: medium-dark skin tone
+👩🏿‍🎤	1	woman singer: dark skin tone
+🧑‍🎨	1	artist
+🧑🏻‍🎨	1	artist: light skin tone
+🧑🏼‍🎨	1	artist: medium-light skin tone
+🧑🏽‍🎨	1	artist: medium skin tone
+🧑🏾‍🎨	1	artist: medium-dark skin tone
+🧑🏿‍🎨	1	artist: dark skin tone
+👨‍🎨	1	man artist
+👨🏻‍🎨	1	man artist: light skin tone
+👨🏼‍🎨	1	man artist: medium-light skin tone
+👨🏽‍🎨	1	man artist: medium skin tone
+👨🏾‍🎨	1	man artist: medium-dark skin tone
+👨🏿‍🎨	1	man artist: dark skin tone
+👩‍🎨	1	woman artist
+👩🏻‍🎨	1	woman artist: light skin tone
+👩🏼‍🎨	1	woman artist: medium-light skin tone
+👩🏽‍🎨	1	woman artist: medium skin tone
+👩🏾‍🎨	1	woman artist: medium-dark skin tone
+👩🏿‍🎨	1	woman artist: dark skin tone
+🧑‍✈️	1	pilot
+🧑🏻‍✈️	1	pilot: light skin tone
+🧑🏼‍✈️	1	pilot: medium-light skin tone
+🧑🏽‍✈️	1	pilot: medium skin tone
+🧑🏾‍✈️	1	pilot: medium-dark skin tone
+🧑🏿‍✈️	1	pilot: dark skin tone
+👨‍✈️	1	man pilot
+👨🏻‍✈️	1	man pilot: light skin tone
+👨🏼‍✈️	1	man pilot: medium-light skin tone
+👨🏽‍✈️	1	man pilot: medium skin tone
+👨🏾‍✈️	1	man pilot: medium-dark skin tone
+👨🏿‍✈️	1	man pilot: dark skin tone
+👩‍✈️	1	woman pilot
+👩🏻‍✈️	1	woman pilot: light skin tone
+👩🏼‍✈️	1	woman pilot: medium-light skin tone
+👩🏽‍✈️	1	woman pilot: medium skin tone
+👩🏾‍✈️	1	woman pilot: medium-dark skin tone
+👩🏿‍✈️	1	woman pilot: dark skin tone
+🧑‍🚀	1	astronaut
+🧑🏻‍🚀	1	astronaut: light skin tone
+🧑🏼‍🚀	1	astronaut: medium-light skin tone
+🧑🏽‍🚀	1	astronaut: medium skin tone
+🧑🏾‍🚀	1	astronaut: medium-dark skin tone
+🧑🏿‍🚀	1	astronaut: dark skin tone
+👨‍🚀	1	man astronaut
+👨🏻‍🚀	1	man astronaut: light skin tone
+👨🏼‍🚀	1	man astronaut: medium-light skin tone
+👨🏽‍🚀	1	man astronaut: medium skin tone
+👨🏾‍🚀	1	man astronaut: medium-dark skin tone
+👨🏿‍🚀	1	man astronaut: dark skin tone
+👩‍🚀	1	woman astronaut
+👩🏻‍🚀	1	woman astronaut: light skin tone
+👩🏼‍🚀	1	woman astronaut: medium-light skin tone
+👩🏽‍🚀	1	woman astronaut: medium skin tone
+👩🏾‍🚀	1	woman astronaut: medium-dark skin tone
+👩🏿‍🚀	1	woman astronaut: dark skin tone
+🧑‍🚒	1	firefighter
+🧑🏻‍🚒	1	firefighter: light skin tone
+🧑🏼‍🚒	1	firefighter: medium-light skin tone
+🧑🏽‍🚒	1	firefighter: medium skin tone
+🧑🏾‍🚒	1	firefighter: medium-dark skin tone
+🧑🏿‍🚒	1	firefighter: dark skin tone
+👨‍🚒	1	man firefighter
+👨🏻‍🚒	1	man firefighter: light skin tone
+👨🏼‍🚒	1	man firefighter: medium-light skin tone
+👨🏽‍🚒	1	man firefighter: medium skin tone
+👨🏾‍🚒	1	man firefighter: medium-dark skin tone
+👨🏿‍🚒	1	man firefighter: dark skin tone
+👩‍🚒	1	woman firefighter
+👩🏻‍🚒	1	woman firefighter: light skin tone
+👩🏼‍🚒	1	woman firefighter: medium-light skin tone
+👩🏽‍🚒	1	woman firefighter: medium skin tone
+👩🏾‍🚒	1	woman firefighter: medium-dark skin tone
+👩🏿‍🚒	1	woman firefighter: dark skin tone
+👮	1	police officer
+👮🏻	1	police officer: light skin tone
+👮🏼	1	police officer: medium-light skin tone
+👮🏽	1	police officer: medium skin tone
+👮🏾	1	police officer: medium-dark skin tone
+👮🏿	1	police officer: dark skin tone
+👮‍♂️	1	man police officer
+👮🏻‍♂️	1	man police officer: light skin tone
+👮🏼‍♂️	1	man police officer: medium-light skin tone
+👮🏽‍♂️	1	man police officer: medium skin tone
+👮🏾‍♂️	1	man police officer: medium-dark skin tone
+👮🏿‍♂️	1	man police officer: dark skin tone
+👮‍♀️	1	woman police officer
+👮🏻‍♀️	1	woman police officer: light skin tone
+👮🏼‍♀️	1	woman police officer: medium-light skin tone
+👮🏽‍♀️	1	woman police officer: medium skin tone
+👮🏾‍♀️	1	woman police officer: medium-dark skin tone
+👮🏿‍♀️	1	woman police officer: dark skin tone
+🕵️	1	detective
+🕵🏻	1	detective: light skin tone
+🕵🏼	1	detective: medium-light skin tone
+🕵🏽	1	detective: medium skin tone
+🕵🏾	1	detective: medium-dark skin tone
+🕵🏿	1	detective: dark skin tone
+🕵️‍♂️	1	man detective
+🕵🏻‍♂️	1	man detective: light skin tone
+🕵🏼‍♂️	1	man detective: medium-light skin tone
+🕵🏽‍♂️	1	man detective: medium skin tone
+🕵🏾‍♂️	1	man detective: medium-dark skin tone
+🕵🏿‍♂️	1	man detective: dark skin tone
+🕵️‍♀️	1	woman detective
+🕵🏻‍♀️	1	woman detective: light skin tone
+🕵🏼‍♀️	1	woman detective: medium-light skin tone
+🕵🏽‍♀️	1	woman detective: medium skin tone
+🕵🏾‍♀️	1	woman detective: medium-dark skin tone
+🕵🏿‍♀️	1	woman detective: dark skin tone
+💂	1	guard
+💂🏻	1	guard: light skin tone
+💂🏼	1	guard: medium-light skin tone
+💂🏽	1	guard: medium skin tone
+💂🏾	1	guard: medium-dark skin tone
+💂🏿	1	guard: dark skin tone
+💂‍♂️	1	man guard
+💂🏻‍♂️	1	man guard: light skin tone
+💂🏼‍♂️	1	man guard: medium-light skin tone
+💂🏽‍♂️	1	man guard: medium skin tone
+💂🏾‍♂️	1	man guard: medium-dark skin tone
+💂🏿‍♂️	1	man guard: dark skin tone
+💂‍♀️	1	woman guard
+💂🏻‍♀️	1	woman guard: light skin tone
+💂🏼‍♀️	1	woman guard: medium-light skin tone
+💂🏽‍♀️	1	woman guard: medium skin tone
+💂🏾‍♀️	1	woman guard: medium-dark skin tone
+💂🏿‍♀️	1	woman guard: dark skin tone
+🥷	1	ninja
+🥷🏻	1	ninja: light skin tone
+🥷🏼	1	ninja: medium-light skin tone
+🥷🏽	1	ninja: medium skin tone
+🥷🏾	1	ninja: medium-dark skin tone
+🥷🏿	1	ninja: dark skin tone
+👷	1	construction worker
+👷🏻	1	construction worker: light skin tone
+👷🏼	1	construction worker: medium-light skin tone
+👷🏽	1	construction worker: medium skin tone
+👷🏾	1	construction worker: medium-dark skin tone
+👷🏿	1	construction worker: dark skin tone
+👷‍♂️	1	man construction worker
+👷🏻‍♂️	1	man construction worker: light skin tone
+👷🏼‍♂️	1	man construction worker: medium-light skin tone
+👷🏽‍♂️	1	man construction worker: medium skin tone
+👷🏾‍♂️	1	man construction worker: medium-dark skin tone
+👷🏿‍♂️	1	man construction worker: dark skin tone
+👷‍♀️	1	woman construction worker
+👷🏻‍♀️	1	woman construction worker: light skin tone
+👷🏼‍♀️	1	woman construction worker: medium-light skin tone
+👷🏽‍♀️	1	woman construction worker: medium skin tone
+👷🏾‍♀️	1	woman construction worker: medium-dark skin tone
+👷🏿‍♀️	1	woman construction worker: dark skin tone
+🫅	1	person with crown
+🫅🏻	1	person with crown: light skin tone
+🫅🏼	1	person with crown: medium-light skin tone
+🫅🏽	1	person with crown: medium skin tone
+🫅🏾	1	person with crown: medium-dark skin tone
+🫅🏿	1	person with crown: dark skin tone
+🤴	1	prince
+🤴🏻	1	prince: light skin tone
+🤴🏼	1	prince: medium-light skin tone
+🤴🏽	1	prince: medium skin tone
+🤴🏾	1	prince: medium-dark skin tone
+🤴🏿	1	prince: dark skin tone
+👸	1	princess
+👸🏻	1	princess: light skin tone
+👸🏼	1	princess: medium-light skin tone
+👸🏽	1	princess: medium skin tone
+👸🏾	1	princess: medium-dark skin tone
+👸🏿	1	princess: dark skin tone
+👳	1	person wearing turban
+👳🏻	1	person wearing turban: light skin tone
+👳🏼	1	person wearing turban: medium-light skin tone
+👳🏽	1	person wearing turban: medium skin tone
+👳🏾	1	person wearing turban: medium-dark skin tone
+👳🏿	1	person wearing turban: dark skin tone
+👳‍♂️	1	man wearing turban
+👳🏻‍♂️	1	man wearing turban: light skin tone
+👳🏼‍♂️	1	man wearing turban: medium-light skin tone
+👳🏽‍♂️	1	man wearing turban: medium skin tone
+👳🏾‍♂️	1	man wearing turban: medium-dark skin tone
+👳🏿‍♂️	1	man wearing turban: dark skin tone
+👳‍♀️	1	woman wearing turban
+👳🏻‍♀️	1	woman wearing turban: light skin tone
+👳🏼‍♀️	1	woman wearing turban: medium-light skin tone
+👳🏽‍♀️	1	woman wearing turban: medium skin tone
+👳🏾‍♀️	1	woman wearing turban: medium-dark skin tone
+👳🏿‍♀️	1	woman wearing turban: dark skin tone
+👲	1	person with skullcap
+👲🏻	1	person with skullcap: light skin tone
+👲🏼	1	person with skullcap: medium-light skin tone
+👲🏽	1	person with skullcap: medium skin tone
+👲🏾	1	person with skullcap: medium-dark skin tone
+👲🏿	1	person with skullcap: dark skin tone
+🧕	1	woman with headscarf
+🧕🏻	1	woman with headscarf: light skin tone
+🧕🏼	1	woman with headscarf: medium-light skin tone
+🧕🏽	1	woman with headscarf: medium skin tone
+🧕🏾	1	woman with headscarf: medium-dark skin tone
+🧕🏿	1	woman with headscarf: dark skin tone
+🤵	1	person in tuxedo
+🤵🏻	1	person in tuxedo: light skin tone
+🤵🏼	1	person in tuxedo: medium-light skin tone
+🤵🏽	1	person in tuxedo: medium skin tone
+🤵🏾	1	person in tuxedo: medium-dark skin tone
+🤵🏿	1	person in tuxedo: dark skin tone
+🤵‍♂️	1	man in tuxedo
+🤵🏻‍♂️	1	man in tuxedo: light skin tone
+🤵🏼‍♂️	1	man in tuxedo: medium-light skin tone
+🤵🏽‍♂️	1	man in tuxedo: medium skin tone
+🤵🏾‍♂️	1	man in tuxedo: medium-dark skin tone
+🤵🏿‍♂️	1	man in tuxedo: dark skin tone
+🤵‍♀️	1	woman in tuxedo
+🤵🏻‍♀️	1	woman in tuxedo: light skin tone
+🤵🏼‍♀️	1	woman in tuxedo: medium-light skin tone
+🤵🏽‍♀️	1	woman in tuxedo: medium skin tone
+🤵🏾‍♀️	1	woman in tuxedo: medium-dark skin tone
+🤵🏿‍♀️	1	woman in tuxedo: dark skin tone
+👰	1	person with veil
+👰🏻	1	person with veil: light skin tone
+👰🏼	1	person with veil: medium-light skin tone
+👰🏽	1	person with veil: medium skin tone
+👰🏾	1	person with veil: medium-dark skin tone
+👰🏿	1	person with veil: dark skin tone
+👰‍♂️	1	man with veil
+👰🏻‍♂️	1	man with veil: light skin tone
+👰🏼‍♂️	1	man with veil: medium-light skin tone
+👰🏽‍♂️	1	man with veil: medium skin tone
+👰🏾‍♂️	1	man with veil: medium-dark skin tone
+👰🏿‍♂️	1	man with veil: dark skin tone
+👰‍♀️	1	woman with veil
+👰🏻‍♀️	1	woman with veil: light skin tone
+👰🏼‍♀️	1	woman with veil: medium-light skin tone
+👰🏽‍♀️	1	woman with veil: medium skin tone
+👰🏾‍♀️	1	woman with veil: medium-dark skin tone
+👰🏿‍♀️	1	woman with veil: dark skin tone
+🤰	1	pregnant woman
+🤰🏻	1	pregnant woman: light skin tone
+🤰🏼	1	pregnant woman: medium-light skin tone
+🤰🏽	1	pregnant woman: medium skin tone
+🤰🏾	1	pregnant woman: medium-dark skin tone
+🤰🏿	1	pregnant woman: dark skin tone
+🫃	1	pregnant man
+🫃🏻	1	pregnant man: light skin tone
+🫃🏼	1	pregnant man: medium-light skin tone
+🫃🏽	1	pregnant man: medium skin tone
+🫃🏾	1	pregnant man: medium-dark skin tone
+🫃🏿	1	pregnant man: dark skin tone
+🫄	1	pregnant person
+🫄🏻	1	pregnant person: light skin tone
+🫄🏼	1	pregnant person: medium-light skin tone
+🫄🏽	1	pregnant person: medium skin tone
+🫄🏾	1	pregnant person: medium-dark skin tone
+🫄🏿	1	pregnant person: dark skin tone
+🤱	1	breast-feeding
+🤱🏻	1	breast-feeding: light skin tone
+🤱🏼	1	breast-feeding: medium-light skin tone
+🤱🏽	1	breast-feeding: medium skin tone
+🤱🏾	1	breast-feeding: medium-dark skin tone
+🤱🏿	1	breast-feeding: dark skin tone
+👩‍🍼	1	woman feeding baby
+👩🏻‍🍼	1	woman feeding baby: light skin tone
+👩🏼‍🍼	1	woman feeding baby: medium-light skin tone
+👩🏽‍🍼	1	woman feeding baby: medium skin tone
+👩🏾‍🍼	1	woman feeding baby: medium-dark skin tone
+👩🏿‍🍼	1	woman feeding baby: dark skin tone
+👨‍🍼	1	man feeding baby
+👨🏻‍🍼	1	man feeding baby: light skin tone
+👨🏼‍🍼	1	man feeding baby: medium-light skin tone
+👨🏽‍🍼	1	man feeding baby: medium skin tone
+👨🏾‍🍼	1	man feeding baby: medium-dark skin tone
+👨🏿‍🍼	1	man feeding baby: dark skin tone
+🧑‍🍼	1	person feeding baby
+🧑🏻‍🍼	1	person feeding baby: light skin tone
+🧑🏼‍🍼	1	person feeding baby: medium-light skin tone
+🧑🏽‍🍼	1	person feeding baby: medium skin tone
+🧑🏾‍🍼	1	person feeding baby: medium-dark skin tone
+🧑🏿‍🍼	1	person feeding baby: dark skin tone
+👼	1	baby angel
+👼🏻	1	baby angel: light skin tone
+👼🏼	1	baby angel: medium-light skin tone
+👼🏽	1	baby angel: medium skin tone
+👼🏾	1	baby angel: medium-dark skin tone
+👼🏿	1	baby angel: dark skin tone
+🎅	1	santa claus
+🎅🏻	1	santa claus: light skin tone
+🎅🏼	1	santa claus: medium-light skin tone
+🎅🏽	1	santa claus: medium skin tone
+🎅🏾	1	santa claus: medium-dark skin tone
+🎅🏿	1	santa claus: dark skin tone
+🤶	1	mrs. claus
+🤶🏻	1	mrs. claus: light skin tone
+🤶🏼	1	mrs. claus: medium-light skin tone
+🤶🏽	1	mrs. claus: medium skin tone
+🤶🏾	1	mrs. claus: medium-dark skin tone
+🤶🏿	1	mrs. claus: dark skin tone
+🧑‍🎄	1	mx claus
+🧑🏻‍🎄	1	mx claus: light skin tone
+🧑🏼‍🎄	1	mx claus: medium-light skin tone
+🧑🏽‍🎄	1	mx claus: medium skin tone
+🧑🏾‍🎄	1	mx claus: medium-dark skin tone
+🧑🏿‍🎄	1	mx claus: dark skin tone
+🦸	1	superhero
+🦸🏻	1	superhero: light skin tone
+🦸🏼	1	superhero: medium-light skin tone
+🦸🏽	1	superhero: medium skin tone
+🦸🏾	1	superhero: medium-dark skin tone
+🦸🏿	1	superhero: dark skin tone
+🦸‍♂️	1	man superhero
+🦸🏻‍♂️	1	man superhero: light skin tone
+🦸🏼‍♂️	1	man superhero: medium-light skin tone
+🦸🏽‍♂️	1	man superhero: medium skin tone
+🦸🏾‍♂️	1	man superhero: medium-dark skin tone
+🦸🏿‍♂️	1	man superhero: dark skin tone
+🦸‍♀️	1	woman superhero
+🦸🏻‍♀️	1	woman superhero: light skin tone
+🦸🏼‍♀️	1	woman superhero: medium-light skin tone
+🦸🏽‍♀️	1	woman superhero: medium skin tone
+🦸🏾‍♀️	1	woman superhero: medium-dark skin tone
+🦸🏿‍♀️	1	woman superhero: dark skin tone
+🦹	1	supervillain
+🦹🏻	1	supervillain: light skin tone
+🦹🏼	1	supervillain: medium-light skin tone
+🦹🏽	1	supervillain: medium skin tone
+🦹🏾	1	supervillain: medium-dark skin tone
+🦹🏿	1	supervillain: dark skin tone
+🦹‍♂️	1	man supervillain
+🦹🏻‍♂️	1	man supervillain: light skin tone
+🦹🏼‍♂️	1	man supervillain: medium-light skin tone
+🦹🏽‍♂️	1	man supervillain: medium skin tone
+🦹🏾‍♂️	1	man supervillain: medium-dark skin tone
+🦹🏿‍♂️	1	man supervillain: dark skin tone
+🦹‍♀️	1	woman supervillain
+🦹🏻‍♀️	1	woman supervillain: light skin tone
+🦹🏼‍♀️	1	woman supervillain: medium-light skin tone
+🦹🏽‍♀️	1	woman supervillain: medium skin tone
+🦹🏾‍♀️	1	woman supervillain: medium-dark skin tone
+🦹🏿‍♀️	1	woman supervillain: dark skin tone
+🧙	1	mage
+🧙🏻	1	mage: light skin tone
+🧙🏼	1	mage: medium-light skin tone
+🧙🏽	1	mage: medium skin tone
+🧙🏾	1	mage: medium-dark skin tone
+🧙🏿	1	mage: dark skin tone
+🧙‍♂️	1	man mage
+🧙🏻‍♂️	1	man mage: light skin tone
+🧙🏼‍♂️	1	man mage: medium-light skin tone
+🧙🏽‍♂️	1	man mage: medium skin tone
+🧙🏾‍♂️	1	man mage: medium-dark skin tone
+🧙🏿‍♂️	1	man mage: dark skin tone
+🧙‍♀️	1	woman mage
+🧙🏻‍♀️	1	woman mage: light skin tone
+🧙🏼‍♀️	1	woman mage: medium-light skin tone
+🧙🏽‍♀️	1	woman mage: medium skin tone
+🧙🏾‍♀️	1	woman mage: medium-dark skin tone
+🧙🏿‍♀️	1	woman mage: dark skin tone
+🧚	1	fairy
+🧚🏻	1	fairy: light skin tone
+🧚🏼	1	fairy: medium-light skin tone
+🧚🏽	1	fairy: medium skin tone
+🧚🏾	1	fairy: medium-dark skin tone
+🧚🏿	1	fairy: dark skin tone
+🧚‍♂️	1	man fairy
+🧚🏻‍♂️	1	man fairy: light skin tone
+🧚🏼‍♂️	1	man fairy: medium-light skin tone
+🧚🏽‍♂️	1	man fairy: medium skin tone
+🧚🏾‍♂️	1	man fairy: medium-dark skin tone
+🧚🏿‍♂️	1	man fairy: dark skin tone
+🧚‍♀️	1	woman fairy
+🧚🏻‍♀️	1	woman fairy: light skin tone
+🧚🏼‍♀️	1	woman fairy: medium-light skin tone
+🧚🏽‍♀️	1	woman fairy: medium skin tone
+🧚🏾‍♀️	1	woman fairy: medium-dark skin tone
+🧚🏿‍♀️	1	woman fairy: dark skin tone
+🧛	1	vampire
+🧛🏻	1	vampire: light skin tone
+🧛🏼	1	vampire: medium-light skin tone
+🧛🏽	1	vampire: medium skin tone
+🧛🏾	1	vampire: medium-dark skin tone
+🧛🏿	1	vampire: dark skin tone
+🧛‍♂️	1	man vampire
+🧛🏻‍♂️	1	man vampire: light skin tone
+🧛🏼‍♂️	1	man vampire: medium-light skin tone
+🧛🏽‍♂️	1	man vampire: medium skin tone
+🧛🏾‍♂️	1	man vampire: medium-dark skin tone
+🧛🏿‍♂️	1	man vampire: dark skin tone
+🧛‍♀️	1	woman vampire
+🧛🏻‍♀️	1	woman vampire: light skin tone
+🧛🏼‍♀️	1	woman vampire: medium-light skin tone
+🧛🏽‍♀️	1	woman vampire: medium skin tone
+🧛🏾‍♀️	1	woman vampire: medium-dark skin tone
+🧛🏿‍♀️	1	woman vampire: dark skin tone
+🧜	1	merperson
+🧜🏻	1	merperson: light skin tone
+🧜🏼	1	merperson: medium-light skin tone
+🧜🏽	1	merperson: medium skin tone
+🧜🏾	1	merperson: medium-dark skin tone
+🧜🏿	1	merperson: dark skin tone
+🧜‍♂️	1	merman
+🧜🏻‍♂️	1	merman: light skin tone
+🧜🏼‍♂️	1	merman: medium-light skin tone
+🧜🏽‍♂️	1	merman: medium skin tone
+🧜🏾‍♂️	1	merman: medium-dark skin tone
+🧜🏿‍♂️	1	merman: dark skin tone
+🧜‍♀️	1	mermaid
+🧜🏻‍♀️	1	mermaid: light skin tone
+🧜🏼‍♀️	1	mermaid: medium-light skin tone
+🧜🏽‍♀️	1	mermaid: medium skin tone
+🧜🏾‍♀️	1	mermaid: medium-dark skin tone
+🧜🏿‍♀️	1	mermaid: dark skin tone
+🧝	1	elf
+🧝🏻	1	elf: light skin tone
+🧝🏼	1	elf: medium-light skin tone
+🧝🏽	1	elf: medium skin tone
+🧝🏾	1	elf: medium-dark skin tone
+🧝🏿	1	elf: dark skin tone
+🧝‍♂️	1	man elf
+🧝🏻‍♂️	1	man elf: light skin tone
+🧝🏼‍♂️	1	man elf: medium-light skin tone
+🧝🏽‍♂️	1	man elf: medium skin tone
+🧝🏾‍♂️	1	man elf: medium-dark skin tone
+🧝🏿‍♂️	1	man elf: dark skin tone
+🧝‍♀️	1	woman elf
+🧝🏻‍♀️	1	woman elf: light skin tone
+🧝🏼‍♀️	1	woman elf: medium-light skin tone
+🧝🏽‍♀️	1	woman elf: medium skin tone
+🧝🏾‍♀️	1	woman elf: medium-dark skin tone
+🧝🏿‍♀️	1	woman elf: dark skin tone
+🧞	1	genie
+🧞‍♂️	1	man genie
+🧞‍♀️	1	woman genie
+🧟	1	zombie
+🧟‍♂️	1	man zombie
+🧟‍♀️	1	woman zombie
+🧌	1	troll
+💆	1	person getting massage
+💆🏻	1	person getting massage: light skin tone
+💆🏼	1	person getting massage: medium-light skin tone
+💆🏽	1	person getting massage: medium skin tone
+💆🏾	1	person getting massage: medium-dark skin tone
+💆🏿	1	person getting massage: dark skin tone
+💆‍♂️	1	man getting massage
+💆🏻‍♂️	1	man getting massage: light skin tone
+💆🏼‍♂️	1	man getting massage: medium-light skin tone
+💆🏽‍♂️	1	man getting massage: medium skin tone
+💆🏾‍♂️	1	man getting massage: medium-dark skin tone
+💆🏿‍♂️	1	man getting massage: dark skin tone
+💆‍♀️	1	woman getting massage
+💆🏻‍♀️	1	woman getting massage: light skin tone
+💆🏼‍♀️	1	woman getting massage: medium-light skin tone
+💆🏽‍♀️	1	woman getting massage: medium skin tone
+💆🏾‍♀️	1	woman getting massage: medium-dark skin tone
+💆🏿‍♀️	1	woman getting massage: dark skin tone
+💇	1	person getting haircut
+💇🏻	1	person getting haircut: light skin tone
+💇🏼	1	person getting haircut: medium-light skin tone
+💇🏽	1	person getting haircut: medium skin tone
+💇🏾	1	person getting haircut: medium-dark skin tone
+💇🏿	1	person getting haircut: dark skin tone
+💇‍♂️	1	man getting haircut
+💇🏻‍♂️	1	man getting haircut: light skin tone
+💇🏼‍♂️	1	man getting haircut: medium-light skin tone
+💇🏽‍♂️	1	man getting haircut: medium skin tone
+💇🏾‍♂️	1	man getting haircut: medium-dark skin tone
+💇🏿‍♂️	1	man getting haircut: dark skin tone
+💇‍♀️	1	woman getting haircut
+💇🏻‍♀️	1	woman getting haircut: light skin tone
+💇🏼‍♀️	1	woman getting haircut: medium-light skin tone
+💇🏽‍♀️	1	woman getting haircut: medium skin tone
+💇🏾‍♀️	1	woman getting haircut: medium-dark skin tone
+💇🏿‍♀️	1	woman getting haircut: dark skin tone
+🚶	1	person walking
+🚶🏻	1	person walking: light skin tone
+🚶🏼	1	person walking: medium-light skin tone
+🚶🏽	1	person walking: medium skin tone
+🚶🏾	1	person walking: medium-dark skin tone
+🚶🏿	1	person walking: dark skin tone
+🚶‍♂️	1	man walking
+🚶🏻‍♂️	1	man walking: light skin tone
+🚶🏼‍♂️	1	man walking: medium-light skin tone
+🚶🏽‍♂️	1	man walking: medium skin tone
+🚶🏾‍♂️	1	man walking: medium-dark skin tone
+🚶🏿‍♂️	1	man walking: dark skin tone
+🚶‍♀️	1	woman walking
+🚶🏻‍♀️	1	woman walking: light skin tone
+🚶🏼‍♀️	1	woman walking: medium-light skin tone
+🚶🏽‍♀️	1	woman walking: medium skin tone
+🚶🏾‍♀️	1	woman walking: medium-dark skin tone
+🚶🏿‍♀️	1	woman walking: dark skin tone
+🚶‍➡️	1	person walking facing right
+🚶🏻‍➡️	1	person walking facing right: light skin tone
+🚶🏼‍➡️	1	person walking facing right: medium-light skin tone
+🚶🏽‍➡️	1	person walking facing right: medium skin tone
+🚶🏾‍➡️	1	person walking facing right: medium-dark skin tone
+🚶🏿‍➡️	1	person walking facing right: dark skin tone
+🚶‍♀️‍➡️	1	woman walking facing right
+🚶🏻‍♀️‍➡️	1	woman walking facing right: light skin tone
+🚶🏼‍♀️‍➡️	1	woman walking facing right: medium-light skin tone
+🚶🏽‍♀️‍➡️	1	woman walking facing right: medium skin tone
+🚶🏾‍♀️‍➡️	1	woman walking facing right: medium-dark skin tone
+🚶🏿‍♀️‍➡️	1	woman walking facing right: dark skin tone
+🚶‍♂️‍➡️	1	man walking facing right
+🚶🏻‍♂️‍➡️	1	man walking facing right: light skin tone
+🚶🏼‍♂️‍➡️	1	man walking facing right: medium-light skin tone
+🚶🏽‍♂️‍➡️	1	man walking facing right: medium skin tone
+🚶🏾‍♂️‍➡️	1	man walking facing right: medium-dark skin tone
+🚶🏿‍♂️‍➡️	1	man walking facing right: dark skin tone
+🧍	1	person standing
+🧍🏻	1	person standing: light skin tone
+🧍🏼	1	person standing: medium-light skin tone
+🧍🏽	1	person standing: medium skin tone
+🧍🏾	1	person standing: medium-dark skin tone
+🧍🏿	1	person standing: dark skin tone
+🧍‍♂️	1	man standing
+🧍🏻‍♂️	1	man standing: light skin tone
+🧍🏼‍♂️	1	man standing: medium-light skin tone
+🧍🏽‍♂️	1	man standing: medium skin tone
+🧍🏾‍♂️	1	man standing: medium-dark skin tone
+🧍🏿‍♂️	1	man standing: dark skin tone
+🧍‍♀️	1	woman standing
+🧍🏻‍♀️	1	woman standing: light skin tone
+🧍🏼‍♀️	1	woman standing: medium-light skin tone
+🧍🏽‍♀️	1	woman standing: medium skin tone
+🧍🏾‍♀️	1	woman standing: medium-dark skin tone
+🧍🏿‍♀️	1	woman standing: dark skin tone
+🧎	1	person kneeling
+🧎🏻	1	person kneeling: light skin tone
+🧎🏼	1	person kneeling: medium-light skin tone
+🧎🏽	1	person kneeling: medium skin tone
+🧎🏾	1	person kneeling: medium-dark skin tone
+🧎🏿	1	person kneeling: dark skin tone
+🧎‍♂️	1	man kneeling
+🧎🏻‍♂️	1	man kneeling: light skin tone
+🧎🏼‍♂️	1	man kneeling: medium-light skin tone
+🧎🏽‍♂️	1	man kneeling: medium skin tone
+🧎🏾‍♂️	1	man kneeling: medium-dark skin tone
+🧎🏿‍♂️	1	man kneeling: dark skin tone
+🧎‍♀️	1	woman kneeling
+🧎🏻‍♀️	1	woman kneeling: light skin tone
+🧎🏼‍♀️	1	woman kneeling: medium-light skin tone
+🧎🏽‍♀️	1	woman kneeling: medium skin tone
+🧎🏾‍♀️	1	woman kneeling: medium-dark skin tone
+🧎🏿‍♀️	1	woman kneeling: dark skin tone
+🧎‍➡️	1	person kneeling facing right
+🧎🏻‍➡️	1	person kneeling facing right: light skin tone
+🧎🏼‍➡️	1	person kneeling facing right: medium-light skin tone
+🧎🏽‍➡️	1	person kneeling facing right: medium skin tone
+🧎🏾‍➡️	1	person kneeling facing right: medium-dark skin tone
+🧎🏿‍➡️	1	person kneeling facing right: dark skin tone
+🧎‍♀️‍➡️	1	woman kneeling facing right
+🧎🏻‍♀️‍➡️	1	woman kneeling facing right: light skin tone
+🧎🏼‍♀️‍➡️	1	woman kneeling facing right: medium-light skin tone
+🧎🏽‍♀️‍➡️	1	woman kneeling facing right: medium skin tone
+🧎🏾‍♀️‍➡️	1	woman kneeling facing right: medium-dark skin tone
+🧎🏿‍♀️‍➡️	1	woman kneeling facing right: dark skin tone
+🧎‍♂️‍➡️	1	man kneeling facing right
+🧎🏻‍♂️‍➡️	1	man kneeling facing right: light skin tone
+🧎🏼‍♂️‍➡️	1	man kneeling facing right: medium-light skin tone
+🧎🏽‍♂️‍➡️	1	man kneeling facing right: medium skin tone
+🧎🏾‍♂️‍➡️	1	man kneeling facing right: medium-dark skin tone
+🧎🏿‍♂️‍➡️	1	man kneeling facing right: dark skin tone
+🧑‍🦯	1	person with white cane
+🧑🏻‍🦯	1	person with white cane: light skin tone
+🧑🏼‍🦯	1	person with white cane: medium-light skin tone
+🧑🏽‍🦯	1	person with white cane: medium skin tone
+🧑🏾‍🦯	1	person with white cane: medium-dark skin tone
+🧑🏿‍🦯	1	person with white cane: dark skin tone
+🧑‍🦯‍➡️	1	person with white cane facing right
+🧑🏻‍🦯‍➡️	1	person with white cane facing right: light skin tone
+🧑🏼‍🦯‍➡️	1	person with white cane facing right: medium-light skin tone
+🧑🏽‍🦯‍➡️	1	person with white cane facing right: medium skin tone
+🧑🏾‍🦯‍➡️	1	person with white cane facing right: medium-dark skin tone
+🧑🏿‍🦯‍➡️	1	person with white cane facing right: dark skin tone
+👨‍🦯	1	man with white cane
+👨🏻‍🦯	1	man with white cane: light skin tone
+👨🏼‍🦯	1	man with white cane: medium-light skin tone
+👨🏽‍🦯	1	man with white cane: medium skin tone
+👨🏾‍🦯	1	man with white cane: medium-dark skin tone
+👨🏿‍🦯	1	man with white cane: dark skin tone
+👨‍🦯‍➡️	1	man with white cane facing right
+👨🏻‍🦯‍➡️	1	man with white cane facing right: light skin tone
+👨🏼‍🦯‍➡️	1	man with white cane facing right: medium-light skin tone
+👨🏽‍🦯‍➡️	1	man with white cane facing right: medium skin tone
+👨🏾‍🦯‍➡️	1	man with white cane facing right: medium-dark skin tone
+👨🏿‍🦯‍➡️	1	man with white cane facing right: dark skin tone
+👩‍🦯	1	woman with white cane
+👩🏻‍🦯	1	woman with white cane: light skin tone
+👩🏼‍🦯	1	woman with white cane: medium-light skin tone
+👩🏽‍🦯	1	woman with white cane: medium skin tone
+👩🏾‍🦯	1	woman with white cane: medium-dark skin tone
+👩🏿‍🦯	1	woman with white cane: dark skin tone
+👩‍🦯‍➡️	1	woman with white cane facing right
+👩🏻‍🦯‍➡️	1	woman with white cane facing right: light skin tone
+👩🏼‍🦯‍➡️	1	woman with white cane facing right: medium-light skin tone
+👩🏽‍🦯‍➡️	1	woman with white cane facing right: medium skin tone
+👩🏾‍🦯‍➡️	1	woman with white cane facing right: medium-dark skin tone
+👩🏿‍🦯‍➡️	1	woman with white cane facing right: dark skin tone
+🧑‍🦼	1	person in motorized wheelchair
+🧑🏻‍🦼	1	person in motorized wheelchair: light skin tone
+🧑🏼‍🦼	1	person in motorized wheelchair: medium-light skin tone
+🧑🏽‍🦼	1	person in motorized wheelchair: medium skin tone
+🧑🏾‍🦼	1	person in motorized wheelchair: medium-dark skin tone
+🧑🏿‍🦼	1	person in motorized wheelchair: dark skin tone
+🧑‍🦼‍➡️	1	person in motorized wheelchair facing right
+🧑🏻‍🦼‍➡️	1	person in motorized wheelchair facing right: light skin tone
+🧑🏼‍🦼‍➡️	1	person in motorized wheelchair facing right: medium-light skin tone
+🧑🏽‍🦼‍➡️	1	person in motorized wheelchair facing right: medium skin tone
+🧑🏾‍🦼‍➡️	1	person in motorized wheelchair facing right: medium-dark skin tone
+🧑🏿‍🦼‍➡️	1	person in motorized wheelchair facing right: dark skin tone
+👨‍🦼	1	man in motorized wheelchair
+👨🏻‍🦼	1	man in motorized wheelchair: light skin tone
+👨🏼‍🦼	1	man in motorized wheelchair: medium-light skin tone
+👨🏽‍🦼	1	man in motorized wheelchair: medium skin tone
+👨🏾‍🦼	1	man in motorized wheelchair: medium-dark skin tone
+👨🏿‍🦼	1	man in motorized wheelchair: dark skin tone
+👨‍🦼‍➡️	1	man in motorized wheelchair facing right
+👨🏻‍🦼‍➡️	1	man in motorized wheelchair facing right: light skin tone
+👨🏼‍🦼‍➡️	1	man in motorized wheelchair facing right: medium-light skin tone
+👨🏽‍🦼‍➡️	1	man in motorized wheelchair facing right: medium skin tone
+👨🏾‍🦼‍➡️	1	man in motorized wheelchair facing right: medium-dark skin tone
+👨🏿‍🦼‍➡️	1	man in motorized wheelchair facing right: dark skin tone
+👩‍🦼	1	woman in motorized wheelchair
+👩🏻‍🦼	1	woman in motorized wheelchair: light skin tone
+👩🏼‍🦼	1	woman in motorized wheelchair: medium-light skin tone
+👩🏽‍🦼	1	woman in motorized wheelchair: medium skin tone
+👩🏾‍🦼	1	woman in motorized wheelchair: medium-dark skin tone
+👩🏿‍🦼	1	woman in motorized wheelchair: dark skin tone
+👩‍🦼‍➡️	1	woman in motorized wheelchair facing right
+👩🏻‍🦼‍➡️	1	woman in motorized wheelchair facing right: light skin tone
+👩🏼‍🦼‍➡️	1	woman in motorized wheelchair facing right: medium-light skin tone
+👩🏽‍🦼‍➡️	1	woman in motorized wheelchair facing right: medium skin tone
+👩🏾‍🦼‍➡️	1	woman in motorized wheelchair facing right: medium-dark skin tone
+👩🏿‍🦼‍➡️	1	woman in motorized wheelchair facing right: dark skin tone
+🧑‍🦽	1	person in manual wheelchair
+🧑🏻‍🦽	1	person in manual wheelchair: light skin tone
+🧑🏼‍🦽	1	person in manual wheelchair: medium-light skin tone
+🧑🏽‍🦽	1	person in manual wheelchair: medium skin tone
+🧑🏾‍🦽	1	person in manual wheelchair: medium-dark skin tone
+🧑🏿‍🦽	1	person in manual wheelchair: dark skin tone
+🧑‍🦽‍➡️	1	person in manual wheelchair facing right
+🧑🏻‍🦽‍➡️	1	person in manual wheelchair facing right: light skin tone
+🧑🏼‍🦽‍➡️	1	person in manual wheelchair facing right: medium-light skin tone
+🧑🏽‍🦽‍➡️	1	person in manual wheelchair facing right: medium skin tone
+🧑🏾‍🦽‍➡️	1	person in manual wheelchair facing right: medium-dark skin tone
+🧑🏿‍🦽‍➡️	1	person in manual wheelchair facing right: dark skin tone
+👨‍🦽	1	man in manual wheelchair
+👨🏻‍🦽	1	man in manual wheelchair: light skin tone
+👨🏼‍🦽	1	man in manual wheelchair: medium-light skin tone
+👨🏽‍🦽	1	man in manual wheelchair: medium skin tone
+👨🏾‍🦽	1	man in manual wheelchair: medium-dark skin tone
+👨🏿‍🦽	1	man in manual wheelchair: dark skin tone
+👨‍🦽‍➡️	1	man in manual wheelchair facing right
+👨🏻‍🦽‍➡️	1	man in manual wheelchair facing right: light skin tone
+👨🏼‍🦽‍➡️	1	man in manual wheelchair facing right: medium-light skin tone
+👨🏽‍🦽‍➡️	1	man in manual wheelchair facing right: medium skin tone
+👨🏾‍🦽‍➡️	1	man in manual wheelchair facing right: medium-dark skin tone
+👨🏿‍🦽‍➡️	1	man in manual wheelchair facing right: dark skin tone
+👩‍🦽	1	woman in manual wheelchair
+👩🏻‍🦽	1	woman in manual wheelchair: light skin tone
+👩🏼‍🦽	1	woman in manual wheelchair: medium-light skin tone
+👩🏽‍🦽	1	woman in manual wheelchair: medium skin tone
+👩🏾‍🦽	1	woman in manual wheelchair: medium-dark skin tone
+👩🏿‍🦽	1	woman in manual wheelchair: dark skin tone
+👩‍🦽‍➡️	1	woman in manual wheelchair facing right
+👩🏻‍🦽‍➡️	1	woman in manual wheelchair facing right: light skin tone
+👩🏼‍🦽‍➡️	1	woman in manual wheelchair facing right: medium-light skin tone
+👩🏽‍🦽‍➡️	1	woman in manual wheelchair facing right: medium skin tone
+👩🏾‍🦽‍➡️	1	woman in manual wheelchair facing right: medium-dark skin tone
+👩🏿‍🦽‍➡️	1	woman in manual wheelchair facing right: dark skin tone
+🏃	1	person running
+🏃🏻	1	person running: light skin tone
+🏃🏼	1	person running: medium-light skin tone
+🏃🏽	1	person running: medium skin tone
+🏃🏾	1	person running: medium-dark skin tone
+🏃🏿	1	person running: dark skin tone
+🏃‍♂️	1	man running
+🏃🏻‍♂️	1	man running: light skin tone
+🏃🏼‍♂️	1	man running: medium-light skin tone
+🏃🏽‍♂️	1	man running: medium skin tone
+🏃🏾‍♂️	1	man running: medium-dark skin tone
+🏃🏿‍♂️	1	man running: dark skin tone
+🏃‍♀️	1	woman running
+🏃🏻‍♀️	1	woman running: light skin tone
+🏃🏼‍♀️	1	woman running: medium-light skin tone
+🏃🏽‍♀️	1	woman running: medium skin tone
+🏃🏾‍♀️	1	woman running: medium-dark skin tone
+🏃🏿‍♀️	1	woman running: dark skin tone
+🏃‍➡️	1	person running facing right
+🏃🏻‍➡️	1	person running facing right: light skin tone
+🏃🏼‍➡️	1	person running facing right: medium-light skin tone
+🏃🏽‍➡️	1	person running facing right: medium skin tone
+🏃🏾‍➡️	1	person running facing right: medium-dark skin tone
+🏃🏿‍➡️	1	person running facing right: dark skin tone
+🏃‍♀️‍➡️	1	woman running facing right
+🏃🏻‍♀️‍➡️	1	woman running facing right: light skin tone
+🏃🏼‍♀️‍➡️	1	woman running facing right: medium-light skin tone
+🏃🏽‍♀️‍➡️	1	woman running facing right: medium skin tone
+🏃🏾‍♀️‍➡️	1	woman running facing right: medium-dark skin tone
+🏃🏿‍♀️‍➡️	1	woman running facing right: dark skin tone
+🏃‍♂️‍➡️	1	man running facing right
+🏃🏻‍♂️‍➡️	1	man running facing right: light skin tone
+🏃🏼‍♂️‍➡️	1	man running facing right: medium-light skin tone
+🏃🏽‍♂️‍➡️	1	man running facing right: medium skin tone
+🏃🏾‍♂️‍➡️	1	man running facing right: medium-dark skin tone
+🏃🏿‍♂️‍➡️	1	man running facing right: dark skin tone
+💃	1	woman dancing
+💃🏻	1	woman dancing: light skin tone
+💃🏼	1	woman dancing: medium-light skin tone
+💃🏽	1	woman dancing: medium skin tone
+💃🏾	1	woman dancing: medium-dark skin tone
+💃🏿	1	woman dancing: dark skin tone
+🕺	1	man dancing
+🕺🏻	1	man dancing: light skin tone
+🕺🏼	1	man dancing: medium-light skin tone
+🕺🏽	1	man dancing: medium skin tone
+🕺🏾	1	man dancing: medium-dark skin tone
+🕺🏿	1	man dancing: dark skin tone
+🕴️	1	person in suit levitating
+🕴🏻	1	person in suit levitating: light skin tone
+🕴🏼	1	person in suit levitating: medium-light skin tone
+🕴🏽	1	person in suit levitating: medium skin tone
+🕴🏾	1	person in suit levitating: medium-dark skin tone
+🕴🏿	1	person in suit levitating: dark skin tone
+👯	1	people with bunny ears
+👯‍♂️	1	men with bunny ears
+👯‍♀️	1	women with bunny ears
+🧖	1	person in steamy room
+🧖🏻	1	person in steamy room: light skin tone
+🧖🏼	1	person in steamy room: medium-light skin tone
+🧖🏽	1	person in steamy room: medium skin tone
+🧖🏾	1	person in steamy room: medium-dark skin tone
+🧖🏿	1	person in steamy room: dark skin tone
+🧖‍♂️	1	man in steamy room
+🧖🏻‍♂️	1	man in steamy room: light skin tone
+🧖🏼‍♂️	1	man in steamy room: medium-light skin tone
+🧖🏽‍♂️	1	man in steamy room: medium skin tone
+🧖🏾‍♂️	1	man in steamy room: medium-dark skin tone
+🧖🏿‍♂️	1	man in steamy room: dark skin tone
+🧖‍♀️	1	woman in steamy room
+🧖🏻‍♀️	1	woman in steamy room: light skin tone
+🧖🏼‍♀️	1	woman in steamy room: medium-light skin tone
+🧖🏽‍♀️	1	woman in steamy room: medium skin tone
+🧖🏾‍♀️	1	woman in steamy room: medium-dark skin tone
+🧖🏿‍♀️	1	woman in steamy room: dark skin tone
+🧗	1	person climbing
+🧗🏻	1	person climbing: light skin tone
+🧗🏼	1	person climbing: medium-light skin tone
+🧗🏽	1	person climbing: medium skin tone
+🧗🏾	1	person climbing: medium-dark skin tone
+🧗🏿	1	person climbing: dark skin tone
+🧗‍♂️	1	man climbing
+🧗🏻‍♂️	1	man climbing: light skin tone
+🧗🏼‍♂️	1	man climbing: medium-light skin tone
+🧗🏽‍♂️	1	man climbing: medium skin tone
+🧗🏾‍♂️	1	man climbing: medium-dark skin tone
+🧗🏿‍♂️	1	man climbing: dark skin tone
+🧗‍♀️	1	woman climbing
+🧗🏻‍♀️	1	woman climbing: light skin tone
+🧗🏼‍♀️	1	woman climbing: medium-light skin tone
+🧗🏽‍♀️	1	woman climbing: medium skin tone
+🧗🏾‍♀️	1	woman climbing: medium-dark skin tone
+🧗🏿‍♀️	1	woman climbing: dark skin tone
+🤺	1	person fencing
+🏇	1	horse racing
+🏇🏻	1	horse racing: light skin tone
+🏇🏼	1	horse racing: medium-light skin tone
+🏇🏽	1	horse racing: medium skin tone
+🏇🏾	1	horse racing: medium-dark skin tone
+🏇🏿	1	horse racing: dark skin tone
+⛷️	1	skier
+🏂	1	snowboarder
+🏂🏻	1	snowboarder: light skin tone
+🏂🏼	1	snowboarder: medium-light skin tone
+🏂🏽	1	snowboarder: medium skin tone
+🏂🏾	1	snowboarder: medium-dark skin tone
+🏂🏿	1	snowboarder: dark skin tone
+🏌️	1	person golfing
+🏌🏻	1	person golfing: light skin tone
+🏌🏼	1	person golfing: medium-light skin tone
+🏌🏽	1	person golfing: medium skin tone
+🏌🏾	1	person golfing: medium-dark skin tone
+🏌🏿	1	person golfing: dark skin tone
+🏌️‍♂️	1	man golfing
+🏌🏻‍♂️	1	man golfing: light skin tone
+🏌🏼‍♂️	1	man golfing: medium-light skin tone
+🏌🏽‍♂️	1	man golfing: medium skin tone
+🏌🏾‍♂️	1	man golfing: medium-dark skin tone
+🏌🏿‍♂️	1	man golfing: dark skin tone
+🏌️‍♀️	1	woman golfing
+🏌🏻‍♀️	1	woman golfing: light skin tone
+🏌🏼‍♀️	1	woman golfing: medium-light skin tone
+🏌🏽‍♀️	1	woman golfing: medium skin tone
+🏌🏾‍♀️	1	woman golfing: medium-dark skin tone
+🏌🏿‍♀️	1	woman golfing: dark skin tone
+🏄	1	person surfing
+🏄🏻	1	person surfing: light skin tone
+🏄🏼	1	person surfing: medium-light skin tone
+🏄🏽	1	person surfing: medium skin tone
+🏄🏾	1	person surfing: medium-dark skin tone
+🏄🏿	1	person surfing: dark skin tone
+🏄‍♂️	1	man surfing
+🏄🏻‍♂️	1	man surfing: light skin tone
+🏄🏼‍♂️	1	man surfing: medium-light skin tone
+🏄🏽‍♂️	1	man surfing: medium skin tone
+🏄🏾‍♂️	1	man surfing: medium-dark skin tone
+🏄🏿‍♂️	1	man surfing: dark skin tone
+🏄‍♀️	1	woman surfing
+🏄🏻‍♀️	1	woman surfing: light skin tone
+🏄🏼‍♀️	1	woman surfing: medium-light skin tone
+🏄🏽‍♀️	1	woman surfing: medium skin tone
+🏄🏾‍♀️	1	woman surfing: medium-dark skin tone
+🏄🏿‍♀️	1	woman surfing: dark skin tone
+🚣	1	person rowing boat
+🚣🏻	1	person rowing boat: light skin tone
+🚣🏼	1	person rowing boat: medium-light skin tone
+🚣🏽	1	person rowing boat: medium skin tone
+🚣🏾	1	person rowing boat: medium-dark skin tone
+🚣🏿	1	person rowing boat: dark skin tone
+🚣‍♂️	1	man rowing boat
+🚣🏻‍♂️	1	man rowing boat: light skin tone
+🚣🏼‍♂️	1	man rowing boat: medium-light skin tone
+🚣🏽‍♂️	1	man rowing boat: medium skin tone
+🚣🏾‍♂️	1	man rowing boat: medium-dark skin tone
+🚣🏿‍♂️	1	man rowing boat: dark skin tone
+🚣‍♀️	1	woman rowing boat
+🚣🏻‍♀️	1	woman rowing boat: light skin tone
+🚣🏼‍♀️	1	woman rowing boat: medium-light skin tone
+🚣🏽‍♀️	1	woman rowing boat: medium skin tone
+🚣🏾‍♀️	1	woman rowing boat: medium-dark skin tone
+🚣🏿‍♀️	1	woman rowing boat: dark skin tone
+🏊	1	person swimming
+🏊🏻	1	person swimming: light skin tone
+🏊🏼	1	person swimming: medium-light skin tone
+🏊🏽	1	person swimming: medium skin tone
+🏊🏾	1	person swimming: medium-dark skin tone
+🏊🏿	1	person swimming: dark skin tone
+🏊‍♂️	1	man swimming
+🏊🏻‍♂️	1	man swimming: light skin tone
+🏊🏼‍♂️	1	man swimming: medium-light skin tone
+🏊🏽‍♂️	1	man swimming: medium skin tone
+🏊🏾‍♂️	1	man swimming: medium-dark skin tone
+🏊🏿‍♂️	1	man swimming: dark skin tone
+🏊‍♀️	1	woman swimming
+🏊🏻‍♀️	1	woman swimming: light skin tone
+🏊🏼‍♀️	1	woman swimming: medium-light skin tone
+🏊🏽‍♀️	1	woman swimming: medium skin tone
+🏊🏾‍♀️	1	woman swimming: medium-dark skin tone
+🏊🏿‍♀️	1	woman swimming: dark skin tone
+⛹️	1	person bouncing ball
+⛹🏻	1	person bouncing ball: light skin tone
+⛹🏼	1	person bouncing ball: medium-light skin tone
+⛹🏽	1	person bouncing ball: medium skin tone
+⛹🏾	1	person bouncing ball: medium-dark skin tone
+⛹🏿	1	person bouncing ball: dark skin tone
+⛹️‍♂️	1	man bouncing ball
+⛹🏻‍♂️	1	man bouncing ball: light skin tone
+⛹🏼‍♂️	1	man bouncing ball: medium-light skin tone
+⛹🏽‍♂️	1	man bouncing ball: medium skin tone
+⛹🏾‍♂️	1	man bouncing ball: medium-dark skin tone
+⛹🏿‍♂️	1	man bouncing ball: dark skin tone
+⛹️‍♀️	1	woman bouncing ball
+⛹🏻‍♀️	1	woman bouncing ball: light skin tone
+⛹🏼‍♀️	1	woman bouncing ball: medium-light skin tone
+⛹🏽‍♀️	1	woman bouncing ball: medium skin tone
+⛹🏾‍♀️	1	woman bouncing ball: medium-dark skin tone
+⛹🏿‍♀️	1	woman bouncing ball: dark skin tone
+🏋️	1	person lifting weights
+🏋🏻	1	person lifting weights: light skin tone
+🏋🏼	1	person lifting weights: medium-light skin tone
+🏋🏽	1	person lifting weights: medium skin tone
+🏋🏾	1	person lifting weights: medium-dark skin tone
+🏋🏿	1	person lifting weights: dark skin tone
+🏋️‍♂️	1	man lifting weights
+🏋🏻‍♂️	1	man lifting weights: light skin tone
+🏋🏼‍♂️	1	man lifting weights: medium-light skin tone
+🏋🏽‍♂️	1	man lifting weights: medium skin tone
+🏋🏾‍♂️	1	man lifting weights: medium-dark skin tone
+🏋🏿‍♂️	1	man lifting weights: dark skin tone
+🏋️‍♀️	1	woman lifting weights
+🏋🏻‍♀️	1	woman lifting weights: light skin tone
+🏋🏼‍♀️	1	woman lifting weights: medium-light skin tone
+🏋🏽‍♀️	1	woman lifting weights: medium skin tone
+🏋🏾‍♀️	1	woman lifting weights: medium-dark skin tone
+🏋🏿‍♀️	1	woman lifting weights: dark skin tone
+🚴	1	person biking
+🚴🏻	1	person biking: light skin tone
+🚴🏼	1	person biking: medium-light skin tone
+🚴🏽	1	person biking: medium skin tone
+🚴🏾	1	person biking: medium-dark skin tone
+🚴🏿	1	person biking: dark skin tone
+🚴‍♂️	1	man biking
+🚴🏻‍♂️	1	man biking: light skin tone
+🚴🏼‍♂️	1	man biking: medium-light skin tone
+🚴🏽‍♂️	1	man biking: medium skin tone
+🚴🏾‍♂️	1	man biking: medium-dark skin tone
+🚴🏿‍♂️	1	man biking: dark skin tone
+🚴‍♀️	1	woman biking
+🚴🏻‍♀️	1	woman biking: light skin tone
+🚴🏼‍♀️	1	woman biking: medium-light skin tone
+🚴🏽‍♀️	1	woman biking: medium skin tone
+🚴🏾‍♀️	1	woman biking: medium-dark skin tone
+🚴🏿‍♀️	1	woman biking: dark skin tone
+🚵	1	person mountain biking
+🚵🏻	1	person mountain biking: light skin tone
+🚵🏼	1	person mountain biking: medium-light skin tone
+🚵🏽	1	person mountain biking: medium skin tone
+🚵🏾	1	person mountain biking: medium-dark skin tone
+🚵🏿	1	person mountain biking: dark skin tone
+🚵‍♂️	1	man mountain biking
+🚵🏻‍♂️	1	man mountain biking: light skin tone
+🚵🏼‍♂️	1	man mountain biking: medium-light skin tone
+🚵🏽‍♂️	1	man mountain biking: medium skin tone
+🚵🏾‍♂️	1	man mountain biking: medium-dark skin tone
+🚵🏿‍♂️	1	man mountain biking: dark skin tone
+🚵‍♀️	1	woman mountain biking
+🚵🏻‍♀️	1	woman mountain biking: light skin tone
+🚵🏼‍♀️	1	woman mountain biking: medium-light skin tone
+🚵🏽‍♀️	1	woman mountain biking: medium skin tone
+🚵🏾‍♀️	1	woman mountain biking: medium-dark skin tone
+🚵🏿‍♀️	1	woman mountain biking: dark skin tone
+🤸	1	person cartwheeling
+🤸🏻	1	person cartwheeling: light skin tone
+🤸🏼	1	person cartwheeling: medium-light skin tone
+🤸🏽	1	person cartwheeling: medium skin tone
+🤸🏾	1	person cartwheeling: medium-dark skin tone
+🤸🏿	1	person cartwheeling: dark skin tone
+🤸‍♂️	1	man cartwheeling
+🤸🏻‍♂️	1	man cartwheeling: light skin tone
+🤸🏼‍♂️	1	man cartwheeling: medium-light skin tone
+🤸🏽‍♂️	1	man cartwheeling: medium skin tone
+🤸🏾‍♂️	1	man cartwheeling: medium-dark skin tone
+🤸🏿‍♂️	1	man cartwheeling: dark skin tone
+🤸‍♀️	1	woman cartwheeling
+🤸🏻‍♀️	1	woman cartwheeling: light skin tone
+🤸🏼‍♀️	1	woman cartwheeling: medium-light skin tone
+🤸🏽‍♀️	1	woman cartwheeling: medium skin tone
+🤸🏾‍♀️	1	woman cartwheeling: medium-dark skin tone
+🤸🏿‍♀️	1	woman cartwheeling: dark skin tone
+🤼	1	people wrestling
+🤼‍♂️	1	men wrestling
+🤼‍♀️	1	women wrestling
+🤽	1	person playing water polo
+🤽🏻	1	person playing water polo: light skin tone
+🤽🏼	1	person playing water polo: medium-light skin tone
+🤽🏽	1	person playing water polo: medium skin tone
+🤽🏾	1	person playing water polo: medium-dark skin tone
+🤽🏿	1	person playing water polo: dark skin tone
+🤽‍♂️	1	man playing water polo
+🤽🏻‍♂️	1	man playing water polo: light skin tone
+🤽🏼‍♂️	1	man playing water polo: medium-light skin tone
+🤽🏽‍♂️	1	man playing water polo: medium skin tone
+🤽🏾‍♂️	1	man playing water polo: medium-dark skin tone
+🤽🏿‍♂️	1	man playing water polo: dark skin tone
+🤽‍♀️	1	woman playing water polo
+🤽🏻‍♀️	1	woman playing water polo: light skin tone
+🤽🏼‍♀️	1	woman playing water polo: medium-light skin tone
+🤽🏽‍♀️	1	woman playing water polo: medium skin tone
+🤽🏾‍♀️	1	woman playing water polo: medium-dark skin tone
+🤽🏿‍♀️	1	woman playing water polo: dark skin tone
+🤾	1	person playing handball
+🤾🏻	1	person playing handball: light skin tone
+🤾🏼	1	person playing handball: medium-light skin tone
+🤾🏽	1	person playing handball: medium skin tone
+🤾🏾	1	person playing handball: medium-dark skin tone
+🤾🏿	1	person playing handball: dark skin tone
+🤾‍♂️	1	man playing handball
+🤾🏻‍♂️	1	man playing handball: light skin tone
+🤾🏼‍♂️	1	man playing handball: medium-light skin tone
+🤾🏽‍♂️	1	man playing handball: medium skin tone
+🤾🏾‍♂️	1	man playing handball: medium-dark skin tone
+🤾🏿‍♂️	1	man playing handball: dark skin tone
+🤾‍♀️	1	woman playing handball
+🤾🏻‍♀️	1	woman playing handball: light skin tone
+🤾🏼‍♀️	1	woman playing handball: medium-light skin tone
+🤾🏽‍♀️	1	woman playing handball: medium skin tone
+🤾🏾‍♀️	1	woman playing handball: medium-dark skin tone
+🤾🏿‍♀️	1	woman playing handball: dark skin tone
+🤹	1	person juggling
+🤹🏻	1	person juggling: light skin tone
+🤹🏼	1	person juggling: medium-light skin tone
+🤹🏽	1	person juggling: medium skin tone
+🤹🏾	1	person juggling: medium-dark skin tone
+🤹🏿	1	person juggling: dark skin tone
+🤹‍♂️	1	man juggling
+🤹🏻‍♂️	1	man juggling: light skin tone
+🤹🏼‍♂️	1	man juggling: medium-light skin tone
+🤹🏽‍♂️	1	man juggling: medium skin tone
+🤹🏾‍♂️	1	man juggling: medium-dark skin tone
+🤹🏿‍♂️	1	man juggling: dark skin tone
+🤹‍♀️	1	woman juggling
+🤹🏻‍♀️	1	woman juggling: light skin tone
+🤹🏼‍♀️	1	woman juggling: medium-light skin tone
+🤹🏽‍♀️	1	woman juggling: medium skin tone
+🤹🏾‍♀️	1	woman juggling: medium-dark skin tone
+🤹🏿‍♀️	1	woman juggling: dark skin tone
+🧘	1	person in lotus position
+🧘🏻	1	person in lotus position: light skin tone
+🧘🏼	1	person in lotus position: medium-light skin tone
+🧘🏽	1	person in lotus position: medium skin tone
+🧘🏾	1	person in lotus position: medium-dark skin tone
+🧘🏿	1	person in lotus position: dark skin tone
+🧘‍♂️	1	man in lotus position
+🧘🏻‍♂️	1	man in lotus position: light skin tone
+🧘🏼‍♂️	1	man in lotus position: medium-light skin tone
+🧘🏽‍♂️	1	man in lotus position: medium skin tone
+🧘🏾‍♂️	1	man in lotus position: medium-dark skin tone
+🧘🏿‍♂️	1	man in lotus position: dark skin tone
+🧘‍♀️	1	woman in lotus position
+🧘🏻‍♀️	1	woman in lotus position: light skin tone
+🧘🏼‍♀️	1	woman in lotus position: medium-light skin tone
+🧘🏽‍♀️	1	woman in lotus position: medium skin tone
+🧘🏾‍♀️	1	woman in lotus position: medium-dark skin tone
+🧘🏿‍♀️	1	woman in lotus position: dark skin tone
+🛀	1	person taking bath
+🛀🏻	1	person taking bath: light skin tone
+🛀🏼	1	person taking bath: medium-light skin tone
+🛀🏽	1	person taking bath: medium skin tone
+🛀🏾	1	person taking bath: medium-dark skin tone
+🛀🏿	1	person taking bath: dark skin tone
+🛌	1	person in bed
+🛌🏻	1	person in bed: light skin tone
+🛌🏼	1	person in bed: medium-light skin tone
+🛌🏽	1	person in bed: medium skin tone
+🛌🏾	1	person in bed: medium-dark skin tone
+🛌🏿	1	person in bed: dark skin tone
+🧑‍🤝‍🧑	1	people holding hands
+🧑🏻‍🤝‍🧑🏻	1	people holding hands: light skin tone
+🧑🏻‍🤝‍🧑🏼	1	people holding hands: light skin tone, medium-light skin tone
+🧑🏻‍🤝‍🧑🏽	1	people holding hands: light skin tone, medium skin tone
+🧑🏻‍🤝‍🧑🏾	1	people holding hands: light skin tone, medium-dark skin tone
+🧑🏻‍🤝‍🧑🏿	1	people holding hands: light skin tone, dark skin tone
+🧑🏼‍🤝‍🧑🏻	1	people holding hands: medium-light skin tone, light skin tone
+🧑🏼‍🤝‍🧑🏼	1	people holding hands: medium-light skin tone
+🧑🏼‍🤝‍🧑🏽	1	people holding hands: medium-light skin tone, medium skin tone
+🧑🏼‍🤝‍🧑🏾	1	people holding hands: medium-light skin tone, medium-dark skin tone
+🧑🏼‍🤝‍🧑🏿	1	people holding hands: medium-light skin tone, dark skin tone
+🧑🏽‍🤝‍🧑🏻	1	people holding hands: medium skin tone, light skin tone
+🧑🏽‍🤝‍🧑🏼	1	people holding hands: medium skin tone, medium-light skin tone
+🧑🏽‍🤝‍🧑🏽	1	people holding hands: medium skin tone
+🧑🏽‍🤝‍🧑🏾	1	people holding hands: medium skin tone, medium-dark skin tone
+🧑🏽‍🤝‍🧑🏿	1	people holding hands: medium skin tone, dark skin tone
+🧑🏾‍🤝‍🧑🏻	1	people holding hands: medium-dark skin tone, light skin tone
+🧑🏾‍🤝‍🧑🏼	1	people holding hands: medium-dark skin tone, medium-light skin tone
+🧑🏾‍🤝‍🧑🏽	1	people holding hands: medium-dark skin tone, medium skin tone
+🧑🏾‍🤝‍🧑🏾	1	people holding hands: medium-dark skin tone
+🧑🏾‍🤝‍🧑🏿	1	people holding hands: medium-dark skin tone, dark skin tone
+🧑🏿‍🤝‍🧑🏻	1	people holding hands: dark skin tone, light skin tone
+🧑🏿‍🤝‍🧑🏼	1	people holding hands: dark skin tone, medium-light skin tone
+🧑🏿‍🤝‍🧑🏽	1	people holding hands: dark skin tone, medium skin tone
+🧑🏿‍🤝‍🧑🏾	1	people holding hands: dark skin tone, medium-dark skin tone
+🧑🏿‍🤝‍🧑🏿	1	people holding hands: dark skin tone
+👭	1	women holding hands
+👭🏻	1	women holding hands: light skin tone
+👩🏻‍🤝‍👩🏼	1	women holding hands: light skin tone, medium-light skin tone
+👩🏻‍🤝‍👩🏽	1	women holding hands: light skin tone, medium skin tone
+👩🏻‍🤝‍👩🏾	1	women holding hands: light skin tone, medium-dark skin tone
+👩🏻‍🤝‍👩🏿	1	women holding hands: light skin tone, dark skin tone
+👩🏼‍🤝‍👩🏻	1	women holding hands: medium-light skin tone, light skin tone
+👭🏼	1	women holding hands: medium-light skin tone
+👩🏼‍🤝‍👩🏽	1	women holding hands: medium-light skin tone, medium skin tone
+👩🏼‍🤝‍👩🏾	1	women holding hands: medium-light skin tone, medium-dark skin tone
+👩🏼‍🤝‍👩🏿	1	women holding hands: medium-light skin tone, dark skin tone
+👩🏽‍🤝‍👩🏻	1	women holding hands: medium skin tone, light skin tone
+👩🏽‍🤝‍👩🏼	1	women holding hands: medium skin tone, medium-light skin tone
+👭🏽	1	women holding hands: medium skin tone
+👩🏽‍🤝‍👩🏾	1	women holding hands: medium skin tone, medium-dark skin tone
+👩🏽‍🤝‍👩🏿	1	women holding hands: medium skin tone, dark skin tone
+👩🏾‍🤝‍👩🏻	1	women holding hands: medium-dark skin tone, light skin tone
+👩🏾‍🤝‍👩🏼	1	women holding hands: medium-dark skin tone, medium-light skin tone
+👩🏾‍🤝‍👩🏽	1	women holding hands: medium-dark skin tone, medium skin tone
+👭🏾	1	women holding hands: medium-dark skin tone
+👩🏾‍🤝‍👩🏿	1	women holding hands: medium-dark skin tone, dark skin tone
+👩🏿‍🤝‍👩🏻	1	women holding hands: dark skin tone, light skin tone
+👩🏿‍🤝‍👩🏼	1	women holding hands: dark skin tone, medium-light skin tone
+👩🏿‍🤝‍👩🏽	1	women holding hands: dark skin tone, medium skin tone
+👩🏿‍🤝‍👩🏾	1	women holding hands: dark skin tone, medium-dark skin tone
+👭🏿	1	women holding hands: dark skin tone
+👫	1	woman and man holding hands
+👫🏻	1	woman and man holding hands: light skin tone
+👩🏻‍🤝‍👨🏼	1	woman and man holding hands: light skin tone, medium-light skin tone
+👩🏻‍🤝‍👨🏽	1	woman and man holding hands: light skin tone, medium skin tone
+👩🏻‍🤝‍👨🏾	1	woman and man holding hands: light skin tone, medium-dark skin tone
+👩🏻‍🤝‍👨🏿	1	woman and man holding hands: light skin tone, dark skin tone
+👩🏼‍🤝‍👨🏻	1	woman and man holding hands: medium-light skin tone, light skin tone
+👫🏼	1	woman and man holding hands: medium-light skin tone
+👩🏼‍🤝‍👨🏽	1	woman and man holding hands: medium-light skin tone, medium skin tone
+👩🏼‍🤝‍👨🏾	1	woman and man holding hands: medium-light skin tone, medium-dark skin tone
+👩🏼‍🤝‍👨🏿	1	woman and man holding hands: medium-light skin tone, dark skin tone
+👩🏽‍🤝‍👨🏻	1	woman and man holding hands: medium skin tone, light skin tone
+👩🏽‍🤝‍👨🏼	1	woman and man holding hands: medium skin tone, medium-light skin tone
+👫🏽	1	woman and man holding hands: medium skin tone
+👩🏽‍🤝‍👨🏾	1	woman and man holding hands: medium skin tone, medium-dark skin tone
+👩🏽‍🤝‍👨🏿	1	woman and man holding hands: medium skin tone, dark skin tone
+👩🏾‍🤝‍👨🏻	1	woman and man holding hands: medium-dark skin tone, light skin tone
+👩🏾‍🤝‍👨🏼	1	woman and man holding hands: medium-dark skin tone, medium-light skin tone
+👩🏾‍🤝‍👨🏽	1	woman and man holding hands: medium-dark skin tone, medium skin tone
+👫🏾	1	woman and man holding hands: medium-dark skin tone
+👩🏾‍🤝‍👨🏿	1	woman and man holding hands: medium-dark skin tone, dark skin tone
+👩🏿‍🤝‍👨🏻	1	woman and man holding hands: dark skin tone, light skin tone
+👩🏿‍🤝‍👨🏼	1	woman and man holding hands: dark skin tone, medium-light skin tone
+👩🏿‍🤝‍👨🏽	1	woman and man holding hands: dark skin tone, medium skin tone
+👩🏿‍🤝‍👨🏾	1	woman and man holding hands: dark skin tone, medium-dark skin tone
+👫🏿	1	woman and man holding hands: dark skin tone
+👬	1	men holding hands
+👬🏻	1	men holding hands: light skin tone
+👨🏻‍🤝‍👨🏼	1	men holding hands: light skin tone, medium-light skin tone
+👨🏻‍🤝‍👨🏽	1	men holding hands: light skin tone, medium skin tone
+👨🏻‍🤝‍👨🏾	1	men holding hands: light skin tone, medium-dark skin tone
+👨🏻‍🤝‍👨🏿	1	men holding hands: light skin tone, dark skin tone
+👨🏼‍🤝‍👨🏻	1	men holding hands: medium-light skin tone, light skin tone
+👬🏼	1	men holding hands: medium-light skin tone
+👨🏼‍🤝‍👨🏽	1	men holding hands: medium-light skin tone, medium skin tone
+👨🏼‍🤝‍👨🏾	1	men holding hands: medium-light skin tone, medium-dark skin tone
+👨🏼‍🤝‍👨🏿	1	men holding hands: medium-light skin tone, dark skin tone
+👨🏽‍🤝‍👨🏻	1	men holding hands: medium skin tone, light skin tone
+👨🏽‍🤝‍👨🏼	1	men holding hands: medium skin tone, medium-light skin tone
+👬🏽	1	men holding hands: medium skin tone
+👨🏽‍🤝‍👨🏾	1	men holding hands: medium skin tone, medium-dark skin tone
+👨🏽‍🤝‍👨🏿	1	men holding hands: medium skin tone, dark skin tone
+👨🏾‍🤝‍👨🏻	1	men holding hands: medium-dark skin tone, light skin tone
+👨🏾‍🤝‍👨🏼	1	men holding hands: medium-dark skin tone, medium-light skin tone
+👨🏾‍🤝‍👨🏽	1	men holding hands: medium-dark skin tone, medium skin tone
+👬🏾	1	men holding hands: medium-dark skin tone
+👨🏾‍🤝‍👨🏿	1	men holding hands: medium-dark skin tone, dark skin tone
+👨🏿‍🤝‍👨🏻	1	men holding hands: dark skin tone, light skin tone
+👨🏿‍🤝‍👨🏼	1	men holding hands: dark skin tone, medium-light skin tone
+👨🏿‍🤝‍👨🏽	1	men holding hands: dark skin tone, medium skin tone
+👨🏿‍🤝‍👨🏾	1	men holding hands: dark skin tone, medium-dark skin tone
+👬🏿	1	men holding hands: dark skin tone
+💏	1	kiss
+💏🏻	1	kiss: light skin tone
+💏🏼	1	kiss: medium-light skin tone
+💏🏽	1	kiss: medium skin tone
+💏🏾	1	kiss: medium-dark skin tone
+💏🏿	1	kiss: dark skin tone
+🧑🏻‍❤️‍💋‍🧑🏼	1	kiss: person, person, light skin tone, medium-light skin tone
+🧑🏻‍❤️‍💋‍🧑🏽	1	kiss: person, person, light skin tone, medium skin tone
+🧑🏻‍❤️‍💋‍🧑🏾	1	kiss: person, person, light skin tone, medium-dark skin tone
+🧑🏻‍❤️‍💋‍🧑🏿	1	kiss: person, person, light skin tone, dark skin tone
+🧑🏼‍❤️‍💋‍🧑🏻	1	kiss: person, person, medium-light skin tone, light skin tone
+🧑🏼‍❤️‍💋‍🧑🏽	1	kiss: person, person, medium-light skin tone, medium skin tone
+🧑🏼‍❤️‍💋‍🧑🏾	1	kiss: person, person, medium-light skin tone, medium-dark skin tone
+🧑🏼‍❤️‍💋‍🧑🏿	1	kiss: person, person, medium-light skin tone, dark skin tone
+🧑🏽‍❤️‍💋‍🧑🏻	1	kiss: person, person, medium skin tone, light skin tone
+🧑🏽‍❤️‍💋‍🧑🏼	1	kiss: person, person, medium skin tone, medium-light skin tone
+🧑🏽‍❤️‍💋‍🧑🏾	1	kiss: person, person, medium skin tone, medium-dark skin tone
+🧑🏽‍❤️‍💋‍🧑🏿	1	kiss: person, person, medium skin tone, dark skin tone
+🧑🏾‍❤️‍💋‍🧑🏻	1	kiss: person, person, medium-dark skin tone, light skin tone
+🧑🏾‍❤️‍💋‍🧑🏼	1	kiss: person, person, medium-dark skin tone, medium-light skin tone
+🧑🏾‍❤️‍💋‍🧑🏽	1	kiss: person, person, medium-dark skin tone, medium skin tone
+🧑🏾‍❤️‍💋‍🧑🏿	1	kiss: person, person, medium-dark skin tone, dark skin tone
+🧑🏿‍❤️‍💋‍🧑🏻	1	kiss: person, person, dark skin tone, light skin tone
+🧑🏿‍❤️‍💋‍🧑🏼	1	kiss: person, person, dark skin tone, medium-light skin tone
+🧑🏿‍❤️‍💋‍🧑🏽	1	kiss: person, person, dark skin tone, medium skin tone
+🧑🏿‍❤️‍💋‍🧑🏾	1	kiss: person, person, dark skin tone, medium-dark skin tone
+👩‍❤️‍💋‍👨	1	kiss: woman, man
+👩🏻‍❤️‍💋‍👨🏻	1	kiss: woman, man, light skin tone
+👩🏻‍❤️‍💋‍👨🏼	1	kiss: woman, man, light skin tone, medium-light skin tone
+👩🏻‍❤️‍💋‍👨🏽	1	kiss: woman, man, light skin tone, medium skin tone
+👩🏻‍❤️‍💋‍👨🏾	1	kiss: woman, man, light skin tone, medium-dark skin tone
+👩🏻‍❤️‍💋‍👨🏿	1	kiss: woman, man, light skin tone, dark skin tone
+👩🏼‍❤️‍💋‍👨🏻	1	kiss: woman, man, medium-light skin tone, light skin tone
+👩🏼‍❤️‍💋‍👨🏼	1	kiss: woman, man, medium-light skin tone
+👩🏼‍❤️‍💋‍👨🏽	1	kiss: woman, man, medium-light skin tone, medium skin tone
+👩🏼‍❤️‍💋‍👨🏾	1	kiss: woman, man, medium-light skin tone, medium-dark skin tone
+👩🏼‍❤️‍💋‍👨🏿	1	kiss: woman, man, medium-light skin tone, dark skin tone
+👩🏽‍❤️‍💋‍👨🏻	1	kiss: woman, man, medium skin tone, light skin tone
+👩🏽‍❤️‍💋‍👨🏼	1	kiss: woman, man, medium skin tone, medium-light skin tone
+👩🏽‍❤️‍💋‍👨🏽	1	kiss: woman, man, medium skin tone
+👩🏽‍❤️‍💋‍👨🏾	1	kiss: woman, man, medium skin tone, medium-dark skin tone
+👩🏽‍❤️‍💋‍👨🏿	1	kiss: woman, man, medium skin tone, dark skin tone
+👩🏾‍❤️‍💋‍👨🏻	1	kiss: woman, man, medium-dark skin tone, light skin tone
+👩🏾‍❤️‍💋‍👨🏼	1	kiss: woman, man, medium-dark skin tone, medium-light skin tone
+👩🏾‍❤️‍💋‍👨🏽	1	kiss: woman, man, medium-dark skin tone, medium skin tone
+👩🏾‍❤️‍💋‍👨🏾	1	kiss: woman, man, medium-dark skin tone
+👩🏾‍❤️‍💋‍👨🏿	1	kiss: woman, man, medium-dark skin tone, dark skin tone
+👩🏿‍❤️‍💋‍👨🏻	1	kiss: woman, man, dark skin tone, light skin tone
+👩🏿‍❤️‍💋‍👨🏼	1	kiss: woman, man, dark skin tone, medium-light skin tone
+👩🏿‍❤️‍💋‍👨🏽	1	kiss: woman, man, dark skin tone, medium skin tone
+👩🏿‍❤️‍💋‍👨🏾	1	kiss: woman, man, dark skin tone, medium-dark skin tone
+👩🏿‍❤️‍💋‍👨🏿	1	kiss: woman, man, dark skin tone
+👨‍❤️‍💋‍👨	1	kiss: man, man
+👨🏻‍❤️‍💋‍👨🏻	1	kiss: man, man, light skin tone
+👨🏻‍❤️‍💋‍👨🏼	1	kiss: man, man, light skin tone, medium-light skin tone
+👨🏻‍❤️‍💋‍👨🏽	1	kiss: man, man, light skin tone, medium skin tone
+👨🏻‍❤️‍💋‍👨🏾	1	kiss: man, man, light skin tone, medium-dark skin tone
+👨🏻‍❤️‍💋‍👨🏿	1	kiss: man, man, light skin tone, dark skin tone
+👨🏼‍❤️‍💋‍👨🏻	1	kiss: man, man, medium-light skin tone, light skin tone
+👨🏼‍❤️‍💋‍👨🏼	1	kiss: man, man, medium-light skin tone
+👨🏼‍❤️‍💋‍👨🏽	1	kiss: man, man, medium-light skin tone, medium skin tone
+👨🏼‍❤️‍💋‍👨🏾	1	kiss: man, man, medium-light skin tone, medium-dark skin tone
+👨🏼‍❤️‍💋‍👨🏿	1	kiss: man, man, medium-light skin tone, dark skin tone
+👨🏽‍❤️‍💋‍👨🏻	1	kiss: man, man, medium skin tone, light skin tone
+👨🏽‍❤️‍💋‍👨🏼	1	kiss: man, man, medium skin tone, medium-light skin tone
+👨🏽‍❤️‍💋‍👨🏽	1	kiss: man, man, medium skin tone
+👨🏽‍❤️‍💋‍👨🏾	1	kiss: man, man, medium skin tone, medium-dark skin tone
+👨🏽‍❤️‍💋‍👨🏿	1	kiss: man, man, medium skin tone, dark skin tone
+👨🏾‍❤️‍💋‍👨🏻	1	kiss: man, man, medium-dark skin tone, light skin tone
+👨🏾‍❤️‍💋‍👨🏼	1	kiss: man, man, medium-dark skin tone, medium-light skin tone
+👨🏾‍❤️‍💋‍👨🏽	1	kiss: man, man, medium-dark skin tone, medium skin tone
+👨🏾‍❤️‍💋‍👨🏾	1	kiss: man, man, medium-dark skin tone
+👨🏾‍❤️‍💋‍👨🏿	1	kiss: man, man, medium-dark skin tone, dark skin tone
+👨🏿‍❤️‍💋‍👨🏻	1	kiss: man, man, dark skin tone, light skin tone
+👨🏿‍❤️‍💋‍👨🏼	1	kiss: man, man, dark skin tone, medium-light skin tone
+👨🏿‍❤️‍💋‍👨🏽	1	kiss: man, man, dark skin tone, medium skin tone
+👨🏿‍❤️‍💋‍👨🏾	1	kiss: man, man, dark skin tone, medium-dark skin tone
+👨🏿‍❤️‍💋‍👨🏿	1	kiss: man, man, dark skin tone
+👩‍❤️‍💋‍👩	1	kiss: woman, woman
+👩🏻‍❤️‍💋‍👩🏻	1	kiss: woman, woman, light skin tone
+👩🏻‍❤️‍💋‍👩🏼	1	kiss: woman, woman, light skin tone, medium-light skin tone
+👩🏻‍❤️‍💋‍👩🏽	1	kiss: woman, woman, light skin tone, medium skin tone
+👩🏻‍❤️‍💋‍👩🏾	1	kiss: woman, woman, light skin tone, medium-dark skin tone
+👩🏻‍❤️‍💋‍👩🏿	1	kiss: woman, woman, light skin tone, dark skin tone
+👩🏼‍❤️‍💋‍👩🏻	1	kiss: woman, woman, medium-light skin tone, light skin tone
+👩🏼‍❤️‍💋‍👩🏼	1	kiss: woman, woman, medium-light skin tone
+👩🏼‍❤️‍💋‍👩🏽	1	kiss: woman, woman, medium-light skin tone, medium skin tone
+👩🏼‍❤️‍💋‍👩🏾	1	kiss: woman, woman, medium-light skin tone, medium-dark skin tone
+👩🏼‍❤️‍💋‍👩🏿	1	kiss: woman, woman, medium-light skin tone, dark skin tone
+👩🏽‍❤️‍💋‍👩🏻	1	kiss: woman, woman, medium skin tone, light skin tone
+👩🏽‍❤️‍💋‍👩🏼	1	kiss: woman, woman, medium skin tone, medium-light skin tone
+👩🏽‍❤️‍💋‍👩🏽	1	kiss: woman, woman, medium skin tone
+👩🏽‍❤️‍💋‍👩🏾	1	kiss: woman, woman, medium skin tone, medium-dark skin tone
+👩🏽‍❤️‍💋‍👩🏿	1	kiss: woman, woman, medium skin tone, dark skin tone
+👩🏾‍❤️‍💋‍👩🏻	1	kiss: woman, woman, medium-dark skin tone, light skin tone
+👩🏾‍❤️‍💋‍👩🏼	1	kiss: woman, woman, medium-dark skin tone, medium-light skin tone
+👩🏾‍❤️‍💋‍👩🏽	1	kiss: woman, woman, medium-dark skin tone, medium skin tone
+👩🏾‍❤️‍💋‍👩🏾	1	kiss: woman, woman, medium-dark skin tone
+👩🏾‍❤️‍💋‍👩🏿	1	kiss: woman, woman, medium-dark skin tone, dark skin tone
+👩🏿‍❤️‍💋‍👩🏻	1	kiss: woman, woman, dark skin tone, light skin tone
+👩🏿‍❤️‍💋‍👩🏼	1	kiss: woman, woman, dark skin tone, medium-light skin tone
+👩🏿‍❤️‍💋‍👩🏽	1	kiss: woman, woman, dark skin tone, medium skin tone
+👩🏿‍❤️‍💋‍👩🏾	1	kiss: woman, woman, dark skin tone, medium-dark skin tone
+👩🏿‍❤️‍💋‍👩🏿	1	kiss: woman, woman, dark skin tone
+💑	1	couple with heart
+💑🏻	1	couple with heart: light skin tone
+💑🏼	1	couple with heart: medium-light skin tone
+💑🏽	1	couple with heart: medium skin tone
+💑🏾	1	couple with heart: medium-dark skin tone
+💑🏿	1	couple with heart: dark skin tone
+🧑🏻‍❤️‍🧑🏼	1	couple with heart: person, person, light skin tone, medium-light skin tone
+🧑🏻‍❤️‍🧑🏽	1	couple with heart: person, person, light skin tone, medium skin tone
+🧑🏻‍❤️‍🧑🏾	1	couple with heart: person, person, light skin tone, medium-dark skin tone
+🧑🏻‍❤️‍🧑🏿	1	couple with heart: person, person, light skin tone, dark skin tone
+🧑🏼‍❤️‍🧑🏻	1	couple with heart: person, person, medium-light skin tone, light skin tone
+🧑🏼‍❤️‍🧑🏽	1	couple with heart: person, person, medium-light skin tone, medium skin tone
+🧑🏼‍❤️‍🧑🏾	1	couple with heart: person, person, medium-light skin tone, medium-dark skin tone
+🧑🏼‍❤️‍🧑🏿	1	couple with heart: person, person, medium-light skin tone, dark skin tone
+🧑🏽‍❤️‍🧑🏻	1	couple with heart: person, person, medium skin tone, light skin tone
+🧑🏽‍❤️‍🧑🏼	1	couple with heart: person, person, medium skin tone, medium-light skin tone
+🧑🏽‍❤️‍🧑🏾	1	couple with heart: person, person, medium skin tone, medium-dark skin tone
+🧑🏽‍❤️‍🧑🏿	1	couple with heart: person, person, medium skin tone, dark skin tone
+🧑🏾‍❤️‍🧑🏻	1	couple with heart: person, person, medium-dark skin tone, light skin tone
+🧑🏾‍❤️‍🧑🏼	1	couple with heart: person, person, medium-dark skin tone, medium-light skin tone
+🧑🏾‍❤️‍🧑🏽	1	couple with heart: person, person, medium-dark skin tone, medium skin tone
+🧑🏾‍❤️‍🧑🏿	1	couple with heart: person, person, medium-dark skin tone, dark skin tone
+🧑🏿‍❤️‍🧑🏻	1	couple with heart: person, person, dark skin tone, light skin tone
+🧑🏿‍❤️‍🧑🏼	1	couple with heart: person, person, dark skin tone, medium-light skin tone
+🧑🏿‍❤️‍🧑🏽	1	couple with heart: person, person, dark skin tone, medium skin tone
+🧑🏿‍❤️‍🧑🏾	1	couple with heart: person, person, dark skin tone, medium-dark skin tone
+👩‍❤️‍👨	1	couple with heart: woman, man
+👩🏻‍❤️‍👨🏻	1	couple with heart: woman, man, light skin tone
+👩🏻‍❤️‍👨🏼	1	couple with heart: woman, man, light skin tone, medium-light skin tone
+👩🏻‍❤️‍👨🏽	1	couple with heart: woman, man, light skin tone, medium skin tone
+👩🏻‍❤️‍👨🏾	1	couple with heart: woman, man, light skin tone, medium-dark skin tone
+👩🏻‍❤️‍👨🏿	1	couple with heart: woman, man, light skin tone, dark skin tone
+👩🏼‍❤️‍👨🏻	1	couple with heart: woman, man, medium-light skin tone, light skin tone
+👩🏼‍❤️‍👨🏼	1	couple with heart: woman, man, medium-light skin tone
+👩🏼‍❤️‍👨🏽	1	couple with heart: woman, man, medium-light skin tone, medium skin tone
+👩🏼‍❤️‍👨🏾	1	couple with heart: woman, man, medium-light skin tone, medium-dark skin tone
+👩🏼‍❤️‍👨🏿	1	couple with heart: woman, man, medium-light skin tone, dark skin tone
+👩🏽‍❤️‍👨🏻	1	couple with heart: woman, man, medium skin tone, light skin tone
+👩🏽‍❤️‍👨🏼	1	couple with heart: woman, man, medium skin tone, medium-light skin tone
+👩🏽‍❤️‍👨🏽	1	couple with heart: woman, man, medium skin tone
+👩🏽‍❤️‍👨🏾	1	couple with heart: woman, man, medium skin tone, medium-dark skin tone
+👩🏽‍❤️‍👨🏿	1	couple with heart: woman, man, medium skin tone, dark skin tone
+👩🏾‍❤️‍👨🏻	1	couple with heart: woman, man, medium-dark skin tone, light skin tone
+👩🏾‍❤️‍👨🏼	1	couple with heart: woman, man, medium-dark skin tone, medium-light skin tone
+👩🏾‍❤️‍👨🏽	1	couple with heart: woman, man, medium-dark skin tone, medium skin tone
+👩🏾‍❤️‍👨🏾	1	couple with heart: woman, man, medium-dark skin tone
+👩🏾‍❤️‍👨🏿	1	couple with heart: woman, man, medium-dark skin tone, dark skin tone
+👩🏿‍❤️‍👨🏻	1	couple with heart: woman, man, dark skin tone, light skin tone
+👩🏿‍❤️‍👨🏼	1	couple with heart: woman, man, dark skin tone, medium-light skin tone
+👩🏿‍❤️‍👨🏽	1	couple with heart: woman, man, dark skin tone, medium skin tone
+👩🏿‍❤️‍👨🏾	1	couple with heart: woman, man, dark skin tone, medium-dark skin tone
+👩🏿‍❤️‍👨🏿	1	couple with heart: woman, man, dark skin tone
+👨‍❤️‍👨	1	couple with heart: man, man
+👨🏻‍❤️‍👨🏻	1	couple with heart: man, man, light skin tone
+👨🏻‍❤️‍👨🏼	1	couple with heart: man, man, light skin tone, medium-light skin tone
+👨🏻‍❤️‍👨🏽	1	couple with heart: man, man, light skin tone, medium skin tone
+👨🏻‍❤️‍👨🏾	1	couple with heart: man, man, light skin tone, medium-dark skin tone
+👨🏻‍❤️‍👨🏿	1	couple with heart: man, man, light skin tone, dark skin tone
+👨🏼‍❤️‍👨🏻	1	couple with heart: man, man, medium-light skin tone, light skin tone
+👨🏼‍❤️‍👨🏼	1	couple with heart: man, man, medium-light skin tone
+👨🏼‍❤️‍👨🏽	1	couple with heart: man, man, medium-light skin tone, medium skin tone
+👨🏼‍❤️‍👨🏾	1	couple with heart: man, man, medium-light skin tone, medium-dark skin tone
+👨🏼‍❤️‍👨🏿	1	couple with heart: man, man, medium-light skin tone, dark skin tone
+👨🏽‍❤️‍👨🏻	1	couple with heart: man, man, medium skin tone, light skin tone
+👨🏽‍❤️‍👨🏼	1	couple with heart: man, man, medium skin tone, medium-light skin tone
+👨🏽‍❤️‍👨🏽	1	couple with heart: man, man, medium skin tone
+👨🏽‍❤️‍👨🏾	1	couple with heart: man, man, medium skin tone, medium-dark skin tone
+👨🏽‍❤️‍👨🏿	1	couple with heart: man, man, medium skin tone, dark skin tone
+👨🏾‍❤️‍👨🏻	1	couple with heart: man, man, medium-dark skin tone, light skin tone
+👨🏾‍❤️‍👨🏼	1	couple with heart: man, man, medium-dark skin tone, medium-light skin tone
+👨🏾‍❤️‍👨🏽	1	couple with heart: man, man, medium-dark skin tone, medium skin tone
+👨🏾‍❤️‍👨🏾	1	couple with heart: man, man, medium-dark skin tone
+👨🏾‍❤️‍👨🏿	1	couple with heart: man, man, medium-dark skin tone, dark skin tone
+👨🏿‍❤️‍👨🏻	1	couple with heart: man, man, dark skin tone, light skin tone
+👨🏿‍❤️‍👨🏼	1	couple with heart: man, man, dark skin tone, medium-light skin tone
+👨🏿‍❤️‍👨🏽	1	couple with heart: man, man, dark skin tone, medium skin tone
+👨🏿‍❤️‍👨🏾	1	couple with heart: man, man, dark skin tone, medium-dark skin tone
+👨🏿‍❤️‍👨🏿	1	couple with heart: man, man, dark skin tone
+👩‍❤️‍👩	1	couple with heart: woman, woman
+👩🏻‍❤️‍👩🏻	1	couple with heart: woman, woman, light skin tone
+👩🏻‍❤️‍👩🏼	1	couple with heart: woman, woman, light skin tone, medium-light skin tone
+👩🏻‍❤️‍👩🏽	1	couple with heart: woman, woman, light skin tone, medium skin tone
+👩🏻‍❤️‍👩🏾	1	couple with heart: woman, woman, light skin tone, medium-dark skin tone
+👩🏻‍❤️‍👩🏿	1	couple with heart: woman, woman, light skin tone, dark skin tone
+👩🏼‍❤️‍👩🏻	1	couple with heart: woman, woman, medium-light skin tone, light skin tone
+👩🏼‍❤️‍👩🏼	1	couple with heart: woman, woman, medium-light skin tone
+👩🏼‍❤️‍👩🏽	1	couple with heart: woman, woman, medium-light skin tone, medium skin tone
+👩🏼‍❤️‍👩🏾	1	couple with heart: woman, woman, medium-light skin tone, medium-dark skin tone
+👩🏼‍❤️‍👩🏿	1	couple with heart: woman, woman, medium-light skin tone, dark skin tone
+👩🏽‍❤️‍👩🏻	1	couple with heart: woman, woman, medium skin tone, light skin tone
+👩🏽‍❤️‍👩🏼	1	couple with heart: woman, woman, medium skin tone, medium-light skin tone
+👩🏽‍❤️‍👩🏽	1	couple with heart: woman, woman, medium skin tone
+👩🏽‍❤️‍👩🏾	1	couple with heart: woman, woman, medium skin tone, medium-dark skin tone
+👩🏽‍❤️‍👩🏿	1	couple with heart: woman, woman, medium skin tone, dark skin tone
+👩🏾‍❤️‍👩🏻	1	couple with heart: woman, woman, medium-dark skin tone, light skin tone
+👩🏾‍❤️‍👩🏼	1	couple with heart: woman, woman, medium-dark skin tone, medium-light skin tone
+👩🏾‍❤️‍👩🏽	1	couple with heart: woman, woman, medium-dark skin tone, medium skin tone
+👩🏾‍❤️‍👩🏾	1	couple with heart: woman, woman, medium-dark skin tone
+👩🏾‍❤️‍👩🏿	1	couple with heart: woman, woman, medium-dark skin tone, dark skin tone
+👩🏿‍❤️‍👩🏻	1	couple with heart: woman, woman, dark skin tone, light skin tone
+👩🏿‍❤️‍👩🏼	1	couple with heart: woman, woman, dark skin tone, medium-light skin tone
+👩🏿‍❤️‍👩🏽	1	couple with heart: woman, woman, dark skin tone, medium skin tone
+👩🏿‍❤️‍👩🏾	1	couple with heart: woman, woman, dark skin tone, medium-dark skin tone
+👩🏿‍❤️‍👩🏿	1	couple with heart: woman, woman, dark skin tone
+👨‍👩‍👦	1	family: man, woman, boy
+👨‍👩‍👧	1	family: man, woman, girl
+👨‍👩‍👧‍👦	1	family: man, woman, girl, boy
+👨‍👩‍👦‍👦	1	family: man, woman, boy, boy
+👨‍👩‍👧‍👧	1	family: man, woman, girl, girl
+👨‍👨‍👦	1	family: man, man, boy
+👨‍👨‍👧	1	family: man, man, girl
+👨‍👨‍👧‍👦	1	family: man, man, girl, boy
+👨‍👨‍👦‍👦	1	family: man, man, boy, boy
+👨‍👨‍👧‍👧	1	family: man, man, girl, girl
+👩‍👩‍👦	1	family: woman, woman, boy
+👩‍👩‍👧	1	family: woman, woman, girl
+👩‍👩‍👧‍👦	1	family: woman, woman, girl, boy
+👩‍👩‍👦‍👦	1	family: woman, woman, boy, boy
+👩‍👩‍👧‍👧	1	family: woman, woman, girl, girl
+👨‍👦	1	family: man, boy
+👨‍👦‍👦	1	family: man, boy, boy
+👨‍👧	1	family: man, girl
+👨‍👧‍👦	1	family: man, girl, boy
+👨‍👧‍👧	1	family: man, girl, girl
+👩‍👦	1	family: woman, boy
+👩‍👦‍👦	1	family: woman, boy, boy
+👩‍👧	1	family: woman, girl
+👩‍👧‍👦	1	family: woman, girl, boy
+👩‍👧‍👧	1	family: woman, girl, girl
+🗣️	1	speaking head
+👤	1	bust in silhouette
+👥	1	busts in silhouette
+🫂	1	people hugging
+👪	1	family
+🧑‍🧑‍🧒	1	family: adult, adult, child
+🧑‍🧑‍🧒‍🧒	1	family: adult, adult, child, child
+🧑‍🧒	1	family: adult, child
+🧑‍🧒‍🧒	1	family: adult, child, child
+👣	1	footprints
+🐵	2	monkey face
+🐒	2	monkey
+🦍	2	gorilla
+🦧	2	orangutan
+🐶	2	dog face
+🐕	2	dog
+🦮	2	guide dog
+🐕‍🦺	2	service dog
+🐩	2	poodle
+🐺	2	wolf
+🦊	2	fox
+🦝	2	raccoon
+🐱	2	cat face
+🐈	2	cat
+🐈‍⬛	2	black cat
+🦁	2	lion
+🐯	2	tiger face
+🐅	2	tiger
+🐆	2	leopard
+🐴	2	horse face
+🫎	2	moose
+🫏	2	donkey
+🐎	2	horse
+🦄	2	unicorn
+🦓	2	zebra
+🦌	2	deer
+🦬	2	bison
+🐮	2	cow face
+🐂	2	ox
+🐃	2	water buffalo
+🐄	2	cow
+🐷	2	pig face
+🐖	2	pig
+🐗	2	boar
+🐽	2	pig nose
+🐏	2	ram
+🐑	2	ewe
+🐐	2	goat
+🐪	2	camel
+🐫	2	two-hump camel
+🦙	2	llama
+🦒	2	giraffe
+🐘	2	elephant
+🦣	2	mammoth
+🦏	2	rhinoceros
+🦛	2	hippopotamus
+🐭	2	mouse face
+🐁	2	mouse
+🐀	2	rat
+🐹	2	hamster
+🐰	2	rabbit face
+🐇	2	rabbit
+🐿️	2	chipmunk
+🦫	2	beaver
+🦔	2	hedgehog
+🦇	2	bat
+🐻	2	bear
+🐻‍❄️	2	polar bear
+🐨	2	koala
+🐼	2	panda
+🦥	2	sloth
+🦦	2	otter
+🦨	2	skunk
+🦘	2	kangaroo
+🦡	2	badger
+🐾	2	paw prints
+🦃	2	turkey
+🐔	2	chicken
+🐓	2	rooster
+🐣	2	hatching chick
+🐤	2	baby chick
+🐥	2	front-facing baby chick
+🐦	2	bird
+🐧	2	penguin
+🕊️	2	dove
+🦅	2	eagle
+🦆	2	duck
+🦢	2	swan
+🦉	2	owl
+🦤	2	dodo
+🪶	2	feather
+🦩	2	flamingo
+🦚	2	peacock
+🦜	2	parrot
+🪽	2	wing
+🐦‍⬛	2	black bird
+🪿	2	goose
+🐦‍🔥	2	phoenix
+🐸	2	frog
+🐊	2	crocodile
+🐢	2	turtle
+🦎	2	lizard
+🐍	2	snake
+🐲	2	dragon face
+🐉	2	dragon
+🦕	2	sauropod
+🦖	2	t-rex
+🐳	2	spouting whale
+🐋	2	whale
+🐬	2	dolphin
+🦭	2	seal
+🐟	2	fish
+🐠	2	tropical fish
+🐡	2	blowfish
+🦈	2	shark
+🐙	2	octopus
+🐚	2	spiral shell
+🪸	2	coral
+🪼	2	jellyfish
+🐌	2	snail
+🦋	2	butterfly
+🐛	2	bug
+🐜	2	ant
+🐝	2	honeybee
+🪲	2	beetle
+🐞	2	lady beetle
+🦗	2	cricket
+🪳	2	cockroach
+🕷️	2	spider
+🕸️	2	spider web
+🦂	2	scorpion
+🦟	2	mosquito
+🪰	2	fly
+🪱	2	worm
+🦠	2	microbe
+💐	2	bouquet
+🌸	2	cherry blossom
+💮	2	white flower
+🪷	2	lotus
+🏵️	2	rosette
+🌹	2	rose
+🥀	2	wilted flower
+🌺	2	hibiscus
+🌻	2	sunflower
+🌼	2	blossom
+🌷	2	tulip
+🪻	2	hyacinth
+🌱	2	seedling
+🪴	2	potted plant
+🌲	2	evergreen tree
+🌳	2	deciduous tree
+🌴	2	palm tree
+🌵	2	cactus
+🌾	2	sheaf of rice
+🌿	2	herb
+☘️	2	shamrock
+🍀	2	four leaf clover
+🍁	2	maple leaf
+🍂	2	fallen leaf
+🍃	2	leaf fluttering in wind
+🪹	2	empty nest
+🪺	2	nest with eggs
+🍄	2	mushroom
+🍇	3	grapes
+🍈	3	melon
+🍉	3	watermelon
+🍊	3	tangerine
+🍋	3	lemon
+🍋‍🟩	3	lime
+🍌	3	banana
+🍍	3	pineapple
+🥭	3	mango
+🍎	3	red apple
+🍏	3	green apple
+🍐	3	pear
+🍑	3	peach
+🍒	3	cherries
+🍓	3	strawberry
+🫐	3	blueberries
+🥝	3	kiwi fruit
+🍅	3	tomato
+🫒	3	olive
+🥥	3	coconut
+🥑	3	avocado
+🍆	3	eggplant
+🥔	3	potato
+🥕	3	carrot
+🌽	3	ear of corn
+🌶️	3	hot pepper
+🫑	3	bell pepper
+🥒	3	cucumber
+🥬	3	leafy green
+🥦	3	broccoli
+🧄	3	garlic
+🧅	3	onion
+🥜	3	peanuts
+🫘	3	beans
+🌰	3	chestnut
+🫚	3	ginger root
+🫛	3	pea pod
+🍄‍🟫	3	brown mushroom
+🍞	3	bread
+🥐	3	croissant
+🥖	3	baguette bread
+🫓	3	flatbread
+🥨	3	pretzel
+🥯	3	bagel
+🥞	3	pancakes
+🧇	3	waffle
+🧀	3	cheese wedge
+🍖	3	meat on bone
+🍗	3	poultry leg
+🥩	3	cut of meat
+🥓	3	bacon
+🍔	3	hamburger
+🍟	3	french fries
+🍕	3	pizza
+🌭	3	hot dog
+🥪	3	sandwich
+🌮	3	taco
+🌯	3	burrito
+🫔	3	tamale
+🥙	3	stuffed flatbread
+🧆	3	falafel
+🥚	3	egg
+🍳	3	cooking
+🥘	3	shallow pan of food
+🍲	3	pot of food
+🫕	3	fondue
+🥣	3	bowl with spoon
+🥗	3	green salad
+🍿	3	popcorn
+🧈	3	butter
+🧂	3	salt
+🥫	3	canned food
+🍱	3	bento box
+🍘	3	rice cracker
+🍙	3	rice ball
+🍚	3	cooked rice
+🍛	3	curry rice
+🍜	3	steaming bowl
+🍝	3	spaghetti
+🍠	3	roasted sweet potato
+🍢	3	oden
+🍣	3	sushi
+🍤	3	fried shrimp
+🍥	3	fish cake with swirl
+🥮	3	moon cake
+🍡	3	dango
+🥟	3	dumpling
+🥠	3	fortune cookie
+🥡	3	takeout box
+🦀	3	crab
+🦞	3	lobster
+🦐	3	shrimp
+🦑	3	squid
+🦪	3	oyster
+🍦	3	soft ice cream
+🍧	3	shaved ice
+🍨	3	ice cream
+🍩	3	doughnut
+🍪	3	cookie
+🎂	3	birthday cake
+🍰	3	shortcake
+🧁	3	cupcake
+🥧	3	pie
+🍫	3	chocolate bar
+🍬	3	candy
+🍭	3	lollipop
+🍮	3	custard
+🍯	3	honey pot
+🍼	3	baby bottle
+🥛	3	glass of milk
+☕	3	hot beverage
+🫖	3	teapot
+🍵	3	teacup without handle
+🍶	3	sake
+🍾	3	bottle with popping cork
+🍷	3	wine glass
+🍸	3	cocktail glass
+🍹	3	tropical drink
+🍺	3	beer mug
+🍻	3	clinking beer mugs
+🥂	3	clinking glasses
+🥃	3	tumbler glass
+🫗	3	pouring liquid
+🥤	3	cup with straw
+🧋	3	bubble tea
+🧃	3	beverage box
+🧉	3	mate
+🧊	3	ice
+🥢	3	chopsticks
+🍽️	3	fork and knife with plate
+🍴	3	fork and knife
+🥄	3	spoon
+🔪	3	kitchen knife
+🫙	3	jar
+🏺	3	amphora
+🌍	4	globe showing europe-africa
+🌎	4	globe showing americas
+🌏	4	globe showing asia-australia
+🌐	4	globe with meridians
+🗺️	4	world map
+🗾	4	map of japan
+🧭	4	compass
+🏔️	4	snow-capped mountain
+⛰️	4	mountain
+🌋	4	volcano
+🗻	4	mount fuji
+🏕️	4	camping
+🏖️	4	beach with umbrella
+🏜️	4	desert
+🏝️	4	desert island
+🏞️	4	national park
+🏟️	4	stadium
+🏛️	4	classical building
+🏗️	4	building construction
+🧱	4	brick
+🪨	4	rock
+🪵	4	wood
+🛖	4	hut
+🏘️	4	houses
+🏚️	4	derelict house
+🏠	4	house
+🏡	4	house with garden
+🏢	4	office building
+🏣	4	japanese post office
+🏤	4	post office
+🏥	4	hospital
+🏦	4	bank
+🏨	4	hotel
+🏩	4	love hotel
+🏪	4	convenience store
+🏫	4	school
+🏬	4	department store
+🏭	4	factory
+🏯	4	japanese castle
+🏰	4	castle
+💒	4	wedding
+🗼	4	tokyo tower
+🗽	4	statue of liberty
+⛪	4	church
+🕌	4	mosque
+🛕	4	hindu temple
+🕍	4	synagogue
+⛩️	4	shinto shrine
+🕋	4	kaaba
+⛲	4	fountain
+⛺	4	tent
+🌁	4	foggy
+🌃	4	night with stars
+🏙️	4	cityscape
+🌄	4	sunrise over mountains
+🌅	4	sunrise
+🌆	4	cityscape at dusk
+🌇	4	sunset
+🌉	4	bridge at night
+♨️	4	hot springs
+🎠	4	carousel horse
+🛝	4	playground slide
+🎡	4	ferris wheel
+🎢	4	roller coaster
+💈	4	barber pole
+🎪	4	circus tent
+🚂	4	locomotive
+🚃	4	railway car
+🚄	4	high-speed train
+🚅	4	bullet train
+🚆	4	train
+🚇	4	metro
+🚈	4	light rail
+🚉	4	station
+🚊	4	tram
+🚝	4	monorail
+🚞	4	mountain railway
+🚋	4	tram car
+🚌	4	bus
+🚍	4	oncoming bus
+🚎	4	trolleybus
+🚐	4	minibus
+🚑	4	ambulance
+🚒	4	fire engine
+🚓	4	police car
+🚔	4	oncoming police car
+🚕	4	taxi
+🚖	4	oncoming taxi
+🚗	4	automobile
+🚘	4	oncoming automobile
+🚙	4	sport utility vehicle
+🛻	4	pickup truck
+🚚	4	delivery truck
+🚛	4	articulated lorry
+🚜	4	tractor
+🏎️	4	racing car
+🏍️	4	motorcycle
+🛵	4	motor scooter
+🦽	4	manual wheelchair
+🦼	4	motorized wheelchair
+🛺	4	auto rickshaw
+🚲	4	bicycle
+🛴	4	kick scooter
+🛹	4	skateboard
+🛼	4	roller skate
+🚏	4	bus stop
+🛣️	4	motorway
+🛤️	4	railway track
+🛢️	4	oil drum
+⛽	4	fuel pump
+🛞	4	wheel
+🚨	4	police car light
+🚥	4	horizontal traffic light
+🚦	4	vertical traffic light
+🛑	4	stop sign
+🚧	4	construction
+⚓	4	anchor
+🛟	4	ring buoy
+⛵	4	sailboat
+🛶	4	canoe
+🚤	4	speedboat
+🛳️	4	passenger ship
+⛴️	4	ferry
+🛥️	4	motor boat
+🚢	4	ship
+✈️	4	airplane
+🛩️	4	small airplane
+🛫	4	airplane departure
+🛬	4	airplane arrival
+🪂	4	parachute
+💺	4	seat
+🚁	4	helicopter
+🚟	4	suspension railway
+🚠	4	mountain cableway
+🚡	4	aerial tramway
+🛰️	4	satellite
+🚀	4	rocket
+🛸	4	flying saucer
+🛎️	4	bellhop bell
+🧳	4	luggage
+⌛	4	hourglass done
+⏳	4	hourglass not done
+⌚	4	watch
+⏰	4	alarm clock
+⏱️	4	stopwatch
+⏲️	4	timer clock
+🕰️	4	mantelpiece clock
+🕛	4	twelve o’clock
+🕧	4	twelve-thirty
+🕐	4	one o’clock
+🕜	4	one-thirty
+🕑	4	two o’clock
+🕝	4	two-thirty
+🕒	4	three o’clock
+🕞	4	three-thirty
+🕓	4	four o’clock
+🕟	4	four-thirty
+🕔	4	five o’clock
+🕠	4	five-thirty
+🕕	4	six o’clock
+🕡	4	six-thirty
+🕖	4	seven o’clock
+🕢	4	seven-thirty
+🕗	4	eight o’clock
+🕣	4	eight-thirty
+🕘	4	nine o’clock
+🕤	4	nine-thirty
+🕙	4	ten o’clock
+🕥	4	ten-thirty
+🕚	4	eleven o’clock
+🕦	4	eleven-thirty
+🌑	4	new moon
+🌒	4	waxing crescent moon
+🌓	4	first quarter moon
+🌔	4	waxing gibbous moon
+🌕	4	full moon
+🌖	4	waning gibbous moon
+🌗	4	last quarter moon
+🌘	4	waning crescent moon
+🌙	4	crescent moon
+🌚	4	new moon face
+🌛	4	first quarter moon face
+🌜	4	last quarter moon face
+🌡️	4	thermometer
+☀️	4	sun
+🌝	4	full moon face
+🌞	4	sun with face
+🪐	4	ringed planet
+⭐	4	star
+🌟	4	glowing star
+🌠	4	shooting star
+🌌	4	milky way
+☁️	4	cloud
+⛅	4	sun behind cloud
+⛈️	4	cloud with lightning and rain
+🌤️	4	sun behind small cloud
+🌥️	4	sun behind large cloud
+🌦️	4	sun behind rain cloud
+🌧️	4	cloud with rain
+🌨️	4	cloud with snow
+🌩️	4	cloud with lightning
+🌪️	4	tornado
+🌫️	4	fog
+🌬️	4	wind face
+🌀	4	cyclone
+🌈	4	rainbow
+🌂	4	closed umbrella
+☂️	4	umbrella
+☔	4	umbrella with rain drops
+⛱️	4	umbrella on ground
+⚡	4	high voltage
+❄️	4	snowflake
+☃️	4	snowman
+⛄	4	snowman without snow
+☄️	4	comet
+🔥	4	fire
+💧	4	droplet
+🌊	4	water wave
+🎃	5	jack-o-lantern
+🎄	5	christmas tree
+🎆	5	fireworks
+🎇	5	sparkler
+🧨	5	firecracker
+✨	5	sparkles
+🎈	5	balloon
+🎉	5	party popper
+🎊	5	confetti ball
+🎋	5	tanabata tree
+🎍	5	pine decoration
+🎎	5	japanese dolls
+🎏	5	carp streamer
+🎐	5	wind chime
+🎑	5	moon viewing ceremony
+🧧	5	red envelope
+🎀	5	ribbon
+🎁	5	wrapped gift
+🎗️	5	reminder ribbon
+🎟️	5	admission tickets
+🎫	5	ticket
+🎖️	5	military medal
+🏆	5	trophy
+🏅	5	sports medal
+🥇	5	1st place medal
+🥈	5	2nd place medal
+🥉	5	3rd place medal
+⚽	5	soccer ball
+⚾	5	baseball
+🥎	5	softball
+🏀	5	basketball
+🏐	5	volleyball
+🏈	5	american football
+🏉	5	rugby football
+🎾	5	tennis
+🥏	5	flying disc
+🎳	5	bowling
+🏏	5	cricket game
+🏑	5	field hockey
+🏒	5	ice hockey
+🥍	5	lacrosse
+🏓	5	ping pong
+🏸	5	badminton
+🥊	5	boxing glove
+🥋	5	martial arts uniform
+🥅	5	goal net
+⛳	5	flag in hole
+⛸️	5	ice skate
+🎣	5	fishing pole
+🤿	5	diving mask
+🎽	5	running shirt
+🎿	5	skis
+🛷	5	sled
+🥌	5	curling stone
+🎯	5	bullseye
+🪀	5	yo-yo
+🪁	5	kite
+🔫	5	water pistol
+🎱	5	pool 8 ball
+🔮	5	crystal ball
+🪄	5	magic wand
+🎮	5	video game
+🕹️	5	joystick
+🎰	5	slot machine
+🎲	5	game die
+🧩	5	puzzle piece
+🧸	5	teddy bear
+🪅	5	piñata
+🪩	5	mirror ball
+🪆	5	nesting dolls
+♠️	5	spade suit
+♥️	5	heart suit
+♦️	5	diamond suit
+♣️	5	club suit
+♟️	5	chess pawn
+🃏	5	joker
+🀄	5	mahjong red dragon
+🎴	5	flower playing cards
+🎭	5	performing arts
+🖼️	5	framed picture
+🎨	5	artist palette
+🧵	5	thread
+🪡	5	sewing needle
+🧶	5	yarn
+🪢	5	knot
+👓	6	glasses
+🕶️	6	sunglasses
+🥽	6	goggles
+🥼	6	lab coat
+🦺	6	safety vest
+👔	6	necktie
+👕	6	t-shirt
+👖	6	jeans
+🧣	6	scarf
+🧤	6	gloves
+🧥	6	coat
+🧦	6	socks
+👗	6	dress
+👘	6	kimono
+🥻	6	sari
+🩱	6	one-piece swimsuit
+🩲	6	briefs
+🩳	6	shorts
+👙	6	bikini
+👚	6	woman’s clothes
+🪭	6	folding hand fan
+👛	6	purse
+👜	6	handbag
+👝	6	clutch bag
+🛍️	6	shopping bags
+🎒	6	backpack
+🩴	6	thong sandal
+👞	6	man’s shoe
+👟	6	running shoe
+🥾	6	hiking boot
+🥿	6	flat shoe
+👠	6	high-heeled shoe
+👡	6	woman’s sandal
+🩰	6	ballet shoes
+👢	6	woman’s boot
+🪮	6	hair pick
+👑	6	crown
+👒	6	woman’s hat
+🎩	6	top hat
+🎓	6	graduation cap
+🧢	6	billed cap
+🪖	6	military helmet
+⛑️	6	rescue worker’s helmet
+📿	6	prayer beads
+💄	6	lipstick
+💍	6	ring
+💎	6	gem stone
+🔇	6	muted speaker
+🔈	6	speaker low volume
+🔉	6	speaker medium volume
+🔊	6	speaker high volume
+📢	6	loudspeaker
+📣	6	megaphone
+📯	6	postal horn
+🔔	6	bell
+🔕	6	bell with slash
+🎼	6	musical score
+🎵	6	musical note
+🎶	6	musical notes
+🎙️	6	studio microphone
+🎚️	6	level slider
+🎛️	6	control knobs
+🎤	6	microphone
+🎧	6	headphone
+📻	6	radio
+🎷	6	saxophone
+🪗	6	accordion
+🎸	6	guitar
+🎹	6	musical keyboard
+🎺	6	trumpet
+🎻	6	violin
+🪕	6	banjo
+🥁	6	drum
+🪘	6	long drum
+🪇	6	maracas
+🪈	6	flute
+📱	6	mobile phone
+📲	6	mobile phone with arrow
+☎️	6	telephone
+📞	6	telephone receiver
+📟	6	pager
+📠	6	fax machine
+🔋	6	battery
+🪫	6	low battery
+🔌	6	electric plug
+💻	6	laptop
+🖥️	6	desktop computer
+🖨️	6	printer
+⌨️	6	keyboard
+🖱️	6	computer mouse
+🖲️	6	trackball
+💽	6	computer disk
+💾	6	floppy disk
+💿	6	optical disk
+📀	6	dvd
+🧮	6	abacus
+🎥	6	movie camera
+🎞️	6	film frames
+📽️	6	film projector
+🎬	6	clapper board
+📺	6	television
+📷	6	camera
+📸	6	camera with flash
+📹	6	video camera
+📼	6	videocassette
+🔍	6	magnifying glass tilted left
+🔎	6	magnifying glass tilted right
+🕯️	6	candle
+💡	6	light bulb
+🔦	6	flashlight
+🏮	6	red paper lantern
+🪔	6	diya lamp
+📔	6	notebook with decorative cover
+📕	6	closed book
+📖	6	open book
+📗	6	green book
+📘	6	blue book
+📙	6	orange book
+📚	6	books
+📓	6	notebook
+📒	6	ledger
+📃	6	page with curl
+📜	6	scroll
+📄	6	page facing up
+📰	6	newspaper
+🗞️	6	rolled-up newspaper
+📑	6	bookmark tabs
+🔖	6	bookmark
+🏷️	6	label
+💰	6	money bag
+🪙	6	coin
+💴	6	yen banknote
+💵	6	dollar banknote
+💶	6	euro banknote
+💷	6	pound banknote
+💸	6	money with wings
+💳	6	credit card
+🧾	6	receipt
+💹	6	chart increasing with yen
+✉️	6	envelope
+📧	6	e-mail
+📨	6	incoming envelope
+📩	6	envelope with arrow
+📤	6	outbox tray
+📥	6	inbox tray
+📦	6	package
+📫	6	closed mailbox with raised flag
+📪	6	closed mailbox with lowered flag
+📬	6	open mailbox with raised flag
+📭	6	open mailbox with lowered flag
+📮	6	postbox
+🗳️	6	ballot box with ballot
+✏️	6	pencil
+✒️	6	black nib
+🖋️	6	fountain pen
+🖊️	6	pen
+🖌️	6	paintbrush
+🖍️	6	crayon
+📝	6	memo
+💼	6	briefcase
+📁	6	file folder
+📂	6	open file folder
+🗂️	6	card index dividers
+📅	6	calendar
+📆	6	tear-off calendar
+🗒️	6	spiral notepad
+🗓️	6	spiral calendar
+📇	6	card index
+📈	6	chart increasing
+📉	6	chart decreasing
+📊	6	bar chart
+📋	6	clipboard
+📌	6	pushpin
+📍	6	round pushpin
+📎	6	paperclip
+🖇️	6	linked paperclips
+📏	6	straight ruler
+📐	6	triangular ruler
+✂️	6	scissors
+🗃️	6	card file box
+🗄️	6	file cabinet
+🗑️	6	wastebasket
+🔒	6	locked
+🔓	6	unlocked
+🔏	6	locked with pen
+🔐	6	locked with key
+🔑	6	key
+🗝️	6	old key
+🔨	6	hammer
+🪓	6	axe
+⛏️	6	pick
+⚒️	6	hammer and pick
+🛠️	6	hammer and wrench
+🗡️	6	dagger
+⚔️	6	crossed swords
+💣	6	bomb
+🪃	6	boomerang
+🏹	6	bow and arrow
+🛡️	6	shield
+🪚	6	carpentry saw
+🔧	6	wrench
+🪛	6	screwdriver
+🔩	6	nut and bolt
+⚙️	6	gear
+🗜️	6	clamp
+⚖️	6	balance scale
+🦯	6	white cane
+🔗	6	link
+⛓️‍💥	6	broken chain
+⛓️	6	chains
+🪝	6	hook
+🧰	6	toolbox
+🧲	6	magnet
+🪜	6	ladder
+⚗️	6	alembic
+🧪	6	test tube
+🧫	6	petri dish
+🧬	6	dna
+🔬	6	microscope
+🔭	6	telescope
+📡	6	satellite antenna
+💉	6	syringe
+🩸	6	drop of blood
+💊	6	pill
+🩹	6	adhesive bandage
+🩼	6	crutch
+🩺	6	stethoscope
+🩻	6	x-ray
+🚪	6	door
+🛗	6	elevator
+🪞	6	mirror
+🪟	6	window
+🛏️	6	bed
+🛋️	6	couch and lamp
+🪑	6	chair
+🚽	6	toilet
+🪠	6	plunger
+🚿	6	shower
+🛁	6	bathtub
+🪤	6	mouse trap
+🪒	6	razor
+🧴	6	lotion bottle
+🧷	6	safety pin
+🧹	6	broom
+🧺	6	basket
+🧻	6	roll of paper
+🪣	6	bucket
+🧼	6	soap
+🫧	6	bubbles
+🪥	6	toothbrush
+🧽	6	sponge
+🧯	6	fire extinguisher
+🛒	6	shopping cart
+🚬	6	cigarette
+⚰️	6	coffin
+🪦	6	headstone
+⚱️	6	funeral urn
+🧿	6	nazar amulet
+🪬	6	hamsa
+🗿	6	moai
+🪧	6	placard
+🪪	6	identification card
+🏧	7	atm sign
+🚮	7	litter in bin sign
+🚰	7	potable water
+♿	7	wheelchair symbol
+🚹	7	men’s room
+🚺	7	women’s room
+🚻	7	restroom
+🚼	7	baby symbol
+🚾	7	water closet
+🛂	7	passport control
+🛃	7	customs
+🛄	7	baggage claim
+🛅	7	left luggage
+⚠️	7	warning
+🚸	7	children crossing
+⛔	7	no entry
+🚫	7	prohibited
+🚳	7	no bicycles
+🚭	7	no smoking
+🚯	7	no littering
+🚱	7	non-potable water
+🚷	7	no pedestrians
+📵	7	no mobile phones
+🔞	7	no one under eighteen
+☢️	7	radioactive
+☣️	7	biohazard
+⬆️	7	up arrow
+↗️	7	up-right arrow
+➡️	7	right arrow
+↘️	7	down-right arrow
+⬇️	7	down arrow
+↙️	7	down-left arrow
+⬅️	7	left arrow
+↖️	7	up-left arrow
+↕️	7	up-down arrow
+↔️	7	left-right arrow
+↩️	7	right arrow curving left
+↪️	7	left arrow curving right
+⤴️	7	right arrow curving up
+⤵️	7	right arrow curving down
+🔃	7	clockwise vertical arrows
+🔄	7	counterclockwise arrows button
+🔙	7	back arrow
+🔚	7	end arrow
+🔛	7	on! arrow
+🔜	7	soon arrow
+🔝	7	top arrow
+🛐	7	place of worship
+⚛️	7	atom symbol
+🕉️	7	om
+✡️	7	star of david
+☸️	7	wheel of dharma
+☯️	7	yin yang
+✝️	7	latin cross
+☦️	7	orthodox cross
+☪️	7	star and crescent
+☮️	7	peace symbol
+🕎	7	menorah
+🔯	7	dotted six-pointed star
+🪯	7	khanda
+♈	7	aries
+♉	7	taurus
+♊	7	gemini
+♋	7	cancer
+♌	7	leo
+♍	7	virgo
+♎	7	libra
+♏	7	scorpio
+♐	7	sagittarius
+♑	7	capricorn
+♒	7	aquarius
+♓	7	pisces
+⛎	7	ophiuchus
+🔀	7	shuffle tracks button
+🔁	7	repeat button
+🔂	7	repeat single button
+▶️	7	play button
+⏩	7	fast-forward button
+⏭️	7	next track button
+⏯️	7	play or pause button
+◀️	7	reverse button
+⏪	7	fast reverse button
+⏮️	7	last track button
+🔼	7	upwards button
+⏫	7	fast up button
+🔽	7	downwards button
+⏬	7	fast down button
+⏸️	7	pause button
+⏹️	7	stop button
+⏺️	7	record button
+⏏️	7	eject button
+🎦	7	cinema
+🔅	7	dim button
+🔆	7	bright button
+📶	7	antenna bars
+🛜	7	wireless
+📳	7	vibration mode
+📴	7	mobile phone off
+♀️	7	female sign
+♂️	7	male sign
+⚧️	7	transgender symbol
+✖️	7	multiply
+➕	7	plus
+➖	7	minus
+➗	7	divide
+🟰	7	heavy equals sign
+♾️	7	infinity
+‼️	7	double exclamation mark
+⁉️	7	exclamation question mark
+❓	7	red question mark
+❔	7	white question mark
+❕	7	white exclamation mark
+❗	7	red exclamation mark
+〰️	7	wavy dash
+💱	7	currency exchange
+💲	7	heavy dollar sign
+⚕️	7	medical symbol
+♻️	7	recycling symbol
+⚜️	7	fleur-de-lis
+🔱	7	trident emblem
+📛	7	name badge
+🔰	7	japanese symbol for beginner
+⭕	7	hollow red circle
+✅	7	check mark button
+☑️	7	check box with check
+✔️	7	check mark
+❌	7	cross mark
+❎	7	cross mark button
+➰	7	curly loop
+➿	7	double curly loop
+〽️	7	part alternation mark
+✳️	7	eight-spoked asterisk
+✴️	7	eight-pointed star
+❇️	7	sparkle
+©️	7	copyright
+®️	7	registered
+™️	7	trade mark
+#️⃣	7	keycap: #
+*️⃣	7	keycap: *
+0️⃣	7	keycap: 0
+1️⃣	7	keycap: 1
+2️⃣	7	keycap: 2
+3️⃣	7	keycap: 3
+4️⃣	7	keycap: 4
+5️⃣	7	keycap: 5
+6️⃣	7	keycap: 6
+7️⃣	7	keycap: 7
+8️⃣	7	keycap: 8
+9️⃣	7	keycap: 9
+🔟	7	keycap: 10
+🔠	7	input latin uppercase
+🔡	7	input latin lowercase
+🔢	7	input numbers
+🔣	7	input symbols
+🔤	7	input latin letters
+🅰️	7	a button (blood type)
+🆎	7	ab button (blood type)
+🅱️	7	b button (blood type)
+🆑	7	cl button
+🆒	7	cool button
+🆓	7	free button
+ℹ️	7	information
+🆔	7	id button
+Ⓜ️	7	circled m
+🆕	7	new button
+🆖	7	ng button
+🅾️	7	o button (blood type)
+🆗	7	ok button
+🅿️	7	p button
+🆘	7	sos button
+🆙	7	up! button
+🆚	7	vs button
+🈁	7	japanese “here” button
+🈂️	7	japanese “service charge” button
+🈷️	7	japanese “monthly amount” button
+🈶	7	japanese “not free of charge” button
+🈯	7	japanese “reserved” button
+🉐	7	japanese “bargain” button
+🈹	7	japanese “discount” button
+🈚	7	japanese “free of charge” button
+🈲	7	japanese “prohibited” button
+🉑	7	japanese “acceptable” button
+🈸	7	japanese “application” button
+🈴	7	japanese “passing grade” button
+🈳	7	japanese “vacancy” button
+㊗️	7	japanese “congratulations” button
+㊙️	7	japanese “secret” button
+🈺	7	japanese “open for business” button
+🈵	7	japanese “no vacancy” button
+🔴	7	red circle
+🟠	7	orange circle
+🟡	7	yellow circle
+🟢	7	green circle
+🔵	7	blue circle
+🟣	7	purple circle
+🟤	7	brown circle
+⚫	7	black circle
+⚪	7	white circle
+🟥	7	red square
+🟧	7	orange square
+🟨	7	yellow square
+🟩	7	green square
+🟦	7	blue square
+🟪	7	purple square
+🟫	7	brown square
+⬛	7	black large square
+⬜	7	white large square
+◼️	7	black medium square
+◻️	7	white medium square
+◾	7	black medium-small square
+◽	7	white medium-small square
+▪️	7	black small square
+▫️	7	white small square
+🔶	7	large orange diamond
+🔷	7	large blue diamond
+🔸	7	small orange diamond
+🔹	7	small blue diamond
+🔺	7	red triangle pointed up
+🔻	7	red triangle pointed down
+💠	7	diamond with a dot
+🔘	7	radio button
+🔳	7	white square button
+🔲	7	black square button
+🏁	8	chequered flag
+🚩	8	triangular flag
+🎌	8	crossed flags
+🏴	8	black flag
+🏳️	8	white flag
+🏳️‍🌈	8	rainbow flag
+🏳️‍⚧️	8	transgender flag
+🏴‍☠️	8	pirate flag
+🇦🇨	8	flag: ascension island
+🇦🇩	8	flag: andorra
+🇦🇪	8	flag: united arab emirates
+🇦🇫	8	flag: afghanistan
+🇦🇬	8	flag: antigua & barbuda
+🇦🇮	8	flag: anguilla
+🇦🇱	8	flag: albania
+🇦🇲	8	flag: armenia
+🇦🇴	8	flag: angola
+🇦🇶	8	flag: antarctica
+🇦🇷	8	flag: argentina
+🇦🇸	8	flag: american samoa
+🇦🇹	8	flag: austria
+🇦🇺	8	flag: australia
+🇦🇼	8	flag: aruba
+🇦🇽	8	flag: åland islands
+🇦🇿	8	flag: azerbaijan
+🇧🇦	8	flag: bosnia & herzegovina
+🇧🇧	8	flag: barbados
+🇧🇩	8	flag: bangladesh
+🇧🇪	8	flag: belgium
+🇧🇫	8	flag: burkina faso
+🇧🇬	8	flag: bulgaria
+🇧🇭	8	flag: bahrain
+🇧🇮	8	flag: burundi
+🇧🇯	8	flag: benin
+🇧🇱	8	flag: st. barthélemy
+🇧🇲	8	flag: bermuda
+🇧🇳	8	flag: brunei
+🇧🇴	8	flag: bolivia
+🇧🇶	8	flag: caribbean netherlands
+🇧🇷	8	flag: brazil
+🇧🇸	8	flag: bahamas
+🇧🇹	8	flag: bhutan
+🇧🇻	8	flag: bouvet island
+🇧🇼	8	flag: botswana
+🇧🇾	8	flag: belarus
+🇧🇿	8	flag: belize
+🇨🇦	8	flag: canada
+🇨🇨	8	flag: cocos (keeling) islands
+🇨🇩	8	flag: congo - kinshasa
+🇨🇫	8	flag: central african republic
+🇨🇬	8	flag: congo - brazzaville
+🇨🇭	8	flag: switzerland
+🇨🇮	8	flag: côte d’ivoire
+🇨🇰	8	flag: cook islands
+🇨🇱	8	flag: chile
+🇨🇲	8	flag: cameroon
+🇨🇳	8	flag: china
+🇨🇴	8	flag: colombia
+🇨🇵	8	flag: clipperton island
+🇨🇷	8	flag: costa rica
+🇨🇺	8	flag: cuba
+🇨🇻	8	flag: cape verde
+🇨🇼	8	flag: curaçao
+🇨🇽	8	flag: christmas island
+🇨🇾	8	flag: cyprus
+🇨🇿	8	flag: czechia
+🇩🇪	8	flag: germany
+🇩🇬	8	flag: diego garcia
+🇩🇯	8	flag: djibouti
+🇩🇰	8	flag: denmark
+🇩🇲	8	flag: dominica
+🇩🇴	8	flag: dominican republic
+🇩🇿	8	flag: algeria
+🇪🇦	8	flag: ceuta & melilla
+🇪🇨	8	flag: ecuador
+🇪🇪	8	flag: estonia
+🇪🇬	8	flag: egypt
+🇪🇭	8	flag: western sahara
+🇪🇷	8	flag: eritrea
+🇪🇸	8	flag: spain
+🇪🇹	8	flag: ethiopia
+🇪🇺	8	flag: european union
+🇫🇮	8	flag: finland
+🇫🇯	8	flag: fiji
+🇫🇰	8	flag: falkland islands
+🇫🇲	8	flag: micronesia
+🇫🇴	8	flag: faroe islands
+🇫🇷	8	flag: france
+🇬🇦	8	flag: gabon
+🇬🇧	8	flag: united kingdom
+🇬🇩	8	flag: grenada
+🇬🇪	8	flag: georgia
+🇬🇫	8	flag: french guiana
+🇬🇬	8	flag: guernsey
+🇬🇭	8	flag: ghana
+🇬🇮	8	flag: gibraltar
+🇬🇱	8	flag: greenland
+🇬🇲	8	flag: gambia
+🇬🇳	8	flag: guinea
+🇬🇵	8	flag: guadeloupe
+🇬🇶	8	flag: equatorial guinea
+🇬🇷	8	flag: greece
+🇬🇸	8	flag: south georgia & south sandwich islands
+🇬🇹	8	flag: guatemala
+🇬🇺	8	flag: guam
+🇬🇼	8	flag: guinea-bissau
+🇬🇾	8	flag: guyana
+🇭🇰	8	flag: hong kong sar china
+🇭🇲	8	flag: heard & mcdonald islands
+🇭🇳	8	flag: honduras
+🇭🇷	8	flag: croatia
+🇭🇹	8	flag: haiti
+🇭🇺	8	flag: hungary
+🇮🇨	8	flag: canary islands
+🇮🇩	8	flag: indonesia
+🇮🇪	8	flag: ireland
+🇮🇱	8	flag: israel
+🇮🇲	8	flag: isle of man
+🇮🇳	8	flag: india
+🇮🇴	8	flag: british indian ocean territory
+🇮🇶	8	flag: iraq
+🇮🇷	8	flag: iran
+🇮🇸	8	flag: iceland
+🇮🇹	8	flag: italy
+🇯🇪	8	flag: jersey
+🇯🇲	8	flag: jamaica
+🇯🇴	8	flag: jordan
+🇯🇵	8	flag: japan
+🇰🇪	8	flag: kenya
+🇰🇬	8	flag: kyrgyzstan
+🇰🇭	8	flag: cambodia
+🇰🇮	8	flag: kiribati
+🇰🇲	8	flag: comoros
+🇰🇳	8	flag: st. kitts & nevis
+🇰🇵	8	flag: north korea
+🇰🇷	8	flag: south korea
+🇰🇼	8	flag: kuwait
+🇰🇾	8	flag: cayman islands
+🇰🇿	8	flag: kazakhstan
+🇱🇦	8	flag: laos
+🇱🇧	8	flag: lebanon
+🇱🇨	8	flag: st. lucia
+🇱🇮	8	flag: liechtenstein
+🇱🇰	8	flag: sri lanka
+🇱🇷	8	flag: liberia
+🇱🇸	8	flag: lesotho
+🇱🇹	8	flag: lithuania
+🇱🇺	8	flag: luxembourg
+🇱🇻	8	flag: latvia
+🇱🇾	8	flag: libya
+🇲🇦	8	flag: morocco
+🇲🇨	8	flag: monaco
+🇲🇩	8	flag: moldova
+🇲🇪	8	flag: montenegro
+🇲🇫	8	flag: st. martin
+🇲🇬	8	flag: madagascar
+🇲🇭	8	flag: marshall islands
+🇲🇰	8	flag: north macedonia
+🇲🇱	8	flag: mali
+🇲🇲	8	flag: myanmar (burma)
+🇲🇳	8	flag: mongolia
+🇲🇴	8	flag: macao sar china
+🇲🇵	8	flag: northern mariana islands
+🇲🇶	8	flag: martinique
+🇲🇷	8	flag: mauritania
+🇲🇸	8	flag: montserrat
+🇲🇹	8	flag: malta
+🇲🇺	8	flag: mauritius
+🇲🇻	8	flag: maldives
+🇲🇼	8	flag: malawi
+🇲🇽	8	flag: mexico
+🇲🇾	8	flag: malaysia
+🇲🇿	8	flag: mozambique
+🇳🇦	8	flag: namibia
+🇳🇨	8	flag: new caledonia
+🇳🇪	8	flag: niger
+🇳🇫	8	flag: norfolk island
+🇳🇬	8	flag: nigeria
+🇳🇮	8	flag: nicaragua
+🇳🇱	8	flag: netherlands
+🇳🇴	8	flag: norway
+🇳🇵	8	flag: nepal
+🇳🇷	8	flag: nauru
+🇳🇺	8	flag: niue
+🇳🇿	8	flag: new zealand
+🇴🇲	8	flag: oman
+🇵🇦	8	flag: panama
+🇵🇪	8	flag: peru
+🇵🇫	8	flag: french polynesia
+🇵🇬	8	flag: papua new guinea
+🇵🇭	8	flag: philippines
+🇵🇰	8	flag: pakistan
+🇵🇱	8	flag: poland
+🇵🇲	8	flag: st. pierre & miquelon
+🇵🇳	8	flag: pitcairn islands
+🇵🇷	8	flag: puerto rico
+🇵🇸	8	flag: palestinian territories
+🇵🇹	8	flag: portugal
+🇵🇼	8	flag: palau
+🇵🇾	8	flag: paraguay
+🇶🇦	8	flag: qatar
+🇷🇪	8	flag: réunion
+🇷🇴	8	flag: romania
+🇷🇸	8	flag: serbia
+🇷🇺	8	flag: russia
+🇷🇼	8	flag: rwanda
+🇸🇦	8	flag: saudi arabia
+🇸🇧	8	flag: solomon islands
+🇸🇨	8	flag: seychelles
+🇸🇩	8	flag: sudan
+🇸🇪	8	flag: sweden
+🇸🇬	8	flag: singapore
+🇸🇭	8	flag: st. helena
+🇸🇮	8	flag: slovenia
+🇸🇯	8	flag: svalbard & jan mayen
+🇸🇰	8	flag: slovakia
+🇸🇱	8	flag: sierra leone
+🇸🇲	8	flag: san marino
+🇸🇳	8	flag: senegal
+🇸🇴	8	flag: somalia
+🇸🇷	8	flag: suriname
+🇸🇸	8	flag: south sudan
+🇸🇹	8	flag: são tomé & príncipe
+🇸🇻	8	flag: el salvador
+🇸🇽	8	flag: sint maarten
+🇸🇾	8	flag: syria
+🇸🇿	8	flag: eswatini
+🇹🇦	8	flag: tristan da cunha
+🇹🇨	8	flag: turks & caicos islands
+🇹🇩	8	flag: chad
+🇹🇫	8	flag: french southern territories
+🇹🇬	8	flag: togo
+🇹🇭	8	flag: thailand
+🇹🇯	8	flag: tajikistan
+🇹🇰	8	flag: tokelau
+🇹🇱	8	flag: timor-leste
+🇹🇲	8	flag: turkmenistan
+🇹🇳	8	flag: tunisia
+🇹🇴	8	flag: tonga
+🇹🇷	8	flag: türkiye
+🇹🇹	8	flag: trinidad & tobago
+🇹🇻	8	flag: tuvalu
+🇹🇼	8	flag: taiwan
+🇹🇿	8	flag: tanzania
+🇺🇦	8	flag: ukraine
+🇺🇬	8	flag: uganda
+🇺🇲	8	flag: u.s. outlying islands
+🇺🇳	8	flag: united nations
+🇺🇸	8	flag: united states
+🇺🇾	8	flag: uruguay
+🇺🇿	8	flag: uzbekistan
+🇻🇦	8	flag: vatican city
+🇻🇨	8	flag: st. vincent & grenadines
+🇻🇪	8	flag: venezuela
+🇻🇬	8	flag: british virgin islands
+🇻🇮	8	flag: u.s. virgin islands
+🇻🇳	8	flag: vietnam
+🇻🇺	8	flag: vanuatu
+🇼🇫	8	flag: wallis & futuna
+🇼🇸	8	flag: samoa
+🇽🇰	8	flag: kosovo
+🇾🇪	8	flag: yemen
+🇾🇹	8	flag: mayotte
+🇿🇦	8	flag: south africa
+🇿🇲	8	flag: zambia
+🇿🇼	8	flag: zimbabwe
+🏴󠁧󠁢󠁥󠁮󠁧󠁿	8	flag: england
+🏴󠁧󠁢󠁳󠁣󠁴󠁿	8	flag: scotland
+🏴󠁧󠁢󠁷󠁬󠁳󠁿	8	flag: wales

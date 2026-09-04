@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.edit
 import rocks.gorjan.gokixp.MainActivity
+import rocks.gorjan.gokixp.getSafeInt
 import rocks.gorjan.gokixp.R
 
 /**
@@ -422,6 +423,150 @@ class ThemeManager(private val context: Context) {
     }
 
     /** True when the WP8.1 shell uses the dark (black) background rather than the light one. */
+    // ---------------------------------------------------------------- keyboard
+
+    /**
+     * Whether the keyboard replaces a word by itself when you press space.
+     *
+     * **Off unless asked for.** Suggestions are always shown and are always one tap away; what
+     * this controls is whether the keyboard acts on them without being told. A keyboard that
+     * silently rewrites what someone typed is the single most complained-about thing a
+     * keyboard does, and the sensible default for a keyboard somebody chose to install is to
+     * offer rather than to insist.
+     */
+    fun getWP81KeyboardAutocorrect(): Boolean =
+        prefs.getBoolean(KEY_WP81_KB_AUTOCORRECT, false)
+
+    fun setWP81KeyboardAutocorrect(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_WP81_KB_AUTOCORRECT, enabled) }
+    }
+
+    /**
+     * Whether the keyboard turns shift on by itself at the start of a sentence.
+     *
+     * **Off unless asked for**, like the correction setting above. A field can ask for this -
+     * that is what `TYPE_TEXT_FLAG_CAP_SENTENCES` is - but plenty of fields ask for it out of
+     * habit rather than because the text wants it, and a keyboard that capitalises without
+     * being told is one somebody has to keep un-capitalising. Shift is one tap away either way.
+     */
+    fun getWP81KeyboardAutoCapitalise(): Boolean =
+        prefs.getBoolean(KEY_WP81_KB_AUTOCAPS, false)
+
+    fun setWP81KeyboardAutoCapitalise(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_WP81_KB_AUTOCAPS, enabled) }
+    }
+
+    /**
+     * Which keyboard languages are turned on, as layout ids.
+     *
+     * English alone to begin with. A keyboard that shipped every language it knew would put
+     * languages nobody reads into the globe's rotation, and the globe is only useful if what
+     * it cycles through is short.
+     *
+     * Stored rather than read back from the system because the two are different questions:
+     * this is what the user chose, and Android's enabled-subtype list is what was made of
+     * that. See `KeyboardLanguages`, which keeps the second in step with the first.
+     */
+    fun getWP81KeyboardLanguages(): Set<String> =
+        prefs.getString(KEY_WP81_KB_LANGUAGES, null)
+            ?.split(",")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?.takeIf { it.isNotEmpty() }
+            ?: setOf(WP81_KB_DEFAULT_LANGUAGE)
+
+    fun setWP81KeyboardLanguages(ids: Set<String>) {
+        // Never none. A keyboard with no language is a keyboard with no letters, and the
+        // setting that produced it would be impossible to undo from the keyboard itself.
+        val kept = ids.ifEmpty { setOf(WP81_KB_DEFAULT_LANGUAGE) }
+        prefs.edit { putString(KEY_WP81_KB_LANGUAGES, kept.joinToString(",")) }
+    }
+
+    /**
+     * Whether the bottom row is shorter than the letters above it.
+     *
+     * On by default. Nothing on that row is a letter - it is the space bar and the keys
+     * either side - so it does not need a letter's target, and the height it gives back is
+     * height the keyboard is not taking from whatever is being typed into. Off for anyone who
+     * would rather have four even rows.
+     */
+    fun getWP81KeyboardShortBottomRow(): Boolean =
+        prefs.getBoolean(KEY_WP81_KB_SHORT_BOTTOM, true)
+
+    fun setWP81KeyboardShortBottomRow(shorter: Boolean) {
+        prefs.edit { putBoolean(KEY_WP81_KB_SHORT_BOTTOM, shorter) }
+    }
+
+    /**
+     * Which engine dictates: Vosk on the phone, or the platform's own recogniser.
+     *
+     * **Vosk by default**, because that is the point: it runs on the phone and sends nothing
+     * anywhere, where the platform's recogniser is Google's on most Android builds and
+     * transcribes in the cloud. The platform one stays selectable, and stays as the fallback
+     * whatever this says - Vosk publishes no Macedonian model, so for the language this
+     * keyboard was built for it is the only dictation there is.
+     */
+    fun getWP81KeyboardOfflineVoice(): Boolean =
+        prefs.getBoolean(KEY_WP81_KB_OFFLINE_VOICE, true)
+
+    fun setWP81KeyboardOfflineVoice(offline: Boolean) {
+        prefs.edit { putBoolean(KEY_WP81_KB_OFFLINE_VOICE, offline) }
+    }
+
+    /**
+     * How long a key must be held before it offers what is behind it, in milliseconds.
+     *
+     * Worth having as a setting rather than a constant because the right value is a property
+     * of the hand and not of the keyboard: too short and reaching for a letter produces its
+     * symbol, too long and the symbol feels like it is being withheld.
+     */
+    fun getWP81KeyboardHoldMs(): Int =
+        prefs.getSafeInt(KEY_WP81_KB_HOLD_MS, WP81_KB_HOLD_DEFAULT)
+            .coerceIn(WP81_KB_HOLD_MIN, WP81_KB_HOLD_MAX)
+
+    fun setWP81KeyboardHoldMs(millis: Int) {
+        prefs.edit { putInt(KEY_WP81_KB_HOLD_MS, millis.coerceIn(WP81_KB_HOLD_MIN, WP81_KB_HOLD_MAX)) }
+    }
+
+    /**
+     * How hard a keystroke buzzes: [WP81_KB_VIBRATION_SYSTEM] for the phone's own, or a
+     * strength from zero (silent) to a hundred.
+     *
+     * The default is the phone's, and that is not a hedge. `Haptics` goes through the view
+     * rather than the vibrator on purpose - it picks up whatever waveform the manufacturer
+     * tuned for a keystroke, and it stays quiet when the user has turned touch feedback off -
+     * and a keyboard that reached for the vibrator by default would throw both of those away
+     * for everybody in order to serve the few who want it stronger.
+     */
+    fun getWP81KeyboardVibration(): Int =
+        prefs.getSafeInt(KEY_WP81_KB_VIBRATION, WP81_KB_VIBRATION_SYSTEM)
+            .coerceIn(WP81_KB_VIBRATION_SYSTEM, WP81_KB_VIBRATION_MAX)
+
+    fun setWP81KeyboardVibration(strength: Int) {
+        prefs.edit {
+            putInt(
+                KEY_WP81_KB_VIBRATION,
+                strength.coerceIn(WP81_KB_VIBRATION_SYSTEM, WP81_KB_VIBRATION_MAX)
+            )
+        }
+    }
+
+    /**
+     * The GIPHY key the keyboard's GIF panel searches with, or empty for none.
+     *
+     * A setting rather than a constant in the source, because GIPHY issues these per person
+     * and per application: one baked into a build is one key answering for everybody who
+     * installs it, against one rate limit, and it would sit in the repository in plain sight.
+     * So the app ships without one and each user pastes in their own - see the keyboard's
+     * settings page, which is also where it says how to get one.
+     */
+    fun getWP81KeyboardGiphyKey(): String =
+        prefs.getString(KEY_WP81_KB_GIPHY_KEY, "").orEmpty().trim()
+
+    fun setWP81KeyboardGiphyKey(key: String) {
+        prefs.edit { putString(KEY_WP81_KB_GIPHY_KEY, key.trim()) }
+    }
+
     fun isWP81Dark(): Boolean = prefs.getBoolean(KEY_WP81_DARK, true)
 
     fun setWP81Dark(dark: Boolean) {
@@ -756,6 +901,33 @@ class ThemeManager(private val context: Context) {
     companion object {
         private const val KEY_SELECTED_THEME = "selected_theme"
         const val KEY_WP81_ACCENT = "wp81_accent"
+        const val KEY_WP81_KB_AUTOCORRECT = "wp81_kb_autocorrect"
+        const val KEY_WP81_KB_AUTOCAPS = "wp81_kb_autocaps"
+        const val KEY_WP81_KB_OFFLINE_VOICE = "wp81_kb_offline_voice"
+        const val KEY_WP81_KB_SHORT_BOTTOM = "wp81_kb_short_bottom"
+        const val KEY_WP81_KB_LANGUAGES = "wp81_kb_languages"
+
+        /** The one every keyboard starts with. Matches Layouts.EN_QWERTY's id. */
+        const val WP81_KB_DEFAULT_LANGUAGE = "en_qwerty"
+        const val KEY_WP81_KB_HOLD_MS = "wp81_kb_hold_ms"
+        const val KEY_WP81_KB_VIBRATION = "wp81_kb_vibration"
+
+        /**
+         * Keystroke vibration: the phone's own, silent, or a strength in between.
+         *
+         * Minus one rather than a separate boolean because "the system's" is genuinely not a
+         * point on this scale - it is a different mechanism, not a stronger or weaker version
+         * of the same one - and two settings that can disagree about which is in force is the
+         * shape that goes wrong.
+         */
+        const val WP81_KB_VIBRATION_SYSTEM = -1
+        const val WP81_KB_VIBRATION_MAX = 100
+        const val KEY_WP81_KB_GIPHY_KEY = "wp81_kb_giphy_key"
+
+        /** The hold, in milliseconds: what it is by default and how far it can be moved. */
+        const val WP81_KB_HOLD_DEFAULT = 350
+        const val WP81_KB_HOLD_MIN = 150
+        const val WP81_KB_HOLD_MAX = 900
         const val KEY_WP81_DARK = "wp81_background_dark"
         const val KEY_WP81_START_BACKGROUND = "wp81_start_background"
         const val KEY_WP81_START_BACKGROUND_FOCUS_X = "wp81_start_background_focus_x"

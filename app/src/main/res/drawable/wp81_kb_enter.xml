@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The keyboard's enter key.
+
+  The one glyph the keyboard needs that the phone's icon set does not have - a set of a
+  thousand icons drawn for app bars had no reason to carry a return arrow, because no app
+  bar has ever had one.
+
+  Drawn to match wp81_calc_backspace, which is the only other key glyph in the shell: a
+  two-unit stroke on the same 32-unit square, mitred rather than rounded. The stem and the
+  head are separate paths because the head is solid where the stem is a line, and a single
+  stroked path cannot be both.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineJoin="miter"
+        android:pathData="M26,7L26,20L10,20" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M14,13.5L14,26.5L5,20Z" />
+</vector>

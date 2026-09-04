@@ -3,6 +3,8 @@ package rocks.gorjan.gokixp.apps.people
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -16,7 +18,7 @@ import rocks.gorjan.gokixp.wp81.SvgIcon
 import rocks.gorjan.gokixp.wp81.WP81Palette
 
 /**
- * Somebody's face, or the accent square with their initials that stands in for one.
+ * Somebody's face, or the outlined square with their initials that stands in for one.
  *
  * Not a placeholder silhouette. An address book is mostly people who never got round to a
  * picture, and a column of identical grey outlines tells the reader nothing; two letters at
@@ -69,7 +71,7 @@ class ContactFace(
     private var token = 0
 
     init {
-        setBackgroundColor(palette.accent)
+        background = placeholder(context, palette.accent)
         addView(initials, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(glyph, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(photo, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -129,11 +131,37 @@ class ContactFace(
         }
     }
 
-    private companion object {
+    companion object {
         /** The shell's own silhouette, the one the call screen shows for a stranger. */
-        const val USER_ICON = "custom_icons_8/appbar.user.svg"
+        private const val USER_ICON = "custom_icons_8/appbar.user.svg"
 
         /** How much of the square is margin around the mark. See [onSizeChanged]. */
-        const val GLYPH_INSET = 0.25f
+        private const val GLYPH_INSET = 0.25f
+
+        /** How heavy the line round a face that isn't there is drawn. */
+        private const val OUTLINE_DP = 2
+
+        /**
+         * The square a missing face is drawn on, wherever one is drawn.
+         *
+         * It used to be the accent filled solid, which on a red accent is the hang-up
+         * button: the same colour in the same square, a thumb's width from the real one on
+         * the call screen. Black with the accent drawn round it says both of the things
+         * the fill was there to say - that this is a person, and which colour the phone is
+         * set to - without ever reading as something to press.
+         *
+         * Handed out rather than kept to this view because the call screen and the editor
+         * each build a square of their own, and three definitions of the same square is
+         * how two of them end up a version behind.
+         */
+        fun placeholder(context: Context, accent: Int): Drawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.BLACK)
+            setStroke(
+                (OUTLINE_DP * context.resources.displayMetrics.density).toInt()
+                    .coerceAtLeast(1),
+                accent
+            )
+        }
     }
 }

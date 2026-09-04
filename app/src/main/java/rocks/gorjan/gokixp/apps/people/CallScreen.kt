@@ -215,7 +215,7 @@ class CallScreen(
     // ---------------------------------------------------------------- who
 
     private fun buildFace() {
-        face.setBackgroundColor(palette.accent)
+        face.background = ContactFace.placeholder(context, palette.accent)
         faceInitials.apply {
             typeface = font(R.font.segoeui_regular)
             textSize = 44f

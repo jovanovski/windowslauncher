@@ -2,10 +2,10 @@ package rocks.gorjan.gokixp.apps.files
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +23,7 @@ import androidx.core.content.edit
 import androidx.core.content.res.ResourcesCompat
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.wp81.MetroAppBar
+import rocks.gorjan.gokixp.wp81.MetroMarker
 import rocks.gorjan.gokixp.wp81.MetroPageTransition
 import rocks.gorjan.gokixp.wp81.MonochromeIconProvider
 import rocks.gorjan.gokixp.wp81.SvgIcon
@@ -164,6 +165,14 @@ class MetroFilesApp(
             isVerticalScrollBarEnabled = false
             addView(listColumn, FrameLayout.LayoutParams(MATCH, WRAP))
         }
+        // A row only asks for its picture once it is nearly in view, and asks as the list
+        // moves under the window. Both hooks are needed: the scroll one is the scrolling,
+        // and the layout one is the first draw of a listing, a rotation, and the rows
+        // coming back after the list is rebuilt without having moved.
+        scroller.setOnScrollChangeListener { _, _, _, _, _ -> askForPicturesInView() }
+        listColumn.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            askForPicturesInView()
+        }
         column.addView(scroller, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
         root.addView(column, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -200,6 +209,7 @@ class MetroFilesApp(
 
     fun cleanup() {
         released = true
+        waitingRows.clear()
         handler.removeCallbacksAndMessages(null)
     }
 
@@ -300,6 +310,9 @@ class MetroFilesApp(
 
     private fun fillList() {
         listColumn.removeAllViews()
+        // The queue is about the listing on the screen. A folder left behind takes its
+        // unanswered rows with it.
+        waitingRows.clear()
 
         val here = current
         if (here == null) {
@@ -318,6 +331,10 @@ class MetroFilesApp(
             return
         }
         for (entry in entries) listColumn.addView(fileRow(entry), wide())
+        // Nothing has been measured yet, so the sweep above the list cannot say what is in
+        // view. This one runs once it can - and the layout hook covers the case where the
+        // frame arrives first.
+        handler.post { askForPicturesInView() }
     }
 
     /** A sentence rather than a picture of an empty box, the way the phone said it. */
@@ -374,7 +391,7 @@ class MetroFilesApp(
             }
         )
         if (selecting) row.addView(checkMark(entry in selection), checkParams())
-        row.addView(glyph(iconFor(entry)), glyphParams())
+        row.addView(iconSlot(row, entry), glyphParams())
         row.addView(labels(entry.name, detailOf(entry)), textParams())
         return row
     }
@@ -421,18 +438,23 @@ class MetroFilesApp(
         return stack
     }
 
-    private fun glyph(asset: String): ImageView {
+    private fun glyph(
+        asset: String,
+        slotDp: Int = ICON_DP,
+        inkDp: Int = GLYPH_DP,
+        tint: Int = palette.accent
+    ): ImageView {
         val view = ImageView(context)
         val drawable = SvgIcon.fromAsset(context, asset)
         view.setImageDrawable(drawable)
         // The set is drawn white for tiles. A file list is not always dark, so the marks
         // take the accent here rather than vanishing on a Light theme.
-        view.imageTintList = android.content.res.ColorStateList.valueOf(palette.accent)
+        view.imageTintList = android.content.res.ColorStateList.valueOf(tint)
         if (drawable == null) {
             view.scaleType = ImageView.ScaleType.FIT_CENTER
             return view
         }
-        placeGlyph(view, drawable, asset)
+        placeGlyph(view, drawable, asset, slotDp, inkDp)
         return view
     }
 
@@ -445,11 +467,18 @@ class MetroFilesApp(
      * the row, and the mark comes out small, off-centre, and a different size on every line.
      *
      * So the measured ink box is what gets placed, exactly as the app list places a tile's
-     * glyph: its longer side scaled to [GLYPH_DP] and its centre put at the middle of the
-     * slot. By matrix rather than by padding, because a mark covering half its canvas needs
-     * a canvas twice the slot to show at the right size, and padding cannot give it one.
+     * glyph: its longer side scaled to [inkDp] and its centre put at the middle of the
+     * [slotDp] square it is being drawn in. By matrix rather than by padding, because a
+     * mark covering half its canvas needs a canvas twice the slot to show at the right
+     * size, and padding cannot give it one.
      */
-    private fun placeGlyph(view: ImageView, drawable: Drawable, asset: String) {
+    private fun placeGlyph(
+        view: ImageView,
+        drawable: Drawable,
+        asset: String,
+        slotDp: Int,
+        inkDp: Int
+    ) {
         val ink = icons.inkFor("files:$asset", drawable)
         val canvasW = drawable.intrinsicWidth.toFloat()
         val canvasH = drawable.intrinsicHeight.toFloat()
@@ -462,8 +491,8 @@ class MetroFilesApp(
         }
         val inkW = ink.width() * canvasW
         val inkH = ink.height() * canvasH
-        val scale = dp(GLYPH_DP) / maxOf(inkW, inkH)
-        val centre = dp(ICON_DP) / 2f
+        val scale = dp(inkDp) / maxOf(inkW, inkH)
+        val centre = dp(slotDp) / 2f
         view.scaleType = ImageView.ScaleType.MATRIX
         view.imageMatrix = Matrix().apply {
             setScale(scale, scale)
@@ -477,24 +506,114 @@ class MetroFilesApp(
     /**
      * The square beside a row in select mode.
      *
-     * Outlined when it is not picked and filled with the accent when it is, which is the
-     * phone's own checkbox: the difference between the two states is a block of colour
-     * rather than a tick somebody has to look for.
+     * The shell's own square, the same one the settings page draws beside a switch: off is
+     * an outline, on is a block of the accent with a tick in it. Drawn here rather than
+     * again from scratch, because a checkbox that is nearly the settings one is a checkbox
+     * the user has to look twice at to be sure it means the same thing.
      */
-    private fun checkMark(on: Boolean): View {
-        val box = ImageView(context)
-        box.background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(if (on) palette.accent else Color.TRANSPARENT)
-            setStroke(dp(2), if (on) palette.accent else palette.foregroundSubtle)
+    private fun checkMark(on: Boolean): View = View(context).apply {
+        background = MetroMarker.drawable(context, palette, round = false, on = on)
+    }
+
+    // ------------------------------------------------------------------- the thumbnails
+
+    /**
+     * A row whose mark should become a picture, once the list is sure it is worth reading.
+     *
+     * The row itself is held as well as the slot, because whether to read the file is a
+     * question about where the row is: only rows at or near the window are asked for.
+     */
+    private class Pending(
+        val row: View,
+        val slot: FrameLayout,
+        val image: ImageView,
+        val file: File,
+        val kind: FileThumbnails.Kind
+    )
+
+    /** Rows in this listing that could show a picture and have not been given one yet. */
+    private val waitingRows = mutableListOf<Pending>()
+
+    /**
+     * What goes in the mark's place on a row.
+     *
+     * A glyph, always, straight away - the list is drawn in the frame it is asked for and
+     * nothing is read from disk to do it. For a file with a picture inside it, that glyph
+     * goes into a slot and the row joins the queue; the picture replaces it when and if it
+     * arrives. Which means the answer to a file that cannot be read, or is not really a
+     * JPEG, is the same thing the app drew before: its type's mark.
+     */
+    private fun iconSlot(row: View, entry: File): View {
+        val mark = glyph(iconFor(entry))
+        val kind = FileThumbnails.kindOf(entry) ?: return mark
+        val slot = FrameLayout(context)
+        slot.addView(mark, FrameLayout.LayoutParams(MATCH, MATCH))
+        val waiting = Pending(row, slot, mark, entry, kind)
+        // Read once already: this listing is being rebuilt rather than opened, so the
+        // picture goes back as the row is drawn. Waiting for the queue instead would mean
+        // a glyph flashing in place of every photograph on every tap in select mode.
+        val held = FileThumbnails.held(entry)
+        if (held != null) show(waiting, held, fade = false) else waitingRows += waiting
+        return slot
+    }
+
+    /**
+     * Asks for the pictures of the rows the user can see, and a screenful either side.
+     *
+     * The whole reason the queue exists. A folder of two thousand photographs is two
+     * thousand files that would each have to be opened and decoded to draw a list nobody
+     * has scrolled yet; this reads the dozen on the screen, and reads the next dozen as
+     * they come up. The margin is what keeps a picture from arriving visibly late during
+     * an ordinary scroll.
+     */
+    private fun askForPicturesInView() {
+        if (released || waitingRows.isEmpty()) return
+        val window = scroller.height
+        // Nothing has been laid out yet, so nothing can be said about what is in view.
+        // Something laid out later will call this again.
+        if (window == 0) return
+        val from = scroller.scrollY - dp(LOOKAHEAD_DP)
+        val to = scroller.scrollY + window + dp(LOOKAHEAD_DP)
+        val queue = waitingRows.iterator()
+        while (queue.hasNext()) {
+            val waiting = queue.next()
+            val row = waiting.row
+            if (row.height == 0) continue
+            if (row.bottom < from || row.top > to) continue
+            queue.remove()
+            askFor(waiting)
         }
-        if (on) {
-            box.setImageDrawable(SvgIcon.fromAsset(context, CHECK_ICON))
-            box.scaleType = ImageView.ScaleType.FIT_CENTER
-            box.setPadding(dp(3), dp(3), dp(3), dp(3))
-            box.imageTintList = android.content.res.ColorStateList.valueOf(palette.onAccent())
+    }
+
+    /** Anything reaching here had to be read from disk, so it arrives with a fade. */
+    private fun askFor(waiting: Pending) {
+        FileThumbnails.load(waiting.file, waiting.kind, dp(ICON_DP * DECODE_OVER)) { picture ->
+            if (released || picture == null) return@load
+            show(waiting, picture, fade = true)
         }
-        return box
+    }
+
+    private fun show(waiting: Pending, picture: Bitmap, fade: Boolean) {
+        val image = waiting.image
+        // The glyph was tinted with the accent; a photograph is not.
+        image.imageTintList = null
+        image.scaleType = ImageView.ScaleType.CENTER_CROP
+        image.setImageBitmap(picture)
+        // A frame from a clip looks exactly like a photograph, and the row would be saying
+        // the file is something it is not. The mark says which it is, the way the phone's
+        // own camera roll did.
+        if (waiting.kind == FileThumbnails.Kind.VIDEO) {
+            waiting.slot.addView(playMark(), FrameLayout.LayoutParams(
+                dp(PLAY_DP), dp(PLAY_DP), Gravity.BOTTOM or Gravity.START))
+        }
+        if (!fade) return
+        waiting.slot.alpha = 0f
+        waiting.slot.animate().alpha(1f).setDuration(FADE_MS).start()
+    }
+
+    /** The little triangle in the corner of a clip's frame, on a scrim so it reads. */
+    private fun playMark(): View = glyph(PLAY_ICON, PLAY_DP, PLAY_INK_DP, Color.WHITE).apply {
+        setBackgroundColor(SCRIM)
     }
 
     // --------------------------------------------------------------------- what a row says
@@ -543,13 +662,26 @@ class MetroFilesApp(
     private fun whenOf(at: Long): String =
         if (at <= 0L) "" else dateFormat.format(java.util.Date(at))
 
+    /**
+     * The mark for a file, which for some files is only what stands there until its own
+     * picture arrives.
+     *
+     * The three kinds that can show themselves are asked about through [FileThumbnails],
+     * so there is one list of what counts as a picture rather than two lists that would
+     * drift - a file drawn with the camera mark and never thumbnailed, or the other way
+     * round, is exactly what a second list eventually produces.
+     */
     private fun iconFor(entry: File): String {
         if (entry.isDirectory) return FOLDER_ICON
+        FileThumbnails.kindOf(entry)?.let {
+            return when (it) {
+                FileThumbnails.Kind.IMAGE -> IMAGE_ICON
+                FileThumbnails.Kind.VIDEO -> VIDEO_ICON
+                FileThumbnails.Kind.DOCUMENT -> PDF_ICON
+            }
+        }
         return when (entry.extension.lowercase(Locale.getDefault())) {
-            "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "ico", "tif", "tiff" -> IMAGE_ICON
             "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma", "opus", "mid", "midi" -> AUDIO_ICON
-            "mp4", "mkv", "avi", "mov", "wmv", "webm", "m4v", "3gp", "mpg", "mpeg" -> VIDEO_ICON
-            "pdf" -> PDF_ICON
             "txt", "md", "log", "json", "xml", "csv", "ini", "cfg" -> TEXT_ICON
             "zip", "rar", "7z", "tar", "gz", "apk" -> ARCHIVE_ICON
             else -> FILE_ICON
@@ -658,9 +790,11 @@ class MetroFilesApp(
 
     // ---------------------------------------------------------------------- select mode
 
-    private fun beginSelecting() {
+    /** [first] is the row that asked for select mode, and is picked out on the way in. */
+    private fun beginSelecting(first: File? = null) {
         selecting = true
         selection.clear()
+        if (first != null) selection.add(first)
         refresh()
     }
 
@@ -689,6 +823,12 @@ class MetroFilesApp(
                 add(WP81ContextMenu.Item("open") {
                     if (entry.isDirectory) navigateTo(entry) else openFile(entry)
                 })
+                // Straight into select mode with this one already picked out, which is
+                // what a hold on the thing you want was always about. The strip's own
+                // select command starts on an empty selection and then wants a tap on the
+                // row underneath the menu that has just closed - the same two steps, in
+                // the order nobody would choose.
+                add(WP81ContextMenu.Item("select") { beginSelecting(entry) })
                 add(WP81ContextMenu.Item("copy") { takeToClipboard(ClipMode.COPY, listOf(entry)) })
                 if (writable) {
                     add(WP81ContextMenu.Item("cut") { takeToClipboard(ClipMode.CUT, listOf(entry)) })
@@ -1052,8 +1192,10 @@ class MetroFilesApp(
         marginEnd = dp(14)
     }
 
-    private fun checkParams() = LinearLayout.LayoutParams(dp(CHECK_DP), dp(CHECK_DP)).apply {
-        marginEnd = dp(14)
+    private fun checkParams() = LinearLayout.LayoutParams(
+        dp(MetroMarker.SIZE_DP), dp(MetroMarker.SIZE_DP)
+    ).apply {
+        marginEnd = dp(MetroMarker.GAP_DP)
     }
 
     private fun textParams() = LinearLayout.LayoutParams(0, WRAP, 1f)
@@ -1074,13 +1216,40 @@ class MetroFilesApp(
 
         /** The size the platform set an app's own name in, and the shell's page titles. */
         private const val TITLE_SP = 34f
-        /** The slot a mark sits in on a row. */
-        private const val ICON_DP = 34
+        /**
+         * The slot a mark sits in on a row, and the square a picture is cropped to.
+         *
+         * Wider than the mark needs, because a thumbnail fills the whole of it and a
+         * photograph at the size of a glyph is not a photograph of anything.
+         */
+        private const val ICON_DP = 40
 
         /** The mark itself, measured across its ink rather than its canvas. */
         private const val GLYPH_DP = 24
 
-        private const val CHECK_DP = 24
+        /**
+         * How much larger than the slot a picture is read at.
+         *
+         * The platform's thumbnailer fits the whole picture inside the box it is given,
+         * while the row crops a square out of the middle of what comes back. Asking for
+         * the size of the slot would therefore hand back a 16:9 frame barely half the
+         * slot tall, which the row would then have to blow up to fill it. Twice over is
+         * enough that anything up to a 2:1 picture still covers the square at full size.
+         */
+        private const val DECODE_OVER = 2
+
+        /** How far beyond the window a row is still worth reading a picture for. */
+        private const val LOOKAHEAD_DP = 400
+
+        /** Long enough to be a fade rather than a flash, short enough not to be a wait. */
+        private const val FADE_MS = 160L
+
+        /** The clip mark in the corner of a frame, and its ink inside that. */
+        private const val PLAY_DP = 15
+        private const val PLAY_INK_DP = 9
+
+        /** Behind the clip mark, so a white triangle is not lost in a bright frame. */
+        private const val SCRIM = 0x99000000.toInt()
 
         /**
          * What is waiting to be pasted, and whether pasting should also take it away.
@@ -1112,6 +1281,6 @@ class MetroFilesApp(
         private const val COPY_ICON = "$ICON_DIR/appbar.page.copy.svg"
         private const val CUT_ICON = "$ICON_DIR/appbar.scissor.svg"
         private const val DELETE_ICON = "$ICON_DIR/appbar.delete.svg"
-        private const val CHECK_ICON = "$ICON_DIR/appbar.checkmark.thick.svg"
+        private const val PLAY_ICON = "$ICON_DIR/appbar.control.play.svg"
     }
 }

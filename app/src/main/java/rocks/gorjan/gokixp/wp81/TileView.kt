@@ -158,6 +158,16 @@ class TileView(
     private val widgetGlyph = ImageView(context)
 
     /**
+     * The mark at the foot of a widget, for a fact about the phone rather than about the
+     * reading: an alarm is coming.
+     *
+     * Its own view rather than a second face for [widgetGlyph], because the two say
+     * different kinds of thing and a tile may want both at once - and because this one is
+     * the same whichever way up the tile is, where the corner mark is per face.
+     */
+    private val alarmMark = ImageView(context)
+
+    /**
      * Marks a tile that has something unread.
      *
      * On a medium or wide tile it is tappable and turns the tile over to the notification,
@@ -192,6 +202,18 @@ class TileView(
      * the tap that opens the app.
      */
     private val flipBackCorner = View(context)
+
+    /**
+     * The same hot zone at the tile's bottom-left, over the foot mark.
+     *
+     * The mark itself is eighteen points of clock face, which is a thing to read rather
+     * than a thing to hit. The corner around it is what the finger is actually aiming at,
+     * exactly as the turn-over corner is the target for the small mark it sits over.
+     *
+     * Only ever up while the mark is - see [applyAlarmMarkVisibility]. A tile with nothing
+     * down there gives the whole corner back to the tap that opens the app.
+     */
+    private val alarmCorner = View(context)
 
     // --- Media -------------------------------------------------------------------------
     // An app that is playing something shows that instead of its icon or its notifications:
@@ -504,6 +526,14 @@ class TileView(
 
     /** Tapping that handle. The host decides what unpinning this tile actually does. */
     var onUnpinTap: (() -> Unit)? = null
+
+    /**
+     * The foot mark, or the corner around it, was tapped.
+     *
+     * Its own way out rather than the tile's: the mark is about an alarm wherever it is
+     * shown, and the tile under it is showing the date or the time.
+     */
+    var onAlarmMarkTap: (() -> Unit)? = null
 
     private var showingBack = false
 
@@ -873,6 +903,29 @@ class TileView(
             topMargin = dp(CORNER_INSET_DP)
             marginEnd = dp(CORNER_INSET_DP)
         })
+
+        alarmMark.scaleType = ImageView.ScaleType.FIT_CENTER
+        alarmMark.visibility = GONE
+        // The far corner from the widget's own mark, so a tile can carry both and neither
+        // is read as belonging to the other. It is the label's corner, and the label gives
+        // way to it - see applyAlarmMarkVisibility. Sized and inset by the rule every
+        // corner mark on this tile follows; see applyCornerMark.
+        addView(alarmMark, LayoutParams(
+            dp(CORNER_MARK_DP), dp(CORNER_MARK_DP),
+            Gravity.BOTTOM or Gravity.START).apply {
+            bottomMargin = dp(CORNER_INSET_DP)
+            marginStart = dp(CORNER_INSET_DP)
+        })
+
+        alarmCorner.isClickable = true
+        alarmCorner.visibility = GONE
+        alarmCorner.setOnClickListener { onAlarmMarkTap?.invoke() }
+        // After the mark, so the corner is the one that takes the touch: a FrameLayout
+        // offers a press to its children back to front, and the mark is not clickable to
+        // pass it on with.
+        addView(alarmCorner, LayoutParams(
+            dp(FLIP_CORNER_DP), dp(FLIP_CORNER_DP),
+            Gravity.BOTTOM or Gravity.START))
     }
 
     /**
@@ -1676,7 +1729,7 @@ class TileView(
         // which is where the tile's own size is known.
         if (tile.size == TileSize.SMALL) return
         val edge = if (tile.size.isStrip) FLIP_CORNER_STRIP_DP else FLIP_CORNER_DP
-        for (corner in listOf(flipCorner, flipBackCorner)) {
+        for (corner in listOf(flipCorner, flipBackCorner, alarmCorner)) {
             val params = corner.layoutParams as? LayoutParams ?: continue
             corner.layoutParams = params.apply {
                 width = dp(edge)
@@ -1695,6 +1748,59 @@ class TileView(
      */
     private fun applyWidgetGlyphSize() {
         applyCornerMark(widgetGlyph, widgetGlyphRatio)
+    }
+
+    /** How much of its canvas the alarm mark covers, and which one that was measured for. */
+    private var alarmMarkRatio = 1f
+    private var alarmMarkMeasuredFor = 0
+
+    /**
+     * Puts a mark at the foot of the tile, or takes it away.
+     *
+     * Null for nothing, which is the usual state: the mark is there to say that something
+     * is set, so a tile carrying it always means it.
+     */
+    fun setAlarmMark(res: Int?) {
+        if (res == null) {
+            alarmMark.setImageDrawable(null)
+            // Through the one place that decides, so the corner goes with it. Setting the
+            // mark's own visibility here left a hot zone over a tile with no mark on it,
+            // quietly sending a quarter of the taps meant for the app to Alarms.
+            applyAlarmMarkVisibility()
+            return
+        }
+        alarmMark.setImageResource(res)
+        alarmMark.imageTintList =
+            android.content.res.ColorStateList.valueOf(palette.onAccent())
+        // Measured once per mark, as the corner one is: the answer only changes when the
+        // artwork does, and this is asked on every live-tile tick.
+        if (alarmMarkMeasuredFor != res) {
+            alarmMarkMeasuredFor = res
+            alarmMarkRatio = alarmMark.drawable
+                ?.let { MonochromeIconProvider.measureContentRatio(it) } ?: 1f
+        }
+        applyAlarmMarkVisibility()
+        applyCornerMark(alarmMark, alarmMarkRatio)
+    }
+
+    /**
+     * Shows the foot mark where there is a foot to put it in.
+     *
+     * The label owns the bottom of a tile whenever it is up, and the two would be drawn
+     * over each other. The 1x1 has no room for it at all: its reading is set to the width
+     * of the whole tile - a time fills it corner to corner - so a mark down there would be
+     * under the digits rather than beside them.
+     */
+    private fun applyAlarmMarkVisibility() {
+        alarmMark.visibility = when {
+            alarmMark.drawable == null || isEditMode -> GONE
+            tile.size == TileSize.SMALL -> GONE
+            label.visibility == VISIBLE -> GONE
+            else -> VISIBLE
+        }
+        // Nothing to aim at while there is no mark, and a corner that swallowed taps for a
+        // mark that is not there would be a quarter of the tile that stopped opening it.
+        alarmCorner.visibility = alarmMark.visibility
     }
 
     /**
@@ -1721,7 +1827,12 @@ class TileView(
         view.layoutParams = params.apply {
             width = box
             height = box
+            // Set on every side, and the mark's own gravity picks the two that place it.
+            // A mark in the opposite corner is inset from that corner by exactly what a
+            // mark in this one is inset from this, which is the whole point of the rule.
             topMargin = inset
+            bottomMargin = inset
+            marginStart = inset
             marginEnd = inset
         }
     }
@@ -2284,11 +2395,11 @@ class TileView(
      * Keeps a widget's caption to one line of type per line it was written in.
      *
      * A widget's caption is written as lines rather than as prose - the appointment and
-     * then when it is, tomorrow's first entry and then how many follow it - and the second
-     * of those is the half that says something the tile is not already showing. Left to
-     * wrap, a long name takes both lines of the caption and the line that was meant to
-     * carry the count is either pushed off the tile or dropped outright, so what is left
-     * reads as the only thing on tomorrow rather than the first of four.
+     * then when it is, the weekday and then the date - and the second of those is the half
+     * that says something the tile is not already showing. Left to wrap, a long name takes
+     * both lines of the caption and the line that was meant to carry the time is either
+     * pushed off the tile or dropped outright, so what is left is an appointment with no
+     * hour on it.
      *
      * So each line is cut to the tile instead, and every one of them keeps its own line.
      * Only where the caption *is* lines: a notification's body is prose, and prose is meant
@@ -2418,8 +2529,8 @@ class TileView(
                     weight))
             }
         }
-        // A reading is not always a number - tomorrow's face is a name and a count - and
-        // an empty one still holds a line of its own height open under everything else.
+        // A reading is not always a number - the clock's reverse is a weekday - and an
+        // empty one still holds a line of its own height open under everything else.
         number.visibility = if (number.text.isNullOrEmpty()) GONE else VISIBLE
         val edge = if (reading) Gravity.END else Gravity.START
         // The row holds only the reading when there is nothing beside it, so it is the row
@@ -2716,7 +2827,10 @@ class TileView(
             else -> VISIBLE
         }
         // The same question this method opens with - is the tile showing content, or is it
-        // showing itself - is the one the scrim answers, so it is asked here too.
+        // showing itself - is the one the scrim answers, so it is asked here too. And the
+        // foot mark stands where the label does, so what the label just decided decides
+        // that as well.
+        applyAlarmMarkVisibility()
         invalidateContentScrim()
     }
 
@@ -2904,6 +3018,7 @@ class TileView(
             control.imageTintList = onAccent
         }
         if (widgetGlyph.drawable != null) widgetGlyph.imageTintList = onAccent
+        if (alarmMark.drawable != null) alarmMark.imageTintList = onAccent
         // Drawn as an inset oval so the mark stays small while the view stays tappable.
         notificationDot.background = android.graphics.drawable.InsetDrawable(
             android.graphics.drawable.GradientDrawable().apply {
@@ -3281,6 +3396,7 @@ class TileView(
         // The corner is the resize handle's while editing, so no indicator shows.
         applyNotificationMark()
         applyWidgetGlyphVisibility()
+        applyAlarmMarkVisibility()
         updateNotificationDot()
         // Lifted above its neighbours, because its handles now hang over them: without
         // this the tile drawn after it covers whichever half is on its side.

@@ -32,15 +32,16 @@ import rocks.gorjan.gokixp.wp81.metroLook
 class GokiInCallService : InCallService() {
 
     /**
-     * Redraws the notification whenever anything about the calls changes.
+     * Redraws the notification whenever the calls change, or whenever what is on screen does.
      *
      * The buttons on it are stateful - speaker is on or it is not - and a notification is a
      * picture rather than a live view, so the only way for it to stay true is to post it
-     * again. Which is cheap: the system replaces the one already showing, in place.
+     * again. Which is cheap: the system replaces the one already showing, in place. The same
+     * callback carries word that the call screen has come or gone, which is the other thing
+     * [sync] changes its mind on.
      */
     private val onCallsChanged = {
-        if (CallCentre.isEmpty()) notifications().cancel(NOTIFICATION_ID)
-        else post()
+        sync()
         updateProximity()
     }
 
@@ -124,13 +125,33 @@ class GokiInCallService : InCallService() {
      */
     private fun ring() {
         val screen = InCallActivity.intentFor(this)
-        post()
+        sync()
         try {
             startActivity(screen)
         } catch (e: Exception) {
             // Expected on a locked phone, and not a failure: the notification above is the
             // path the system has left open for exactly this, and it has already been sent.
             Log.d(TAG, "Could not open the call screen directly; the notification has it", e)
+        }
+    }
+
+    /**
+     * Decides whether there should be a notification at all, and there usually is not.
+     *
+     * Two reasons for one to exist: there is a call, and the call screen is not what the
+     * user is looking at. A notification about the very screen somebody is on is the call
+     * twice over - a card in the shade behind it, and on a modern phone a chip in the
+     * status bar sitting on top of the call screen's own - so while that screen is up this
+     * takes it away, and puts it back the moment the screen is left for anything else.
+     *
+     * Called for every change to the calls and for every change of what is on screen,
+     * because either can be what makes the answer different from last time.
+     */
+    private fun sync() {
+        if (CallCentre.isEmpty() || CallCentre.screenShowing) {
+            notifications().cancel(NOTIFICATION_ID)
+        } else {
+            post()
         }
     }
 
@@ -166,13 +187,13 @@ class GokiInCallService : InCallService() {
      * actions, which CallStyle keeps.
      */
     private fun notification(screen: Intent): Notification {
-        ensureChannel()
+        ensureChannels()
         val open = PendingIntent.getActivity(
             this, 0, screen, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val line = CallCentre.primary()
         val ringing = line?.stage == CallCentre.Stage.INCOMING
 
-        val builder = Notification.Builder(this, CHANNEL)
+        val builder = Notification.Builder(this, if (ringing) CHANNEL else CHANNEL_ONGOING)
             .setSmallIcon(R.drawable.wp81_notify_call)
             .metroLook(this)
             .setContentTitle(line?.title ?: "Call")
@@ -182,7 +203,12 @@ class GokiInCallService : InCallService() {
             // category it is an ordinary notification and the phone rings behind whatever
             // the user was looking at.
             .setCategory(Notification.CATEGORY_CALL)
-            .setFullScreenIntent(open, true)
+            // Carried by a call in progress too, which never wants to be flung at anybody:
+            // since Android 14 the system throws out a CallStyle notification with no
+            // full-screen intent unless it belongs to a foreground service, and this one
+            // belongs to a bound InCallService. What decides whether the screen is actually
+            // taken over is the channel it went out on - see [ensureChannels].
+            .setFullScreenIntent(open, ringing)
             .setOngoing(true)
 
         val hangUp = CallActionReceiver.pending(this, CallActionReceiver.ACTION_HANG_UP)
@@ -261,19 +287,45 @@ class GokiInCallService : InCallService() {
         return android.graphics.drawable.Icon.createWithBitmap(bitmap)
     }
 
-    private fun ensureChannel() {
+    /**
+     * Two channels, because a ringing phone and a call in progress want opposite things.
+     *
+     * The ring has to be able to take over whatever the screen is doing, and a full-screen
+     * intent is only honoured on a channel at high importance. A call already in progress
+     * must not: its notification goes up the moment the call screen is left, and at high
+     * importance the phone would light itself back up and put the call screen straight back
+     * the instant somebody pressed the power button to put it away. Low is silent and does
+     * not push in, while still showing the call in the shade and in the status bar, which is
+     * all the in-progress one was ever for.
+     */
+    private fun ensureChannels() {
         val manager = notifications()
-        if (manager.getNotificationChannel(CHANNEL) != null) return
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Calls", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "The screen shown while a call is going on"
-                // The network is already ringing the phone; a second sound over the top of
-                // it is this app ringing as well.
-                setSound(null, null)
-                enableVibration(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-        )
+        if (manager.getNotificationChannel(CHANNEL) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL, "Calls", NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "A phone that is ringing"
+                    // The network is already ringing the phone; a second sound over the top
+                    // of it is this app ringing as well.
+                    setSound(null, null)
+                    enableVibration(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+            )
+        }
+        if (manager.getNotificationChannel(CHANNEL_ONGOING) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ONGOING, "Calls in progress", NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "The call you are on, while you are looking at something else"
+                    setSound(null, null)
+                    enableVibration(false)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+            )
+        }
     }
 
     private fun notifications() =
@@ -295,6 +347,7 @@ class GokiInCallService : InCallService() {
         }
 
         const val CHANNEL = "wp81_calls"
+        const val CHANNEL_ONGOING = "wp81_call_ongoing"
         const val NOTIFICATION_ID = 8101
         const val TAG = "WP81Phone"
 

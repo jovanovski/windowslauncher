@@ -14,6 +14,23 @@ android {
         versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        /*
+         * Which processors the bundled native code is carried for.
+         *
+         * Only relevant since Vosk arrived - nothing else in this project has a native part.
+         * Its AAR ships seven architectures totalling forty megabytes, three of which
+         * (mips, mips64, armeabi) have not been supported by Android for years and one of
+         * which (x86) is a 32-bit emulator nobody runs any more.
+         *
+         * What is left is the two every real phone uses. The emulator's x86_64 is gone too,
+         * which saves a further ten megabytes at the cost of not being able to test the
+         * keyboard's dictation on an emulator - this is a launcher for phones, and it is
+         * tested on one.
+         */
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -57,6 +74,25 @@ dependencies {
     implementation("androidx.media:media:1.8.0")
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.car.app:app-projected:1.7.0")
+
+    /*
+     * Offline speech recognition, for the keyboard's dictation.
+     *
+     * Vosk runs entirely on the phone: no account, no network, nothing sent anywhere. That is
+     * the whole reason it is here rather than the platform's own recogniser, which on most
+     * Android phones is Google's and transcribes in the cloud - and which on this one cannot
+     * be used at all, because GrapheneOS ships no speech-to-text engine and deliberately
+     * leaves no recogniser selected.
+     *
+     * JNA is not optional: vosk-android is a thin Kotlin layer over a native library and
+     * reaches it through JNA rather than hand-written JNI, so leaving it out compiles and
+     * then fails at the first call.
+     *
+     * This is the first native code in the project. Nothing here is written in C++, but the
+     * AAR carries prebuilt .so files, which is why the APK grows by more than the Java in it.
+     */
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
 
     // WindowManager for foldable device detection
     implementation("androidx.window:window:1.3.0")

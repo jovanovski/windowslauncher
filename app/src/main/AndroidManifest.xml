@@ -11,6 +11,26 @@
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
     <!-- And to draw on it. The template is refused without this, not merely left blank. -->
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <!--
+      Dictation.
+
+      Asked for at the moment the microphone on the keyboard is first pressed, not on first
+      run - and asked for by a tiny Activity rather than by the keyboard, because an input
+      method has no Activity of its own and cannot raise a permission dialog. See
+      VoicePermissionActivity.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!--
+      Which speech recogniser the phone has, so the keyboard can prefer the on-device one -
+      the one that does not send what you said anywhere - over the networked one. Without this
+      the query comes back empty on Android 11 and later and every phone looks like it has none.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
@@ -558,6 +578,61 @@
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
+        </service>
+
+        <!--
+          The keyboard.
+
+          An input method belongs to the system rather than to this app: once it is turned
+          on in system settings it comes up in every text box on the phone, which is the
+          point of it - the shell styles its own text boxes down to the selection grips and
+          then had whatever keyboard the phone came with appear underneath them.
+
+          BIND_INPUT_METHOD is the permission the *system* must hold to bind this, not one
+          this app requests. Declaring it is what promises that nothing else can bind to the
+          service and impersonate the system, and an input method without it is refused.
+
+          Left in the app's own process deliberately. The launcher is the home app and is
+          always running, so the keyboard comes up warm rather than starting a process on
+          the first tap, and it sees theme changes the moment they are written because the
+          preferences are the same instance. The cost is that a crash in here takes the
+          launcher with it.
+        -->
+        <!--
+          The keyboard's settings, as a page of its own.
+
+          Exported because Android's keyboard settings launches it on the user's behalf when
+          it is named as an input method's settingsActivity - see res/xml/method.xml - and a
+          settings page that only the keyboard itself could open would be missing from the one
+          place people look for it.
+        -->
+        <!--
+          Asks for the microphone on the keyboard's behalf. Transparent, and on screen only
+          for as long as the system's own dialog. See VoicePermissionActivity.
+        -->
+        <activity
+            android:name=".wp81.keyboard.VoicePermissionActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <activity
+            android:name=".wp81.keyboard.KeyboardSettingsActivity"
+            android:label="@string/keyboard_name"
+            android:theme="@style/Base.Theme.GokiXP"
+            android:exported="true" />
+
+        <service
+            android:name=".wp81.keyboard.WP81KeyboardService"
+            android:label="@string/keyboard_name"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
         </service>
 
         <!-- FileProvider for My Computer file sharing -->

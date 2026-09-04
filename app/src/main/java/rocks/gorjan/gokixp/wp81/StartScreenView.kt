@@ -347,6 +347,7 @@ class StartScreenView(
         liveWidget: (Tile) -> TileView.Reading? = { null },
         widgetGlyphs: (Tile) -> Pair<Int?, Int?> = { null to null },
         widgetBacks: (Tile) -> TileView.Reading? = { null },
+        alarmMarks: (Tile) -> Int? = { null },
         tileColors: (Tile) -> Int? = { null },
         glyphs: (Tile) -> MonochromeIconProvider.Glyph?
     ) {
@@ -374,6 +375,7 @@ class StartScreenView(
             view.setWidgetGlyph(frontGlyph, backGlyph)
             view.setTileColor(tileColors(tile))
             view.setWidgetBack(widgetBacks(tile))
+            view.setAlarmMark(alarmMarks(tile))
             grid.addView(view)
         }
         grid.requestLayout()
@@ -461,6 +463,11 @@ class StartScreenView(
         forEachTileView { if (it.tile.id == tileId) it.setWidgetBack(back) }
     }
 
+    /** Puts the mark at one tile's foot up, or takes it down. */
+    fun setAlarmMark(tileId: String, res: Int?) {
+        forEachTileView { if (it.tile.id == tileId) it.setAlarmMark(res) }
+    }
+
     private fun buildTileView(
         tile: Tile,
         glyphs: (Tile) -> MonochromeIconProvider.Glyph?
@@ -520,11 +527,17 @@ class StartScreenView(
         // What "off Start" means differs between a pinned app, a built-in and a tile
         // inside a folder, and only the host knows which of those it is looking at.
         view.onUnpinTap = { onTileUnpin?.invoke(tile) }
+        // No tile passed with it: the mark means the same thing on whichever tile is
+        // carrying it, and the host opens the one app that answers for it.
+        view.onAlarmMarkTap = { onAlarmMarkTap?.invoke() }
         return view
     }
 
     /** The top-right handle on the selected tile was tapped. See TileView.onUnpinTap. */
     var onTileUnpin: ((Tile) -> Unit)? = null
+
+    /** The alarm mark at the foot of a tile was tapped. See TileView.onAlarmMarkTap. */
+    var onAlarmMarkTap: (() -> Unit)? = null
 
     /**
      * Whether tiles count their notifications or just mark them. See TileView.countsEnabled.

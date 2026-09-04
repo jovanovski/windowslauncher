@@ -138,7 +138,7 @@ class PeopleApp(
     private var openThread: MessageThread? = null
 
     /** The one history row that is open, if any. See [toggleHistoryActions]. */
-    private var openHistoryActions: View? = null
+    private var openHistoryActions: OpenRow? = null
 
     /**
      * Pages stacked over the panorama, newest last.
@@ -664,41 +664,70 @@ class PeopleApp(
             setTextColor(palette.foregroundSubtle)
             setPadding(0, dp(3), 0, 0)
         }, wide())
-        row.addView(text, LinearLayout.LayoutParams(0, WRAP, 1f))
+        // Squared off with the top of the title rather than centred on the whole block,
+        // so that the rings beside it line up with the name and not with the gap under it.
+        row.addView(text, LinearLayout.LayoutParams(0, WRAP, 1f).apply { gravity = Gravity.TOP })
+
+        // Ringing back and texting, on the name's own line: they are about the call the
+        // title names, and set below it they would read as two more of the words in the
+        // block underneath rather than as the two commands the row is mostly opened for.
+        val rings = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+        }
+        rings.addView(reachKey(CALL_ICON) { place(entry.number) }, ring(first = true))
+        // The other thing you do about a call you have just looked at, and now that
+        // messages are a page in this app it goes to the conversation rather than out to
+        // somebody else's program. See message().
+        rings.addView(reachKey(MESSAGE_ICON) { message(entry.number) }, ring(first = false))
+        row.addView(rings, LinearLayout.LayoutParams(WRAP, WRAP).apply { gravity = Gravity.TOP })
         holder.addView(row, wide())
 
         // Built once and hidden, rather than made on each tap: a row that has been opened
-        // and shut is the common case, and rebuilding three buttons every time is work
+        // and shut is the common case, and rebuilding four buttons every time is work
         // done in the middle of an animation.
         val actions = historyActions(entry)
         actions.visibility = View.GONE
         holder.addView(actions, wide())
 
+        val open = OpenRow(rings, actions)
         row.setOnClickListener {
             Haptics.tap(it)
-            toggleHistoryActions(actions)
+            toggleHistoryActions(open)
         }
         return holder
     }
 
     /**
-     * The three things a call in the list is a way to.
+     * What a call's row shows once it has been opened.
      *
-     * Ringing back, texting them, the whole of what has passed between you, and their
-     * card - or, for a number the phone does not know, the offer to make one. Words rather
-     * than glyphs because they are opened deliberately and read once, and four unlabelled
-     * marks in a row would be a puzzle.
+     * Two views rather than one, and in different parents: the rings belong on the title's
+     * line and the words belong under it, and they still have to come and go together.
+     */
+    private class OpenRow(private val rings: View, private val words: View) {
+        val isOpen: Boolean get() = words.visibility == View.VISIBLE
+
+        fun setOpen(open: Boolean) {
+            val how = if (open) View.VISIBLE else View.GONE
+            rings.visibility = how
+            words.visibility = how
+        }
+    }
+
+    /**
+     * The other two things a call in the list is a way to.
+     *
+     * Ringing back and texting are rings on the title's line - see [historyRow] - because
+     * they are the two the row is usually opened for and they are the two a profile draws
+     * that way. What is left has no mark of its own and would not be read as one: the
+     * whole of what has passed between you, and their card, or for a number the phone does
+     * not know the offer to make one. Those stay words, under the title, indented to it.
      */
     private fun historyActions(entry: PhoneHistory.Entry): LinearLayout {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(ARROW_DP + 10), 0, 0, dp(10))
         }
-        row.addView(actionWord("call") { place(entry.number) })
-        // The other thing you do about a call you have just looked at, and now that
-        // messages are a page in this app it goes to the conversation rather than out to
-        // somebody else's program. See message().
-        row.addView(actionWord("text") { message(entry.number) })
         row.addView(actionWord("call history") { showNumberHistory(entry) })
         val id = entry.contactId
         if (id != null) row.addView(actionWord("view contact") { showProfile(id) })
@@ -708,10 +737,20 @@ class PeopleApp(
         return row
     }
 
+    /** How one of those rings stands off what comes before it. See [reachRow], which spaces
+     *  its own the same way. */
+    private fun ring(first: Boolean) =
+        LinearLayout.LayoutParams(dp(REACH_KEY_DP), dp(REACH_KEY_DP)).apply {
+            marginStart = dp(if (first) REACH_KEY_INSET_DP else REACH_KEY_GAP_DP)
+        }
+
     private fun actionWord(label: String, onTap: () -> Unit): View = TextView(context).apply {
         text = label
         typeface = font(R.font.segoeui_regular)
         textSize = 14f
+        // One line always: these are labels, and a squeezed "view contact" folded in two
+        // is a taller row rather than a more readable one.
+        maxLines = 1
         setTextColor(palette.accent)
         // Tightened when the row gained a fourth word: four commands and their gaps have
         // to fit across the narrowest page this app is shown on.
@@ -725,10 +764,10 @@ class PeopleApp(
     }
 
     /** One open row at a time: two sets of buttons on screen is two rows asking to be read. */
-    private fun toggleHistoryActions(actions: View) {
-        val already = actions.visibility == View.VISIBLE
-        openHistoryActions?.visibility = View.GONE
-        openHistoryActions = if (already) null else actions.also { it.visibility = View.VISIBLE }
+    private fun toggleHistoryActions(row: OpenRow) {
+        val already = row.isOpen
+        openHistoryActions?.setOpen(false)
+        openHistoryActions = if (already) null else row.also { it.setOpen(true) }
     }
 
     /**
@@ -1562,7 +1601,7 @@ class PeopleApp(
         /** The picture, and the whole square as the way to change it. */
         private fun photoSquare(): View {
             val holder = FrameLayout(context)
-            holder.setBackgroundColor(palette.accent)
+            holder.background = ContactFace.placeholder(context, palette.accent)
             faceInitials.apply {
                 text = "photo"
                 typeface = font(R.font.segoeui_regular)
@@ -2120,6 +2159,29 @@ class PeopleApp(
      */
     private fun message(number: String) = showThread(number, null)
 
+    /**
+     * Puts a number on the clipboard.
+     *
+     * Silent when it works. Android has shown what was copied itself since 13, and a word
+     * of our own over the top of that is the same news twice - see MessageThread.copy,
+     * which takes a message the same way and for the same reason.
+     */
+    private fun copyNumber(number: String) {
+        if (number.isBlank()) return
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                as? android.content.ClipboardManager
+            if (clipboard == null) {
+                onNotify("People", "This phone has nowhere to copy to")
+                return
+            }
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("number", number))
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not copy a number", e)
+            onNotify("People", "That could not be copied")
+        }
+    }
+
     private fun email(address: String) = open(Intent(
         Intent.ACTION_SENDTO, Uri.parse("mailto:" + Uri.encode(address))), "email")
 
@@ -2215,6 +2277,12 @@ class PeopleApp(
                 else add(WP81ContextMenu.Item("save to contacts") {
                     showEditor(null, prefillNumber = entry.number)
                 })
+                // Last, under the things the row is usually held for. It is the one command
+                // here that is about the number as a piece of text rather than about the
+                // person - pasting it into a message, into a form, reading it out to
+                // somebody - and a withheld caller never reaches this list, so there is
+                // always a number there to take.
+                add(WP81ContextMenu.Item("copy number") { copyNumber(entry.number) })
             },
             anchor
         )

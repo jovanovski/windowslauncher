@@ -50,6 +50,20 @@ class InCallActivity : Activity() {
         setContentView(view)
     }
 
+    override fun onStart() {
+        super.onStart()
+        // On screen, so the call has no business in the notification shade as well. See
+        // [CallCentre.screenShowing].
+        CallCentre.screenShowing = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Gone - home, another app, or a phone that has been put to sleep - and from here
+        // the notification is the only way back to the call.
+        CallCentre.screenShowing = false
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         screen?.bind()
