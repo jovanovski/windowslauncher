@@ -550,7 +550,8 @@ class KeyboardSettingsActivity : Activity() {
         addView(
             detail(
                 "word lists from the OpenSubtitles frequency lists (CC BY-SA 3.0) and " +
-                    "dwyl/english-words. emoji names from Unicode CLDR."
+                    "dwyl/english-words. next-word predictions counted from the " +
+                    "OpenSubtitles corpus itself, via OPUS. emoji names from Unicode CLDR."
             ),
             wide()
         )

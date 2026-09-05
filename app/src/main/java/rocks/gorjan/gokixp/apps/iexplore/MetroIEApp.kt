@@ -111,7 +111,11 @@ class MetroIEApp(
     /**
      * Back has run out of page in a tab another app handed over. See [handleBack].
      */
-    private val onReturnToLinkCaller: () -> Unit = {}
+    private val onReturnToLinkCaller: () -> Unit = {},
+    /**
+     * The last page has been closed, and the browser goes with it. See [closeTab].
+     */
+    private val onRequestClose: () -> Unit = {}
 ) {
 
     /**
@@ -454,8 +458,13 @@ class MetroIEApp(
     }
 
     /**
-     * Closes [tab], and with the last one closes nothing: a browser with no pages in it is
-     * a blank screen with an address bar, so the last close starts a new page instead.
+     * Closes [tab], and with the last one closes the browser.
+     *
+     * A browser with no pages in it is a blank screen with an address bar, and the phone
+     * answered that by leaving rather than by opening something: closing the last card
+     * puts the shell back on screen, the way running out of back does. Coming back to it
+     * later is a fresh start on the home page - see [createView], which finds nothing
+     * written down because [saveTabs] has just written down nothing.
      */
     private fun closeTab(tab: Tab) {
         val index = tabs.indexOf(tab)
@@ -468,10 +477,12 @@ class MetroIEApp(
             current = null
             // The one before it, which is where the eye already was.
             val next = tabs.getOrNull(index - 1) ?: tabs.firstOrNull()
-            if (next != null) activate(next) else openTab(homepage)
+            if (next != null) activate(next)
         }
         paintTabsButton()
         saveTabs()
+        // Written down first: the window's own teardown follows this straight away.
+        if (tabs.isEmpty()) onRequestClose()
     }
 
     /**
@@ -484,9 +495,8 @@ class MetroIEApp(
      *
      * The current tab is never taken, whatever its clock says - it is the page on screen.
      * Neither is the last one: closing that would leave the browser with nothing in it,
-     * which [closeTab] would answer by opening the home page, and a launcher that swaps
-     * your last tab for a home page while you are not looking has lost it rather than
-     * tidied it. Run when the tabs page is reached, which is the one place the whole
+     * which [closeTab] would answer by closing the window, and a launcher that shuts the
+     * browser while you are not looking has lost your session rather than tidied it. Run when the tabs page is reached, which is the one place the whole
      * set is on screen; a session that has been left running long enough for a tab to
      * go stale is rarer than one that is restarted, and a restart drops them earlier
      * still - see [loadTabs], which does not put them back at all.

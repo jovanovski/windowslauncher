@@ -9534,7 +9534,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 showNotification(title, message, onTap)
             },
             onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) },
-            onReturnToLinkCaller = { returnToLinkCaller() }
+            onReturnToLinkCaller = { returnToLinkCaller() },
+            // The last tab closed. A browser with nothing open in it is nothing to look
+            // at, so the window goes the same way it goes when back runs out.
+            onRequestClose = { windowsDialog.closeWindow() }
         )
         metroIEAppInstance = ieApp
 
@@ -9559,9 +9562,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      *
      * Full-screen and chromeless like Zune - it is a phone app, and the panorama it is
      * built on needs the screen to itself.
+     *
+     * [openAt] is the story the tile was showing when it was tapped, where it was opened
+     * that way: the reader runs down to it and marks it rather than landing at the top of
+     * a page of fifty with the tapped headline somewhere on it. Nothing from the app list
+     * or the taskbar, which is a request for the news rather than for one story.
      */
-    private fun showNewsDialog() {
-        if (floatingWindowManager.findAndFocusWindow("system.news")) return
+    private fun showNewsDialog(openAt: rocks.gorjan.gokixp.wp81.NewsStory? = null) {
+        if (floatingWindowManager.findAndFocusWindow("system.news")) {
+            // Already open, and tapping the tile again is still a request for the story on
+            // its face - the reader it brings forward goes to it as a fresh one would.
+            openAt?.let { newsAppInstance?.reveal(it) }
+            return
+        }
 
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = "system.news"
@@ -9601,6 +9614,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setContextMenuView(contextMenu)
         floatingWindowManager.showWindow(windowsDialog)
         turnWP81PageIn(newsView)
+        // After the window is up, so the page it scrolls is one that has been laid out.
+        openAt?.let { newsApp.reveal(it) }
 
         // Asked for on the way in, whatever the tile has been doing: opening a reader is a
         // request for what is current, and forced so it does not sit on half-hour-old
@@ -11618,7 +11633,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         showPeopleDialog()
         // After the window, because the keypad is a page inside it and there has to be
         // something for it to be a page over.
-        peopleAppInstance?.showKeypad(number)
+        peopleAppInstance?.showDialer(number)
     }
 
     /**
@@ -16328,6 +16343,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         )
     }
 
+    /**
+     * The story the News tile has on its face this moment, if it has one.
+     *
+     * The tile turns through [NewsFeed.stories] in order and knows how far along it is, so
+     * the face is a lookup rather than anything the tile has to be asked to remember. Null
+     * while the tile is still showing the line it puts up in place of a story.
+     */
+    private fun wp81NewsStoryOnTile(): rocks.gorjan.gokixp.wp81.NewsStory? {
+        val shell = wp81Shell ?: return null
+        return wp81NewsFeed.stories()
+            .getOrNull(shell.startScreen.rotationIndexOf(WP81_WIDGET_NEWS))
+    }
+
     /** Reads the feeds, if the tile that shows them is on Start. */
     private fun refreshWP81NewsFeeds(force: Boolean = false) {
         if (!wp81HasNewsTile()) return
@@ -17808,10 +17836,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // which is a number in a corner with nowhere of its own to go, and this tile
             // is the Weather app's own tile.
             rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_WEATHER -> showWeatherDialog()
-            // The reader, not the story. A tile shows one headline at a time and tapping
-            // it is a request for the rest of them; the story on the face is one tap
-            // further in, where the whole front page is on offer.
-            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS -> showNewsDialog()
+            // The reader, not the story itself: a tile shows one headline at a time and
+            // tapping it is a request for the rest of them, with the story on the face one
+            // tap further in. But the reader opens *on* that story, marked - the tile was
+            // pointing at something, and a page that landed at the top would lose it.
+            rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_NEWS -> showNewsDialog(wp81NewsStoryOnTile())
 
             rocks.gorjan.gokixp.wp81.Tile.Kind.LIVE_PHOTOS -> openWP81Photos()
 

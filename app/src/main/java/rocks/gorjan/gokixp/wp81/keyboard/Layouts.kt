@@ -110,7 +110,7 @@ object Layouts {
                 overhangTop = SPACE_OVERHANG
             ),
             Key(output = "."),
-            Key(span = ENTER_KEY, style = Style.FUNCTION, action = Action.ENTER)
+            Key(span = ENTER_KEY, style = Style.ACCENT, action = Action.ENTER)
         ),
         heightScale = BOTTOM_ROW_SCALE
     )
@@ -457,7 +457,7 @@ object Layouts {
             Row(symbols("789,")),
             Row(
                 symbols("+0.") +
-                    listOf(Key(span = 1f, style = Style.FUNCTION, action = Action.ENTER))
+                    listOf(Key(span = 1f, style = Style.ACCENT, action = Action.ENTER))
             )
         )
     )
@@ -473,7 +473,7 @@ object Layouts {
             Row(symbols("789;")),
             Row(
                 symbols("*0#") +
-                    listOf(Key(span = 1f, style = Style.FUNCTION, action = Action.ENTER))
+                    listOf(Key(span = 1f, style = Style.ACCENT, action = Action.ENTER))
             )
         )
     )

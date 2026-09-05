@@ -10,6 +10,9 @@ import android.text.InputType
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.InsetDrawable
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -32,6 +35,7 @@ import rocks.gorjan.gokixp.wp81.WP81ContextMenu
 import rocks.gorjan.gokixp.wp81.WP81InputDialog
 import rocks.gorjan.gokixp.wp81.WP81Palette
 import rocks.gorjan.gokixp.wp81.applyToField
+import rocks.gorjan.gokixp.wp81.applyToPageText
 
 /**
  * People, as Windows Phone 8.1 had it - and the Phone app it shared a job with.
@@ -139,6 +143,16 @@ class PeopleApp(
 
     /** The one history row that is open, if any. See [toggleHistoryActions]. */
     private var openHistoryActions: OpenRow? = null
+
+    /**
+     * Which day the calls built into the history so far belong to.
+     *
+     * Held across the chunks the list is built in rather than worked out from them: the
+     * rows arrive a screenful at a time and a heading has to be written when the day
+     * changes *between* two of them, which the chunk that starts the new day cannot see on
+     * its own. [NO_DAY] until the first row, so that day gets a heading like every other.
+     */
+    private var lastHistoryDay = NO_DAY
 
     /**
      * Pages stacked over the panorama, newest last.
@@ -335,16 +349,17 @@ class PeopleApp(
      */
     private fun buildAppBar(): MetroAppBar {
         val bar = MetroAppBar(context, palette)
-        bar.addCommand(KEYPAD_ICON) { showKeypad() }
-        // Search rather than new-contact on the ring. Looking somebody up is what this app
-        // is opened for, and adding somebody is what it is opened for once in a while; the
-        // strip's two rings should be the two things done most.
+        // Search rather than new-contact on the ring, and first: looking somebody up is
+        // what this app is opened for, and adding somebody is what it is opened for once
+        // in a while. The keypad is second because it is the answer when the search has
+        // failed - the book first, the bare number after it.
         bar.addCommand(SEARCH_ICON) {
             // To the page the search is of, and then into it. Searching contacts while
             // standing on the call history would be a field with nothing under it.
             panorama.goTo(PAGE_CONTACTS, animated = true)
             allList.beginSearch()
         }
+        bar.addCommand(KEYPAD_ICON) { showDialer() }
         bar.menu = {
             buildList {
                 add(MetroAppBar.Item("new contact") { showEditor(null, prefillNumber = null) })
@@ -583,6 +598,7 @@ class PeopleApp(
     private fun bindHistory() {
         historyColumn.removeAllViews()
         openHistoryActions = null
+        lastHistoryDay = NO_DAY
         if (!PhoneHistory.hasAccess(context)) {
             historyColumn.addView(
                 note("no access to your call history.  tap to allow") {
@@ -615,9 +631,40 @@ class PeopleApp(
     private fun extendHistory() {
         var built = 0
         while (pendingCalls.isNotEmpty() && built < CHUNK) {
-            historyColumn.addView(historyRow(pendingCalls.removeAt(0)), wide())
+            val entry = pendingCalls.removeAt(0)
+            // A heading each time the day changes, which - the log being newest first - is
+            // the only direction it can change in. The first call of all gets one too: the
+            // top of the list is the start of a day as much as any line further down is.
+            val day = dayOf(entry.at)
+            if (day != lastHistoryDay) {
+                val heading = dayHeadingOf(entry.at)
+                if (heading.isNotBlank()) {
+                    historyColumn.addView(dayHeading(heading, first = lastHistoryDay == NO_DAY), wide())
+                }
+                lastHistoryDay = day
+            }
+            historyColumn.addView(historyRow(entry), wide())
             built++
         }
+    }
+
+    /**
+     * The line that says which day the calls under it happened on.
+     *
+     * In the accent, which is what the phone put its list headings in and what makes them
+     * findable at a scroll - the eye goes down the coloured line and stops at the day it
+     * wants. Set smaller and in the lighter face than the names it stands over, because it
+     * is still not one of the things in the list; it is the shelf they are on.
+     */
+    private fun dayHeading(label: String, first: Boolean) = TextView(context).apply {
+        text = label
+        typeface = font(R.font.segoeui_semilight)
+        textSize = 15f
+        setTextColor(palette.accent)
+        includeFontPadding = false
+        // Air above, so a heading belongs to what follows it rather than floating between
+        // two days - except at the very top, where there is nothing above to be parted from.
+        setPadding(0, dp(if (first) 6 else 22), dp(16), dp(6))
     }
 
     private fun historyRow(entry: PhoneHistory.Entry): View {
@@ -651,10 +698,12 @@ class PeopleApp(
             includeFontPadding = false
         }, wide())
         text.addView(TextView(context).apply {
-            // When, and how long it lasted. The number is not repeated here: it is either
-            // the title of the row already, or it is one tap away on their card.
+            // The clock, and how long it lasted. Which day it was is written once over the
+            // day's rows instead of on each of them - see [dayHeading]. The number is not
+            // repeated here either: it is either the title of the row already, or it is one
+            // tap away on their card.
             this.text = listOfNotNull(
-                whenOf(entry.at).takeIf { it.isNotBlank() },
+                timeOf(context, entry.at).takeIf { it.isNotBlank() },
                 lasted(entry.seconds)
             ).joinToString("  ·  ")
             typeface = font(R.font.segoeui_regular)
@@ -1087,7 +1136,7 @@ class PeopleApp(
             onProfile = { showProfile(it) },
             onAddContact = { showEditor(null, prefillNumber = it) },
             onRequestPermissions = onRequestPermissions,
-            onMenu = { items, anchor -> showMenu(null, items, anchor) },
+            onMenu = { title, items, anchor -> showMenu(title, items, anchor) },
             onNotify = onNotify
         )
         openThread = page
@@ -1921,128 +1970,308 @@ class PeopleApp(
         panorama.goTo(PAGE_HISTORY, animated = false)
     }
 
-    fun showKeypad(prefill: String? = null) {
+    fun showDialer(prefill: String? = null) {
         val page = overlayPage()
         val header = MetroPageHeader(context, palette).apply {
-            setTitle("keypad")
+            // The pad is the keypad; the page is the dialer. What is on screen is a number
+            // being put together and the people it might be, and only one part of that is
+            // keys - naming the whole page after them named it after its furniture.
+            setTitle("dialer")
             onBack = { dismissOverlay(page) }
         }
         page.addView(header, wide())
 
-        val typed = TextView(context).apply {
-            typeface = font(R.font.segoeui_light)
-            textSize = 40f
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.START
-            gravity = Gravity.CENTER
-            setTextColor(palette.foreground)
-            setPadding(dp(PAGE_MARGIN_DP), dp(10), dp(PAGE_MARGIN_DP), dp(10))
+        // Who that could be, as it is typed. The one thing a modern keypad can do that the
+        // phone's could not, and the answer to the commonest reason for opening one: a
+        // number half-remembered that turns out to be somebody already in the book - or a
+        // name being spelled out on the keys, which is the other half of what a keypad has
+        // always been for. See PeopleStore.keypadMatches.
+        //
+        // In a scroller of its own, taking whatever height is left between the number and
+        // the keys: five people is more than fits on a short phone under a keypad, and a
+        // list that pushed the keys off the bottom of the screen would have answered the
+        // question by taking away the thing that asked it.
+        val matches = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val matchScroller = ScrollView(context).apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            addView(matches, LinearLayout.LayoutParams(MATCH, WRAP))
         }
-        page.addView(typed, wide())
+        page.addView(matchScroller, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
-        // Who that is, as it is typed. The one thing a modern keypad can do that the
-        // phone's could not, and the answer to the commonest reason for opening one:
-        // a number half-remembered that turns out to be somebody already in the book.
-        val match = TextView(context).apply {
-            typeface = font(R.font.segoeui_regular)
-            textSize = 15f
-            maxLines = 1
-            gravity = Gravity.CENTER
-            setTextColor(palette.accent)
-            visibility = View.GONE
-        }
-        page.addView(match, wide())
-
-        val digits = StringBuilder(prefill.orEmpty())
-        // Which lookup the line below the number is waiting for. The provider answers on
-        // its own thread, and a slow answer to "07" must not land on top of the right
-        // answer to "0712345" that was asked for after it.
-        var pending = 0
-        fun repaint() {
-            typed.text = digits.toString()
-            val typedNow = digits.toString()
-            pending++
-            val token = pending
-            match.visibility = View.GONE
-            if (typedNow.length < MATCH_FROM) return
-            PeopleStore.lookup(context, typedNow) { found ->
-                if (token != pending || found == null) return@lookup
-                match.text = found.name
-                match.visibility = View.VISIBLE
-                match.setOnClickListener { showProfile(found.id) }
-            }
-        }
-
+        // One grid, held at the foot of the page: the number, the digits under it, and
+        // under those the three keys that are about the number rather than about a digit.
+        // They used to be three separate things with the page's spare height shared out
+        // between them, which drew lines across the keypad where there are none - the
+        // number is what the pad is filling in, and the call key is on the pad rather
+        // than beside it.
         val keys = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            // Centred in whatever height is left over: the keys are sized off the width,
-            // so on a screen taller than the keypad the spare height falls above and below
-            // them rather than all of it landing between them and the call bar.
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(KEYPAD_MARGIN_DP), dp(6), dp(KEYPAD_MARGIN_DP), dp(6))
+            // Only the last row's own margin below it, because the rows carry the rest.
+            setPadding(dp(KEYPAD_MARGIN_DP), dp(6), dp(KEYPAD_MARGIN_DP), dp(10))
         }
+
+        // The number, in a key of its own at the head of the pad. It used to sit on the
+        // black under the title, where it read as a caption about the page rather than as
+        // the thing the page fills in; in the keys' own grey, directly over them, it is
+        // the top of the pad.
+        //
+        // A field rather than a label, because a number is got wrong in the middle far
+        // more often than at the end - a digit dropped from a dialling code was otherwise
+        // six presses of delete and the whole thing typed again. A tap puts the caret
+        // where the finger is and the keys write there. The soft keyboard never comes up:
+        // this pad *is* the keyboard, and a second one would cover what it types into.
+        val typed = EditText(context).apply {
+            typeface = font(R.font.segoeui_light)
+            textSize = 32f
+            gravity = Gravity.CENTER
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_PHONE
+            showSoftInputOnFocus = false
+            isCursorVisible = true
+            // Set before the padding: a view takes its padding from whatever background
+            // it is handed, and this one has insets to report. See [keyFace].
+            background = keyFace(keyFill())
+            setPadding(dp(12), dp(10), dp(12), dp(12))
+            setText(prefill.orEmpty())
+            setSelection(text.length)
+        }
+        // Not applyToField, which is the white box a form has. This one is a key, drawn in
+        // the page's own colours, so only the caret and the band behind a selection need
+        // saying.
+        palette.applyToPageText(typed)
+        keys.addView(typed, wideCell())
+
+        // The rows on screen, by who is on them.
+        //
+        // Kept so that a keystroke can change the list without rebuilding it. Emptying the
+        // column and filling it again is the obvious way and the wrong one: most of an
+        // answer is usually the same people as the answer before it, and tearing their
+        // rows down only to build the same rows again throws away every face that had
+        // finished decoding - which is a list that flashes on every key pressed.
+        val rows = LinkedHashMap<String, View>()
+
+        fun showMatches(found: List<PeopleStore.Reachable>) {
+            val wanted = found.map { "${it.contact.id}:${it.number}" }
+            // The people who are no longer an answer. Taken out first, so what is left is
+            // already in the right order more often than not.
+            for (gone in rows.keys - wanted.toSet()) {
+                matches.removeView(rows.remove(gone))
+            }
+            for ((index, person) in found.withIndex()) {
+                val id = wanted[index]
+                val standing = rows[id]
+                if (standing == null) {
+                    val row = matchRow(person)
+                    rows[id] = row
+                    matches.addView(row, index, wide())
+                } else if (matches.indexOfChild(standing) != index) {
+                    // Moved rather than remade: a row that has slid up the list is the
+                    // same row, and its face has already been decoded once.
+                    matches.removeView(standing)
+                    matches.addView(standing, index)
+                }
+            }
+        }
+
+        // Which search the list above the number is waiting for. The book is read on its
+        // own thread, and a slow answer to "07" must not land on top of the right answer
+        // to "0712345" that was asked for after it.
+        var pending = 0
+        fun repaint() {
+            val typedNow = typed.text.toString()
+            pending++
+            val token = pending
+            // What is standing is left standing until the book answers. It belongs to the
+            // digits of a keystroke ago, which is a moment out of date rather than wrong -
+            // and a list that empties itself between every pair of answers is a list that
+            // blinks at the user for the whole time they are typing.
+            if (typedNow.count { it.isDigit() } < MATCH_FROM) {
+                showMatches(emptyList())
+                return
+            }
+            PeopleStore.keypadMatches(context, typedNow) { found ->
+                if (token != pending) return@keypadMatches
+                showMatches(found)
+            }
+        }
+        typed.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) = repaint()
+        })
+
         for (row in KEYS) {
             val line = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-            for (key in row) {
-                line.addView(
-                    keyView(key) {
-                        digits.append(key.digit)
-                        repaint()
-                    },
-                    LinearLayout.LayoutParams(0, WRAP, 1f).apply {
-                        setMargins(dp(KEY_GAP_DP) / 2, dp(KEY_GAP_DP) / 2,
-                            dp(KEY_GAP_DP) / 2, dp(KEY_GAP_DP) / 2)
-                    }
-                )
-            }
+            for (key in row) line.addView(
+                keyView(
+                    key,
+                    onTap = { write(typed, key.digit) },
+                    onHold = { second -> write(typed, second) }
+                ),
+                keyCell(dp(KEY_DP))
+            )
             keys.addView(line, wide())
         }
-        page.addView(keys, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
-        // Call across the foot, in the middle: it is the one thing this page is for, and
-        // it sits between the two keys that are about the number rather than the call -
-        // saving it on one side, taking it back a digit on the other.
-        val foot = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(KEYPAD_MARGIN_DP), 0, dp(KEYPAD_MARGIN_DP), dp(14))
-        }
+        // Call in the middle of the last row: it is the one thing this page is for, and it
+        // sits between the two keys that are about the number rather than the call -
+        // saving it on one side, taking it back a digit on the other. Under the 0, where
+        // the thumb already is.
+        val foot = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         foot.addView(footKey(ADD_ICON, keyFill()) {
-            if (digits.isNotEmpty()) {
+            val number = typed.text.toString()
+            if (number.isNotEmpty()) {
                 dismissOverlay(page)
-                showEditor(null, prefillNumber = digits.toString())
+                showEditor(null, prefillNumber = number)
             }
-        }, LinearLayout.LayoutParams(0, dp(FOOT_DP), 1f))
-        foot.addView(footKey(CALL_ICON, palette.accent) {
-            if (digits.isNotEmpty()) place(digits.toString())
-        }, LinearLayout.LayoutParams(0, dp(FOOT_DP), 1f).apply { marginStart = dp(KEY_GAP_DP) })
-        val back = footKey(BACKSPACE_ICON, keyFill()) {
-            if (digits.isNotEmpty()) {
-                digits.deleteCharAt(digits.length - 1)
-                repaint()
-            }
-        }
+        }, keyCell(dp(FOOT_DP)))
+        // Green rather than the accent, and the same green the call screen answers in -
+        // this is the other end of the same act. See CALL_GREEN, which says why the one
+        // colour in this shell that is not the user's choice is not the user's choice.
+        foot.addView(footKey(CALL_ICON, CALL_GREEN, android.graphics.Color.WHITE) {
+            val number = typed.text.toString()
+            if (number.isNotEmpty()) place(number)
+        }, keyCell(dp(FOOT_DP)))
+        val back = footKey(BACKSPACE_ICON, keyFill()) { erase(typed) }
         back.setOnLongClickListener {
-            digits.clear()
-            repaint()
+            typed.setText("")
             true
         }
-        foot.addView(back, LinearLayout.LayoutParams(0, dp(FOOT_DP), 1f).apply {
-            marginStart = dp(KEY_GAP_DP)
-        })
-        page.addView(foot, wide())
+        foot.addView(back, keyCell(dp(FOOT_DP)))
+        keys.addView(foot, wide())
+
+        page.addView(keys, wide())
 
         repaint()
         pushOverlay(page)
     }
 
-    private data class Key(val digit: Char, val letters: String)
+    /**
+     * Writes one character where the caret is, which is where the last tap put it.
+     *
+     * Through the field's own text rather than by keeping the number here and setting it
+     * back afterwards: the caret belongs to the field, and a number rewritten from outside
+     * puts it back at the end on every key pressed - which is the whole of what tapping
+     * into the middle was for.
+     */
+    private fun write(field: EditText, digit: Char) {
+        val from = field.selectionStart.coerceAtLeast(0)
+        val to = field.selectionEnd.coerceAtLeast(0)
+        field.text.replace(minOf(from, to), maxOf(from, to), digit.toString())
+    }
 
-    private fun keyView(key: Key, onTap: () -> Unit): View =
+    /** Takes out what is selected, or the character before the caret when nothing is. */
+    private fun erase(field: EditText) {
+        val from = field.selectionStart.coerceAtLeast(0)
+        val to = field.selectionEnd.coerceAtLeast(0)
+        when {
+            from != to -> field.text.delete(minOf(from, to), maxOf(from, to))
+            from > 0 -> field.text.delete(from - 1, from)
+        }
+    }
+
+    /**
+     * One key of the pad, a third of a row wide.
+     *
+     * [height] is the key as it is drawn; the cell is that plus a whole gap, because the
+     * gap lives inside the cell rather than between the cells - see [keyFace]. The columns
+     * still line up with the columns above them and the space between any two rows is the
+     * same space; the difference is that all of it can be pressed.
+     */
+    private fun keyCell(height: Int) =
+        LinearLayout.LayoutParams(0, height + dp(KEY_GAP_DP), 1f)
+
+    /** A key that is the whole row: the number at the head of the pad. */
+    private fun wideCell() = LinearLayout.LayoutParams(MATCH, WRAP)
+
+    /**
+     * One person the keys pressed could mean, and the two things you would do about them.
+     *
+     * The same pair of rings a profile puts beside a number, because it is the same offer
+     * in the same clothes - somebody found on the keypad is somebody to ring or to write
+     * to, and having found them there is no reason to make the user open their card first
+     * to do either. The card is still a tap away on the name, which is what the line the
+     * list replaced used to do and the only thing it could do.
+     */
+    private fun matchRow(found: PeopleStore.Reachable): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(KEYPAD_MARGIN_DP), dp(MATCH_ROW_PAD_DP), dp(KEYPAD_MARGIN_DP),
+                dp(MATCH_ROW_PAD_DP))
+        }
+
+        // The same square the contact list puts at the head of a row, at the same size:
+        // somebody found on the keypad is the same person the list shows, and a face that
+        // was a different size here would say they were a different kind of thing.
+        row.addView(
+            ContactFace(context, palette).apply {
+                setLetterSize(MATCH_FACE_SP)
+                show(found.contact)
+            },
+            LinearLayout.LayoutParams(dp(MATCH_FACE_DP), dp(MATCH_FACE_DP))
+        )
+
+        val words = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            isClickable = true
+            setOnClickListener {
+                Haptics.tap(it)
+                showProfile(found.contact.id)
+            }
+            TiltEffect.apply(this)
+        }
+        words.addView(TextView(context).apply {
+            text = found.contact.name
+            typeface = font(R.font.segoeui_regular)
+            textSize = 19f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(palette.foreground)
+            includeFontPadding = false
+        }, wide())
+        // The number they were found by, and not only for show: somebody with a work and a
+        // home number matched on one of them, and the rings act on that one.
+        words.addView(TextView(context).apply {
+            text = found.number
+            typeface = font(R.font.segoeui_regular)
+            textSize = 13f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(palette.foregroundSubtle)
+            setPadding(0, dp(3), 0, 0)
+        }, wide())
+        row.addView(words, LinearLayout.LayoutParams(0, WRAP, 1f).apply {
+            marginStart = dp(16)
+        })
+
+        // The ring, and only the one. A keypad is somebody about to make a call - that is
+        // what they opened it to do - and a second ring beside it for writing to them
+        // instead would be answering a question nobody asked here. Their card is a tap on
+        // the name away, and everything else about them is on it.
+        row.addView(reachKey(CALL_ICON) { place(found.number) }, ring(first = true))
+        return row
+    }
+
+    /**
+     * One key: what it types, what is written under it, and what holding it types instead.
+     *
+     * [held] is the plus on the zero and nothing anywhere else. It is the one thing on a
+     * telephone keypad that has never had a key of its own - there are twelve keys and
+     * thirteen things to type - and every phone since has put it under a long press on the
+     * nought, which is why the plus is printed there in the first place.
+     */
+    private data class Key(val digit: Char, val letters: String, val held: Char? = null)
+
+    private fun keyView(key: Key, onTap: () -> Unit, onHold: (Char) -> Unit): View =
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(keyFill())
-            setPadding(0, dp(12), 0, dp(12))
+            // Before the padding, which a view otherwise takes from whatever background it
+            // is handed - and this one has insets to report.
+            background = keyFace(keyFill())
+            setPadding(0, dp(KEY_PAD_DP), 0, dp(KEY_PAD_DP))
             isClickable = true
             setOnClickListener {
                 Haptics.key(it)
@@ -2051,40 +2280,90 @@ class PeopleApp(
                 DialTones.press(key.digit)
                 onTap()
             }
+            key.held?.let { second ->
+                setOnLongClickListener {
+                    // No tone, and no buzz of its own: there is no tone for a plus - it is
+                    // not something the line can hear, it is how a country code is written
+                    // down - and the framework gives the shell's tick as it claims a hold.
+                    onHold(second)
+                    true
+                }
+            }
             TiltEffect.apply(this)
 
             addView(TextView(context).apply {
                 text = key.digit.toString()
                 typeface = font(R.font.segoeui_semilight)
-                textSize = 30f
+                textSize = KEY_DIGIT_SP
                 includeFontPadding = false
                 setTextColor(palette.foreground)
                 gravity = Gravity.CENTER
+                // Centred by the ink rather than by the line it sits on.
+                //
+                // A line box is the same height whatever is written in it, and centring
+                // that centres the space rather than the mark. It makes no difference to
+                // the digits, which all fill their line the same way - and all the
+                // difference to the star, which is drawn up at the cap height with
+                // nothing below the middle of the em, so a centred line box left it
+                // sitting visibly above the middle of its own key.
+                val ink = android.graphics.Rect()
+                paint.getTextBounds(key.digit.toString(), 0, 1, ink)
+                val metrics = paint.fontMetrics
+                translationY =
+                    (metrics.ascent + metrics.descent) / 2f - (ink.top + ink.bottom) / 2f
             }, wide())
             // The letters are what tells a keypad from a calculator, and they are set
-            // small and quiet because nobody reads them - they are recognised. Kept as an
-            // invisible line on the keys that have none, so every key is the same height.
+            // small and quiet because nobody reads them - they are recognised.
+            //
+            // Gone rather than invisible on the keys that have none: the key is a fixed
+            // height now - see KEY_DP - so a line held open for nothing no longer keeps
+            // the rows level, it only pushes the star and the hash up off the middle of
+            // their own keys.
             addView(TextView(context).apply {
                 text = key.letters
                 typeface = font(R.font.segoeui_regular)
-                textSize = 10f
+                textSize = KEY_LETTERS_SP
                 letterSpacing = 0.12f
                 includeFontPadding = false
                 setTextColor(palette.foregroundSubtle)
                 gravity = Gravity.CENTER
-                setPadding(0, dp(4), 0, 0)
-                visibility = if (key.letters.isBlank()) View.INVISIBLE else View.VISIBLE
+                setPadding(0, dp(3), 0, 0)
+                visibility = if (key.letters.isBlank()) View.GONE else View.VISIBLE
             }, wide())
         }
 
-    private fun footKey(icon: String, fill: Int, onTap: () -> Unit): View =
+    /**
+     * A key's own paint, held half a gap in from the edge of the cell it is drawn in.
+     *
+     * What makes a keypad with no dead ground on it. The gaps used to be margins - space
+     * between the keys that belonged to neither of them, so a thumb landing a millimetre
+     * wide of a key hit nothing at all and the number stayed as it was. The gap is now
+     * inside the key that owns it: the same picture, and every pixel of the pad answers.
+     */
+    private fun keyFace(colour: Int): Drawable =
+        InsetDrawable(ColorDrawable(colour), dp(KEY_GAP_DP) / 2)
+
+    /**
+     * One of the three across the foot of the keypad.
+     *
+     * [ink] is said rather than worked out from [fill], because the one key that is not
+     * drawn in the page's own colours is not drawn in the palette's either: green is a
+     * colour this shell chose, and what reads on it is a decision that belongs with the
+     * green rather than with a rule about fills.
+     */
+    private fun footKey(
+        icon: String, fill: Int, ink: Int = palette.foreground, onTap: () -> Unit
+    ): View =
         ImageView(context).apply {
             setImageDrawable(rocks.gorjan.gokixp.wp81.SvgIcon.fromAsset(context, icon))
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            setBackgroundColor(fill)
-            imageTintList = android.content.res.ColorStateList.valueOf(
-                if (fill == palette.accent) palette.onAccent() else palette.foreground)
+            // The background first: it carries insets, and a view takes its padding from
+            // whatever background it is handed. See [keyFace].
+            background = keyFace(fill)
+            // Measured against the key rather than the cell: the cell grew by a gap when
+            // the gap moved inside it, and the same numbers would have grown the mark.
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            imageTintList = android.content.res.ColorStateList.valueOf(ink)
             isClickable = true
             setOnClickListener {
                 Haptics.key(it)
@@ -2424,6 +2703,9 @@ class PeopleApp(
         /** Rows built at a time, and added again as the reader nears the end of them. */
         const val CHUNK = 30
 
+        /** No day yet, for [lastHistoryDay]. Not zero: that is what an undated call gives. */
+        const val NO_DAY = Long.MIN_VALUE
+
         const val PAGE_MARGIN_DP = 22
 
         const val ICON_DIR = "custom_icons_8"
@@ -2439,7 +2721,14 @@ class PeopleApp(
         const val MESSAGE_ICON = "$ICON_DIR/appbar.message.svg"
         /** Mail. The hard-edged envelope, which is the one drawn as this shell draws. */
         const val EMAIL_ICON = "$ICON_DIR/appbar.email.hardedge.svg"
-        const val BACKSPACE_ICON = "$ICON_DIR/appbar.arrow.left.svg"
+        /**
+         * The delete key's mark: a cross backed into a shoulder, pointing left.
+         *
+         * A plain left arrow is the same mark the back key wears, and on a keypad whose
+         * other two foot keys add and call, an arrow reads as "go back" rather than as
+         * "take one off". This is the shape every telephone keypad has drawn there.
+         */
+        const val BACKSPACE_ICON = "$ICON_DIR/appbar.clear.inverse.reflect.horizontal.svg"
 
         /**
          * Which way a call went.
@@ -2509,11 +2798,51 @@ class PeopleApp(
         /** How many digits are typed before the keypad starts guessing who they belong to. */
         const val MATCH_FROM = 3
 
+        /**
+         * A digit key, at three quarters of the size it was drawn at first.
+         *
+         * The pad was a hand's worth of screen and the list of people it finds had what
+         * was left, which on a full name and number is not enough. Everything about the
+         * key comes down together - the air above and below the digit and both sizes of
+         * type - because a key with the same type on it in a shorter box is not a smaller
+         * key, it is a cramped one.
+         */
+        const val KEY_PAD_DP = 9
+        const val KEY_DIGIT_SP = 22.5f
+        const val KEY_LETTERS_SP = 10.5f
+
+        /**
+         * How tall a digit key is drawn.
+         *
+         * Said rather than left to the words on it, because the star and the hash have no
+         * words: a key that took its height from its contents was a key that stood shorter
+         * than its neighbours the moment the line of letters under the digit went away, so
+         * the line was kept open and empty and their glyphs sat above the middle of their
+         * own keys ever after. With the height fixed, the letters can simply go, and every
+         * key centres what is actually on it.
+         *
+         * The number is what the four rows come to at these sizes, with the air above and
+         * below the digit that [KEY_PAD_DP] asks for.
+         */
+        const val KEY_DP = 60
+
+        /**
+         * A face beside somebody the keypad found, and the row it sits in.
+         *
+         * ContactList's own numbers - see ContactList.FACE_DP and its ROW_DP, which is
+         * this padding either side of this square. Two lists in one shell whose rows are
+         * a different height with their faces at different sizes are two lists that
+         * merely resemble each other.
+         */
+        const val MATCH_FACE_DP = 42
+        const val MATCH_FACE_SP = 15f
+        const val MATCH_ROW_PAD_DP = 10
+
         val KEYS = listOf(
             listOf(Key('1', ""), Key('2', "ABC"), Key('3', "DEF")),
             listOf(Key('4', "GHI"), Key('5', "JKL"), Key('6', "MNO")),
             listOf(Key('7', "PQRS"), Key('8', "TUV"), Key('9', "WXYZ")),
-            listOf(Key('*', ""), Key('0', "+"), Key('#', ""))
+            listOf(Key('*', ""), Key('0', "+", held = '+'), Key('#', ""))
         )
 
         const val TAG = "WP81People"

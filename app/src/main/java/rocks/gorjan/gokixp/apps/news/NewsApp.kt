@@ -1,16 +1,22 @@
 package rocks.gorjan.gokixp.apps.news
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.view.Gravity
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.doOnPreDraw
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.wp81.NewsFeed
 import rocks.gorjan.gokixp.wp81.NewsImages
@@ -34,6 +40,8 @@ import rocks.gorjan.gokixp.wp81.MetroPanorama
  * It reads the feed the shell already holds instead of fetching its own: the tile has
  * usually been at it for a while by the time anyone opens this, and a second copy of the
  * same stories would only disagree with the first.
+ *
+ * Opened from the tile it opens *on* the story the tile was showing - see [reveal].
  */
 class NewsApp(
     private val context: Context,
@@ -72,6 +80,25 @@ class NewsApp(
      * reaches the bottom of the last.
      */
     private val pending = mutableMapOf<String, MutableList<NewsStory>>()
+
+    /**
+     * The story the reader was opened on, until it has been shown.
+     *
+     * Held rather than acted on once and forgotten: the host forces a fetch on the way in,
+     * and the rows this has to walk are all thrown away and built again when it lands. A
+     * story found and marked before that happens would be gone a second later.
+     */
+    private var revealing: NewsStory? = null
+
+    /**
+     * Which attempt at showing [revealing] is the live one.
+     *
+     * A reveal waits for a layout pass and then for the page to finish swinging in, and
+     * anything landing in between - the forced fetch, most of the time - starts it over on
+     * rows that did not exist when it began. The turn is what the waiting halves check
+     * before they act, so only the last attempt ever gets as far as scrolling.
+     */
+    private var revealTurn = 0
 
     fun createView(): View {
         root = FrameLayout(context).apply { setBackgroundColor(palette.background) }
@@ -151,6 +178,138 @@ class NewsApp(
     fun bind() {
         stale.addAll(columns.keys)
         columns.keys.elementAtOrNull(panorama.currentPage())?.let { bindSection(it) }
+        // The rows an outstanding reveal was measured against have just been thrown away.
+        // Ask again on the ones that replaced them - the story may have moved up the page.
+        revealOpening()
+    }
+
+    // ---------------------------------------------------------------- opening on a story
+
+    /**
+     * Runs the reader down to [story] and marks it for a moment.
+     *
+     * What joins the tile to the app behind it. The tile shows one headline at a time, and
+     * a tap on it is a tap on *that* story; landing at the top of a page of fifty and
+     * leaving the reader to find it again is the tile's own answer thrown away.
+     *
+     * Grey rather than the accent, and gone a second later: this is where you have been
+     * put, not something you have chosen, and a mark that stayed would say it was.
+     */
+    fun reveal(story: NewsStory) {
+        revealing = story
+        revealOpening()
+    }
+
+    /**
+     * Shows the story the reader was opened on, if it can be found yet.
+     *
+     * Where the story is looked for is where the tile got it from: the run of everything
+     * newest-first, which is the "latest" section, and the outlet's own section when there
+     * is only one outlet on and no "latest" to hold it.
+     */
+    private fun revealOpening() {
+        val story = revealing ?: return
+        // Taken first, so an attempt that finds nothing still calls off the one before it
+        // rather than leaving it to scroll to a row that has since been thrown away.
+        val turn = ++revealTurn
+        val section = sectionHolding(story)
+        if (section == null) {
+            // Dropped out of the feed, rather than not fetched into it yet: there is
+            // nothing left to go to, and holding on would scroll at some later refresh.
+            if (feed.stories().isNotEmpty()) revealing = null
+            return
+        }
+        val page = columns.keys.indexOf(section)
+        // Not animated: the app is opening, and a panorama sliding across underneath its
+        // own entrance is two movements saying the same thing.
+        if (page >= 0 && page != panorama.currentPage()) panorama.goTo(page, animated = false)
+        bindSection(section)
+        val list = columns[section] ?: return
+        val scroll = list.parent as? ScrollView ?: return
+        val row = rowFor(section, story) ?: run { revealing = null; return }
+
+        // Where the row sits is not known until it has been laid out, and the rows were
+        // built a moment ago - the panorama may never have been measured at all.
+        row.doOnPreDraw {
+            if (turn != revealTurn) return@doOnPreDraw
+            // And then after the page has finished turning in, so the scroll is something
+            // the reader watches happen rather than something buried under the entrance.
+            row.postDelayed({
+                if (turn != revealTurn) return@postDelayed
+                scroll.smoothScrollTo(0, (row.top - dp(REVEAL_GAP_DP)).coerceAtLeast(0))
+                highlight(row, turn)
+            }, OPENING_MS)
+        }
+    }
+
+    /** Which section holds [story], as the reader has them laid out. */
+    private fun sectionHolding(story: NewsStory): String? {
+        if (columns.containsKey(LATEST) && feed.stories().any { same(it, story) }) return LATEST
+        return columns.keys.firstOrNull { name ->
+            name != LATEST && feed.bySource()[name].orEmpty().any { same(it, story) }
+        }
+    }
+
+    /**
+     * The row [story] is on, building the rest of the section until it exists.
+     *
+     * A section builds a screenful at a time as it is scrolled, and the story being looked
+     * for is usually past the first screenful - a tile deep into its rotation is pointing
+     * at the twentieth headline. The rows it would have built on the way down are built
+     * here instead, all at once, because it is not being scrolled to.
+     */
+    private fun rowFor(section: String, story: NewsStory): View? {
+        val list = columns[section] ?: return null
+        while (true) {
+            for (i in 0 until list.childCount) {
+                val child = list.getChildAt(i)
+                val held = child.tag as? NewsStory ?: continue
+                if (same(held, story)) return child
+            }
+            if (pending[section].isNullOrEmpty()) return null
+            extendSection(section)
+        }
+    }
+
+    /**
+     * Whether two stories are the same one.
+     *
+     * By address where there is one, since a feed re-read between the tile showing a story
+     * and the reader opening on it hands back new objects for the same stories. By headline
+     * where there is not, which is all an undated, unlinked item can be told apart by.
+     */
+    private fun same(a: NewsStory, b: NewsStory): Boolean =
+        if (a.link.isNotBlank() && b.link.isNotBlank()) a.link == b.link
+        else a.title == b.title
+
+    /**
+     * Fades a grey band in behind one story and takes it away again.
+     *
+     * The page has moved on the reader's behalf, and this is what says where it moved to.
+     * The same grey the shell uses for chrome that is present without being active, so it
+     * reads as a light thrown on the row rather than as a state the row is now in.
+     */
+    private fun highlight(row: View, turn: Int) {
+        val band = ColorDrawable(palette.inactive).apply { alpha = 0 }
+        row.background = band
+        // In, held, out, in equal thirds - and linear, since a fade that eases at both
+        // ends of each third is three separate movements rather than one breath.
+        ValueAnimator.ofFloat(0f, 1f, 1f, 0f).apply {
+            duration = HIGHLIGHT_MS
+            interpolator = LinearInterpolator()
+            addUpdateListener { band.alpha = ((it.animatedValue as Float) * 255f).toInt() }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // Left as it was found. Only if it is still this band: a rebuild
+                    // partway through has already put another one on another row.
+                    if (row.background === band) row.background = null
+                    // And the reveal is over - unless a rebuild has already started
+                    // another one, which is now the one that owns the story.
+                    if (turn == revealTurn) revealing = null
+                }
+            })
+            start()
+        }
     }
 
     // ---------------------------------------------------------------- settings
@@ -281,6 +440,8 @@ class NewsApp(
             isClickable = true
             setOnClickListener { onOpenStory(story) }
             TiltEffect.apply(this)
+            // What it is a row for, so a story can be found again on the page. See [reveal].
+            tag = story
         }
 
         // Only where there is one. A picture column held open by an invisible view left
@@ -573,6 +734,20 @@ class NewsApp(
 
         /** Rows built at a time, and added again as the reader nears the end of them. */
         const val CHUNK = 12
+
+        /** Air left above a story the reader has been sent to. See [reveal]. */
+        const val REVEAL_GAP_DP = 12
+
+        /**
+         * How long a reveal waits before it moves.
+         *
+         * The length of the page's own entrance - MetroPageTransition.IN_MS. Scrolling
+         * underneath a page that is still swinging in is a movement nobody sees.
+         */
+        const val OPENING_MS = 260L
+
+        /** How long the grey band is up for, entrance and exit included. */
+        const val HIGHLIGHT_MS = 1400L
 
         const val DAY_MS = 24L * 60L * 60L * 1000L
     }

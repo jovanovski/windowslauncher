@@ -280,6 +280,7 @@ class KeyView(
      * the single most irritating way to get this wrong.
      */
     private var slideFrom = 0f
+    private var slideFromY = 0f
 
     /** How many characters the caret has already been moved this gesture. */
     private var slideSteps = 0
@@ -293,6 +294,7 @@ class KeyView(
                 longPressFired = false
                 repeatCount = 0
                 slideFrom = event.rawX
+                slideFromY = event.rawY
                 slideSteps = 0
                 sliding = false
                 // The gesture is this key's for as long as the finger is down, wherever it
@@ -377,6 +379,13 @@ class KeyView(
         val density = resources.displayMetrics.density
         if (!sliding) {
             if (kotlin.math.abs(travel) < SLIDE_SLOP_DP * density) return false
+            // And it has to be a sideways gesture, not a thumb rolling off the key. A press
+            // that comes off at an angle covers ground horizontally without anybody meaning
+            // it to, and distance alone cannot tell that from a deliberate slide - direction
+            // can. Asked only at the moment the gesture starts: once it is a slide it stays
+            // one, because a finger tracking along a row drifts vertically without meaning
+            // that either.
+            if (kotlin.math.abs(travel) < kotlin.math.abs(event.rawY - slideFromY)) return false
             sliding = true
             cancelHold()
             // Nothing is being typed any more, so nothing should look pressed either.
@@ -534,6 +543,26 @@ class KeyView(
     private fun textUnit(): Float = if (keyW > keyH) minOf(keyW * WIDE_KEY_SCALE, keyH) else keyW
 
     /**
+     * Where the key's character sits.
+     *
+     * Centred on its own ink, which is what makes a quote and a comma both look middled on a
+     * key despite living at opposite ends of the line - see the long note at the call site.
+     *
+     * Except for the characters in [ON_THE_LINE], where that rule destroys the character. An
+     * underscore is *defined* by sitting below the baseline; centre its ink in the key and it
+     * becomes a dash with delusions - which on the symbol page is a real problem, because the
+     * hyphen is two keys away and looked exactly the same. Those are placed on the line they
+     * would sit on in a word instead, which is the only place an underscore means anything.
+     */
+    private fun labelBaseline(label: String): Float {
+        if (label in ON_THE_LINE) {
+            val metrics = ink.fontMetrics
+            return faceCentreY - (metrics.ascent + metrics.descent) / 2f
+        }
+        return faceCentreY - (bounds.top + bounds.bottom) / 2f + labelDrop()
+    }
+
+    /**
      * How far below the middle a key's character sits.
      *
      * Optically rather than geometrically centred. A key with a mark in its top corner is not
@@ -630,12 +659,7 @@ class KeyView(
             // the box itself, and it gives the same answer as the naive version for the
             // letters that do sit on the baseline.
             ink.getTextBounds(label, 0, label.length, bounds)
-            canvas.drawText(
-                label,
-                width / 2f,
-                faceCentreY - (bounds.top + bounds.bottom) / 2f + labelDrop(),
-                ink
-            )
+            canvas.drawText(label, width / 2f, labelBaseline(label), ink)
         }
 
         hintGlyph?.let { mark ->
@@ -775,13 +799,26 @@ class KeyView(
         const val FIRST_REPEAT_MS = 400L
 
         /**
+         * Characters placed by the baseline rather than centred on their own ink.
+         *
+         * The ones whose position below the line is the character. See [labelBaseline].
+         */
+        val ON_THE_LINE = setOf("_")
+
+        /**
          * How far sideways before a press on the space bar becomes a caret slide.
          *
-         * Comfortably past the wobble in a tap and well short of a deliberate drag. Too small
-         * and the space bar stops typing spaces reliably, which is the worst thing a keyboard
-         * can do; too large and the gesture feels like it has to be argued for.
+         * It was ten, which is barely past the system's own touch slop of about eight - the
+         * distance below which Android does not consider a finger to have moved at all. That
+         * is the right threshold for "a drag rather than a tap" and much too low for "a drag
+         * rather than a *space*": the space bar is pressed constantly, by a thumb, at speed,
+         * and a keyboard that stops reliably typing spaces has broken the one key it cannot
+         * afford to.
+         *
+         * More than twice that now, so the gesture has to be meant. It stays cheap to ask
+         * for, because the caret only starts moving after [SLIDE_STEP_DP] more.
          */
-        const val SLIDE_SLOP_DP = 10f
+        const val SLIDE_SLOP_DP = 22f
 
         /** And how far per character after that. About a fingertip's width of travel. */
         const val SLIDE_STEP_DP = 12f

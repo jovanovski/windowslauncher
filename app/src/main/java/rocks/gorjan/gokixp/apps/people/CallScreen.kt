@@ -21,6 +21,22 @@ import rocks.gorjan.gokixp.wp81.TiltEffect
 import rocks.gorjan.gokixp.wp81.WP81Palette
 
 /**
+ * The green a call button is, whatever the phone's accent is.
+ *
+ * The two places in this shell where a colour is not the user's choice, and they are the
+ * same place twice: the button that takes a call, and the button that places one. Every
+ * other button in here says "this is the command in force" and takes the accent to say
+ * it. These two say "this is the one that starts the call", each of them next to a button
+ * an inch away that does the opposite - ends it, or saves the number instead - and green
+ * has meant this on a telephone for longer than any of this has existed. A phone whose
+ * accent happened to be red would otherwise put a red button under "answer".
+ *
+ * Windows Phone's own Green, from the twenty the theme picker offered, so it still belongs
+ * to the palette even where it is not the palette's choice. See ThemeManager.WP81_ACCENTS.
+ */
+internal const val CALL_GREEN = 0xFF60A917.toInt()
+
+/**
  * The screen a call is on.
  *
  * Windows Phone gave a call the whole display and almost nothing on it: who it is, in type
@@ -106,8 +122,23 @@ class CallScreen(
     private var muteButton: CallButton? = null
     private var holdButton: CallButton? = null
 
-    /** The DTMF pad, while it is up over the call. */
-    private var keypad: View? = null
+    /** The one of the four that is a switch. Lit while its pad is up. See [showKeypad]. */
+    private var keypadButton: CallButton? = null
+
+    /** The DTMF pad, in the caller's picture's place. Gone unless it has been asked for. */
+    private val dtmfPad = LinearLayout(context)
+
+    /** What has been typed into it so far, on the line above the keys. */
+    private val dtmfReadout = TextView(context)
+
+    /**
+     * The empty stretch that holds the controls at the foot.
+     *
+     * It and the pad are the two things in the column that take whatever height is going,
+     * and only ever one of them at a time: the pad takes the room this was holding, which
+     * is how it arrives without moving anything else on the screen.
+     */
+    private val filler = View(context)
 
     /** The quick replies, while they are up over a ringing call. */
     private var quickReplies: View? = null
@@ -130,7 +161,7 @@ class CallScreen(
      * The window is edge to edge, which is right for the picture behind everything and
      * wrong for the type in front of it: the elapsed time sat under the clock in the status
      * bar. Held here and added to the page's own margin rather than set once, because the
-     * keypad is built later and has to clear the same bars.
+     * bars are measured after the page is built and can change under it afterwards.
      */
     private var barInsets: androidx.core.graphics.Insets = androidx.core.graphics.Insets.NONE
 
@@ -176,9 +207,15 @@ class CallScreen(
             topMargin = dp(26)
         })
 
+        // In the picture's place, and never both. See [showKeypad].
+        buildKeypad()
+        column.addView(dtmfPad, LinearLayout.LayoutParams(MATCH, 0, 1f).apply {
+            topMargin = dp(26)
+        })
+
         // The controls sit at the foot whatever the screen's height, with the space above
         // them - which is the space the name and the face are in.
-        column.addView(View(context), LinearLayout.LayoutParams(MATCH, 0, 1f))
+        column.addView(filler, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
         ringingRow.orientation = LinearLayout.HORIZONTAL
         column.addView(ringingRow, wide())
@@ -202,14 +239,12 @@ class CallScreen(
     /** Pushes the page in off the bars, leaving the picture behind it running to the edges. */
     private fun applyInsets() {
         val edge = dp(MARGIN_DP)
-        for (page in listOfNotNull(column, keypad)) {
-            page.setPadding(
-                edge + barInsets.left,
-                edge + barInsets.top + dp(HEADS_UP_DP),
-                edge + barInsets.right,
-                edge + barInsets.bottom
-            )
-        }
+        column.setPadding(
+            edge + barInsets.left,
+            edge + barInsets.top + dp(HEADS_UP_DP),
+            edge + barInsets.right,
+            edge + barInsets.bottom
+        )
     }
 
     // ---------------------------------------------------------------- who
@@ -272,7 +307,7 @@ class CallScreen(
             LinearLayout.LayoutParams(0, dp(ACTION_DP), 1f)
         )
         answers.addView(
-            wideButton("answer", CALL_ICON, ANSWER_GREEN) {
+            wideButton("answer", CALL_ICON, CALL_GREEN) {
                 // Set here as well as on the swap below, because the two are not the same
                 // moment: the call is answered now and the buttons change when Telecom
                 // says the call is up, and a tap landing in between should not count.
@@ -438,7 +473,13 @@ class CallScreen(
         }
         // The keypad is one of the four and is drawn as one: it had no fill behind it,
         // which made it the only glyph on the row floating on the black.
-        val keys = CallButton(KEYPAD_ICON) { showKeypad() }
+        //
+        // The only one of the four that is a switch rather than a command, and it is drawn
+        // as one for the same reason the other three are: pressed again it puts the pad
+        // away, and it carries the accent while the pad is up the way speaker, mute and
+        // hold carry it for a mode in force.
+        val keys = CallButton(KEYPAD_ICON) { if (!hideKeypad()) showKeypad() }
+        keypadButton = keys
         for ((index, button) in listOf(speakerButton!!, muteButton!!, holdButton!!, keys)
             .withIndex()) {
             row.addView(button.view, LinearLayout.LayoutParams(0, dp(BUTTON_DP), 1f).apply {
@@ -537,32 +578,31 @@ class CallScreen(
     /**
      * The tones, for the machine at the other end.
      *
-     * Over the call rather than instead of it: what is typed here is not a number being
-     * dialled, it is a menu being answered, and the call it belongs to has to stay on
-     * screen behind it. Closed by the same key that opened it.
+     * Built once and kept, because it is part of the call screen rather than something
+     * laid over it. See [showKeypad] for why that distinction is the whole of it.
      */
-    private fun showKeypad() {
-        if (keypad != null) return
-        typed.setLength(0)
-        val page = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.BLACK)
-            isClickable = true
-            setPadding(dp(MARGIN_DP), dp(MARGIN_DP), dp(MARGIN_DP), dp(MARGIN_DP))
-        }
-        val readout = TextView(context).apply {
+    private fun buildKeypad() {
+        dtmfPad.orientation = LinearLayout.VERTICAL
+        dtmfPad.visibility = View.GONE
+
+        dtmfReadout.apply {
             typeface = font(R.font.segoeui_light)
             textSize = 34f
             maxLines = 1
             gravity = Gravity.CENTER
+            // Cut at the front. A run of tones is a menu being worked through, and what
+            // matters is the digit just pressed rather than the one pressed a minute ago.
             ellipsize = android.text.TextUtils.TruncateAt.START
             setTextColor(Color.WHITE)
             setPadding(0, dp(8), 0, dp(14))
         }
-        page.addView(readout, wide())
+        dtmfPad.addView(dtmfReadout, wide())
 
         val keys = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
+            // Centred in whatever is left between the name and the controls: the keys are
+            // sized off the width, so on a tall screen the slack falls above and below
+            // them rather than all of it landing between them and the row of buttons.
             gravity = Gravity.CENTER_VERTICAL
         }
         for (row in DTMF_KEYS) {
@@ -572,7 +612,7 @@ class CallScreen(
                     dtmfKey(digit) {
                         CallCentre.dtmf(digit)
                         typed.append(digit)
-                        readout.text = typed.toString()
+                        dtmfReadout.text = typed.toString()
                     },
                     LinearLayout.LayoutParams(0, WRAP, 1f).apply {
                         setMargins(dp(GAP_DP) / 2, dp(GAP_DP) / 2, dp(GAP_DP) / 2, dp(GAP_DP) / 2)
@@ -581,20 +621,31 @@ class CallScreen(
             }
             keys.addView(line, wide())
         }
-        page.addView(keys, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        dtmfPad.addView(keys, LinearLayout.LayoutParams(MATCH, 0, 1f))
+    }
 
-        page.addView(
-            wideButton("hide keypad", KEYPAD_ICON, fill()) { hideKeypad() },
-            LinearLayout.LayoutParams(MATCH, dp(ACTION_DP))
-        )
-        page.addView(
-            wideButton("end call", HANGUP_ICON, palette.accent) { CallCentre.hangUp() },
-            LinearLayout.LayoutParams(MATCH, dp(ACTION_DP)).apply { topMargin = dp(GAP_DP) }
-        )
-
-        keypad = page
-        addView(page, LayoutParams(MATCH, MATCH))
-        applyInsets()
+    /**
+     * Puts the pad up, in the caller's picture's place.
+     *
+     * What is typed here is not a number being dialled, it is a menu being answered, and
+     * who you are answering it to has to stay on screen while you do. So the pad takes the
+     * one part of the page that is a picture rather than a fact - the square with their
+     * face on it - and nothing else moves: the name and the elapsed time stay above it,
+     * the row of things you can do to the call stays below, and the key that opened the
+     * pad is on that row, lit, to close it again.
+     *
+     * It used to be a page of its own laid over the whole call, which is the one thing a
+     * pad for a call in progress must not be: a screen with no call on it, wearing a
+     * second "end call" bar because the real one had been covered up.
+     */
+    private fun showKeypad() {
+        if (dtmfPad.visibility == View.VISIBLE) return
+        typed.setLength(0)
+        dtmfReadout.text = ""
+        face.visibility = View.GONE
+        filler.visibility = View.GONE
+        dtmfPad.visibility = View.VISIBLE
+        keypadButton?.setOn(true)
     }
 
     /**
@@ -608,9 +659,11 @@ class CallScreen(
 
     /** Puts the pad away, and says whether there was one. The back key asks this. */
     fun hideKeypad(): Boolean {
-        val page = keypad ?: return false
-        keypad = null
-        removeView(page)
+        if (dtmfPad.visibility != View.VISIBLE) return false
+        dtmfPad.visibility = View.GONE
+        face.visibility = View.VISIBLE
+        filler.visibility = View.VISIBLE
+        keypadButton?.setOn(false)
         return true
     }
 
@@ -843,22 +896,6 @@ class CallScreen(
             "Can't talk now, call me later",
             "Can't talk now"
         )
-
-        /**
-         * Answering is green, whatever the phone's accent is.
-         *
-         * The one place in this shell where a colour is not the user's choice. Every other
-         * button here says "this is the command in force" and takes the accent to say it;
-         * this one says "this is the one that takes the call", against another button an
-         * inch away that ends it - and green has meant that on a telephone for longer than
-         * any of this has existed. A phone whose accent happened to be red would otherwise
-         * put a red button under "answer".
-         *
-         * Windows Phone's own Green, from the twenty the theme picker offered, so it still
-         * belongs to the palette even where it is not the palette's choice. See
-         * ThemeManager.WP81_ACCENTS.
-         */
-        const val ANSWER_GREEN = 0xFF60A917.toInt()
 
         /** Grey on black for anything that is not the one thing the screen is asking. */
         const val FILL_ALPHA = 0.16f

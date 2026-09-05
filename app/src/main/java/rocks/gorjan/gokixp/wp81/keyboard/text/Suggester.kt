@@ -47,7 +47,8 @@ data class Candidate(
 class Suggester(
     private val dictionary: Dictionary?,
     layout: KeyboardLayout,
-    private val user: UserDictionary? = null
+    private val user: UserDictionary? = null,
+    private val bigrams: Bigrams? = null
 ) {
 
     private val proximity = Proximity(layout)
@@ -124,8 +125,9 @@ class Suggester(
      * @param typed what the user has actually pressed. Returned candidates never include it -
      *   the caller is expected to offer the literal text itself, always and first, so that an
      *   unwanted correction is one tap to reject.
-     * @param previousWord the word before this one, for next-word prediction. Only the
-     *   learned dictionary has an opinion; the shipped one holds no bigrams.
+     * @param previousWord the word before this one. Words known to follow it are lifted, so
+     *   that `thank y` finds `you` ahead of `your` and `year`. Both sources of pairs have an
+     *   opinion - the shipped table and what has been learned - and [followers] merges them.
      */
     fun candidates(typed: CharSequence, previousWord: String? = null): List<Candidate> {
         found.clear()
@@ -171,7 +173,8 @@ class Suggester(
         // The learned dictionary gets the same treatment as the shipped one but is consulted
         // separately, because it is a different shape - a short list rather than a trie - and
         // is small enough that scanning it costs nothing.
-        user?.let { collectLearned(it, typed, previousWord, budget) }
+        user?.let { collectLearned(it, typed) }
+        previousWord?.let { collectFollowing(typed, it) }
 
         // If the keyboard can finish the word, it should not also offer to shorten it.
         //
@@ -203,19 +206,70 @@ class Suggester(
     }
 
     /**
+     * Whether the shipped word list has [word], as opposed to the keyboard having learned it.
+     *
+     * The bin needs the difference. A word the keyboard only knows because it watched
+     * somebody type it can be taken back completely, because without that typing it would
+     * never have existed; a word of the language stays a word of the language, and all the
+     * user is saying is that they do not want it offered *here*.
+     */
+    fun isShipped(word: String): Boolean = dictionary?.contains(word) == true
+
+    /**
      * Words that could follow [previousWord], for the bar to show before anything is typed.
      *
-     * Empty until the user has typed enough for the keyboard to have learned some pairs. The
-     * shipped word lists are frequency-only - the corpus behind them was tokenized in a way
-     * that discarded word order entirely - so this is the one part of prediction that starts
-     * out knowing nothing and gets better with use.
+     * Empty for a language with no shipped table until the user has typed enough for the
+     * keyboard to have learned some pairs of its own - which is most of them: twenty-two
+     * layouts, and one [Bigrams] file.
      */
     fun following(previousWord: String?): List<Candidate> {
         val word = previousWord ?: return emptyList()
-        val learned = user ?: return emptyList()
-        return learned.following(word).take(LIMIT).map { (next, weight) ->
+        return followers(word).take(LIMIT).map { (next, weight) ->
             Candidate(next, weight, corrected = true)
         }
+    }
+
+    /**
+     * Words that tend to begin a sentence, for a bar with nothing at all to go on.
+     *
+     * Separate from [following] and not simply what it returns for a null previous word,
+     * because the caller is the only one who can tell the two apart. There is no previous
+     * word at the start of a sentence *and* there is none when somebody has just tapped into
+     * the middle of a paragraph, and offering the openers of English in the second case would
+     * be the keyboard talking over them.
+     */
+    fun starting(): List<Candidate> =
+        bigrams?.starters().orEmpty()
+            .filter { user?.isBlocked(it.first) != true }
+            .take(LIMIT)
+            .map { (word, weight) -> Candidate(word, weight, corrected = true) }
+
+    /**
+     * Everything known to follow [previousWord], from both sources, best first.
+     *
+     * The merge is one line and the policy behind it is the point. Where the two agree on a
+     * word the higher weight wins, and the scales are arranged so that means something: the
+     * shipped table tops out at 190 and a pair the user has typed five times is worth 190 too,
+     * so the corpus is what the keyboard thinks until this person has said otherwise, and
+     * then it is what this person thinks. See `weigh` in the builder, and `LEARNED_FLOOR`.
+     */
+    private fun followers(previousWord: String): List<Pair<String, Int>> {
+        // Filtered on the shipped side only: what comes back from the learned dictionary has
+        // already been through the same test, and it is the one holding the list.
+        val shipped = bigrams?.following(previousWord).orEmpty().filter { (word, _) ->
+            user?.isBlockedAfter(previousWord, word) != true && user?.isBlocked(word) != true
+        }
+        val learned = user?.following(previousWord).orEmpty()
+        if (shipped.isEmpty()) return learned
+        if (learned.isEmpty()) return shipped
+
+        val merged = LinkedHashMap<String, Int>(shipped.size + learned.size)
+        for ((word, weight) in learned) merged[word] = weight
+        for ((word, weight) in shipped) {
+            val held = merged[word]
+            if (held == null || weight > held) merged[word] = weight
+        }
+        return merged.entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
 
     /**
@@ -358,12 +412,7 @@ class Suggester(
         }
     }
 
-    private fun collectLearned(
-        learned: UserDictionary,
-        typed: CharSequence,
-        previousWord: String?,
-        budget: Int
-    ) {
+    private fun collectLearned(learned: UserDictionary, typed: CharSequence) {
         val prefix = typed.toString()
         for ((word, weight) in learned.matching(prefix)) {
             // A learned word is only offered as an exact prefix match, never as a correction.
@@ -372,11 +421,22 @@ class Suggester(
             val cost = (word.length - prefix.length).coerceAtLeast(0) * TAIL
             keep(word, COMPLETION_BONUS + weight * FREQUENCY_WEIGHT - cost * COST_WEIGHT)
         }
-        if (previousWord != null) {
-            for ((word, weight) in learned.following(previousWord)) {
-                if (word.startsWith(prefix, ignoreCase = true)) {
-                    keep(word, COMPLETION_BONUS + (weight + BIGRAM_BONUS) * FREQUENCY_WEIGHT)
-                }
+    }
+
+    /**
+     * Lifts the words known to follow [previousWord], when the typed text starts one of them.
+     *
+     * The one place the two halves of prediction meet the spelling half, and it is worth more
+     * than the empty bar is. `thank y` has three ordinary completions - `you`, `your`, `year`
+     * - that frequency alone cannot choose between, and the previous word settles it
+     * instantly. [BIGRAM_BONUS] is what that certainty is worth against the word's own
+     * commonness.
+     */
+    private fun collectFollowing(typed: CharSequence, previousWord: String) {
+        val prefix = typed.toString()
+        for ((word, weight) in followers(previousWord)) {
+            if (word.startsWith(prefix, ignoreCase = true)) {
+                keep(word, COMPLETION_BONUS + (weight + BIGRAM_BONUS) * FREQUENCY_WEIGHT)
             }
         }
     }
@@ -526,6 +586,13 @@ class Suggester(
         // out of a bar that only holds a handful.
         if (word.equals(searching, ignoreCase = true)) return
 
+        // And never something thrown in the bin. Here rather than in each search, because
+        // this is the one place every candidate from every source passes through, and a word
+        // the user has deleted coming back from the *other* search would be the whole point
+        // of the gesture missed. Costs a field read when nothing has ever been binned, which
+        // is almost every keyboard - see [UserDictionary.isBlocked].
+        if (user?.isBlocked(word) == true) return
+
         for (i in found.indices) {
             if (found[i].word == word) {
                 // The same word can arrive from both searches, and from the learned list.
@@ -654,7 +721,7 @@ class Suggester(
          */
         const val MIN_PART = 2
 
-        /** What a learned pairing is worth on top of the word's own weight. */
+        /** What a known pairing is worth on top of the word's own weight. */
         const val BIGRAM_BONUS = 120
 
         /** The bar shows a handful; searching for more would be work thrown away. */

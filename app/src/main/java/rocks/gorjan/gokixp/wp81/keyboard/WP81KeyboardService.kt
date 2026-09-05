@@ -25,6 +25,7 @@ import androidx.core.view.inputmethod.InputContentInfoCompat
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.theme.ThemeManager
 import rocks.gorjan.gokixp.wp81.WP81Palette
+import rocks.gorjan.gokixp.wp81.keyboard.text.Bigrams
 import rocks.gorjan.gokixp.wp81.keyboard.text.Composer
 import rocks.gorjan.gokixp.wp81.keyboard.text.Dictionary
 import rocks.gorjan.gokixp.wp81.keyboard.text.Suggester
@@ -241,6 +242,7 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         view.keyboard.setLayout(language)
         view.bar.onWordPicked = { index -> takeSuggestion(index) }
         view.bar.onVoice = { toggleVoice() }
+        view.bar.onWordForgotten = { index -> forgetSuggestion(index) }
         view.bar.onClipboard = { showClipboardHistory() }
         host = view
         return view
@@ -288,7 +290,11 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         // are not the same kind of work and should not wait for each other.
         loads.execute {
             val dictionary = Dictionary.load(this, layout.language)
-            val built = Suggester(dictionary, layout, learned)
+            // On the same thread and for the same reason: another asset to inflate and parse,
+            // and the keyboard is no more able to afford it on the first keystroke than it
+            // was able to afford the trie.
+            val bigrams = Bigrams.load(this, layout.language)
+            val built = Suggester(dictionary, layout, learned, bigrams)
             onMain.post {
                 suggesters[id] = built
                 warming = null
@@ -581,9 +587,7 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
             EditorInfo.IME_ACTION_DONE -> "done"
             else -> null
         }
-        // Send is the one action the phone coloured, because it is the one that cannot be
-        // taken back once it has been pressed.
-        view.setEnterKey(label, accent = action == EditorInfo.IME_ACTION_SEND)
+        view.setEnterKey(label)
     }
 
     /**
@@ -864,12 +868,20 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         val bar = host?.bar ?: return
         val typed = composer.typed
         if (typed.isEmpty()) {
-            // Nothing typed: offer what tends to follow the last word, if anything has been
-            // learned. Empty on a fresh install, and better the more the keyboard is used.
-            val next = suggester()?.following(previousWord)?.map { it.word }.orEmpty()
-                .take(BAR_SLOTS)
-            offered = next
-            bar.setWords(next, emphasised = -1)
+            // Nothing typed: offer what tends to follow the last word. The shipped table has
+            // an opinion from the first keystroke of a fresh install, and what has been
+            // learned is merged over the top of it and wins where the two disagree.
+            val engine = suggester()
+            val next = when {
+                previousWord != null -> engine?.following(previousWord)
+                // No previous word means one of two quite different things, and only the
+                // field can say which. See [atSentenceStart].
+                atSentenceStart() -> engine?.starting()
+                else -> null
+            }
+            val words = next?.map { it.word }.orEmpty().take(BAR_SLOTS)
+            offered = words
+            bar.setWords(words, emphasised = -1)
             return
         }
 
@@ -926,6 +938,33 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         }
     }
 
+    /**
+     * Whether the caret is at the start of a sentence rather than merely between words.
+     *
+     * [previousWord] is null in two situations that look identical from here and are not. One
+     * is a fresh field, or the moment after a full stop: there is nothing before the caret
+     * because a sentence has not started yet, and the openers of the language are exactly
+     * what to offer. The other is somebody tapping into the middle of a paragraph they wrote
+     * yesterday, where the keyboard has simply lost track - and answering that with `i`, `you`
+     * and `the` is the keyboard talking over them about a sentence it cannot see.
+     *
+     * So the field is asked. Two characters, on a path that runs when the bar has nothing to
+     * show anyway - not on every keystroke, which is where round trips have to be counted.
+     */
+    private fun atSentenceStart(): Boolean = try {
+        val before = currentInputConnection?.getTextBeforeCursor(2, 0)
+        when {
+            before.isNullOrEmpty() -> true
+            // A sentence that has ended, and the space after it.
+            before.length == 2 && before[1] == ' ' && before[0] in SENTENCE_END -> true
+            before.last() == '\n' -> true
+            else -> false
+        }
+    } catch (e: Exception) {
+        // No answer is not a reason to guess that a sentence is starting.
+        false
+    }
+
     /** Whether what has been typed is itself a word, which stops it being corrected away. */
     private fun typedIsAWord(): Boolean {
         val dictionary = suggester() ?: return false
@@ -968,13 +1007,77 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
             phantomSpace = true
         } else {
             // A next-word prediction, with nothing being composed.
-            val spaced = previousWord != null
-            commit(if (spaced) "$word " else word)
-            phantomSpace = spaced
-            previousWord = word
-            learned?.learn(word)
+            //
+            // Capitalised if shift is up, because that is what would have happened had the
+            // word been typed rather than tapped. The predictions offered at the start of a
+            // sentence are the openers of the language - `i`, `you`, `the` - and the field
+            // has usually just asked for a capital, so without this the one place the bar is
+            // most useful is the one place it inserts something visibly wrong.
+            val text = when (shiftState) {
+                ShiftState.LOCKED -> word.uppercase()
+                ShiftState.ONCE -> word.replaceFirstChar { it.uppercase() }
+                ShiftState.OFF -> word
+            }
+            // A one-shot shift is spent by the word it capitalised, exactly as a letter key
+            // spends it. A locked one is not.
+            if (shiftState == ShiftState.ONCE) setShift(ShiftState.OFF)
+            // The space is unconditional, which it was not before. It did not need to be:
+            // the bar could only offer a prediction when there *was* a previous word, so the
+            // other branch was unreachable. Sentence starters reach it, and a starter taken
+            // without a space behind it means the next word is typed straight onto it.
+            commit("$text ")
+            phantomSpace = true
+            previousWord = text
+            learned?.learn(text)
             refreshCandidates()
         }
+    }
+
+    /**
+     * A suggestion was dragged to the bin.
+     *
+     * What "forget" means depends on which of the three things the bar was showing, and the
+     * distinction is the whole of getting this right:
+     *
+     *  - **A prediction** - nothing typed, a word offered because of the one before it. The
+     *    complaint is about the pairing, so the pairing goes. `see` should stop being
+     *    followed by `ya`; `ya` itself is none of the keyboard's business.
+     *  - **A completion or correction** - something typed, and this is one of the words
+     *    offered for it. The complaint is about the word, so the word goes.
+     *  - **The literal text**, which is never a suggestion. Nothing to forget: it is what the
+     *    user's own fingers just did, and the bar says so rather than doing nothing.
+     *
+     * A word the shipped list has never heard of is then taken back entirely whichever of
+     * those it was. It exists only because it was typed once, and if that once was a mistake
+     * then leaving it means meeting it again tomorrow, spelled out of its own first letters.
+     */
+    private fun forgetSuggestion(index: Int) {
+        val word = offered.getOrNull(index)?.takeIf { it.isNotBlank() } ?: return
+        val dictionary = learned ?: return
+
+        if (composer.isComposing && index == 0) {
+            say("that is what you typed")
+            return
+        }
+
+        val after = if (composer.isComposing) null else previousWord
+        val known = dictionary.knowsAnythingAbout(word, after)
+        if (after != null) dictionary.forgetPair(after, word) else dictionary.forgetWord(word)
+        // Learned-only, so it goes altogether. See the note above.
+        if (suggester()?.isShipped(word) != true) dictionary.forgetWord(word)
+        dictionary.flush()
+
+        // Said either way, because "nothing happened" and "nothing was there to happen" look
+        // identical from the outside and only one of them is worth wondering about. The
+        // second wording is the honest one when the keyboard had learned nothing: the word
+        // still stops being offered, but it was never something this person taught it.
+        say(if (known) "$word forgotten" else "$word will not be suggested")
+    }
+
+    /** Puts a line on the bar for a moment, then gives it back to the suggestions. */
+    private fun say(message: String) {
+        host?.bar?.setMessage(message)
+        onMain.postDelayed({ host?.bar?.setMessage(null); refreshCandidates() }, MESSAGE_MS)
     }
 
     /**
@@ -1427,6 +1530,16 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
     private var dictated = ""
 
     /**
+     * What goes in front of the next dictated words - a space, or nothing.
+     *
+     * A recogniser settles a sentence at a time. Pause mid-thought and what has been said so
+     * far is final and gets committed; the words after the pause arrive as a fresh hypothesis
+     * that knows nothing about them, and composing text goes in at the caret - hard against
+     * the last committed letter. Without this, a pause between two words reads as "twowords".
+     */
+    private var dictationLead = ""
+
+    /**
      * The microphone, pressed.
      *
      * A toggle rather than a hold: dictating a sentence takes longer than anyone wants to
@@ -1464,6 +1577,7 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         }
 
         dictated = ""
+        dictationLead = leadForDictation()
         val listener = object : VoiceInput.Listener {
             override fun onPartial(text: String) = showDictation(text)
 
@@ -1477,6 +1591,10 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
                     // The field can go away mid-sentence.
                 }
                 dictated = ""
+                // Asked of the field rather than assumed to be a space: the committed words
+                // are behind the caret now, and this is the one place that knows whether the
+                // application moved it somewhere else in the meantime.
+                dictationLead = leadForDictation()
                 previousWord = text.substringAfterLast(' ').ifBlank { null }
             }
 
@@ -1486,8 +1604,7 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
                 if (error != null) {
                     // Said on the bar rather than swallowed. A microphone that does nothing
                     // and explains nothing is the worst of the possible outcomes.
-                    host?.bar?.setMessage(error)
-                    onMain.postDelayed({ host?.bar?.setMessage(null); refreshCandidates() }, MESSAGE_MS)
+                    say(error)
                 } else {
                     refreshCandidates()
                 }
@@ -1581,10 +1698,31 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
     private fun showDictation(text: String) {
         dictated = text
         try {
-            currentInputConnection?.setComposingText(text, 1)
+            // The lead is part of the composing text, not committed ahead of it, so that a
+            // revised hypothesis replaces the space along with the words it belonged to.
+            currentInputConnection?.setComposingText(dictationLead + text, 1)
         } catch (e: Exception) {
             // The field can go away mid-sentence.
         }
+    }
+
+    /**
+     * Whether the next dictated words need a space in front of them.
+     *
+     * Only the character behind the caret decides it. Nothing there, whitespace, or a bracket
+     * something was about to be said inside of, and the words go straight in; anything else -
+     * a letter, a full stop, the end of the last thing dictated - and they need separating.
+     */
+    private fun leadForDictation(): String = try {
+        val before = currentInputConnection?.getTextBeforeCursor(1, 0)
+        if (before.isNullOrEmpty() || before[0].isWhitespace() || before[0] in OPENING) {
+            ""
+        } else {
+            " "
+        }
+    } catch (e: Exception) {
+        // Nothing said back means nothing to butt against.
+        ""
     }
 
     private fun stopVoice() {
@@ -1910,6 +2048,12 @@ class WP81KeyboardService : InputMethodService(), KeyView.Listener {
         const val RESUME_LOOKBACK = 48
 
         const val ATTACHING = ".,!?:;)]}%\u2026\"'\u2019@/"
+
+        /** What ends a sentence, for [atSentenceStart]. */
+        const val SENTENCE_END = ".!?\u2026"
+
+        /** Punctuation that a dictated phrase follows without a space. See [leadForDictation]. */
+        const val OPENING = "([{\u201c\u2018"
 
         const val DOUBLE_SPACE_MS = 900L
     }

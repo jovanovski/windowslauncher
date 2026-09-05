@@ -17,14 +17,69 @@ fun momentOf(context: Context, at: Long): String {
     if (at <= 0L) return ""
     val locale = java.util.Locale.getDefault()
     val moment = java.util.Calendar.getInstance().apply { timeInMillis = at }
-    val time = java.text.SimpleDateFormat(
-        if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a",
-        locale
-    ).format(moment.time)
+    val time = timeOf(context, at)
     return when (daysAgo(moment)) {
         0 -> time
         1 -> "yesterday, $time"
         else -> java.text.SimpleDateFormat("d MMM, ", locale).format(moment.time) + time
+    }
+}
+
+/**
+ * The clock alone, with nothing about which day it was.
+ *
+ * For a list that says the day in a heading over the rows instead - see [dayHeadingOf] -
+ * where a date on every row is the same thing said twice, once in a place nobody is
+ * reading. In the phone's own 12- or 24-hour setting, like every other time here.
+ */
+fun timeOf(context: Context, at: Long): String {
+    if (at <= 0L) return ""
+    return java.text.SimpleDateFormat(
+        if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a",
+        java.util.Locale.getDefault()
+    ).format(java.util.Date(at))
+}
+
+/**
+ * Which day [at] fell on, as something two moments can be compared by.
+ *
+ * The midnight that started it, in the reader's own zone - so two calls either side of
+ * lunch match and two either side of midnight do not, which is the whole question a list
+ * grouped by day is asking. Zero for a moment there is no date for.
+ */
+fun dayOf(at: Long): Long {
+    if (at <= 0L) return 0L
+    return java.util.Calendar.getInstance().apply {
+        timeInMillis = at
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
+}
+
+/**
+ * What to write over a day's worth of rows.
+ *
+ * The two days that have names of their own have them, and everything older is a date -
+ * which is what a reader scrolling back is looking for by then, the names having run out
+ * after yesterday. The year only once it is not this one, because writing it on every
+ * heading is a word of noise for the eleven months where it cannot be anything else.
+ */
+fun dayHeadingOf(at: Long): String {
+    if (at <= 0L) return ""
+    val locale = java.util.Locale.getDefault()
+    val moment = java.util.Calendar.getInstance().apply { timeInMillis = at }
+    return when (daysAgo(moment)) {
+        0 -> "today"
+        1 -> "yesterday"
+        else -> {
+            val thisYear = moment.get(java.util.Calendar.YEAR) ==
+                java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+            java.text.SimpleDateFormat(if (thisYear) "d MMMM" else "d MMMM yyyy", locale)
+                .format(moment.time)
+                .lowercase(locale)
+        }
     }
 }
 

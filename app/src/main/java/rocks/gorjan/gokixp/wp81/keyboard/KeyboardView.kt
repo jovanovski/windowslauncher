@@ -99,6 +99,37 @@ class KeyboardView(
      */
     private var bottomInset = 0
 
+    /**
+     * The screen [bottomInset] was reported for, in dp, or zeroes for "nothing yet".
+     *
+     * Remembered alongside the inset because the inset is only an answer for the screen it
+     * was measured on, and this view outlives the screen. Turn the phone to landscape and
+     * back and the same view is shown again in portrait, still holding whatever the system
+     * asked for while the phone was on its side - which is less, and which is the keyboard
+     * sitting a little lower than it should with its bottom row under the chevron and the
+     * globe. Tying the two together is what makes that answer expire by itself: it is no
+     * longer for this screen, so it is no longer used, and the bar's own height stands in
+     * until the system says otherwise.
+     */
+    private var insetsW = 0
+    private var insetsH = 0
+
+    /**
+     * Whether the framework has said how much room the navigation bar wants *here*.
+     *
+     * Until it has, the honest answer is not zero. Zero is a real answer - it means there is
+     * no bar to keep clear of - and treating "not told yet" as "nothing to reserve" is what
+     * puts the bottom row of keys under the navigation bar. So an untold view reserves the
+     * bar's usual height, and gives it back the moment it is told otherwise. A band of dead
+     * keyboard for one frame is a far smaller thing to be wrong about than a row of keys that
+     * cannot be pressed.
+     */
+    private val insetsKnown: Boolean
+        get() {
+            val config = resources.configuration
+            return insetsW > 0 && insetsW == config.screenWidthDp && insetsH == config.screenHeightDp
+        }
+
     private var shifted = false
 
     /**
@@ -194,16 +225,64 @@ class KeyboardView(
     init {
         setBackgroundColor(groundColour())
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
-            val reported = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-            // No bar, nothing to keep clear of. A reported zero is the one case where
-            // reserving the frame height anyway would leave a band of dead keyboard.
-            val next = if (reported <= 0) 0 else maxOf(reported, navigationBarFrameHeight())
-            if (next != bottomInset) {
+            // Only while the keyboard is actually up. A hidden input method still gets
+            // dispatched insets - rotating the phone with the keyboard down provokes one -
+            // and what a window nobody can see is told about the navigation bar is not what
+            // will be drawn over it when it is shown again. Believing one of those is the
+            // other way the bottom row ends up under the chevron and the globe.
+            if (isShown) {
+                val reported = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                // No bar, nothing to keep clear of. A reported zero is the one case where
+                // reserving the frame height anyway would leave a band of dead keyboard.
+                val next = if (reported <= 0) 0 else maxOf(reported, navigationBarFrameHeight())
+                val changed = next != bottomInset || !insetsKnown
                 bottomInset = next
-                requestLayout()
+                val config = resources.configuration
+                insetsW = config.screenWidthDp
+                insetsH = config.screenHeightDp
+                if (changed) requestLayout()
             }
             insets
         }
+    }
+
+    /**
+     * Asks for the insets again, because nothing else will.
+     *
+     * [bottomInset] has exactly one writer - the listener above - and that listener only runs
+     * when the framework decides to dispatch insets to this view. Turn the phone while the
+     * keyboard is down and it is not dispatched anything worth having, because there is no
+     * keyboard on screen to be dispatched anything about; and an input view is often built
+     * afresh after a configuration change, so what comes back is a view that has never been
+     * told how much room the navigation bar wants and is holding zero. Reserving nothing is
+     * what puts the bottom row of keys underneath the navigation bar - the keyboard
+     * "rendered lower" - and it survives until something else happens to make the framework
+     * dispatch insets.
+     *
+     * So it is asked for at the three moments the remembered answer stops being true or was
+     * never true to begin with: on attach, whenever the configuration changes, and - the one
+     * that matters after the phone has been turned and turned back - whenever the keyboard
+     * comes back on screen, which is the first moment the answer can be believed at all.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        ViewCompat.requestApplyInsets(this)
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE) ViewCompat.requestApplyInsets(this)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration?) {
+        super.onConfigurationChanged(newConfig)
+        // Turning the phone changes every measurement here: the keys, the navigation bar, and
+        // the bounds each cached grid is holding from the orientation it was laid out in. The
+        // navigation bar's own reservation needs nothing said to it - it is remembered against
+        // the screen it was measured on, and this is a different screen. See [insetsW].
+        laidOutAt.clear()
+        ViewCompat.requestApplyInsets(this)
+        requestLayout()
     }
 
     // ---------------------------------------------------------------- contents
@@ -275,16 +354,15 @@ class KeyboardView(
     /**
      * Relabels the enter key for whatever the field being typed into has asked for.
      *
-     * A field that wants a search says so, one that wants to send gets the accent and the
-     * word, and a note gets the return arrow - the same key doing three jobs, which is the
-     * phone's behaviour as much as it is Android's.
+     * A field that wants a search says so, one that wants to send says that, and a note gets
+     * the return arrow - the same key doing three jobs, which is the phone's behaviour as
+     * much as it is Android's. Only the word on it changes: the key is the accent throughout,
+     * declared that way by the layouts, so the key that finishes what you are typing looks
+     * the same in every app.
      */
-    fun setEnterKey(label: String?, accent: Boolean) {
+    fun setEnterKey(label: String?) {
         val view = keys.firstOrNull { it.key.action == Action.ENTER } ?: return
-        view.key = view.key.copy(
-            label = label ?: "",
-            style = if (accent) Style.ACCENT else Style.FUNCTION
-        )
+        view.key = view.key.copy(label = label ?: "")
         view.glyph = if (label == null) glyphFor(Action.ENTER) else null
         view.applyPalette(palette)
     }
@@ -498,7 +576,7 @@ class KeyboardView(
             lastKeyH = keyH
         }
 
-        val h = contentHeight() + bottomInset
+        val h = contentHeight() + if (insetsKnown) bottomInset else navigationBarFrameHeight()
 
         var index = 0
         for (row in layout.rows) {
@@ -597,7 +675,15 @@ class KeyboardView(
     fun unitWidth(): Float = keyW
     fun keyHeight(): Float = keyH
     fun gutter(): Float = gap
-    fun bottomReserved(): Int = bottomInset
+    /**
+     * What is held clear at the foot of the keyboard, for anything that has to match it.
+     *
+     * The emoji panel stands in for the keys and has to reserve exactly the same, or it would
+     * resize the window every time it opened. Reports the provisional reservation too, so the
+     * panel agrees with the keys even before the framework has said anything - see
+     * [insetsKnown].
+     */
+    fun bottomReserved(): Int = if (insetsKnown) bottomInset else navigationBarFrameHeight()
 
     companion object {
 
@@ -652,8 +738,15 @@ class KeyboardView(
          */
         fun verticalUnit(resources: android.content.res.Resources, width: Int, columns: Float): Float {
             val fromWidth = unitWidth(width, columns)
-            val room = resources.displayMetrics.heightPixels * MAX_HEIGHT_SHARE / TOTAL_UNITS
-            return minOf(fromWidth, room)
+            // From the configuration rather than from `displayMetrics`. Both describe the
+            // screen and only one of them is guaranteed to describe it *now*: the
+            // configuration is what the system revises when the phone turns, and it is what
+            // every other part of an app reads the orientation from. Display metrics on a
+            // view in an input method have been known to lag it, and a cap taken from the
+            // wrong orientation is a keyboard built to the wrong height.
+            val screen = resources.configuration.screenHeightDp * resources.displayMetrics.density
+            if (screen <= 0f) return fromWidth
+            return minOf(fromWidth, screen * MAX_HEIGHT_SHARE / TOTAL_UNITS)
         }
 
         /**

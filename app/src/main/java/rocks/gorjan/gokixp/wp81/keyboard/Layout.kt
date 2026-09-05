@@ -113,15 +113,17 @@ enum class Style {
     /** The pale fill. Letters, digits, punctuation - anything that types something. */
     LETTER,
 
-    /** The darker fill. Shift, backspace, `&123`, emoji, enter. */
+    /** The darker fill. Shift, backspace, `&123`, emoji. */
     FUNCTION,
 
     /**
      * The accent fill, white on colour.
      *
-     * Nothing in the built-in layouts uses this: on the phone the keyboard was grey and the
-     * accent appeared only under a finger. It exists because the enter key becomes the
-     * accent when a field asks for `send`, which is the one place the phone did colour a key.
+     * The enter key wears it, whatever the field it is being shown for asks that key to do -
+     * `send`, `search`, `go`, or a plain return. It was once only `send`, which made the one
+     * key on the keyboard that finishes what you are typing look like an ordinary function
+     * key in every app that names its action anything else. Shift takes it too, but only
+     * while shift is on: there it is a state and not a job.
      */
     ACCENT
 }

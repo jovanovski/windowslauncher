@@ -15,6 +15,7 @@ import android.os.Looper
 import android.provider.ContactsContract
 import android.util.Log
 import java.io.ByteArrayOutputStream
+import java.text.Normalizer
 import java.util.concurrent.Executors
 
 /**
@@ -71,6 +72,9 @@ object PeopleStore {
 
     /** One way of reaching somebody: the number or address, and what they call it. */
     data class Entry(val value: String, val label: String)
+
+    /** Somebody a keypad found, and the number it found them by. See [keypadMatches]. */
+    data class Reachable(val contact: Contact, val number: String)
 
     /**
      * Everything a profile page shows.
@@ -481,6 +485,125 @@ object PeopleStore {
     }
 
     /**
+     * Who the keys pressed so far could mean.
+     *
+     * A keypad is two searches at once, because a telephone keypad always was: the digits
+     * are a number being dialled *and* a name being spelled, and which of the two somebody
+     * is doing is not knowable until they stop. So both are answered - 6-2-7-5 finds the
+     * number ending 6275 and it finds Mark - and the two are ranked against each other
+     * rather than kept as separate lists, because to the person typing they are one
+     * question with one answer.
+     *
+     * Favourites first, whatever they matched on. Somebody starred is somebody rung
+     * often enough to say so, and the whole reason a half-typed number is worth answering
+     * at all is that the answer is usually one of the handful of people the phone is
+     * really for. Below them the order is the confidence: a number that *starts* the way
+     * the typing does is almost certainly the number being dialled; a name spelled out on
+     * the keys is the next likeliest; and a number that merely contains the digits
+     * somewhere is the long shot that catches somebody remembered by their last four.
+     * Within a rank it is alphabetical, so the list does not reshuffle for reasons nobody
+     * can see.
+     *
+     * One row per person rather than per number: somebody with three numbers that all
+     * match is one answer, offered on the best of them.
+     *
+     * Everybody who matches, however many that is. A keypad search is not a guess being
+     * offered - it is a list being narrowed, and a list that stops at five has hidden the
+     * person somebody is looking for exactly when the typing has not yet got rid of them.
+     * What keeps it short is the next digit; the page it lands on scrolls.
+     */
+    fun keypadMatches(
+        context: Context, digits: String, onReady: (List<Reachable>) -> Unit
+    ) {
+        val typed = digits.filter { it.isDigit() }
+        if (typed.isEmpty() || !canRead(context)) {
+            onReady(emptyList())
+            return
+        }
+        val app = context.applicationContext
+        executor.execute {
+            val found = try {
+                search(app, typed)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not search the book from the keypad", e)
+                emptyList()
+            }
+            main.post { onReady(found) }
+        }
+    }
+
+    private fun search(context: Context, typed: String): List<Reachable> {
+        val best = HashMap<Long, Pair<Int, Reachable>>()
+        for (row in rows(context)) {
+            val rank = when {
+                row.digits.startsWith(typed) -> 0
+                row.words.any { it.startsWith(typed) } -> 1
+                row.digits.contains(typed) -> 2
+                else -> continue
+            }
+            val standing = best[row.contact.id]
+            if (standing == null || rank < standing.first) {
+                best[row.contact.id] = rank to Reachable(row.contact, row.number)
+            }
+        }
+        return best.values
+            .sortedWith(
+                compareBy(
+                    { !it.second.contact.starred },
+                    { it.first },
+                    { it.second.contact.name.lowercase() }
+                )
+            )
+            .map { it.second }
+    }
+
+    /**
+     * A name as it would be typed on a telephone keypad, one run of digits per word.
+     *
+     * Per word, because that is how a name is looked for: somebody hunting for John Lamb
+     * types 5-2-6-2 for the surname as readily as 5-6-4-6 for the first name, and neither
+     * of them runs across the space between the two.
+     *
+     * Accents come off first, so Jokic is found by typing Jokic - which is what the keys
+     * can spell, there being no key for the one with the accent on it. A name in a script
+     * the keys cannot spell at all - Cyrillic, Chinese, Arabic - comes back with no words,
+     * and that is the honest answer: those people are found here by their number, and by
+     * name in the search that has a whole keyboard behind it.
+     */
+    private fun t9(name: String): List<String> {
+        val plain = Normalizer.normalize(name, Normalizer.Form.NFD).replace(MARKS, "")
+        val words = mutableListOf<String>()
+        val word = StringBuilder()
+        for (ch in plain) {
+            val key = keyFor(ch)
+            if (key == null) {
+                if (word.isNotEmpty()) {
+                    words.add(word.toString())
+                    word.clear()
+                }
+            } else {
+                word.append(key)
+            }
+        }
+        if (word.isNotEmpty()) words.add(word.toString())
+        return words
+    }
+
+    /** Which key a letter is under. A digit stands for itself; nothing else is on a key. */
+    private fun keyFor(ch: Char): Char? = when (val lower = ch.lowercaseChar()) {
+        in 'a'..'c' -> '2'
+        in 'd'..'f' -> '3'
+        in 'g'..'i' -> '4'
+        in 'j'..'l' -> '5'
+        in 'm'..'o' -> '6'
+        in 'p'..'s' -> '7'
+        in 't'..'v' -> '8'
+        in 'w'..'z' -> '9'
+        in '0'..'9' -> lower
+        else -> null
+    }
+
+    /**
      * The whole book's numbers, compared as numbers.
      *
      * `PhoneLookup` is an index the provider builds, and a number can be in the book and
@@ -511,14 +634,52 @@ object PeopleStore {
     }
 
     /**
-     * One pass over every number in the book.
+     * Every number in the book, filed by the number as a number.
      *
-     * A phone with a few thousand contacts is one query and a map, on a worker thread, and
-     * it is only ever built because something was not found - so a page of calls from
-     * people who are all in the book never pays for it at all.
+     * Folded out of [rows] rather than read for itself: the same single pass answers this
+     * and the keypad's search, and a phone with a few thousand contacts should pay for
+     * that pass once rather than once per question asked of it.
      */
     private fun readNumbers(context: Context): Map<String, Contact> {
         val index = HashMap<String, Contact>()
+        for (row in rows(context)) {
+            val key = normalise(row.number)
+            if (key.isEmpty()) continue
+            val standing = index[key]
+            // The same number from three accounts is one person; the row that says most
+            // about them is the one worth keeping.
+            if (standing == null || rank(row.contact) > rank(standing)) index[key] = row.contact
+        }
+        return index
+    }
+
+    /**
+     * One number in the book, with everything anything here asks of it.
+     *
+     * [digits] is the whole number rather than [normalise]'s last nine: that one exists to
+     * tell two spellings of the same number apart, and a keypad is matching against a
+     * number somebody is part way through typing, front end first.
+     *
+     * [words] is the name on the telephone keys - see [t9] - held rather than worked out,
+     * because it is the same answer on every keystroke and there is one of these per
+     * number on the phone.
+     */
+    private class Row(
+        val contact: Contact,
+        val number: String,
+        val digits: String,
+        val words: List<String>
+    )
+
+    /**
+     * One pass over every number in the book.
+     *
+     * On a worker thread, and only ever built because something was asked that the
+     * provider's own indexes could not answer - so a page of calls from people who are all
+     * in the book never pays for it at all.
+     */
+    private fun readRows(context: Context): List<Row> {
+        val found = mutableListOf<Row>()
         try {
             context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -533,33 +694,54 @@ object PeopleStore {
                 null, null, null
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
-                    val key = normalise(cursor.getString(0).orEmpty())
-                    if (key.isEmpty()) continue
-                    val found = Contact(
+                    val number = cursor.getString(0)?.trim().orEmpty()
+                    if (number.isEmpty()) continue
+                    val person = Contact(
                         id = cursor.getLong(1),
                         lookupKey = cursor.getString(2),
                         name = cursor.getString(3)?.trim().orEmpty(),
                         photoUri = cursor.getString(4),
                         starred = cursor.getInt(5) != 0
                     )
-                    if (found.name.isBlank()) continue
-                    val standing = index[key]
-                    // The same number from three accounts is one person; the row that says
-                    // most about them is the one worth keeping.
-                    if (standing == null || rank(found) > rank(standing)) index[key] = found
+                    // A row with no name is a number filed against nobody. There is
+                    // nothing to show for it and nothing to match on but the number
+                    // itself, which the keypad is already holding.
+                    if (person.name.isBlank()) continue
+                    found.add(Row(
+                        contact = person,
+                        number = number,
+                        digits = number.filter { it.isDigit() },
+                        words = t9(person.name)
+                    ))
                 }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not index the book's numbers", e)
         }
-        return index
+        return found
     }
+
+    private fun rows(context: Context): List<Row> {
+        val held = cachedRows
+        if (held != null && System.currentTimeMillis() - cachedRowsAt < NUMBER_CACHE_MS) {
+            return held
+        }
+        val built = readRows(context)
+        cachedRows = built
+        cachedRowsAt = System.currentTimeMillis()
+        return built
+    }
+
+    private var cachedRows: List<Row>? = null
+    private var cachedRowsAt = 0L
 
     private var cachedNumbers: Map<String, Contact>? = null
     private var cachedNumbersAt = 0L
 
     /** Dropped whenever the book is written to, so an edit shows up in the next lookup. */
     fun forgetNumbers() {
+        cachedRows = null
+        cachedRowsAt = 0L
         cachedNumbers = null
         cachedNumbersAt = 0L
     }
@@ -797,6 +979,9 @@ object PeopleStore {
      * scan of the address book per screenful.
      */
     private const val NUMBER_CACHE_MS = 3 * 60 * 1000L
+
+    /** What is left of an accent once a letter has been decomposed away from it. See [t9]. */
+    private val MARKS = Regex("\\p{Mn}+")
 
     /** A short name for an account, for the picker. */
     fun labelOf(account: Account?): String = when {

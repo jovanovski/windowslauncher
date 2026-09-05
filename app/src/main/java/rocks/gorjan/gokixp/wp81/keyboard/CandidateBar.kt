@@ -10,6 +10,8 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import kotlin.math.abs
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.ColorUtils
 import rocks.gorjan.gokixp.R
@@ -38,6 +40,17 @@ class CandidateBar(
 
     /** A suggestion was chosen. The index is into whatever was last given to [setWords]. */
     var onWordPicked: ((Int) -> Unit)? = null
+
+    /**
+     * A suggestion was held and dragged onto the bin: forget it.
+     *
+     * The way out of a wrong thing the keyboard has learned, and it needs one. Learning from
+     * what somebody types is what makes the keyboard theirs, and it means a single mistyped
+     * word becomes a suggestion that comes back for months - this phone had `thank fod` in it
+     * within a day. A dictionary that only ever grows is a dictionary that only ever gets
+     * worse at the one thing it was added for.
+     */
+    var onWordForgotten: ((Int) -> Unit)? = null
 
     /** The microphone. Voice typing is a later phase; until then the glyph is not drawn. */
     var onVoice: (() -> Unit)? = null
@@ -71,6 +84,37 @@ class CandidateBar(
     private var pressed = -1
 
     /**
+     * Which suggestion is being dragged to the bin, or -1.
+     *
+     * A mode, and the only one this view has. While it is on, the bar stops being three words
+     * and two glyphs and becomes one word under the finger and somewhere to drop it - because
+     * a strip this short cannot show the word travelling *and* keep everything else in place
+     * without the two overlapping in the middle.
+     */
+    private var dragging = -1
+
+    /** Where the finger is, so the word being dragged can ride under it. */
+    private var dragX = 0f
+
+    /** Whether the finger is over the bin, so the drop is visible before it happens. */
+    private var overBin = false
+
+    /** Where the finger went down, to tell a hold apart from a scroll of the thumb. */
+    private var downX = 0f
+    private var downY = 0f
+
+    /**
+     * The hold that starts a drag.
+     *
+     * The platform's own long-press timeout rather than the keyboard's `hold to show symbols`
+     * setting, which somebody may well have taken down to 150 ms. That is the right number
+     * for a key - the alternates it opens are what the hold is *for*, and they are wanted
+     * fast - and the wrong one here, where a hold is a rare, deliberate thing and the common
+     * gesture on the same pixels is an ordinary tap that must never turn into one.
+     */
+    private val startDrag = Runnable { beginDrag() }
+
+    /**
      * Whether dictation is running.
      *
      * Drawn as the accent, because that is what the accent means everywhere else on this
@@ -90,6 +134,9 @@ class CandidateBar(
     private val bounds = Rect()
     private val font = ResourcesCompat.getFont(context, R.font.segoeui_regular)
 
+    /** How far a finger may wander and still be holding still. */
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+
     /** Where each word was drawn, for hit testing. Rebuilt on every paint. */
     private val slots = ArrayList<Slot>(6)
 
@@ -99,6 +146,8 @@ class CandidateBar(
     private val voiceGlyph: Drawable? = SvgIcon.fromAsset(context, "$ICONS/appbar.microphone.svg")
     private val pasteGlyph: Drawable? =
         SvgIcon.fromAsset(context, "$ICONS/appbar.clipboard.paste.svg")?.mutate()
+    private val binGlyph: Drawable? =
+        SvgIcon.fromAsset(context, "$ICONS/appbar.delete.svg")?.mutate()
 
     init {
         isClickable = true
@@ -167,23 +216,57 @@ class CandidateBar(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressed = slotAt(event.x)
+                downX = event.x
+                downY = event.y
                 if (pressed != -1) {
                     KeyboardHaptics.key(this)
                     invalidate()
                 }
+                // Only a word can be dragged to the bin. The two glyphs are ways in to
+                // something, not things the keyboard has an opinion about.
+                if (pressed >= 0) postDelayed(startDrag, LONG_PRESS)
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (dragging >= 0) {
+                    dragX = event.x
+                    val onIt = event.x > width - keyW * GLYPH_SLOT
+                    if (onIt != overBin) {
+                        overBin = onIt
+                        // Felt at the edge of the bin rather than only on release, so the
+                        // drop is known to be armed without having to look.
+                        KeyboardHaptics.key(this)
+                    }
+                    invalidate()
+                    return true
+                }
+                // A thumb that has travelled is a thumb going somewhere else, not a hold.
+                if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) {
+                    removeCallbacks(startDrag)
+                }
                 val over = slotAt(event.x)
                 if (over != pressed) {
                     pressed = over
+                    removeCallbacks(startDrag)
                     invalidate()
                 }
                 return true
             }
 
             MotionEvent.ACTION_UP -> {
+                removeCallbacks(startDrag)
+                if (dragging >= 0) {
+                    val index = dragging
+                    val dropped = overBin
+                    endDrag()
+                    // Released short of the bin, the word is *not* taken either. Somebody who
+                    // held a suggestion and thought better of it meant to cancel, and
+                    // inserting the word they were trying to delete is the worst available
+                    // reading of that.
+                    if (dropped) onWordForgotten?.invoke(index)
+                    return true
+                }
                 val chosen = slotAt(event.x)
                 pressed = -1
                 invalidate()
@@ -196,6 +279,8 @@ class CandidateBar(
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(startDrag)
+                endDrag()
                 pressed = -1
                 invalidate()
                 return true
@@ -203,6 +288,36 @@ class CandidateBar(
         }
         return super.onTouchEvent(event)
     }
+
+    /**
+     * The hold has fired: the word comes off the bar and the bin appears.
+     *
+     * The parent is asked to keep its hands off the rest of the gesture. The bar lives inside
+     * the keyboard's own view group, and a drag that wandered a few pixels vertically without
+     * this would be taken for a scroll by whatever is above it and the finger would be lost
+     * halfway to the bin.
+     */
+    private fun beginDrag() {
+        if (pressed < 0) return
+        dragging = pressed
+        pressed = -1
+        dragX = downX
+        overBin = false
+        parent?.requestDisallowInterceptTouchEvent(true)
+        KeyboardHaptics.tap(this)
+        invalidate()
+    }
+
+    private fun endDrag() {
+        if (dragging < 0) return
+        dragging = -1
+        overBin = false
+        parent?.requestDisallowInterceptTouchEvent(false)
+        invalidate()
+    }
+
+    /** What the word being dragged says, or null when nothing is being dragged. */
+    private fun draggedWord(): String? = words.getOrNull(dragging)
 
     /** Which word, or which glyph, is at [x]. The glyph slot uses a negative index. */
     private fun slotAt(x: Float): Int {
@@ -226,6 +341,22 @@ class CandidateBar(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), face)
 
         val side = keyW * GLYPH_SLOT
+
+        // A drag takes the bar over. Everything else steps aside for it - the two glyphs
+        // included - because the word has to be seen travelling and there is one row to do it
+        // in. What is left is the word under the finger and the bin it is going to.
+        draggedWord()?.let { word ->
+            drawGlyph(canvas, binGlyph, width - side / 2f, overBin)
+            ink.typeface = font
+            ink.textSize = keyW * TEXT
+            ink.textAlign = Paint.Align.CENTER
+            ink.color = if (overBin) palette.accent else palette.foreground
+            // Held clear of the bin so the word never sits on top of what it is aimed at.
+            val limit = width - side
+            canvas.drawText(word, dragX.coerceIn(side, limit), baseline(), ink)
+            return
+        }
+
         drawGlyph(canvas, voiceGlyph, width - side / 2f, pressed == VOICE || listening)
         // The clipboard at the other end. Always drawn, whatever is on the clipboard and
         // whatever the middle of the bar is up to: it is a way in to something, like the
@@ -338,7 +469,7 @@ class CandidateBar(
             canvas.drawRect(centreX - half, 0f, centreX + half, height.toFloat(), face)
         }
         drawable.setTint(if (lit) palette.onAccent() else palette.foreground)
-        val size = (keyW * GLYPH).toInt()
+        val size = (keyW * GLYPH - GLYPH_TRIM_DP * resources.displayMetrics.density).toInt()
         val left = (centreX - size / 2f).toInt()
         val top = (height - size) / 2
         drawable.setBounds(left, top, left + size, top + size)
@@ -398,6 +529,17 @@ class CandidateBar(
          * seen out of the corner of an eye rather than sized like a piece of punctuation.
          */
         const val GLYPH = 1.0f
+
+        /**
+         * Taken off both glyphs, in real millimetres rather than as a fraction.
+         *
+         * A fraction would have been the house style, and it is the wrong tool here: this is
+         * not a proportion anybody chose, it is four density-independent pixels trimmed off a
+         * mark that was slightly too heavy for the row of words beside it. The slot they sit
+         * in ([GLYPH_SLOT]) is untouched, so what is drawn gets smaller while what can be
+         * tapped stays exactly where it was.
+         */
+        const val GLYPH_TRIM_DP = 4f
         const val GLYPH_SLOT = 1.25f
         const val WORD_PADDING = 0.22f
 
@@ -415,5 +557,8 @@ class CandidateBar(
         const val DIVIDER_INSET = 0.22f
 
         const val ICONS = "custom_icons_8"
+
+        /** How long a suggestion has to be held before it comes off the bar. */
+        val LONG_PRESS = ViewConfiguration.getLongPressTimeout().toLong()
     }
 }

@@ -1859,8 +1859,13 @@ class StartScreenView(
                 // that is no longer on it.
                 if (editingView === view) clearSelection()
                 reindex()
-                onTilesChanged?.invoke(tiles.toList())
+                // Filed before the wall's new order is written down, never after. The
+                // host reads a tile's absence from that order as an unpinning and throws
+                // the icon away - which is what filing it first says it is not. The other
+                // way round the tile went into the folder and was deleted in the same
+                // breath, and the drop looked like it had swallowed it.
                 onTileFiled?.invoke(view.tile, folderId, false)
+                onTilesChanged?.invoke(tiles.toList())
                 grid.requestLayout()
             }
             .start()

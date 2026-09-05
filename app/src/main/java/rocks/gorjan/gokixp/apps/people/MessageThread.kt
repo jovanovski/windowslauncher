@@ -5,9 +5,13 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.database.ContentObserver
 import android.graphics.Color
+import android.net.Uri
 import android.text.InputType
+import android.text.Spannable
+import android.text.style.URLSpan
 import android.text.util.Linkify
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -45,7 +49,7 @@ import rocks.gorjan.gokixp.wp81.applyToField
  * conversation as it is written down - by whichever app on the phone is the one that does
  * the writing. See [MessageStore] for why that is not this one.
  */
-@SuppressLint("ViewConstructor")
+@SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class MessageThread(
     context: Context,
     private val palette: WP81Palette,
@@ -65,7 +69,7 @@ class MessageThread(
      * program and brings it to the front as it is shown, and a second one made inside a
      * page would go up behind the page that asked for it. See PeopleApp.showMenu.
      */
-    private val onMenu: (List<WP81ContextMenu.Item>, View) -> Unit,
+    private val onMenu: (String?, List<WP81ContextMenu.Item>, View) -> Unit,
     private val onNotify: (String, String) -> Unit
 ) : LinearLayout(context) {
 
@@ -440,6 +444,13 @@ class MessageThread(
             setPadding(0, dp(3), 0, dp(3))
         }
 
+        // Where the finger came down, so a hold can tell what it came down *on*, and
+        // whether the hold has already been answered. Kept per bubble, because that is
+        // what they belong to.
+        var downX = 0f
+        var downY = 0f
+        var answered = false
+
         val text = TextView(context).apply {
             this.text = body
             typeface = font(R.font.segoeui_regular)
@@ -460,13 +471,40 @@ class MessageThread(
             // that can be tapped.
             setLinkTextColor(if (outgoing) palette.onAccent() else palette.accent)
             highlightColor = Color.TRANSPARENT
-            // Held for what can be done to something already said. Which is one thing -
-            // taking a copy of it: a code to paste somewhere, an address, a name spelled
-            // out - but it is offered the way everything else in this shell is offered,
-            // because a hold that acted on the spot is the one gesture in the app whose
-            // result you find out about afterwards.
+            // Only watched, never answered: the field goes on handling the press itself,
+            // which is what puts the list of commands up. See [heldItems].
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.x
+                        downY = event.y
+                        answered = false
+                    }
+                    // The finger coming off a hold that has already been answered with a
+                    // list of commands. Swallowed, because the release is what the link
+                    // movement method acts on: a TextView runs its own press handling and
+                    // its movement method side by side, and the movement method knows
+                    // nothing about the hold - so without this, holding a number in a
+                    // message put the commands up and then rang it anyway.
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (answered) {
+                        // The view never sees this release, so it is left believing it is
+                        // still held unless it is told otherwise.
+                        view.isPressed = false
+                        return@setOnTouchListener true
+                    }
+                }
+                false
+            }
+            // Held for what can be done to something already said - taking a copy of it:
+            // a code to paste somewhere, an address, a name spelled out - and, where the
+            // hold landed on something the message *leads to*, what can be done to that.
+            // Offered the way everything else in this shell is offered, because a hold
+            // that acted on the spot is the one gesture in the app whose result you find
+            // out about afterwards.
             setOnLongClickListener { row ->
-                onMenu(listOf(WP81ContextMenu.Item("copy") { copy(body) }), row)
+                answered = true
+                val link = linkAt(this, downX, downY)
+                onMenu(headingFor(link), heldItems(this, body, link), row)
                 true
             }
         }
@@ -495,6 +533,77 @@ class MessageThread(
             }, LinearLayout.LayoutParams(WRAP, WRAP).apply { gravity = side })
         }
         return holder
+    }
+
+    /**
+     * The link the finger came down on, if it came down on one at all.
+     *
+     * Worked out from where the press landed rather than from the movement method, which
+     * only knows what a *tap* was on and only at the moment it acts on it. A press past
+     * the end of a line is nothing: the offset for a point out in the margin is the
+     * nearest character, which would hand back the link at the end of the line above.
+     */
+    private fun linkAt(view: TextView, x: Float, y: Float): URLSpan? {
+        val spanned = view.text as? Spannable ?: return null
+        val layout = view.layout ?: return null
+        val line = layout.getLineForVertical((y - view.totalPaddingTop + view.scrollY).toInt())
+        val across = x - view.totalPaddingLeft + view.scrollX
+        if (across < layout.getLineLeft(line) || across > layout.getLineRight(line)) return null
+        val at = layout.getOffsetForHorizontal(line, across)
+        return spanned.getSpans(at, at, URLSpan::class.java).firstOrNull()
+    }
+
+    /** What the list is about, when it is about something narrower than the message. */
+    private fun headingFor(link: URLSpan?): String? = link?.url?.let { url ->
+        when (Uri.parse(url).scheme?.lowercase()) {
+            "tel" -> "number"
+            "mailto" -> "email address"
+            else -> "link"
+        }
+    }
+
+    /**
+     * What a hold on a bubble offers, which is decided by what was under the finger.
+     *
+     * A hold anywhere in a message is about the message, and there is one thing to do with
+     * one of those. A hold on a number, an address or a web link is about that instead -
+     * it is the part of the message somebody was pointing at - so the commands are its,
+     * with the message's own copy left on the end: the thing held is still a message, and
+     * a list that took that away would answer a narrower question than was asked.
+     */
+    private fun heldItems(
+        view: TextView, body: String, link: URLSpan?
+    ): List<WP81ContextMenu.Item> {
+        val spanned = view.text as? Spannable
+        if (link == null || spanned == null) {
+            return listOf(WP81ContextMenu.Item("copy") { copy(body) })
+        }
+        // What the message actually says, rather than what Linkify made of it: the address
+        // behind a number is `tel:` and whatever encoding it took to get there, and what
+        // somebody holding a number wants a copy of is the number as they can see it.
+        val shown = spanned
+            .subSequence(spanned.getSpanStart(link), spanned.getSpanEnd(link))
+            .toString()
+        val scheme = Uri.parse(link.url).scheme?.lowercase()
+        return listOf(
+            // The same thing a tap does, done by the span itself rather than by working
+            // out a second time what a tel: or a mailto: is supposed to mean.
+            WP81ContextMenu.Item(
+                when (scheme) {
+                    "tel" -> "call"
+                    "mailto" -> "send email"
+                    else -> "open link"
+                }
+            ) { link.onClick(view) },
+            WP81ContextMenu.Item(
+                when (scheme) {
+                    "tel" -> "copy number"
+                    "mailto" -> "copy address"
+                    else -> "copy link"
+                }
+            ) { copy(shown) },
+            WP81ContextMenu.Item("copy message") { copy(body) }
+        )
     }
 
     /**
