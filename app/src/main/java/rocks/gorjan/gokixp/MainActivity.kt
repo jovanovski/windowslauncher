@@ -195,6 +195,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // that session of the start menu stays open, and reset when it closes.
     private var isShowingHiddenApps = false
     private var lastAppliedTheme: String? = null
+
+    /**
+     * Whether this phone was running the Windows Phone theme before it moved to its own
+     * app. Decides whether the "it moved" notice is shown; see [WP8Migration].
+     */
+    private var wasWindowsPhoneUser = false
     private var selectedIcon: DesktopIconView? = null
     private val desktopIcons = mutableListOf<DesktopIcon>()
     private val desktopIconViews = mutableListOf<DesktopIconView>()
@@ -900,6 +906,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private val RETIRED_SYSTEM_APPS = setOf("system.msn")
 
         /**
+         * Where Windows Phone 8.1 went. Shown once to the people who were running it.
+         *
+         * Its own repository, and so its own release feed - this launcher's updater still
+         * points at this launcher's releases and must not be pointed here.
+         */
+        private const val WINDOWS_PHONE_LAUNCHER_URL =
+            "https://github.com/jovanovski/windowsphonelauncher/releases/latest"
+
+        /**
+         * Custom-icon maps belonging to themes this launcher no longer renders.
+         *
+         * [AppTheme.all] stopped listing Windows Phone 8.1 when it moved to its own app,
+         * and two sweeps read their list of live icon maps from it: [purgeRetiredSystemApps],
+         * which would stop cleaning the WP8 map, and - far worse - [pruneUnusedImportedIcons],
+         * which *deletes* every imported icon file no live map still points at. Left out,
+         * that sweep would wipe the imported icons of everyone who had been running the
+         * phone theme, on their first launch after updating, before they had any chance to
+         * carry them over.
+         *
+         * So the key stays named here. The theme is gone; its icons are still the user's.
+         */
+        private val RETIRED_CUSTOM_ICON_KEYS = listOf(AppTheme.WindowsPhone81.customIconsKey)
+
+        /**
          * Programs that belong to the phone shell and to nothing else.
          *
          * Each is built out of WP8.1's own furniture and has a desktop counterpart that
@@ -1512,6 +1542,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Set up modern back press handling
         setupBackPressHandling()
+
+        // Before any of the sweeps below touch the user's arrangement: if this phone was
+        // running the Windows Phone theme, put a copy of that setup aside for the launcher
+        // it moved to. purgeRetiredSystemApps and pruneUnusedImportedIcons both edit or
+        // delete exactly the things it is made of.
+        wasWindowsPhoneUser = WP8Migration.captureIfNeeded(this)
 
         // Migrate custom mappings from old preferences file if needed
         migrateCustomMappingsIfNeeded()
@@ -6365,7 +6401,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Icons chosen by hand - one set per theme - and renamed shortcuts. Both
                 // are "package:value" pairs, and a renamed one escapes the colons in the
                 // value, so the package is always what stands before the first.
-                for (key in AppTheme.all().map { it.customIconsKey } + KEY_CUSTOM_NAMES) {
+                for (key in AppTheme.all().map { it.customIconsKey } +
+                        RETIRED_CUSTOM_ICON_KEYS + KEY_CUSTOM_NAMES) {
                     purgeListedPackages(prefs, key, ";", retiring) { it.substringBefore(":") }
                 }
 
@@ -6551,7 +6588,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val files = iconsDir.listFiles() ?: return
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val inUse = AppTheme.all().map { it.customIconsKey }
+        val inUse = (AppTheme.all().map { it.customIconsKey } + RETIRED_CUSTOM_ICON_KEYS)
             .flatMap { key -> (prefs.getString(key, "") ?: "").split(";") }
             .mapNotNull { entry -> entry.substringAfter(":", "").takeIf { it.isNotEmpty() } }
             .toSet()
@@ -7047,8 +7084,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val previewScreensaverButton = contentView.findViewById<TextView>(R.id.preview_screensaver_button)
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
 
-        // Set up theme spinner with appropriate layouts based on current theme
-        val themes = arrayOf("Windows Classic", "Windows XP", "Windows Vista", "Windows Phone 8")
+        // Set up theme spinner with appropriate layouts based on current theme.
+        // Taken from AppTheme.all() rather than written out again, so a theme that is
+        // added or retired there does not have to be remembered here too - which is
+        // exactly how "Windows Phone 8" outlived its own removal in this list once.
+        val themes = AppTheme.all().map { it.toString() }.toTypedArray()
         val spinnerLayoutId = themeManager.getSpinnerItemLayoutRes(currentTheme)
         val dropdownLayoutId = themeManager.getSpinnerDropdownLayoutRes(currentTheme)
 
@@ -10030,25 +10070,71 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Check if welcome was already shown for this version
         val shownForVersion = prefs.getString(KEY_SHOWN_WELCOME_FOR_VERSION, null)
 
+        // Someone who was running the phone theme is not looking at a new version of the
+        // launcher they had - they are looking at a different one. That is the thing to
+        // explain, and it takes the place of the changelog rather than queueing behind it.
+        if (wasWindowsPhoneUser && !prefs.getBoolean(WP8Migration.KEY_NOTICE_SHOWN, false)) {
+            showWindowsPhoneMovedNotice()
+            prefs.edit {
+                putBoolean(WP8Migration.KEY_NOTICE_SHOWN, true)
+                putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion)
+            }
+            return
+        }
+
         if (shownForVersion != currentVersion) {
             // Welcome not shown for this version yet, show it
-            if (themeManager.isWindowsPhone81()) {
-                // The same moment, in this theme's own program: a Vista dialog with a
-                // picture and two buttons over a Start screen would be a window from
-                // another operating system.
-                showWelcomeDialogWP81()
-            } else if(shownForVersion == null){
+            if (shownForVersion == null) {
                 showWelcomeToWindows()
-            }
-            else{
+            } else {
                 showWelcomeToWindows(showChangeLog = true)
             }
-
 
             // Save that we've shown it for this version
             prefs.edit { putString(KEY_SHOWN_WELCOME_FOR_VERSION, currentVersion) }
         }
     }
+
+    /**
+     * Tells someone who was running Windows Phone 8.1 where it went.
+     *
+     * Shown once, on the first launch after it moved out. Without it the launcher simply
+     * looks different one morning, which reads as a fault rather than a change - the
+     * whole shell is replaced, and nothing on screen would say why.
+     *
+     * The keyboard gets its own line, and only when it is actually the one in use: it is
+     * the part of the phone theme that leaves the launcher entirely, and Android will
+     * quietly fall back to another one without saying so.
+     */
+    private fun showWindowsPhoneMovedNotice() {
+        val message = buildString {
+            append("Windows Phone 8 is now its own app.\n\n")
+            append("It has moved out of Windows Launcher so it can grow on its own, ")
+            append("and this desktop has been set back to Windows Vista.\n\n")
+            append("Your Start screen, tiles, colours and icons have been kept. ")
+            append("Install Windows Phone Launcher and it will offer to bring them across.")
+            if (isWindowsPhoneKeyboardActive()) {
+                append("\n\nYour Windows Phone keyboard moved with it, so your phone has ")
+                append("switched to another one for now.")
+            }
+            append("\n\nOpen the download page?")
+        }
+
+        showConfirmDialog("Windows Phone 8 has moved", message) {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, WINDOWS_PHONE_LAUNCHER_URL.toUri()))
+            }.onFailure {
+                Log.w("MainActivity", "Nothing on this phone opens a web page", it)
+            }
+        }
+    }
+
+    /** Whether the phone theme's keyboard is the input method currently in use. */
+    private fun isWindowsPhoneKeyboardActive(): Boolean = runCatching {
+        android.provider.Settings.Secure.getString(
+            contentResolver, android.provider.Settings.Secure.DEFAULT_INPUT_METHOD
+        )?.contains("WP81KeyboardService") == true
+    }.getOrDefault(false)
 
     private fun showWelcomeToWindows(showChangeLog: Boolean = false) {
         // Get theme preferences

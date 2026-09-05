@@ -78,16 +78,28 @@ sealed class AppTheme {
             "Windows Classic" -> WindowsClassic
             "Windows Vista" -> WindowsVista
             "Windows XP" -> WindowsXP
-            // Both spellings: the theme was called 8.1 for a while, and that string is
-            // sitting in the preferences of everyone who chose it.
-            "Windows Phone 8", "Windows Phone 8.1" -> WindowsPhone81
+            // Windows Phone 8.1 ships as its own launcher now. Both spellings - the theme
+            // was called 8.1 for a while - land on Vista, which is the chrome it already
+            // drew its windows in, so the change is as small as it can be for the people
+            // who were running it.
+            //
+            // This has to be here, at the point of reading, rather than done once as a
+            // migration. The old string can re-enter preferences long after any migration
+            // would have run: `allowBackup` is on with empty rules, so it arrives with a
+            // cloud restore onto a fresh install; PrefsBackup.restore clears and replaces
+            // wholesale from a Drive sync or an imported .reg; and the Registry Editor
+            // lets it be typed in by hand. Every one of those routes reads back through
+            // here.
+            "Windows Phone 8", "Windows Phone 8.1" -> WindowsVista
             else -> WindowsXP // Default to XP if unknown
         }
 
         /**
-         * Returns all available themes.
+         * The themes a user can pick. Windows Phone 8.1 is deliberately absent: the object
+         * still exists so leftover WP8 state can be named (see [WindowsPhone81]), but it is
+         * not a shell this launcher can render any more.
          */
-        fun all(): List<AppTheme> = listOf(WindowsXP, WindowsClassic, WindowsVista, WindowsPhone81)
+        fun all(): List<AppTheme> = listOf(WindowsXP, WindowsClassic, WindowsVista)
     }
 }
 
