@@ -74,13 +74,18 @@
         android:layout_marginTop="8dp"
         android:text="Choose a messaging app" />
 
+    <!--
+      The way out on a phone with no second messaging app installed: there is no other app
+      to give the role to from the buttons above, and Android will not simply take it back,
+      so the whole default-apps list is the last place left to look.
+    -->
     <TextView
-        android:id="@+id/gate_theme_button"
+        android:id="@+id/gate_settings_button"
         style="?winButtonStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Go back to Windows Phone 8" />
+        android:text="Open Android default apps settings" />
 
     <!-- Only ever filled in when a button could not do what it offered. See showProblem. -->
     <TextView

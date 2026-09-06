@@ -118,7 +118,3 @@ target/
 secrets.properties
 keystore.properties
 firebase-adminsdk-*.json
-
-# Python bytecode from the tools/ asset generators
-__pycache__/
-*.pyc

@@ -78,16 +78,6 @@ class WindowsDialog @JvmOverloads constructor(
     private var canMaximize = false
     private var canMinimize = true
     private var isMaximized = false
-
-    /**
-     * Locks the window maximized with no way back.
-     *
-     * Windows Phone 8.1 has no notion of a floating window, so under that theme every
-     * window that *can* maximize opens maximized and stays there: the maximize/restore
-     * button is hidden, double-tapping the title bar does nothing, and the title bar
-     * cannot be dragged. Set automatically from [setMaximizable]; see [setForceMaximized].
-     */
-    private var forceMaximized = false
     private var savedWidth = 0
     private var savedHeight = 0
     private var savedX = 0f
@@ -368,13 +358,11 @@ class WindowsDialog @JvmOverloads constructor(
                 // Try to restore saved state first, fallback to centering
                 if (windowIdentifier != null) {
                     restoreWindowState()
-                    // Only center if no saved state was found - and never a maximized
-                    // window, which is already exactly where it belongs. Its x and y are
-                    // legitimately 0, which the test below reads as "never positioned".
-                    if (!isMaximized && windowFrame.x == 0f && windowFrame.y == 0f) {
+                    // Only center if no saved state was found
+                    if (windowFrame.x == 0f && windowFrame.y == 0f) {
                         centerWindowFrame()
                     }
-                } else if (!isMaximized) {
+                } else {
                     centerWindowFrame()
                 }
                 windowFrame.visibility = View.VISIBLE
@@ -386,12 +374,11 @@ class WindowsDialog @JvmOverloads constructor(
                         // Try to restore saved state first, fallback to centering
                         if (windowIdentifier != null) {
                             restoreWindowState()
-                            // Only center if no saved state was found, and never a
-                            // maximized window - see the branch above.
-                            if (!isMaximized && windowFrame.x == 0f && windowFrame.y == 0f) {
+                            // Only center if no saved state was found
+                            if (windowFrame.x == 0f && windowFrame.y == 0f) {
                                 centerWindowFrame()
                             }
-                        } else if (!isMaximized) {
+                        } else {
                             centerWindowFrame()
                         }
                         windowFrame.visibility = View.VISIBLE
@@ -696,22 +683,6 @@ class WindowsDialog @JvmOverloads constructor(
     }
 
     /**
-     * How much of the screen lies below the area windows are laid out in, in pixels.
-     *
-     * The container's own bottom margin and everything the root is inset by, taken from
-     * where the container actually ends up rather than from the numbers that put it there:
-     * the two shells lay it out differently, the system bars move it again, and the one
-     * thing both of those agree on is where it is.
-     */
-    private fun spaceBelowWindowArea(): Int {
-        val container = windowFrame.parent as? View ?: return 0
-        val location = IntArray(2)
-        container.getLocationInWindow(location)
-        val bottom = location[1] + container.height
-        return (windowFrame.rootView.height - bottom).coerceAtLeast(0)
-    }
-
-    /**
      * Adjusts maximized window bottom margin to accommodate keyboard
      */
     private fun adjustMaximizedWindowForKeyboard() {
@@ -723,21 +694,14 @@ class WindowsDialog @JvmOverloads constructor(
             width = FrameLayout.LayoutParams.MATCH_PARENT
             height = FrameLayout.LayoutParams.MATCH_PARENT
             if (isKeyboardVisible) {
-                // Only the part of the keyboard the window would actually be under. The
-                // container windows live in already stops short of the bottom of the screen
-                // - 70dp for the desktop taskbar, the navigation bar's height under the
-                // phone shell, plus whatever the system bars are inset by - and every
-                // pixel of that is keyboard the window was never covering.
-                //
-                // Measured rather than assumed. It was a hardcoded 70dp, which is the
-                // desktop number and one the phone shell has never used, so a note being
-                // typed sat with its command strip floating above the keyboard by the
-                // difference between the two.
-                val clearance = spaceBelowWindowArea()
-                val adjustedMargin = (keyboardHeight - clearance).coerceAtLeast(0)
+                // The floating windows container has 70dp bottom margin for taskbar
+                // We need to subtract that from keyboard height to get the actual adjustment needed
+                val density = resources.displayMetrics.density
+                val taskbarMarginPx = (70 * density).toInt()
+                val adjustedMargin = (keyboardHeight - taskbarMarginPx).coerceAtLeast(0)
 
                 bottomMargin = adjustedMargin
-                Log.d("WindowsDialog", "Keyboard height=$keyboardHeight, clearance=$clearance, adjusted margin=$adjustedMargin")
+                Log.d("WindowsDialog", "Keyboard height=$keyboardHeight, taskbar margin=$taskbarMarginPx, adjusted margin=$adjustedMargin")
             } else {
                 // Fill entire screen
                 bottomMargin = 0
@@ -836,27 +800,6 @@ class WindowsDialog @JvmOverloads constructor(
         canMaximize = enabled
         // Show or hide maximize button based on enabled state
         maximizeButton?.visibility = if (enabled) View.VISIBLE else View.GONE
-
-        // Under Windows Phone 8.1 a maximizable window is *always* maximized. Hooked here
-        // rather than at each of the dozen call sites so Solitaire, Internet Explorer and
-        // every other maximizable program behave alike without touching them individually.
-        if (enabled && ThemeManager(context).isWindowsPhone81()) {
-            setForceMaximized(true)
-        }
-    }
-
-    /**
-     * Opens the window maximized and prevents it being restored.
-     * See [forceMaximized].
-     */
-    fun setForceMaximized(enabled: Boolean) {
-        forceMaximized = enabled
-        if (!enabled) return
-        canMaximize = true
-        maximizeButton?.visibility = View.GONE
-        // Deferred: the frame has no measured size until it has been laid out, and
-        // maximizeWindow() stashes those dimensions as the restore target.
-        post { if (!isMaximized) maximizeWindow() }
     }
 
 
@@ -1390,9 +1333,6 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = true
             windowFrame.visibility = View.GONE
             onMinimizeListener?.invoke()
-            // Whatever is drawn behind windows needs to know one has gone off screen; the
-            // count only ever changed when a window opened or closed.
-            windowManager?.notifyWindowVisibilityChanged()
         }
     }
 
@@ -1404,7 +1344,6 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = false
             windowFrame.visibility = View.VISIBLE
             windowManager?.bringToFront(this)
-            windowManager?.notifyWindowVisibilityChanged()
         }
     }
 
@@ -1459,8 +1398,6 @@ class WindowsDialog @JvmOverloads constructor(
      */
     private fun restoreWindow() {
         if (!isMaximized) return
-        // Locked maximized: there is no restored state to go back to.
-        if (forceMaximized) return
 
         // Reset keyboard state
         isKeyboardVisible = false
@@ -1602,9 +1539,7 @@ class WindowsDialog @JvmOverloads constructor(
                 y = if (isMaximized) savedY else windowFrame.y,
                 width = if (isMaximized) savedWidth else windowFrame.width,
                 height = if (isMaximized) savedHeight else windowFrame.height,
-                // Never persist "restored" for a locked window - otherwise leaving the
-                // WP8.1 theme would leave the window remembering a state it never had.
-                isMaximized = isMaximized || forceMaximized
+                isMaximized = isMaximized
             )
 
             // Update state for this window

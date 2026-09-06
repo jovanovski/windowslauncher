@@ -15,7 +15,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.theme.ThemeManager
 import java.util.Locale
-import rocks.gorjan.gokixp.wp81.metroLook
 
 /**
  * Data model for a theme
@@ -1127,12 +1126,7 @@ class WinampApp(
         }
             .setContentTitle(track.title)
             .setContentText("Winamp")
-            // The monochrome glyph, not the themed Winamp icon. A small icon is drawn from
-            // its alpha channel and nothing else, so a colour bitmap arrives as a filled
-            // square - which was survivable while this only appeared in the status bar and
-            // is not now that metroLook puts it on the notification as well.
-            .setSmallIcon(R.drawable.wp81_glyph_winamp)
-            .metroLook(context)
+            .setSmallIcon(ThemeManager(context).getWinampIcon())
             .setStyle(android.app.Notification.MediaStyle()
                 .setMediaSession(mediaSession?.sessionToken))
             .setOngoing(isPlaying)
@@ -1355,11 +1349,16 @@ class WinampApp(
      */
     private fun loadPlaylists() {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val gson = Gson()
 
-        // Read through the shared store: these playlists are the launcher's, not this
-        // program's, and Zune writes to the same place.
-        playlists.clear()
-        playlists.addAll(PlaylistStore.load(context))
+        // Load playlists
+        val playlistsJson = prefs.getString(KEY_PLAYLISTS, null)
+        if (playlistsJson != null) {
+            val type = object : TypeToken<List<Playlist>>() {}.type
+            val loadedPlaylists = gson.fromJson<List<Playlist>>(playlistsJson, type)
+            playlists.clear()
+            playlists.addAll(loadedPlaylists)
+        }
 
         // Ensure "ALL LOCAL FILES" playlist exists at index 0
         if (playlists.isEmpty() || playlists[0].name != ALL_LOCAL_FILES) {
@@ -1381,12 +1380,20 @@ class WinampApp(
      * Save playlists to SharedPreferences
      */
     private fun savePlaylists() {
-        // The playlists themselves go through the shared store; which one Winamp happens
-        // to be looking at is Winamp's own business and stays in its preferences.
-        PlaylistStore.save(context, playlists)
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_CURRENT_PLAYLIST, currentPlaylistIndex)
-            .apply()
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val gson = Gson()
+
+        // Save playlists (excluding ALL LOCAL FILES which is auto-generated)
+        val playlistsToSave = playlists.filter { it.name != ALL_LOCAL_FILES }
+        val playlistsJson = gson.toJson(playlistsToSave)
+
+        prefs.edit().apply {
+            putString(KEY_PLAYLISTS, playlistsJson)
+            putInt(KEY_CURRENT_PLAYLIST, currentPlaylistIndex)
+            apply()
+        }
+
+        Log.d("WinampApp", "Saved ${playlistsToSave.size} playlists")
     }
 
     /**

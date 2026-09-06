@@ -2,6 +2,7 @@ package rocks.gorjan.gokixp.theme
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -31,7 +32,7 @@ class AppThemeTest {
 
     @Test
     fun `the phone theme is no longer offered as a choice`() {
-        assertFalse(AppTheme.all().contains(AppTheme.WindowsPhone81))
+        assertTrue(AppTheme.all().none { it.toString().startsWith("Windows Phone") })
     }
 
     @Test
@@ -47,9 +48,9 @@ class AppThemeTest {
     fun `the phone theme keeps its own icon key so its icons stay identifiable`() {
         // MainActivity.RETIRED_CUSTOM_ICON_KEYS names this key to keep
         // pruneUnusedImportedIcons from deleting a phone user's imported icon files.
-        assertEquals("custom_icons_wp8", AppTheme.WindowsPhone81.customIconsKey)
+        assertEquals("custom_icons_wp8", WP8_CUSTOM_ICONS_KEY)
         for (theme in AppTheme.all()) {
-            assertFalse(theme.customIconsKey == AppTheme.WindowsPhone81.customIconsKey)
+            assertFalse(theme.customIconsKey == WP8_CUSTOM_ICONS_KEY)
         }
     }
 }

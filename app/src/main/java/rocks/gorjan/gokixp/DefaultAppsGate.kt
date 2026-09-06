@@ -13,20 +13,18 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import rocks.gorjan.gokixp.theme.AppTheme
-import rocks.gorjan.gokixp.theme.DesktopChrome
 
 /**
- * The wall the launcher puts up when it is still the phone's phone or messaging app under
- * a theme that has neither.
+ * The wall the launcher puts up when it is still the phone's phone or messaging app.
  *
- * Only Windows Phone 8.1 has a People app, a call screen and a conversation view, so it is
- * the only theme under which holding those roles means anything. Held under a desktop
- * theme they are worse than useless: every call and every text message on the device is
- * routed to a shell with nowhere to put it, and a message delivered to this app is a
- * message no other app is given - so one arriving now is one nobody ever sees. See
- * SmsDeliverReceiver. That is not a thing to mention in a notification and let the user
- * walk past, so this covers the launcher entirely and stays until the roles are somewhere
- * they can be answered.
+ * No theme here has a People app, a call screen or a conversation view - the shell that
+ * did left for its own launcher - so holding either role is worse than useless: every call
+ * and every text message on the device is routed to a shell with nowhere to put it, and a
+ * message delivered to this app is a message no other app is given, so one arriving now is
+ * one nobody ever sees. Somebody who was running the phone theme can still be holding both
+ * the morning after they update, with nothing left here to answer them. That is not a thing
+ * to mention in a notification and let the user walk past, so this covers the launcher
+ * entirely and stays until the roles are somewhere they can be answered.
  *
  * Deliberately a plain view rather than a [WindowsDialog]: a window can be moved, closed
  * and minimised, and every one of those is a way past something that is not meant to be
@@ -44,7 +42,7 @@ class DefaultAppsGate(
     private val theme: AppTheme,
     private val onChoosePhoneApp: () -> Unit,
     private val onChooseMessagingApp: () -> Unit,
-    private val onReturnToPhoneTheme: () -> Unit
+    private val onOpenDefaultApps: () -> Unit
 ) : FrameLayout(context) {
 
     private val windowFrame: LinearLayout
@@ -65,10 +63,10 @@ class DefaultAppsGate(
         setPadding(0, margin, 0, margin)
 
         val themeManager = (context as? MainActivity)?.themeManager
-        val chromeRes = themeManager?.getDialogLayoutRes(theme) ?: when (theme.chrome) {
-            DesktopChrome.CLASSIC -> R.layout.windows_dialog_content_98
-            DesktopChrome.XP -> R.layout.windows_dialog_content_xp
-            DesktopChrome.VISTA -> R.layout.windows_dialog_content_vista
+        val chromeRes = themeManager?.getDialogLayoutRes(theme) ?: when (theme) {
+            AppTheme.WindowsClassic -> R.layout.windows_dialog_content_98
+            AppTheme.WindowsVista -> R.layout.windows_dialog_content_vista
+            else -> R.layout.windows_dialog_content_xp
         }
 
         // The chrome comes wrapped in a full-screen overlay that a floating window is
@@ -116,10 +114,10 @@ class DefaultAppsGate(
         LayoutInflater.from(context).inflate(R.layout.default_apps_gate, content, true)
 
         content.findViewById<ImageView>(R.id.gate_icon).setImageResource(
-            when (theme.chrome) {
-                DesktopChrome.CLASSIC -> R.drawable.dialog_warning_98
-                DesktopChrome.XP -> R.drawable.dialog_warning_xp
-                DesktopChrome.VISTA -> R.drawable.dialog_warning_vista
+            when (theme) {
+                AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
+                AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
+                else -> R.drawable.dialog_warning_xp
             }
         )
 
@@ -136,8 +134,11 @@ class DefaultAppsGate(
             problem.visibility = View.GONE
             onChooseMessagingApp()
         }
-        content.findViewById<TextView>(R.id.gate_theme_button)
-            .setOnClickListener { onReturnToPhoneTheme() }
+        content.findViewById<TextView>(R.id.gate_settings_button)
+            .setOnClickListener {
+                problem.visibility = View.GONE
+                onOpenDefaultApps()
+            }
     }
 
     /**
@@ -157,8 +158,7 @@ class DefaultAppsGate(
         body.text = "Windows Launcher is still $what, and $theme has no screen to answer a " +
             "call on or to read a text message in. Calls and messages arriving now reach an " +
             "app that cannot show them.\n\n" +
-            "Give $them back to another app, or go back to Windows Phone 8, which has both. " +
-            "Until then there is nothing here to use."
+            "Give $them back to another app. Until then there is nothing here to use."
         dialerButton.visibility = if (dialerHeld) View.VISIBLE else View.GONE
         smsButton.visibility = if (smsHeld) View.VISIBLE else View.GONE
     }
