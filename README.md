@@ -1,7 +1,9 @@
 # Windows Launcher for Android
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/jovanovski)
+Donate to keep this project alive and going: [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/jovanovski)
 
 This is a Windows inspired launcher for Android 11+, which tries to faithfully recreate the retro Windows on modern phones. Feel free to grab a pre-comliped APK from the Releases tab or download and build the project yourself.
+
+Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://github.com/jovanovski/windowsphonelauncher/) as a separate project.
 
 ![Windows Launcher Preview](https://i.imgur.com/TBZMjFl.gif)
 
