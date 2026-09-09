@@ -1,6 +1,7 @@
 package rocks.gorjan.gokixp
 
 import android.app.NotificationManager
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
@@ -12,6 +13,17 @@ class NotificationListenerService : NotificationListenerService() {
         private const val TAG = "NotificationListener"
         private var instance: NotificationListenerService? = null
         private val activeNotificationPackages = mutableSetOf<String>()
+
+        // Messages the mail sound has already been played for, as "key@timestamp".
+        // Mail apps re-post the same notification whenever it changes, and those
+        // re-posts must not ring again.
+        private val ringedEmailKeys = LinkedHashSet<String>()
+        private const val RINGED_EMAIL_KEYS_MAX = 64
+
+        // One mail reaches us as several posts (a per-message notification plus a
+        // group summary), so posts landing this close together share one sound.
+        private const val EMAIL_SOUND_DEBOUNCE_MS = 2000L
+        private var lastEmailSoundAt = 0L
 
         // Common email app package names
         private val EMAIL_PACKAGES = setOf(
@@ -67,12 +79,14 @@ class NotificationListenerService : NotificationListenerService() {
         // even if they would normally be filtered out
         if (isEmailApp(packageName)) {
             Log.d(TAG, "Email notification detected from: $packageName")
-            val mainActivity = MainActivity.getInstance()
-            if (mainActivity != null) {
-                Log.d(TAG, "MainActivity instance found, playing email sound")
-                mainActivity.playEmailSound()
-            } else {
-                Log.w(TAG, "MainActivity instance is null, cannot play email sound")
+            if (shouldRingForEmail(sbn)) {
+                val mainActivity = MainActivity.getInstance()
+                if (mainActivity != null) {
+                    Log.d(TAG, "MainActivity instance found, playing email sound")
+                    mainActivity.playEmailSound()
+                } else {
+                    Log.w(TAG, "MainActivity instance is null, cannot play email sound")
+                }
             }
             // Only add non-ongoing, non-silent email notifications
             if (!isOngoing && !isSilentNotification(sbn)) {
@@ -98,6 +112,9 @@ class NotificationListenerService : NotificationListenerService() {
 
         val packageName = sbn.packageName
         Log.d(TAG, "Notification removed for: $packageName")
+
+        // A dismissed message may legitimately ring again if the app re-posts it.
+        ringedEmailKeys.removeAll { it.startsWith("${sbn.key}@") }
 
         // Check if there are still active notifications for this package
         // Only count non-ongoing notifications
@@ -129,6 +146,45 @@ class NotificationListenerService : NotificationListenerService() {
         }
     }
     
+    /**
+     * Whether this mail notification is a new message that should play the
+     * "You've got mail" sound.
+     *
+     * A single incoming mail produces more than one post: Gmail and friends post
+     * the per-message notification *and* a group summary for it, then re-post the
+     * notification as it is updated (actions added, sync finished). Each of those
+     * used to ring, so one mail was heard twice.
+     */
+    private fun shouldRingForEmail(sbn: StatusBarNotification): Boolean {
+        val notification = sbn.notification
+
+        // A foreground-service notification ("Getting your mail...") is not a mail.
+        if (notification.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0) {
+            return false
+        }
+
+        // The timestamp keeps a new message in an existing conversation distinct
+        // from a re-post of the message already rung for, which reuses the key.
+        val stamp = if (notification.`when` > 0L) notification.`when` else sbn.postTime
+        if (!ringedEmailKeys.add("${sbn.key}@$stamp")) {
+            Log.d(TAG, "Mail sound skipped - already played for ${sbn.key}")
+            return false
+        }
+        while (ringedEmailKeys.size > RINGED_EMAIL_KEYS_MAX) {
+            ringedEmailKeys.remove(ringedEmailKeys.first())
+        }
+
+        // The group summary arrives alongside its message, and a batch of mail
+        // arrives as a burst - either way that is one sound, not one per post.
+        val now = SystemClock.elapsedRealtime()
+        if (lastEmailSoundAt != 0L && now - lastEmailSoundAt < EMAIL_SOUND_DEBOUNCE_MS) {
+            Log.d(TAG, "Mail sound skipped - within debounce of the last one")
+            return false
+        }
+        lastEmailSoundAt = now
+        return true
+    }
+
     private fun refreshActiveNotifications() {
         try {
             activeNotificationPackages.clear()
