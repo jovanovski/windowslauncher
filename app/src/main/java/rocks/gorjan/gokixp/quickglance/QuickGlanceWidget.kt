@@ -203,11 +203,23 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // Half the screen wide, set here rather than in layout params: MainActivity adds the
-        // widget with WRAP_CONTENT, which let the panels stretch it across the whole desktop
-        // and left no room to drag it sideways. Measured each pass, so it follows rotation.
-        val widgetWidth = resources.displayMetrics.widthPixels / 2
+        // Sized here rather than in layout params: MainActivity adds the widget with WRAP_CONTENT,
+        // which let the panels stretch it across the whole desktop. At rest it reaches from where
+        // it sits to the desktop's right edge, so text isn't cut short; while moving it's half the
+        // screen, leaving room to drag it sideways. Measured each pass, so it follows rotation.
+        val halfWidth = resources.displayMetrics.widthPixels / 2
+        val widgetWidth = if (isMoveMode) {
+            halfWidth
+        } else {
+            (MeasureSpec.getSize(widthMeasureSpec) - x.toInt()).coerceAtLeast(halfWidth)
+        }
         super.onMeasure(MeasureSpec.makeMeasureSpec(widgetWidth, MeasureSpec.EXACTLY), heightMeasureSpec)
+    }
+
+    override fun setTranslationX(translationX: Float) {
+        super.setTranslationX(translationX)
+        // At rest the width depends on where the widget sits, so a new position needs a new measure
+        if (!isMoveMode) requestLayout()
     }
 
     fun setMoveMode(enabled: Boolean) {
@@ -215,6 +227,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
         isMoveMode = enabled
         removeCallbacks(longPressRunnable)
         hasMoved = false
+        requestLayout()
         // Dotted selection outline so it's clear the next drag moves the widget
         foreground = if (enabled) context.getDrawable(R.drawable.quick_glance_move_outline) else null
         Log.d("QuickGlanceWidget", "Move mode: $enabled")

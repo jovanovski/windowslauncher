@@ -3831,7 +3831,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         quickGlanceWidget.setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
         Log.d("MainActivity", "QuickGlanceWidget initial theme font set for: ${themeManager.getSelectedTheme()}")
         
-        // Create layout params - the widget measures itself to half the screen width
+        // Create layout params - the widget measures its own width (see QuickGlanceWidget.onMeasure)
         val layoutParams = RelativeLayout.LayoutParams(
             RelativeLayout.LayoutParams.WRAP_CONTENT,
             RelativeLayout.LayoutParams.WRAP_CONTENT
