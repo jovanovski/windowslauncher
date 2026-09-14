@@ -3,7 +3,6 @@ package rocks.gorjan.gokixp.quickglance
 import android.content.Context
 import android.util.Log
 import rocks.gorjan.gokixp.MainActivity
-import rocks.gorjan.gokixp.R
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,7 +30,6 @@ object QuickGlanceDefaults {
         return QuickGlanceData(
             title = formattedDate,
             subtitle = weatherSubtitle,
-            iconResourceId = R.drawable.clippy_still,
             priority = 10, // Low priority, only shows when no events
             sourceId = "default_fallback",
             tapAction = createCalendarTapAction(context)

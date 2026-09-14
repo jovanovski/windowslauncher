@@ -9,7 +9,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import rocks.gorjan.gokixp.MainActivity
-import rocks.gorjan.gokixp.R
 
 class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvider {
     
@@ -24,7 +23,6 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                     return@withContext QuickGlanceData(
                         title = "Calendar Access Needed",
                         subtitle = "Tap to grant permission",
-                        iconResourceId = R.drawable.clippy_still, // TODO: Use permission icon
                         priority = 50,
                         sourceId = "calendar_permission"
                     )
@@ -38,7 +36,6 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                     return@withContext QuickGlanceData(
                         title = "Calendar Access Needed",
                         subtitle = "Tap to grant permission",
-                        iconResourceId = R.drawable.clippy_still, // TODO: Use permission icon
                         priority = 50,
                         sourceId = "calendar_permission"
                     )
@@ -440,7 +437,6 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                     return QuickGlanceData(
                         title = title,
                         subtitle = subtitle,
-                        iconResourceId = R.drawable.clippy_still, // TODO: Use calendar icon
                         priority = 100, // High priority for ongoing events
                         sourceId = "calendar",
                         tapAction = createCalendarTapAction()
@@ -468,7 +464,6 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                         return QuickGlanceData(
                             title = title,
                             subtitle = subtitle,
-                            iconResourceId = R.drawable.clippy_still, // TODO: Use calendar icon
                             priority = 90 - minutesUntil, // Higher priority for sooner events
                             sourceId = "calendar",
                             tapAction = createCalendarTapAction()
@@ -498,7 +493,6 @@ class CalendarDataProvider(private val context: Context) : QuickGlanceDataProvid
                         return QuickGlanceData(
                             title = title,
                             subtitle = subtitle,
-                            iconResourceId = R.drawable.clippy_still, // TODO: Use calendar icon
                             priority = 30 - hoursUntil, // Lower priority for later events
                             sourceId = "calendar",
                             tapAction = createCalendarTapAction()

@@ -1,6 +1,10 @@
 package rocks.gorjan.gokixp.agent
 
 import android.content.Context
+import android.graphics.ImageDecoder
+import android.graphics.drawable.Animatable2
+import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -9,12 +13,13 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.resource.gif.GifDrawable
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.agent.Agent
+import java.io.IOException
 import kotlin.math.abs
+import kotlin.random.Random
 import rocks.gorjan.gokixp.getSafeFloat
 
 class AgentView @JvmOverloads constructor(
@@ -24,10 +29,18 @@ class AgentView @JvmOverloads constructor(
 ) : ImageView(context, attrs, defStyleAttr) {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var currentAgent: Agent = Agent.ROVER
+    private var currentAgent: Agent = Agent.DEFAULT
     private var isInTalkingState = false
+    private var isInWaitingState = false
     private var talkingStateTimer: Runnable? = null
     private var isLoadingSpeech = false
+    private var isGifLoaded = false
+
+    // Sprite animation state
+    private var spriteDrawable: AnimatedImageDrawable? = null
+    private var nextIdleRunnable: Runnable? = null
+    private var lastIdleAnimation: String? = null
+    private val idlePools = mutableMapOf<String, List<String>>()
     
     // Drag functionality
     private var isDragging = false
@@ -59,11 +72,7 @@ class AgentView @JvmOverloads constructor(
     private val ttsService = TTSService(context)
 
     init {
-        // Set initial size to 100dp x 100dp (25% bigger than original 80dp)
-        val size = (100 * context.resources.displayMetrics.density).toInt()
         dragThreshold = 10 * context.resources.displayMetrics.density
-        
-        Log.d("AgentView", "Setting size to ${size}px (100dp)")
         
         scaleType = ScaleType.FIT_CENTER
         visibility = View.VISIBLE
@@ -80,8 +89,8 @@ class AgentView @JvmOverloads constructor(
     
     private fun loadCurrentAgent() {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedAgentId = prefs.getString(KEY_CURRENT_AGENT, Agent.ROVER.id) ?: Agent.ROVER.id
-        currentAgent = Agent.getAgentById(savedAgentId) ?: Agent.ROVER
+        val savedAgentId = prefs.getString(KEY_CURRENT_AGENT, Agent.DEFAULT.id) ?: Agent.DEFAULT.id
+        currentAgent = Agent.getAgentById(savedAgentId) ?: Agent.DEFAULT
         Log.d("AgentView", "Loaded current agent: ${currentAgent.name}")
     }
     
@@ -89,6 +98,9 @@ class AgentView @JvmOverloads constructor(
         if (currentAgent != agent) {
             currentAgent = agent
             saveCurrentAgent()
+            applyAgentSize()
+            isInWaitingState = false
+            lastIdleAnimation = null
             switchToWaitingState()
             Log.d("AgentView", "Switched to agent: ${agent.name}")
         }
@@ -97,6 +109,14 @@ class AgentView @JvmOverloads constructor(
     private fun saveCurrentAgent() {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_CURRENT_AGENT, currentAgent.id).apply()
+    }
+
+    private fun applyAgentSize() {
+        val params = layoutParams ?: return
+        val density = resources.displayMetrics.density
+        params.width = (currentAgent.widthDp * density).toInt()
+        params.height = (currentAgent.heightDp * density).toInt()
+        layoutParams = params
     }
     
     fun switchToWaitingState() {
@@ -108,9 +128,20 @@ class AgentView @JvmOverloads constructor(
         
         // Clear loading state when returning to waiting
         isLoadingSpeech = false
+
+        // Both the talking timer and the end of the audio land here; don't cut the idle loop short
+        if (isInWaitingState) return
+        isInWaitingState = true
         
         Log.d("AgentView", "Switching to waiting state for ${currentAgent.name}")
+        if (currentAgent.sprites != null) {
+            clearGif()
+            rest()
+            return
+        }
+        stopSprite()
         try {
+            isGifLoaded = true
             Glide.with(context)
                 .asGif()
                 .load(currentAgent.waitingDrawableRes)
@@ -125,13 +156,22 @@ class AgentView @JvmOverloads constructor(
         if (isInTalkingState) return
         
         isInTalkingState = true
+        isInWaitingState = false
         Log.d("AgentView", "Switching to talking state for ${currentAgent.name} for ${durationMs}ms")
         
         try {
-            Glide.with(context)
-                .asGif()
-                .load(currentAgent.talkingDrawableRes)
-                .into(this)
+            val sprites = currentAgent.sprites
+            if (sprites != null) {
+                clearGif()
+                playSprite(sprites.talking, loop = true)
+            } else {
+                stopSprite()
+                isGifLoaded = true
+                Glide.with(context)
+                    .asGif()
+                    .load(currentAgent.talkingDrawableRes)
+                    .into(this)
+            }
             
             // Schedule return to waiting state
             talkingStateTimer = Runnable {
@@ -143,6 +183,86 @@ class AgentView @JvmOverloads constructor(
             Log.e("AgentView", "Failed to load talking animation for ${currentAgent.name}", e)
             switchToWaitingState()
         }
+    }
+
+    // Hold the rest pose for a beat, then play a random idle animation; each one ends back here
+    private fun rest() {
+        val sprites = currentAgent.sprites ?: return
+        playSprite(sprites.rest, loop = false)
+        val next = Runnable { playNextIdle() }
+        nextIdleRunnable = next
+        handler.postDelayed(next, Random.nextLong(IDLE_REST_MIN_MS, IDLE_REST_MAX_MS))
+    }
+
+    private fun playNextIdle() {
+        val sprites = currentAgent.sprites ?: return
+        val pool = idlePool(currentAgent, sprites)
+        val name = pool.filter { it != lastIdleAnimation }.randomOrNull() ?: pool.randomOrNull()
+        if (name == null) {
+            rest()
+            return
+        }
+        lastIdleAnimation = name
+        playSprite(name, loop = false) { rest() }
+    }
+
+    private fun idlePool(agent: Agent, sprites: SpriteAnimations): List<String> = idlePools.getOrPut(agent.id) {
+        val excluded = sprites.notIdle + sprites.rest + sprites.talking
+        (context.assets.list("agents/${agent.id}") ?: emptyArray())
+            .filter { it.endsWith(".webp") }
+            .map { it.removeSuffix(".webp") }
+            .filter { it !in excluded }
+    }
+
+    /**
+     * Shows one of the agent's animations. The drawable only advances while it is drawn, so the idle
+     * loop pauses by itself when the agent is hidden or the launcher is in the background.
+     */
+    private fun playSprite(name: String, loop: Boolean, onEnd: (() -> Unit)? = null) {
+        stopSprite()
+        val drawable = try {
+            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, "agents/${currentAgent.id}/$name.webp"))
+        } catch (e: IOException) {
+            Log.e("AgentView", "Failed to load animation $name for ${currentAgent.name}", e)
+            null
+        }
+        setImageDrawable(drawable)
+        if (drawable !is AnimatedImageDrawable) {
+            // A still frame (or a missing file) has nothing to wait for
+            onEnd?.let { handler.post(it) }
+            return
+        }
+        drawable.repeatCount = if (loop) AnimatedImageDrawable.REPEAT_INFINITE else 0
+        if (onEnd != null) {
+            drawable.registerAnimationCallback(object : Animatable2.AnimationCallback() {
+                override fun onAnimationEnd(ended: Drawable) {
+                    // Posted so the next animation doesn't swap drawables inside this drawable's callback
+                    handler.post { if (ended === spriteDrawable) onEnd() }
+                }
+            })
+        }
+        spriteDrawable = drawable
+        drawable.start()
+    }
+
+    // A pending Glide load would otherwise land on top of the sprite
+    private fun clearGif() {
+        if (!isGifLoaded) return
+        isGifLoaded = false
+        try {
+            Glide.with(context).clear(this)
+        } catch (e: Exception) {
+            Log.e("AgentView", "Failed to clear GIF animation", e)
+        }
+    }
+
+    private fun stopSprite() {
+        nextIdleRunnable?.let { handler.removeCallbacks(it) }
+        nextIdleRunnable = null
+        // Callbacks stay registered: clearing them while the drawable has an end callback posted
+        // crashes (it iterates the cleared list), and the identity check in playSprite ignores stale ends
+        spriteDrawable?.stop()
+        spriteDrawable = null
     }
 
     fun getCurrentAgent(): Agent {
@@ -245,6 +365,12 @@ class AgentView @JvmOverloads constructor(
         talkingStateTimer = null
         longPressRunnable?.let { handler.removeCallbacks(it) }
         longPressRunnable = null
+        stopSprite()
         ttsService.cleanup()
+    }
+
+    companion object {
+        private const val IDLE_REST_MIN_MS = 1000L
+        private const val IDLE_REST_MAX_MS = 3000L
     }
 }

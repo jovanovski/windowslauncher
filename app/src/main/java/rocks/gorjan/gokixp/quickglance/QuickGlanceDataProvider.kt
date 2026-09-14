@@ -8,7 +8,6 @@ import android.content.Context
 data class QuickGlanceData(
     val title: String,
     val subtitle: String,
-    val iconResourceId: Int,
     val priority: Int = 0, // Higher priority takes precedence
     val sourceId: String, // Identifier for the data source (e.g., "calendar", "weather", "news")
     val tapAction: TapAction? = null // Optional action to perform when tapped

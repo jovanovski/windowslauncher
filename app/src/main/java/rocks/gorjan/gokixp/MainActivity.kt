@@ -2673,6 +2673,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::contextMenu.isInitialized) {
             // Create Quick Glance context menu items
             val menuItems = ContextMenuItems.getQuickGlanceMenuItems(
+                onMoveQuickGlance = {
+                    Log.d("MainActivity", "Quick Glance entering move mode")
+                    startQuickGlanceMoveMode()
+                },
                 onHideQuickGlance = {
                     Log.d("MainActivity", "Hiding Quick Glance widget")
                     toggleQuickGlance()
@@ -2768,6 +2772,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         prefs.edit {putBoolean(KEY_QUICK_GLANCE_VISIBLE, newVisibility) }
 
         if (::quickGlanceWidget.isInitialized) {
+            if (!newVisibility) quickGlanceWidget.setMoveMode(false)
             quickGlanceWidget.visibility = if (newVisibility) View.VISIBLE else View.GONE
         }
         
@@ -3753,11 +3758,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showAgentContextMenu(agent, agentX, agentY)
         }
         
-        // Create layout params without positioning rules  
-        val size = (100 * resources.displayMetrics.density).toInt()
-        val layoutParams = RelativeLayout.LayoutParams(size, size)
+        // Create layout params without positioning rules, sized for the current agent
+        val density = resources.displayMetrics.density
+        val currentAgent = agentView.getCurrentAgent()
+        val layoutParams = RelativeLayout.LayoutParams(
+            (currentAgent.widthDp * density).toInt(),
+            (currentAgent.heightDp * density).toInt()
+        )
         
-        Log.d("MainActivity", "Layout params set: size=${size}px")
+        Log.d("MainActivity", "Layout params set: ${layoutParams.width}x${layoutParams.height}px")
         
         // Add to desktop container (this will render over icons but under menus)
         desktopContainer.addView(agentView, layoutParams)
@@ -3822,7 +3831,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         quickGlanceWidget.setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
         Log.d("MainActivity", "QuickGlanceWidget initial theme font set for: ${themeManager.getSelectedTheme()}")
         
-        // Create layout params - widget will set its own width to 80% of screen
+        // Create layout params - the widget measures itself to half the screen width
         val layoutParams = RelativeLayout.LayoutParams(
             RelativeLayout.LayoutParams.WRAP_CONTENT,
             RelativeLayout.LayoutParams.WRAP_CONTENT
@@ -4702,6 +4711,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Clear any previously selected icon (from context menu)
         selectedIcon?.setSelected(false)
         selectedIcon = null
+        exitQuickGlanceMoveMode()
         
         iconInMoveMode = iconView
         iconView.setSelected(true) // Use blue background selection effect
@@ -4715,6 +4725,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             iconView.setMoveMode(false)
         }
         iconInMoveMode = null
+    }
+
+    // Quick Glance moves like an icon, minus the grid: the widget holds its own move mode
+    // and leaves it on drop. Only one thing is ever in move mode at a time.
+    private fun startQuickGlanceMoveMode() {
+        selectedIcon?.setSelected(false)
+        selectedIcon = null
+        exitIconMoveMode()
+        hideContextMenu()
+        quickGlanceWidget.setMoveMode(true)
+    }
+
+    private fun exitQuickGlanceMoveMode() {
+        if (::quickGlanceWidget.isInitialized) {
+            quickGlanceWidget.setMoveMode(false)
+        }
     }
     
     private fun showIconSelectionDialog(
@@ -6069,7 +6095,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val gestureBarCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_under_taskbar_checkbox)
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
         val showQuickGlanceCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_quick_glance_checkbox)
-        val showClippyImageCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_clippy_image_checkbox)
         val alignRightCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.quick_glance_align_right_checkbox)
         val showRecycleBinCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_recycle_bin_checkbox)
         val showMyComputerCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_my_computer_checkbox)
@@ -6207,15 +6232,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         showQuickGlanceCheckbox.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != isQuickGlanceVisible()) {
                 toggleQuickGlance()
-            }
-        }
-
-        // Set up Show Clippy image checkbox (Quick Glance)
-        showClippyImageCheckbox.isChecked =
-            if (::quickGlanceWidget.isInitialized) quickGlanceWidget.isShowClippyImageEnabled() else true
-        showClippyImageCheckbox.setOnCheckedChangeListener { _, isChecked ->
-            if (::quickGlanceWidget.isInitialized && isChecked != quickGlanceWidget.isShowClippyImageEnabled()) {
-                quickGlanceWidget.setShowClippyImage(isChecked)
             }
         }
 

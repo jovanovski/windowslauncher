@@ -3,13 +3,10 @@ package rocks.gorjan.gokixp.quickglance
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Handler
-import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -26,34 +23,32 @@ class QuickGlanceWidget @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    // Drag functionality
-    private var isDragging = false
+    // Move mode, entered from the context menu's "Move": the whole widget becomes the drag handle
+    private var isMoveMode = false
     private var initialX = 0f
     private var initialY = 0f
     private var initialTouchX = 0f
     private var initialTouchY = 0f
-    private var longPressRunnable: Runnable? = null
-    private var isLongPress = false
     private var hasMoved = false
-    
+    private val longPressRunnable = Runnable {
+        Log.d("QuickGlanceWidget", "Long press detected - showing context menu")
+        showQuickGlanceContextMenu()
+    }
+
     // Movement threshold for distinguishing between tap, drag, and long press
     private val MOVEMENT_THRESHOLD = 10f
-    
+
     // SharedPreferences keys for position and settings - use MainActivity.PREFS_NAME for consistency
     private val KEY_WIDGET_X = "widget_x"
     private val KEY_WIDGET_Y = "widget_y"
     private val KEY_SHOW_CALENDAR_EVENTS = "show_calendar_events"
-    private val KEY_SHOW_CLIPPY_IMAGE = "quick_glance_show_clippy"
     private val KEY_ALIGN_RIGHT = "quick_glance_align_right"
 
     // UI components
-    private lateinit var iconView: ImageView
-    private lateinit var horizontalContainer: LinearLayout
-    private lateinit var contentContainer: LinearLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var dotsIndicator: LinearLayout
     private lateinit var panelAdapter: QuickGlancePanelAdapter
-    
+
     // Data management
     private var dataManager: QuickGlanceDataManager? = null
     private var panels = mutableListOf<QuickGlancePanel>()
@@ -77,38 +72,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
     
     private fun setupLayout() {
-        // Calculate 80% of screen width for the widget
-        val screenWidth = context.resources.displayMetrics.widthPixels
-        val widgetWidth = (screenWidth * 0.8f).toInt()
-
-        // Set fixed width for the widget and change orientation to vertical
         orientation = VERTICAL
-        layoutParams = LayoutParams(widgetWidth, LayoutParams.WRAP_CONTENT)
-
-        // Create horizontal container for icon and content
-        horizontalContainer = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        }
-
-        // Create icon
-        iconView = ImageView(context).apply {
-            val iconSize = (48 * context.resources.displayMetrics.density).toInt()
-            layoutParams = LayoutParams(iconSize, iconSize).apply {
-                setMargins(0, 0, 12, 0) // Right margin for spacing
-            }
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setImageResource(R.drawable.clippy_still) // Clippy icon
-        }
-        horizontalContainer.addView(iconView)
-
-        // Create content container (ViewPager2 for swiping).
-        // Uses layout weight so it fills whatever space the icon leaves — this keeps
-        // things correct whether the icon is shown/hidden or moved to the right.
-        contentContainer = LinearLayout(context).apply {
-            orientation = VERTICAL
-            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
-        }
 
         // Create ViewPager2 for swipeable panels
         viewPager = ViewPager2(context).apply {
@@ -137,9 +101,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
             }
         })
 
-        contentContainer.addView(viewPager)
-        horizontalContainer.addView(contentContainer)
-        addView(horizontalContainer)
+        addView(viewPager)
 
         // Create dots indicator (initially hidden)
         dotsIndicator = LinearLayout(context).apply {
@@ -147,7 +109,6 @@ class QuickGlanceWidget @JvmOverloads constructor(
             gravity = android.view.Gravity.START
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                 topMargin = (4 * context.resources.displayMetrics.density).toInt()
-                leftMargin = (48 * context.resources.displayMetrics.density).toInt()
             }
             visibility = View.GONE // Hide by default
         }
@@ -156,55 +117,17 @@ class QuickGlanceWidget @JvmOverloads constructor(
         // Set up initial panels
         initializePanels()
 
-        // Apply persisted appearance settings (Clippy image visibility, alignment)
+        // Apply persisted appearance settings (alignment)
         applyLayoutConfig()
     }
 
     /**
-     * Applies the "Show Clippy image" and "Align right" settings to the live layout.
-     * Safe to call repeatedly — it fully reconfigures the icon/content arrangement.
+     * Applies the "Align right" setting to the live layout. Safe to call repeatedly.
      */
     private fun applyLayoutConfig() {
-        val showClippy = isShowClippyImageEnabled()
-        val alignRight = isAlignRightEnabled()
-
-        // Toggle the Clippy image
-        iconView.visibility = if (showClippy) View.VISIBLE else View.GONE
-
-        // Icon spacing sits on whichever side faces the content
-        (iconView.layoutParams as LayoutParams).apply {
-            if (alignRight) setMargins(12, 0, 0, 0) else setMargins(0, 0, 12, 0)
-            iconView.layoutParams = this
-        }
-
-        // Reorder icon and content so Clippy sits on the right when aligned right
-        horizontalContainer.removeAllViews()
-        if (alignRight) {
-            horizontalContainer.addView(contentContainer)
-            horizontalContainer.addView(iconView)
-        } else {
-            horizontalContainer.addView(iconView)
-            horizontalContainer.addView(contentContainer)
-        }
-
-        // Right-align the panel text to match
-        panelAdapter.setTextGravity(
-            if (alignRight) android.view.Gravity.END else android.view.Gravity.START
-        )
-
-        // Keep the dots indicator aligned with the content column
-        dotsIndicator.gravity = if (alignRight) android.view.Gravity.END else android.view.Gravity.START
-        (dotsIndicator.layoutParams as LayoutParams).apply {
-            val offset = (48 * context.resources.displayMetrics.density).toInt()
-            if (alignRight) {
-                leftMargin = 0
-                rightMargin = offset
-            } else {
-                leftMargin = offset
-                rightMargin = 0
-            }
-            dotsIndicator.layoutParams = this
-        }
+        val gravity = if (isAlignRightEnabled()) android.view.Gravity.END else android.view.Gravity.START
+        panelAdapter.setTextGravity(gravity)
+        dotsIndicator.gravity = gravity
     }
 
     private fun initializePanels() {
@@ -279,115 +202,100 @@ class QuickGlanceWidget @JvmOverloads constructor(
         }
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // Half the screen wide, set here rather than in layout params: MainActivity adds the
+        // widget with WRAP_CONTENT, which let the panels stretch it across the whole desktop
+        // and left no room to drag it sideways. Measured each pass, so it follows rotation.
+        val widgetWidth = resources.displayMetrics.widthPixels / 2
+        super.onMeasure(MeasureSpec.makeMeasureSpec(widgetWidth, MeasureSpec.EXACTLY), heightMeasureSpec)
+    }
+
+    fun setMoveMode(enabled: Boolean) {
+        if (isMoveMode == enabled) return
+        isMoveMode = enabled
+        removeCallbacks(longPressRunnable)
+        hasMoved = false
+        // Dotted selection outline so it's clear the next drag moves the widget
+        foreground = if (enabled) context.getDrawable(R.drawable.quick_glance_move_outline) else null
+        Log.d("QuickGlanceWidget", "Move mode: $enabled")
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        // In move mode the panels must not see the touch - no swiping, no tap actions
+        return isMoveMode || super.onInterceptTouchEvent(event)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Check if touch is on the icon for dragging
-        val iconLocation = IntArray(2)
-        iconView.getLocationInWindow(iconLocation)
-        val iconLeft = iconLocation[0]
-        val iconTop = iconLocation[1]
-        val iconRight = iconLeft + iconView.width
-        val iconBottom = iconTop + iconView.height
+        if (isMoveMode) return handleMoveTouch(event)
 
-        val touchX = event.rawX.toInt()
-        val touchY = event.rawY.toInt()
-
-        val isTouchOnIcon = touchX >= iconLeft && touchX <= iconRight && touchY >= iconTop && touchY <= iconBottom
-
-        when (event.action) {
+        // Only touches the panels don't consume land here (the padding around them),
+        // so all that's left to detect is a long press for the context menu
+        when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                isLongPress = false
-                hasMoved = false
                 initialTouchX = event.rawX
                 initialTouchY = event.rawY
-
-                if (isTouchOnIcon) {
-                    // Handle icon dragging
-                    isDragging = true
-                    initialX = x
-                    initialY = y
-                }
-
-                // Start long press detection for both icon and content area
-                longPressRunnable = Runnable {
-                    // Only trigger long press if the finger hasn't moved
-                    if (!hasMoved) {
-                        isLongPress = true
-                        Log.d("QuickGlanceWidget", "Long press detected - showing context menu")
-                        showQuickGlanceContextMenu()
-                    }
-                }
-                Handler(Looper.getMainLooper()).postDelayed(longPressRunnable!!, 500) // 500ms for long press
-
+                postDelayed(longPressRunnable, 500)
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
-                val deltaX = event.rawX - initialTouchX
-                val deltaY = event.rawY - initialTouchY
-
-                // Check if user has moved beyond threshold
-                if (Math.abs(deltaX) > MOVEMENT_THRESHOLD || Math.abs(deltaY) > MOVEMENT_THRESHOLD) {
-                    // Mark as moved and cancel long press immediately
-                    if (!hasMoved) {
-                        hasMoved = true
-                        longPressRunnable?.let {
-                            Handler(Looper.getMainLooper()).removeCallbacks(it)
-                            longPressRunnable = null
-                        }
-                        Log.d("QuickGlanceWidget", "Movement detected, canceling long press")
-                    }
-
-                    // Only update position if dragging the icon
-                    if (isDragging && isTouchOnIcon) {
-                        x = initialX + deltaX
-                        y = initialY + deltaY
-                    }
+                if (Math.abs(event.rawX - initialTouchX) > MOVEMENT_THRESHOLD ||
+                    Math.abs(event.rawY - initialTouchY) > MOVEMENT_THRESHOLD) {
+                    removeCallbacks(longPressRunnable)
                 }
                 return true
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                // Cancel long press if still pending
-                longPressRunnable?.let {
-                    Handler(Looper.getMainLooper()).removeCallbacks(it)
-                    longPressRunnable = null
-                }
-
-                if (isDragging) {
-                    if (hasMoved && !isLongPress) {
-                        // Save position when user finishes dragging (but not on long press)
-                        Log.d("QuickGlanceWidget", "Drag completed, saving position")
-                        savePosition()
-                    } else if (isLongPress) {
-                        Log.d("QuickGlanceWidget", "Long press completed, context menu already shown")
-                    }
-
-                    // Reset state
-                    isDragging = false
-                }
-
-                // Reset common state
-                hasMoved = false
-                isLongPress = false
-
-                // If it was just a tap on content area (not icon) and not a long press, let ViewPager2 handle it
-                if (!isTouchOnIcon && !isLongPress) {
-                    return super.onTouchEvent(event)
-                }
-
-                return true
+                removeCallbacks(longPressRunnable)
             }
         }
+        return super.onTouchEvent(event)
+    }
 
-        // Let ViewPager2 handle swipe gestures for content area
-        if (!isTouchOnIcon) {
-            return super.onTouchEvent(event)
+    private fun handleMoveTouch(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                initialX = x
+                initialY = y
+                initialTouchX = event.rawX
+                initialTouchY = event.rawY
+                hasMoved = false
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val deltaX = event.rawX - initialTouchX
+                val deltaY = event.rawY - initialTouchY
+                if (!hasMoved && (Math.abs(deltaX) > MOVEMENT_THRESHOLD || Math.abs(deltaY) > MOVEMENT_THRESHOLD)) {
+                    hasMoved = true
+                }
+                if (hasMoved) {
+                    // Keep the widget on the desktop so it can't be dragged out of reach
+                    val desktop = parent as View
+                    x = (initialX + deltaX).coerceIn(0f, (desktop.width - width).coerceAtLeast(0).toFloat())
+                    y = (initialY + deltaY).coerceIn(0f, (desktop.height - height).coerceAtLeast(0).toFloat())
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                // A drop saves the new spot; a tap without dragging just cancels the move
+                if (hasMoved) {
+                    Log.d("QuickGlanceWidget", "Drag completed, saving position")
+                    savePosition()
+                }
+                setMoveMode(false)
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                // Gesture was taken away mid-drag - put the widget back and let them try again
+                x = initialX
+                y = initialY
+                hasMoved = false
+            }
         }
-
         return true
     }
-    
-    
+
     private fun executeTapAction(tapAction: TapAction) {
         try {
             when (tapAction) {
@@ -444,10 +352,6 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
     
     // Public methods to update widget content
-    fun setIcon(resourceId: Int) {
-        iconView.setImageResource(resourceId)
-    }
-
     fun setThemeFont(isWindows98: Boolean) {
         val fontName = if (isWindows98) "Microsoft Sans Serif" else "Tahoma"
         Log.d("QuickGlanceWidget", "Setting theme font to: $fontName")
@@ -646,19 +550,6 @@ class QuickGlanceWidget @JvmOverloads constructor(
         Log.d("QuickGlanceWidget", "Calendar events setting changed to: $enabled")
     }
 
-    // "Show Clippy image" setting management
-    fun isShowClippyImageEnabled(): Boolean {
-        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_SHOW_CLIPPY_IMAGE, true) // Default to true (shown)
-    }
-
-    fun setShowClippyImage(enabled: Boolean) {
-        val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_SHOW_CLIPPY_IMAGE, enabled).apply()
-        applyLayoutConfig()
-        Log.d("QuickGlanceWidget", "Show Clippy image setting changed to: $enabled")
-    }
-
     // "Align right" setting management
     fun isAlignRightEnabled(): Boolean {
         val prefs = context.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
@@ -686,6 +577,7 @@ class QuickGlanceWidget @JvmOverloads constructor(
     }
 
     fun destroy() {
+        removeCallbacks(longPressRunnable)
         dataManager?.stopUpdates()
         dataManager = null
         permissionRequestCallback = null

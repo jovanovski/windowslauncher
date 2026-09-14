@@ -135,6 +135,7 @@ object ContextMenuItems {
     
     // Quick Glance widget context menu items
     fun getQuickGlanceMenuItems(
+        onMoveQuickGlance: () -> Unit,
         onHideQuickGlance: () -> Unit,
         onRefreshCalendar: () -> Unit,
         onToggleCalendarEvents: () -> Unit,
@@ -145,6 +146,7 @@ object ContextMenuItems {
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Refresh Calendar", isEnabled = true, action = onRefreshCalendar),
             ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Move", isEnabled = true, action = onMoveQuickGlance),
             ContextMenuItem("Hide Quick Glance", isEnabled = true, action = onHideQuickGlance)
         )
     }
