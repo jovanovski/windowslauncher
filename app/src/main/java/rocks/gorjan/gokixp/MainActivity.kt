@@ -28,7 +28,9 @@ import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -202,7 +204,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var areDesktopIconsHidden = false // When true, icons are invisible but still tappable
     private var wallpaperSlideRunnable: Runnable? = null
     private var wallpaperSlidePositionMs = 0L // elapsed within the slide cycle, so it resumes where it stopped
-    private lateinit var floatingWindowManager: FloatingWindowManager
+    lateinit var floatingWindowManager: FloatingWindowManager
+        private set
+
+    /** The Windows 7 superbar's pins; null under every other theme. */
+    var win7TaskbarPins: Win7TaskbarPins? = null
+        private set
     private var iconInMoveMode: DesktopIconView? = null
     private val customIconMappings = mutableMapOf<String, String>() // packageName -> customIconPath
     private val customNameMappings = mutableMapOf<String, String>() // packageName -> customName
@@ -260,6 +267,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private val notepadGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         currentNotepadApp?.onImageSelected(uri)
+    }
+
+    // Paint's File > Open. Whichever Paint window asked is the one the picture comes back to.
+    private var currentPaintApp: rocks.gorjan.gokixp.apps.paint.PaintApp? = null
+
+    private val paintGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        currentPaintApp?.onPictureChosen(uri)
     }
 
     /**
@@ -571,6 +585,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
          */
         private val RETIRED_CUSTOM_ICON_KEYS = listOf(WP8_CUSTOM_ICONS_KEY)
 
+        /** Window key for My Computer opened from the Windows 7 start menu with no desktop icon. */
+        private const val WIN7_START_MENU_COMPUTER_ID = "start_menu"
+
         /**
          * Where Windows Phone 8.1 went. Shown once to the people who were running it.
          *
@@ -584,9 +601,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_SHOW_NOTIFICATION_DOTS = "show_notification_dots"
         private const val KEY_CLOCK_24_HOUR = "clock_24_hour"
         private const val KEY_KNOWN_APPS = "known_apps"
-        private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
-        private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
-        private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"
         private const val KEY_ROVER_VISIBLE = "rover_visible"
         private const val KEY_RECYCLE_BIN_VISIBLE = "recycle_bin_visible"
         private const val KEY_MY_COMPUTER_VISIBLE = "my_computer_visible"
@@ -597,9 +611,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WALLPAPER_CLASSIC_URI = "wallpaper_classic_uri"
         private const val KEY_WALLPAPER_VISTA_PATH = "wallpaper_vista_path"
         private const val KEY_WALLPAPER_VISTA_URI = "wallpaper_vista_uri"
+        private const val KEY_WALLPAPER_WIN7_PATH = "wallpaper_win7_path"
+        private const val KEY_WALLPAPER_WIN7_URI = "wallpaper_win7_uri"
         private const val KEY_WALLPAPER_XP_FOCUS_X = "wallpaper_xp_focus_x"
         private const val KEY_WALLPAPER_CLASSIC_FOCUS_X = "wallpaper_classic_focus_x"
         private const val KEY_WALLPAPER_VISTA_FOCUS_X = "wallpaper_vista_focus_x"
+        private const val KEY_WALLPAPER_WIN7_FOCUS_X = "wallpaper_win7_focus_x"
         private const val KEY_SLIDE_WALLPAPER_ENABLED = "slide_wallpaper_enabled"
         private const val KEY_SLIDE_WALLPAPER_DURATION = "slide_wallpaper_duration" // whole 0->max->0 cycle, in seconds
         private const val DEFAULT_SLIDE_WALLPAPER_DURATION = 10
@@ -898,6 +915,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> Pair(KEY_WALLPAPER_CLASSIC_PATH, KEY_WALLPAPER_CLASSIC_URI)
             AppTheme.WindowsXP -> Pair(KEY_WALLPAPER_XP_PATH, KEY_WALLPAPER_XP_URI)
             AppTheme.WindowsVista -> Pair(KEY_WALLPAPER_VISTA_PATH, KEY_WALLPAPER_VISTA_URI)
+            AppTheme.Windows7 -> Pair(KEY_WALLPAPER_WIN7_PATH, KEY_WALLPAPER_WIN7_URI)
         }
     }
 
@@ -909,6 +927,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> KEY_WALLPAPER_CLASSIC_FOCUS_X
             AppTheme.WindowsXP -> KEY_WALLPAPER_XP_FOCUS_X
             AppTheme.WindowsVista -> KEY_WALLPAPER_VISTA_FOCUS_X
+            AppTheme.Windows7 -> KEY_WALLPAPER_WIN7_FOCUS_X
         }
     }
 
@@ -920,6 +939,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> "wallpapers/Windows ME (m).jpg"
             AppTheme.WindowsXP -> "wallpapers/Bliss (m).jpg"
             AppTheme.WindowsVista -> "wallpapers/Windows Vista (m).jpg" // Can be changed to Vista default later
+            AppTheme.Windows7 -> "wallpapers/Windows 7 (m).jpg"
         }
     }
 
@@ -931,6 +951,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> "custom_icons_98"
             AppTheme.WindowsXP -> "custom_icons"
             AppTheme.WindowsVista -> "custom_icons_vista"
+            AppTheme.Windows7 -> "custom_icons_7"
         }
     }
 
@@ -942,6 +963,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
             AppTheme.WindowsXP -> R.drawable.button_xp_background
             AppTheme.WindowsVista -> R.drawable.button_xp_background // Can be changed to Vista button later
+            AppTheme.Windows7 -> R.drawable.button_win7
         }
     }
 
@@ -952,7 +974,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return when (themeManager.getSelectedTheme()) {
             AppTheme.WindowsClassic -> R.drawable.display_98
             AppTheme.WindowsXP -> R.drawable.display_xp
-            AppTheme.WindowsVista -> R.drawable.display_xp // Can be changed to Vista icon later
+            AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.display_xp // Can be changed to Vista icon later
         }
     }
 
@@ -964,6 +986,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> if (isMuted) R.drawable.mute_98 else R.drawable.sound_98
             AppTheme.WindowsXP -> if (isMuted) R.drawable.mute else R.drawable.sound
             AppTheme.WindowsVista -> if (isMuted) R.drawable.mute_vista else R.drawable.sound_vista
+            AppTheme.Windows7 -> if (isMuted) R.drawable.mute_win7 else R.drawable.sound_win7
         }
     }
 
@@ -1312,6 +1335,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Update icon based on visibility state and theme
         val currentTheme = themeManager.getSelectedTheme()
         val iconRes = when {
+            // Windows 7's chevron opens a flyout rather than collapsing inline, so it doesn't flip
+            currentTheme is AppTheme.Windows7 -> R.drawable.tray_chevron_win7
             currentTheme is AppTheme.WindowsVista && isVisible -> R.drawable.system_tray_collapse_vista
             currentTheme is AppTheme.WindowsVista && !isVisible -> R.drawable.system_tray_expand_vista
             isVisible -> R.drawable.system_tray_collapse_xp
@@ -1361,8 +1386,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 dateSpan.setSpan(SuperscriptSpan(), ordinalStart, ordinalEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 dateSpan.setSpan(RelativeSizeSpan(0.7f), ordinalStart, ordinalEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-                // Update separate date and time displays
-                dateDay.text = dateSpan
+                // Update separate date and time displays. Windows 7's two-line tray clock
+                // shows a plain short date under the time instead of "Feb 1st".
+                dateDay.text = if (themeManager.isWin7Theme()) {
+                    java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT, Locale.getDefault()).format(currentDate)
+                } else {
+                    dateSpan
+                }
                 dateOrdinal.text = ""
                 clockTime.text = time
 
@@ -1415,20 +1445,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.startup_95] = soundPool.load(audioContext, R.raw.startup_95, 1)
         soundIds[R.raw.startup_2000] = soundPool.load(audioContext, R.raw.startup_2000, 1)
         soundIds[R.raw.startup_vista] = soundPool.load(audioContext, R.raw.startup_vista, 1)
+        soundIds[R.raw.startup_win7] = soundPool.load(audioContext, R.raw.startup_win7, 1)
         soundIds[R.raw.shutdown] = soundPool.load(audioContext, R.raw.shutdown, 1)
         soundIds[R.raw.shutdown_98] = soundPool.load(audioContext, R.raw.shutdown_98, 1)
         soundIds[R.raw.shutdown_2000] = soundPool.load(audioContext, R.raw.shutdown_2000, 1)
         soundIds[R.raw.shutdown_vista] = soundPool.load(audioContext, R.raw.shutdown_vista, 1)
+        soundIds[R.raw.shutdown_win7] = soundPool.load(audioContext, R.raw.shutdown_win7, 1)
         soundIds[R.raw.click] = soundPool.load(audioContext, R.raw.click, 1)
         soundIds[R.raw.click_vista] = soundPool.load(audioContext, R.raw.click_vista, 1)
         soundIds[R.raw.recycle] = soundPool.load(audioContext, R.raw.recycle, 1)
         soundIds[R.raw.ding] = soundPool.load(audioContext, R.raw.ding, 1)
         soundIds[R.raw.ding_vista] = soundPool.load(audioContext, R.raw.ding_vista, 1)
+        soundIds[R.raw.ding_win7] = soundPool.load(audioContext, R.raw.ding_win7, 1)
         soundIds[R.raw.bubble] = soundPool.load(audioContext, R.raw.bubble, 1)
+        soundIds[R.raw.bubble_win7] = soundPool.load(audioContext, R.raw.bubble_win7, 1)
+        soundIds[R.raw.recycle_win7] = soundPool.load(audioContext, R.raw.recycle_win7, 1)
         soundIds[R.raw.charge_on] = soundPool.load(audioContext, R.raw.charge_on, 1)
         soundIds[R.raw.charge_on_vista] = soundPool.load(audioContext, R.raw.charge_on_vista, 1)
+        soundIds[R.raw.charge_on_win7] = soundPool.load(audioContext, R.raw.charge_on_win7, 1)
         soundIds[R.raw.charge_off] = soundPool.load(audioContext, R.raw.charge_off, 1)
         soundIds[R.raw.charge_off_vista] = soundPool.load(audioContext, R.raw.charge_off_vista, 1)
+        soundIds[R.raw.charge_off_win7] = soundPool.load(audioContext, R.raw.charge_off_win7, 1)
         soundIds[R.raw.num_1] = soundPool.load(audioContext, R.raw.num_1, 1)
         soundIds[R.raw.num_2] = soundPool.load(audioContext, R.raw.num_2, 1)
         soundIds[R.raw.num_3] = soundPool.load(audioContext, R.raw.num_3, 1)
@@ -1443,6 +1480,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.error_xp] = soundPool.load(audioContext, R.raw.error_xp, 1)
         soundIds[R.raw.warning_xp] = soundPool.load(audioContext, R.raw.warning_xp, 1)
         soundIds[R.raw.information_xp] = soundPool.load(audioContext, R.raw.information_xp, 1)
+        soundIds[R.raw.error_win7] = soundPool.load(audioContext, R.raw.error_win7, 1)
+        soundIds[R.raw.warning_win7] = soundPool.load(audioContext, R.raw.warning_win7, 1)
+        soundIds[R.raw.information_win7] = soundPool.load(audioContext, R.raw.information_win7, 1)
 
         // Preload egg sounds
         for (resourceId in eggSounds) {
@@ -1520,22 +1560,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
                 val currentTheme = themeManager.getSelectedTheme()
                 when (intent?.action) {
-                    Intent.ACTION_POWER_CONNECTED -> {
-                        if(currentTheme == AppTheme.WindowsVista){
-                            playSound(R.raw.charge_on_vista)
-                        }
-                        else{
-                            playSound(R.raw.charge_on)
-                        }
-                    }
-                    Intent.ACTION_POWER_DISCONNECTED -> {
-                        if(currentTheme == AppTheme.WindowsVista){
-                            playSound(R.raw.charge_off_vista)
-                        }
-                        else{
-                            playSound(R.raw.charge_off)
-                        }
-                    }
+                    Intent.ACTION_POWER_CONNECTED -> playSound(when (currentTheme) {
+                        AppTheme.WindowsVista -> R.raw.charge_on_vista
+                        AppTheme.Windows7 -> R.raw.charge_on_win7
+                        AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.charge_on
+                    })
+                    Intent.ACTION_POWER_DISCONNECTED -> playSound(when (currentTheme) {
+                        AppTheme.WindowsVista -> R.raw.charge_off_vista
+                        AppTheme.Windows7 -> R.raw.charge_off_win7
+                        AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.charge_off
+                    })
                 }
             }
         }
@@ -1567,6 +1601,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Register Notepad
         systemAppActions["system.notepad"] = { appInfo ->
             showNotepadDialog()
+        }
+
+        // Register Paint
+        systemAppActions["system.paint"] = { appInfo ->
+            showPaintDialog()
         }
 
         // Register Winamp
@@ -1649,6 +1688,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "notepad.exe",
                 packageName = "system.notepad",
                 icon = createSquareDrawable(notepadDrawable)
+            ))
+        }
+
+        // Paint - scale icon to match app icon size
+        val paintDrawable = AppCompatResources.getDrawable(this, themeManager.getPaintIcon())
+        if (paintDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "Paint",
+                exeName = "mspaint.exe",
+                packageName = "system.paint",
+                icon = createSquareDrawable(paintDrawable),
+                minWindowWidthDp = 300
             ))
         }
 
@@ -1949,6 +2000,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 checkForUpdates(true)
             }
 
+            if (selectedTheme is AppTheme.Windows7) setupWin7StartMenuLinks()
+
             // Setup XP/Vista-specific All Programs toggle
             if (selectedTheme !is AppTheme.WindowsClassic) {
                 val allProgramsWrapper = findViewById<LinearLayout>(R.id.all_programs)
@@ -1963,7 +2016,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         isStartMenuShowingApps = true
                         appListWrapper.visibility = View.VISIBLE
                         commandListWrapper?.visibility = View.GONE
-                        allProgramsText?.text = "Back to Pinned"
+                        allProgramsText?.text = if (selectedTheme is AppTheme.Windows7) "Back" else "Back to Pinned"
                         allProgramsArrow?.rotation = 180f
                     }
                 }
@@ -2057,6 +2110,64 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun openPhoneSettings() {
         createAndShowWallpaperDialog("settings")
     }
+
+    /**
+     * The Windows 7 start menu's right column is made of real views, so the links that have
+     * somewhere to go on a phone go there. Documents and Pictures have no counterpart here and
+     * stay as unwired as every link in Vista's baked column. Control Panel is settings_item,
+     * wired with the other themes' items in setupStartMenu.
+     */
+    private fun setupWin7StartMenuLinks() {
+        fun link(id: Int, action: () -> Unit) {
+            findViewById<View>(id)?.setOnClickListener {
+                playClickSound()
+                hideStartMenu()
+                action()
+            }
+        }
+        link(R.id.win7_computer_item) {
+            openMyComputerWindow(myComputer?.getDesktopIcon()?.id ?: WIN7_START_MENU_COMPUTER_ID)
+        }
+        link(R.id.win7_music_item) { launchSystemApp("system.wmp") }
+        link(R.id.win7_default_programs_item) { openDefaultAppChooser(null) }
+        link(R.id.win7_help_item) { showWelcomeToWindows() }
+        link(R.id.win7_devices_item) {
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
+            } catch (e: Exception) {
+                Log.w("MainActivity", "No Bluetooth settings screen to open", e)
+            }
+        }
+
+        // Games: the games that shipped in Windows 7's Games folder, as a menu.
+        findViewById<View>(R.id.win7_games_item)?.setOnClickListener { view ->
+            playClickSound()
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            showWin7Menu(
+                listOf(
+                    ContextMenuItem("Solitaire", action = { hideStartMenu(); launchSystemApp("system.solitare") }),
+                    ContextMenuItem("Minesweeper", action = { hideStartMenu(); launchSystemApp("system.minesweeper") }),
+                    ContextMenuItem("Pinball", action = { hideStartMenu(); launchSystemApp("system.pinball") })
+                ),
+                location[0] + view.width.toFloat(), location[1].toFloat()
+            )
+        }
+
+        // The arrow beside Shut down opens its menu.
+        findViewById<View>(R.id.win7_shutdown_options)?.setOnClickListener { view ->
+            playClickSound()
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            showWin7Menu(
+                listOf(
+                    ContextMenuItem("Log off", action = { handleShutdown(isLogoff = true) }),
+                    ContextMenuItem("Shut down", action = { handleShutdown() })
+                ),
+                location[0].toFloat(), location[1].toFloat()
+            )
+        }
+    }
     
     
     private fun loadAppIcon(packageName: String): Drawable? {
@@ -2076,6 +2187,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return when (packageName) {
                 "system.internet_explorer" ->AppCompatResources.getDrawable(this, themeManager.getIEIcon())
                 "system.notepad" ->AppCompatResources.getDrawable(this, themeManager.getNotepadIcon())
+                "system.paint" ->AppCompatResources.getDrawable(this, themeManager.getPaintIcon())
                 "system.clock" ->AppCompatResources.getDrawable(this, themeManager.getClockIcon())
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
@@ -3274,6 +3386,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun showStartMenu() {
+        hideWin7TrayFlyout()
         if (::startMenu.isInitialized) {
             startMenu.visibility = View.VISIBLE
             isStartMenuVisible = true
@@ -3292,8 +3405,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             isProgramsMenuExpanded = false
             commandsAdapter?.setProgramsExpanded(false)
 
-            // For Windows Vista theme, reset to show command list instead of app list
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista || themeManager.getSelectedTheme() is AppTheme.WindowsXP) {
+            // XP and the Aero themes: reset to show the command list instead of the app list
+            if (themeManager.getSelectedTheme() !is AppTheme.WindowsClassic) {
                 val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
                 val commandListWrapper = findViewById<LinearLayout>(R.id.command_list_wrapper)
                 val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
@@ -4022,7 +4135,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         quickGlanceWidget.setShowCalendarEvents(currentState)
     }
 
-    private fun hideContextMenu() {
+    fun hideContextMenu() {
         if (::contextMenu.isInitialized) {
             contextMenu.hideMenu()
             isContextMenuVisible = false
@@ -4037,8 +4150,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun toggleDesktopIconsVisibility() {
         areDesktopIconsHidden = !areDesktopIconsHidden
-        // Vista fades; XP and 9x (Classic) toggle instantly.
-        val duration = if (themeManager.isVistaTheme()) 150L else 0L
+        // Vista and 7 fade; XP and 9x (Classic) toggle instantly.
+        val duration = if (themeManager.isAeroTheme()) 150L else 0L
         desktopIconViews.forEach { iconView ->
             if (areDesktopIconsHidden) {
                 // Fade out, then fully hide (INVISIBLE) so hidden icons can't be tapped.
@@ -4096,6 +4209,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // Keep start menu open for easier bulk pinning/unpinning
                 },
                 isPinned = isPinned,
+                taskbarPin = taskbarPinItemFor(appInfo.packageName),
                 onSetSwipeRightApp = {
                     setSwipeRightApp(appInfo)
                     hideStartMenu()
@@ -4227,7 +4341,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     }
                 },
                 isSystemApp = isSystemApp,
-                isUrlShortcut = isUrlShortcut
+                isUrlShortcut = isUrlShortcut,
+                taskbarPin = icon?.takeIf { it.type == IconType.APP }?.let { taskbarPinItemFor(it.packageName) }
             )
             
             // Show the menu
@@ -4702,7 +4817,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun playRecycleSound() {
-        playSound(R.raw.recycle)
+        playSound(if (themeManager.isWin7Theme()) R.raw.recycle_win7 else R.raw.recycle)
     }
     
     
@@ -4752,33 +4867,22 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.setTitle("Change Icon")
 
-        // Get current theme for content layout selection
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-
         // Create and set the content with theme-appropriate layout
+        val selectedTheme = themeManager.getSelectedTheme()
         val contentLayoutResId = when (selectedTheme) {
-            "Windows Classic" -> {
-                R.layout.icon_selection_content
-            }
-            "Windows Vista" -> {
-                R.layout.icon_selection_content_vista
-            }
-            else -> {
-                R.layout.icon_selection_content_xp
-            }
+            AppTheme.WindowsClassic -> R.layout.icon_selection_content
+            AppTheme.WindowsVista, AppTheme.Windows7 -> R.layout.icon_selection_content_vista
+            AppTheme.WindowsXP -> R.layout.icon_selection_content_xp
         }
         val contentView = layoutInflater.inflate(contentLayoutResId, null)
         windowsDialog.setContentView(contentView)
 
         val recyclerView = contentView.findViewById<RecyclerView>(R.id.icons_recycler_view)
         val iconTypeButtons = contentView.findViewById<LinearLayout>(R.id.icon_type_buttons)
-        val btnWindows98 = contentView.findViewById<TextView>(R.id.btn_windows_98)
-        val btnWindowsXP = contentView.findViewById<TextView>(R.id.btn_windows_xp)
-        val btnWindowsVista = contentView.findViewById<TextView>(R.id.btn_windows_vista)
-        val btnPrograms = contentView.findViewById<TextView>(R.id.btn_programs)
+        val iconSetSpinner = contentView.findViewById<android.widget.Spinner>(R.id.icon_set_spinner)
         val browseRow = contentView.findViewById<LinearLayout>(R.id.browse_icon_row)
         val btnBrowseIcon = contentView.findViewById<TextView>(R.id.btn_browse_icon)
+        btnBrowseIcon.setBackgroundResource(getButtonBackgroundForCurrentTheme())
 
         // Show icon type buttons for desktop icon selection
         iconTypeButtons.visibility = View.VISIBLE
@@ -4911,77 +5015,39 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
-        // Track current icon type and loading thread
+        // Which icons to show: a dropdown of the icon sets, each an asset folder, starting on the
+        // current theme's own
+        val iconSets = listOf(
+            "Windows Classic" to "custom_icons_98",
+            "Windows XP" to "custom_icons",
+            "Windows Vista" to "custom_icons_vista",
+            "Windows 7" to "custom_icons_7",
+            "Programs" to "custom_icons_programs"
+        )
+        val iconSetAdapter = android.widget.ArrayAdapter(
+            this, themeManager.getSpinnerItemLayoutRes(selectedTheme), iconSets.map { it.first }
+        )
+        iconSetAdapter.setDropDownViewResource(themeManager.getSpinnerDropdownLayoutRes(selectedTheme))
+        iconSetSpinner.adapter = iconSetAdapter
+
         var currentLoadingThread: Thread? = null
+        var shownFolder = getCustomIconKeyForCurrentTheme()
+        iconSetSpinner.setSelection(iconSets.indexOfFirst { it.second == shownFolder }.coerceAtLeast(0), false)
+        currentLoadingThread = loadCustomIconsLazy(adapter, shownFolder)
 
-        // Helper function to clear all button selections
-        fun clearButtonSelections() {
-            btnWindows98.isSelected = false
-            btnWindowsXP.isSelected = false
-            btnWindowsVista.isSelected = false
-            btnPrograms.isSelected = false
-        }
-
-        // Set up button click listeners
-        btnWindows98.setOnClickListener {
-            // Cancel any running loading thread
-            currentLoadingThread?.interrupt()
-            playClickSound()
-            clearButtonSelections()
-            btnWindows98.isSelected = true
-            // Clear current icons and reload from 98 folder
-            adapter.clearIcons()
-            currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons_98")
-        }
-
-        btnWindowsXP.setOnClickListener {
-            // Cancel any running loading thread
-            currentLoadingThread?.interrupt()
-            playClickSound()
-            clearButtonSelections()
-            btnWindowsXP.isSelected = true
-            // Clear current icons and reload from XP folder
-            adapter.clearIcons()
-            currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons")
-        }
-
-
-        btnWindowsVista.setOnClickListener {
-            // Cancel any running loading thread
-            currentLoadingThread?.interrupt()
-            playClickSound()
-            clearButtonSelections()
-            btnWindowsVista.isSelected = true
-            // Clear current icons and reload from XP folder
-            adapter.clearIcons()
-            currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons_vista")
-        }
-
-        btnPrograms.setOnClickListener {
-            // Cancel any running loading thread
-            currentLoadingThread?.interrupt()
-            playClickSound()
-            clearButtonSelections()
-            btnPrograms.isSelected = true
-            // Clear current icons and reload from programs folder
-            adapter.clearIcons()
-            currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons_programs")
-        }
-
-        // Set initial button state based on current theme and load initial icons
-        when (selectedTheme) {
-            "Windows Classic" -> {
-                btnWindows98.isSelected = true
-                currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons_98")
+        iconSetSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val folder = iconSets[position].second
+                if (folder == shownFolder) return
+                shownFolder = folder
+                // Cancel any running loading thread, then load the chosen set
+                currentLoadingThread?.interrupt()
+                playClickSound()
+                adapter.clearIcons()
+                currentLoadingThread = loadCustomIconsLazy(adapter, folder)
             }
-            "Windows Vista" -> {
-                btnWindowsVista.isSelected = true
-                currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons_vista")
-            }
-            else -> {
-                btnWindowsXP.isSelected = true
-                currentLoadingThread = loadCustomIconsLazy(adapter, "custom_icons")
-            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
 
         // Set context menu reference and show as floating window
@@ -5210,31 +5276,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        // Get current theme
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = folderId  // Set identifier for tracking
         windowsDialog.setTitle(folderNameDisplay)
 
         // Use folder icon as taskbar icon
-        val taskbarIcon = when (selectedTheme) {
-            "Windows Classic" -> {
-                R.drawable.folder_98
-            }
-            "Windows Vista" -> {
-                R.drawable.folder_vista
-            }
-            else -> {
-                R.drawable.folder_xp
-            }
-        }
-        windowsDialog.setTaskbarIcon(taskbarIcon)
+        val currentTheme = themeManager.getSelectedTheme()
+        windowsDialog.setTaskbarIcon(themeManager.getFolderIconRes(currentTheme))
 
         // Inflate the windows explorer content
-        val currentTheme = themeManager.getSelectedTheme()
         val explorerLayoutRes = themeManager.getWindowsExplorerLayoutRes(currentTheme)
         val contentView = layoutInflater.inflate(explorerLayoutRes, null)
 
@@ -5245,7 +5296,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         windowsDialog.setWindowSizePercentage(90f, 30f)
         windowsDialog.setMaximizable(true)
-        if (selectedTheme == "Windows Classic") {
+        if (currentTheme is AppTheme.WindowsClassic) {
             val folderNameLarge = contentView.findViewById<TextView>(R.id.folder_name_large)
             val folderIconLarge = contentView.findViewById<ImageView>(R.id.folder_icon_large)
             folderNameLarge.text = folderNameDisplay
@@ -5272,7 +5323,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
 
         // Pre-calculate theme-dependent values
-        val isWindows98 = selectedTheme == "Windows Classic"
+        val isWindows98 = currentTheme is AppTheme.WindowsClassic
 
         // Create and set adapter
         val adapter = FolderIconAdapter(
@@ -5413,14 +5464,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun saveCustomIconMappings() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Use the reliable getCustomIconsPath() method to determine current theme
-        val expectedIconsPath = getCustomIconsPath()
-        val (currentTheme, themeKey) = when (expectedIconsPath) {
-            "custom_icons_98" -> "Windows Classic" to KEY_CUSTOM_ICONS_98
-            "custom_icons" -> "Windows XP" to KEY_CUSTOM_ICONS_XP
-            "custom_icons_vista" -> "Windows Vista" to KEY_CUSTOM_ICONS_VISTA
-            else -> "Windows XP" to KEY_CUSTOM_ICONS_XP // fallback
-        }
+        // The theme names its own map. This used to be worked out backwards from the icon
+        // *picker's* asset folder, with anything unrecognised falling back to XP's map, so a
+        // new theme silently read and overwrote XP's hand-picked icons.
+        val currentTheme = themeManager.getSelectedTheme()
+        val themeKey = currentTheme.customIconsKey
 
         val jsonString = customIconMappings.entries.joinToString(";") { "${it.key}:${it.value}" }
         Log.d("MainActivity", "Saving custom icons to $themeKey for theme $currentTheme: $jsonString")
@@ -5541,7 +5589,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 // Pins in the Start menu, and anything the user had hidden from the app list.
-                for (key in listOf(KEY_PINNED_APPS, KEY_HIDDEN_APPS)) {
+                for (key in listOf(KEY_PINNED_APPS, KEY_HIDDEN_APPS, Win7TaskbarPins.KEY)) {
                     purgeListedPackages(prefs, key, ",", retiring) { it }
                 }
 
@@ -5594,14 +5642,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun loadCustomIconMappings() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Use the reliable getCustomIconsPath() method to determine current theme
-        val expectedIconsPath = getCustomIconsPath()
-        val (currentTheme, themeKey) = when (expectedIconsPath) {
-            "custom_icons_98" -> "Windows Classic" to KEY_CUSTOM_ICONS_98
-            "custom_icons" -> "Windows XP" to KEY_CUSTOM_ICONS_XP
-            "custom_icons_vista" -> "Windows Vista" to KEY_CUSTOM_ICONS_VISTA
-            else -> "Windows XP" to KEY_CUSTOM_ICONS_XP // fallback
-        }
+        // The theme names its own map. This used to be worked out backwards from the icon
+        // *picker's* asset folder, with anything unrecognised falling back to XP's map, so a
+        // new theme silently read and overwrote XP's hand-picked icons.
+        val currentTheme = themeManager.getSelectedTheme()
+        val themeKey = currentTheme.customIconsKey
 
         Log.d("MainActivity", "Loading custom icon mappings for theme: $currentTheme, key: $themeKey")
 
@@ -5892,20 +5937,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun createNewFolder(menuX: Float, menuY: Float) {
         Log.d("MainActivity", "createNewFolder called at ($menuX, $menuY)")
 
-        // Get theme to determine which folder icon to use
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-        val isWindows98 = selectedTheme == "Windows Classic"
-
         // Get the appropriate folder icon
-        val folderIconResource = if (isWindows98) {
-            R.drawable.folder_98
-        } else if (selectedTheme == "Windows Vista") {
-            R.drawable.folder_vista
-        }
-        else {
-            R.drawable.folder_xp
-        }
+        val isWindows98 = themeManager.isClassicTheme()
+        val folderIconResource = themeManager.getFolderIconRes(themeManager.getSelectedTheme())
 
         val folderIcon =AppCompatResources.getDrawable(this, folderIconResource)!!
 
@@ -7627,6 +7661,132 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
+    /**
+     * Public API to open Paint on a picture file, which is what Explorer's Edit does.
+     */
+    fun openPaint(imagePath: String) {
+        setCursorBusy()
+        Handler(Looper.getMainLooper()).post {
+            createAndShowPaintDialog(java.io.File(imagePath))
+        }
+    }
+
+    private fun showPaintDialog() {
+        // Set cursor to busy while loading
+        setCursorBusy()
+
+        // Defer the actual loading to allow cursor to render
+        Handler(Looper.getMainLooper()).post {
+            createAndShowPaintDialog(null)
+        }
+    }
+
+    private fun createAndShowPaintDialog(file: java.io.File?) {
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier =
+            if (file == null) "system.paint" else "system.paint.${file.absolutePath.hashCode()}"
+        windowsDialog.setTitle(if (file == null) "untitled - Paint" else "${file.name} - Paint")
+        windowsDialog.setTaskbarIcon(themeManager.getPaintIcon())
+
+        // Inflate the Paint content
+        val contentView = layoutInflater.inflate(R.layout.program_paint, null)
+
+        // The window has to be able to name itself to the picture picker, and it cannot do
+        // that from inside its own constructor, so the reference is filled in just below.
+        var thisPaint: rocks.gorjan.gokixp.apps.paint.PaintApp? = null
+
+        val paintApp = rocks.gorjan.gokixp.apps.paint.PaintApp(
+            context = this,
+            onSoundPlay = { playClickSound() },
+            onShowMenu = { menuItems, x, y ->
+                if (::contextMenu.isInitialized) {
+                    contextMenu.showMenu(menuItems, x, y)
+                }
+            },
+            onAskText = { title, initialText, hint, onOk ->
+                showRenameDialog(title, initialText, hint, onOk)
+            },
+            onSayMessage = { title, message ->
+                showMessageDialog(title, message)
+            },
+            onAskConfirm = { title, message, onConfirm, onDecline ->
+                showConfirmDialog(title, message, onConfirm, onDecline)
+            },
+            onUpdateWindowTitle = { title ->
+                windowsDialog.setTitle(title)
+            },
+            onBrowseForPicture = {
+                currentPaintApp = thisPaint
+                paintGalleryPickerLauncher.launch("image/*")
+            },
+            onSetWallpaper = { uri ->
+                handleSelectedImage(uri)
+            },
+            onClose = {
+                windowsDialog.closeWindow()
+            },
+            initialFile = file
+        )
+
+        // Store reference so the picture picker can call back into this window
+        thisPaint = paintApp
+        currentPaintApp = paintApp
+
+        paintApp.setupApp(contentView)
+
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setWindowSizePercentage(95f, 70f)
+
+        windowsDialog.setOnMinimizeListener {
+            paintApp.onMinimize()
+        }
+
+        windowsDialog.setOnCloseListener {
+            if (currentPaintApp === paintApp) currentPaintApp = null
+            paintApp.cleanup()
+        }
+
+        // Set context menu reference and show as floating window
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            setCursorNormal()
+        }, 100)
+    }
+
+    /**
+     * A message box with nothing to decide: one OK button, the way Paint's warnings work.
+     */
+    private fun showMessageDialog(title: String, message: String) {
+        val windowsDialog = createThemedWindowsDialog()
+        val contentView = layoutInflater.inflate(R.layout.program_dialog_box, null)
+
+        val dialogBoxApp = rocks.gorjan.gokixp.apps.dialogbox.DialogBoxApp(
+            context = this,
+            theme = themeManager.getSelectedTheme(),
+            themeManager = themeManager,
+            dialogType = rocks.gorjan.gokixp.apps.dialogbox.DialogType.INFORMATION,
+            message = message,
+            onClose = {
+                playClickSound()
+                floatingWindowManager.removeWindow(windowsDialog)
+            },
+            onPlaySound = { soundResId -> playSound(soundResId) }
+        )
+
+        dialogBoxApp.setupDialog(contentView)
+
+        windowsDialog.setTitle(title)
+        windowsDialog.setTaskbarIcon(dialogBoxApp.getIconResId())
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSize(280)
+        windowsDialog.setMinimizable(false)
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
     private fun showFullscreenImage(uri: Uri) {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         val imageView = ImageView(this).apply {
@@ -7710,6 +7870,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
             AppTheme.WindowsXP -> R.drawable.button_xp_background
             AppTheme.WindowsVista -> R.drawable.button_xp_background
+            AppTheme.Windows7 -> R.drawable.button_win7
         }
     }
 
@@ -7848,7 +8009,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showConfirmDialog(
         title: String,
         message: String,
-        onConfirm: () -> Unit
+        onConfirm: () -> Unit,
+        onDecline: (() -> Unit)? = null
     ) {
         // Create Windows dialog
         val windowsDialog = createThemedWindowsDialog()
@@ -7875,6 +8037,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onCancel = {
                 playClickSound()
                 floatingWindowManager.removeWindow(windowsDialog)
+                onDecline?.invoke()
             }
         )
 
@@ -8226,7 +8389,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             themeManager.isXPTheme() -> {
                 windowsDialog.setWindowSize(384, 262)
             }
-            themeManager.isVistaTheme() -> {
+            themeManager.isAeroTheme() -> {
                 windowsDialog.setWindowSize(384, 284)
             }
             else -> {
@@ -8380,13 +8543,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             append("\n\nOpen the download page?")
         }
 
-        showConfirmDialog("Windows Phone 8 has moved", message) {
+        showConfirmDialog("Windows Phone 8 has moved", message, onConfirm = {
             runCatching {
                 startActivity(Intent(Intent.ACTION_VIEW, WINDOWS_PHONE_LAUNCHER_URL.toUri()))
             }.onFailure {
                 Log.w("MainActivity", "Nothing on this phone opens a web page", it)
             }
-        }
+        })
     }
 
     /** Whether the phone theme's keyboard is the input method currently in use. */
@@ -8399,11 +8562,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun showWelcomeToWindows(showChangeLog: Boolean = false) {
         // Get theme preferences
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
 
         // Determine the layout based on theme and flavor
-        val layoutRes = when (selectedTheme) {
-            "Windows Classic" -> {
+        val theme = themeManager.getSelectedTheme()
+        val layoutRes = when (theme) {
+            AppTheme.WindowsClassic -> {
                 val flavor = prefs.getString(KEY_START_BANNER_98, "start_banner_98") ?: "start_banner_98"
                 when (flavor) {
                     "start_banner_95" -> R.layout.program_welcome_95
@@ -8413,21 +8576,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     else -> R.layout.program_welcome_98
                 }
             }
-            "Windows Vista" -> R.layout.program_welcome_vista
-            else -> R.layout.program_welcome_xp // Windows XP theme
+            AppTheme.WindowsVista, AppTheme.Windows7 -> R.layout.program_welcome_vista
+            AppTheme.WindowsXP -> R.layout.program_welcome_xp
         }
 
         // Create MediaPlayer for welcome sound - choose based on theme
-        val soundRes = when (selectedTheme) {
-            "Windows Classic" -> {
+        val soundRes = when (theme) {
+            AppTheme.WindowsClassic -> {
                 val flavor = prefs.getString(KEY_START_BANNER_98, "start_banner_98") ?: "start_banner_98"
                 when (flavor) {
                     "start_banner_95", "start_banner_98" -> R.raw.welcome_98
                     else -> R.raw.welcome
                 }
             }
-            "Windows Vista" -> R.raw.welcome_vista
-            else -> R.raw.welcome
+            AppTheme.WindowsVista -> R.raw.welcome_vista
+            // Windows 7 had no welcome music; this is Kalimba, from the Sample Music it shipped.
+            AppTheme.Windows7 -> R.raw.welcome_win7
+            AppTheme.WindowsXP -> R.raw.welcome
         }
         val welcomeMediaPlayer = MediaPlayer.create(this, soundRes)
         welcomeMediaPlayer.isLooping = true
@@ -8435,7 +8600,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.setTitle("Welcome to Windows")
+        windowsDialog.setTitle(if (theme is AppTheme.Windows7) "Getting Started" else "Welcome to Windows")
         windowsDialog.setTaskbarIcon(themeManager.getWindowsIcon())
 
         // Inflate the welcome content
@@ -8458,8 +8623,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val changeLogButton = contentView.findViewById<View>(R.id.change_log_button)
 
         // Determine which drawables to use based on theme and flavor
-        val (welcomeDrawable, changeLogDrawable) = when (selectedTheme) {
-            "Windows Classic" -> {
+        val (welcomeDrawable, changeLogDrawable) = when (theme) {
+            AppTheme.WindowsClassic -> {
                 val flavor = prefs.getString(KEY_START_BANNER_98, "start_banner_98") ?: "start_banner_98"
                 when (flavor) {
                     "start_banner_95" -> Pair(R.drawable.welcome_95_welcome, R.drawable.welcome_95_change_log)
@@ -8469,9 +8634,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     else -> Pair(R.drawable.welcome_98_welcome, R.drawable.welcome_98_change_log)
                 }
             }
-            "Windows Vista" -> Pair(R.drawable.welcome_vista_welcome, R.drawable.welcome_vista_change_log)
-            else -> Pair(R.drawable.welcome_xp_welcome, R.drawable.welcome_xp_change_log)
+            AppTheme.WindowsVista -> Pair(R.drawable.welcome_vista_welcome, R.drawable.welcome_vista_change_log)
+            AppTheme.Windows7 -> Pair(R.drawable.welcome_win7_welcome, R.drawable.welcome_win7_welcome)
+            AppTheme.WindowsXP -> Pair(R.drawable.welcome_xp_welcome, R.drawable.welcome_xp_change_log)
         }
+        // Windows 7 shares Vista's layout, whose picture is Vista's; set the theme's own
+        backgroundImageView?.setImageResource(welcomeDrawable)
 
         // Get version name
         val versionName = try {
@@ -8543,6 +8711,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set version text (using the versionName we already retrieved)
         versionTextView?.text = "Version: $versionName"
+        // Vista's header is dark; Windows 7's Getting Started banner is pale
+        if (theme is AppTheme.Windows7) versionTextView?.setTextColor(Color.parseColor("#1E395B"))
 
         // Set welcome text and auto-linkify URLs and email addresses
         welcomeTextView.text = welcomeMessage
@@ -9245,12 +9415,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val newTaskbar = layoutInflater.inflate(layoutResId, null)
             newTaskbar.id = R.id.taskbar_container
 
-            // Set height based on theme - Vista taskbar is taller
-            val taskbarHeight = if (layoutResId == R.layout.taskbar_vista) {
-                (45 * resources.displayMetrics.density).toInt()
-            } else {
-                (40 * resources.displayMetrics.density).toInt()
-            }
+            // The Aero taskbars are taller than their glass, to leave room for the orb
+            val taskbarHeight = (themeManager.getTaskbarHeightDp(themeManager.getSelectedTheme()) *
+                resources.displayMetrics.density).toInt()
 
             // Update layout params with new height
             if (layoutParams is RelativeLayout.LayoutParams) {
@@ -9350,9 +9517,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             true // Consume the long press event
         }
 
-        // Set up volume icon click
-        val volumeIcon = findViewById<ImageView>(R.id.volume_icon)
-        volumeIcon?.setOnClickListener {
+        // Set up volume icon click - on the padded wrapper where the taskbar has one, since the
+        // speaker alone is too small a target for a finger
+        val volumeTarget = findViewById<View>(R.id.volume_icon_wrapper) ?: findViewById<ImageView>(R.id.volume_icon)
+        volumeTarget?.setOnClickListener {
             toggleSoundMute()
         }
 
@@ -9418,6 +9586,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         else if(themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
             playSound(R.raw.startup_vista)
+        }
+        else if(themeManager.getSelectedTheme() is AppTheme.Windows7) {
+            playSound(R.raw.startup_win7)
         }
         else{
             playSound(R.raw.startup)
@@ -9501,6 +9672,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         else if(themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
             playSound(R.raw.shutdown_vista)
+        }
+        else if(themeManager.getSelectedTheme() is AppTheme.Windows7) {
+            playSound(R.raw.shutdown_win7)
         }
         else{
             playSound(R.raw.shutdown)
@@ -9777,12 +9951,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun playDingSound() {
         // Bypass mute check since this is specifically for unmute confirmation
-        if(themeManager.getSelectedTheme() == AppTheme.WindowsVista){
-            playSound(R.raw.ding_vista, bypassMute = true)
+        val ding = when (themeManager.getSelectedTheme()) {
+            AppTheme.WindowsVista -> R.raw.ding_vista
+            AppTheme.Windows7 -> R.raw.ding_win7
+            AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.ding
         }
-        else{
-            playSound(R.raw.ding, bypassMute = true)
-        }
+        playSound(ding, bypassMute = true)
 
     }
 
@@ -10105,10 +10279,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             }
                             IconType.FOLDER -> {
                                 // Use custom icon if available, otherwise use theme-appropriate folder icon
-                                getAppIcon(packageName) ?: run {
-                                    val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-                                    AppCompatResources.getDrawable(this, if (selectedTheme == "Windows Classic") R.drawable.folder_98 else if (selectedTheme == "Windows Vista") R.drawable.folder_vista else R.drawable.folder_xp)!!
-                                }
+                                getAppIcon(packageName) ?: AppCompatResources.getDrawable(
+                                    this, themeManager.getFolderIconRes(themeManager.getSelectedTheme())
+                                )!!
                             }
                             IconType.URL_SHORTCUT -> {
                                 // URL shortcut: use custom icon if set, otherwise the URL icon
@@ -10247,16 +10420,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * on a program would say the wrong thing about it.
      */
     private fun fallbackIconFor(type: IconType): Drawable {
-        val chrome = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString("selected_theme", "Windows XP") ?: "Windows XP"
         val resource = when (type) {
             IconType.RECYCLE_BIN -> R.drawable.recycle
             IconType.MY_COMPUTER -> themeManager.getMyComputerIcon()
-            IconType.FOLDER -> when (chrome) {
-                "Windows Classic" -> R.drawable.folder_98
-                "Windows Vista" -> R.drawable.folder_vista
-                else -> R.drawable.folder_xp
-            }
+            IconType.FOLDER -> themeManager.getFolderIconRes(themeManager.getSelectedTheme())
             IconType.URL_SHORTCUT -> R.drawable.url_shortcut
             IconType.APP -> android.R.drawable.sym_def_app_icon
         }
@@ -10270,14 +10437,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         if (!recycleBinExists) {
             // Create recycle bin as a regular desktop icon with theme-appropriate icon
-            // Use reliable theme detection method
-            val expectedIconsPath = getCustomIconsPath()
-            val currentTheme = if (expectedIconsPath == "custom_icons_98") "Windows Classic" else "Windows XP"
-            val iconResource = if (currentTheme == "Windows Classic") {
-                R.drawable.recycle_98
-            } else {
-                R.drawable.recycle
-            }
+            val iconResource = themeManager.getRecycleBinIconRes(themeManager.getSelectedTheme(), isEmpty = true)
             val recycleDrawable = AppCompatResources.getDrawable(this, iconResource)!!
             val recycleBinAppInfo = AppInfo(
                 name = "Recycle Bin",
@@ -10350,7 +10510,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     fun openMyComputer(myComputerView: rocks.gorjan.gokixp.apps.explorer.MyComputerView) {
         val desktopIcon = myComputerView.getDesktopIcon() ?: return
+        openMyComputerWindow(desktopIcon.id)
+    }
 
+    /**
+     * Opens the My Computer window. Keyed by the desktop icon it belongs to; the Windows 7
+     * start menu's Computer link opens it whether or not that icon is on the desktop.
+     */
+    private fun openMyComputerWindow(iconId: String) {
         // Check and request storage permissions
         if (!hasStoragePermission()) {
             requestStoragePermission()
@@ -10358,7 +10525,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         // Check if window is already open
-        val windowId = "mycomputer:${desktopIcon.id}"
+        val windowId = "mycomputer:$iconId"
         if (floatingWindowManager.findAndFocusWindow(windowId)) {
             // Window already open, reset clipboard
             val existingWindow = floatingWindowManager.findWindowByIdentifier(windowId)
@@ -10369,7 +10536,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create Windows dialog
         val windowsDialog = createThemedWindowsDialog()
         windowsDialog.windowIdentifier = windowId
-        windowsDialog.setTitle("My Computer")
+        windowsDialog.setTitle(if (themeManager.isWin7Theme()) "Computer" else "My Computer")
         windowsDialog.setTaskbarIcon(themeManager.getMyComputerIcon())
 
         // Inflate layout based on current theme (reuse Windows Explorer layouts)
@@ -13303,6 +13470,195 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Dialogs will check this when they're created
     }
 
+    private fun applyWindows7Theme() {
+        Log.d("MainActivity", "Applying Windows 7 theme")
+
+        swapTaskbarLayout(themeManager.getTaskbarLayoutRes(AppTheme.Windows7))
+        setupSystemTrayToggle()
+        setupWin7TrayOverflow()
+        setupWin7ShowDesktop()
+
+        setupStartMenu(AppTheme.Windows7.toString())
+
+        loadCustomIconMappings()
+        updateAllCustomIcons()
+
+        // Pins after the icon mappings, so a pinned program shows its custom icon
+        win7TaskbarPins = Win7TaskbarPins(this).also { pins ->
+            pins.seedDefaultsOnce()
+            findViewById<LinearLayout>(R.id.taskbar_empty_space)?.let { pins.attach(it) }
+        }
+
+        if (::quickGlanceWidget.isInitialized) {
+            quickGlanceWidget.setThemeFont(false)
+            quickGlanceWidget.refreshData()
+        }
+
+        notifyThemeChanged(AppTheme.Windows7)
+    }
+
+    /** Shows a menu the way the other menus here do, so a tap elsewhere closes it. */
+    private fun showWin7Menu(items: List<ContextMenuItem>, x: Float, y: Float) {
+        if (!::contextMenu.isInitialized) return
+        contextMenu.showMenu(items, x, y)
+        isContextMenuVisible = true
+    }
+
+    /** "Pin to Taskbar" for a program's menu, while the Windows 7 superbar is up. */
+    private fun taskbarPinItemFor(program: String): TaskbarPinItem? {
+        val pins = win7TaskbarPins ?: return null
+        return TaskbarPinItem(pins.isPinned(program)) {
+            if (pins.isPinned(program)) pins.unpin(program) else pins.pin(program)
+        }
+    }
+
+    fun launchPinnedProgram(program: String) {
+        playClickSound()
+        try {
+            if (isSystemApp(program)) {
+                launchSystemApp(program)
+            } else {
+                packageManager.getLaunchIntentForPackage(program)?.let { startActivity(it) }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Could not launch pinned program $program", e)
+        }
+    }
+
+    /** Windows 7's jump list, cut down to what a pin has to offer here. */
+    fun showWin7PinContextMenu(program: String, x: Float, y: Float) {
+        showWin7Menu(
+            listOf(
+                ContextMenuItem("Open", action = { launchPinnedProgram(program) }),
+                ContextMenuItem("", isEnabled = false),
+                ContextMenuItem("Unpin from Taskbar", action = { win7TaskbarPins?.unpin(program) })
+            ),
+            x, y
+        )
+    }
+
+    /** Windows minimized by the last tap on Show desktop, to put back on the next. */
+    private var win7ShowDesktopRestore: List<WindowsDialog> = emptyList()
+
+    /**
+     * The glass strip at the end of the Windows 7 taskbar. A tap minimizes every window, and
+     * a second tap brings the same ones back; pressing and holding peeks at the desktop,
+     * fading the windows out until the finger lifts.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupWin7ShowDesktop() {
+        val button = findViewById<View>(R.id.show_desktop) ?: return
+        val handler = Handler(Looper.getMainLooper())
+        var peeking = false
+        val startPeek = Runnable {
+            peeking = true
+            button.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            floatingWindowManager.setPeek(true)
+        }
+        button.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    peeking = false
+                    view.isPressed = true
+                    handler.postDelayed(startPeek, ViewConfiguration.getLongPressTimeout().toLong())
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(startPeek)
+                    view.isPressed = false
+                    if (peeking) {
+                        floatingWindowManager.setPeek(false)
+                    } else if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        view.performClick()
+                        toggleShowDesktop()
+                    }
+                }
+            }
+            true
+        }
+    }
+
+    private fun toggleShowDesktop() {
+        if (isStartMenuVisible) hideStartMenu()
+        val open = floatingWindowManager.getAllActiveWindows()
+        val toRestore = win7ShowDesktopRestore.filter { it in open && it.isMinimized() }
+        if (toRestore.isNotEmpty() && open.none { !it.isMinimized() }) {
+            floatingWindowManager.restoreWindows(toRestore)
+            win7ShowDesktopRestore = emptyList()
+        } else {
+            win7ShowDesktopRestore = floatingWindowManager.minimizeAll()
+        }
+    }
+
+    /** Full-screen catcher holding the notification-area flyout; null outside Windows 7. */
+    private var win7TrayFlyout: FrameLayout? = null
+
+    /**
+     * Windows 7 keeps the tray's lesser items behind the chevron, in a flyout that opens above
+     * it, rather than collapsing them inline the way Vista's arrow does. The hidden items keep
+     * their ids when they move into the flyout, so the code that fills them in still finds
+     * them. Any tap outside the flyout closes it.
+     */
+    private fun setupWin7TrayOverflow() {
+        val chevron = findViewById<ImageView>(R.id.system_tray_toggle) ?: return
+        val hiddenItems = findViewById<LinearLayout>(R.id.system_tray_toggle_area) ?: return
+        val root = findViewById<ViewGroup>(android.R.id.content) ?: return
+        val density = resources.displayMetrics.density
+
+        win7TrayFlyout?.let { root.removeView(it) }
+        (hiddenItems.parent as? ViewGroup)?.removeView(hiddenItems)
+        hiddenItems.visibility = View.VISIBLE
+
+        val flyout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.tray_flyout_win7)
+            val pad = (8 * density).toInt()
+            setPadding(pad, pad / 2, pad, pad / 2)
+            isClickable = true // taps inside the flyout don't reach the catcher
+            addView(hiddenItems, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, (32 * density).toInt()))
+        }
+        val catcher = FrameLayout(this).apply {
+            visibility = View.GONE
+            isClickable = true
+            setOnClickListener { hideWin7TrayFlyout() }
+            addView(flyout, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        }
+        root.addView(catcher, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        win7TrayFlyout = catcher
+
+        chevron.setOnLongClickListener(null)
+        chevron.setOnClickListener {
+            playClickSound()
+            if (catcher.visibility == View.VISIBLE) {
+                hideWin7TrayFlyout()
+                return@setOnClickListener
+            }
+            if (isStartMenuVisible) hideStartMenu()
+            catcher.visibility = View.VISIBLE
+            chevron.isSelected = true
+            // Placed once measured: centred over the chevron, just above the taskbar
+            catcher.post {
+                val chevronAt = IntArray(2).also { chevron.getLocationOnScreen(it) }
+                val catcherAt = IntArray(2).also { catcher.getLocationOnScreen(it) }
+                val gap = 6 * density
+                val centreX = chevronAt[0] - catcherAt[0] + chevron.width / 2f
+                flyout.x = (centreX - flyout.width / 2f)
+                    .coerceIn(gap, (catcher.width - flyout.width - gap).coerceAtLeast(gap))
+                flyout.y = chevronAt[1] - catcherAt[1] - flyout.height - gap
+            }
+        }
+    }
+
+    private fun hideWin7TrayFlyout() {
+        val catcher = win7TrayFlyout ?: return
+        if (catcher.visibility != View.VISIBLE) return
+        catcher.visibility = View.GONE
+        findViewById<ImageView>(R.id.system_tray_toggle)?.isSelected = false
+    }
+
     private fun setupStartBannerCycling() {
         try {
             // Only set up banner cycling if we're in Windows 98 theme
@@ -13506,8 +13862,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun initializeTheme() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
+        // Through AppTheme rather than the raw preference, so a stored name that fromString
+        // maps onto another theme (the retired phone theme) still gets that theme's taskbar.
+        val theme = themeManager.getSelectedTheme()
+        val selectedTheme = theme.toString()
         Log.d("MainActivity", "initializeTheme: selectedTheme = '$selectedTheme'")
 
         // Check if this theme is already applied to prevent double application
@@ -13520,16 +13878,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         setupStartMenu(selectedTheme)
 
         // Apply theme layouts directly (bypass tracking for initialization)
-        when (selectedTheme) {
-            "Windows Classic" -> {
-                applyWindows98Theme()
-            }
-            "Windows XP" -> {
-                applyWindowsXPTheme()
-            }
-            "Windows Vista" -> {
-                applyWindowsVistaTheme()
-            }
+        when (theme) {
+            AppTheme.WindowsClassic -> applyWindows98Theme()
+            AppTheme.WindowsXP -> applyWindowsXPTheme()
+            AppTheme.WindowsVista -> applyWindowsVistaTheme()
+            AppTheme.Windows7 -> applyWindows7Theme()
         }
 
         // Mark theme as applied to prevent future unnecessary applications
@@ -13603,7 +13956,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 return
             }
         }
-        if (themeManager.isVistaTheme()) {
+        if (themeManager.isAeroTheme()) {
             cursorEffect.setImageResource(R.drawable.cursor_vista)
         } else {
             cursorEffect.setImageResource(R.drawable.cursor)
@@ -13850,7 +14203,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     return
                 }
             }
-            if (themeManager.isVistaTheme()) {
+            if (themeManager.isAeroTheme()) {
                 cursorEffect.setImageResource(R.drawable.cursor_busy_vista)
                 // Rotate the Vista busy cursor continuously
                 busyCursorAnimator = android.animation.ObjectAnimator.ofFloat(cursorEffect, "rotation", 0f, 360f).apply {
@@ -13910,7 +14263,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         notificationHandler.postDelayed(notificationHideRunnable!!, 7000)
 
-        playSound(R.raw.bubble)
+        playSound(if (themeManager.isWin7Theme()) R.raw.bubble_win7 else R.raw.bubble)
     }
 
     /**

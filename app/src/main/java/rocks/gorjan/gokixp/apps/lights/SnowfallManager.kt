@@ -13,7 +13,6 @@ import android.widget.ImageView
 import android.widget.RelativeLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 import kotlin.random.Random
 
@@ -205,11 +204,9 @@ class SnowfallManager(
                     screenHeight - (70 * density)
                 }
 
-                // Adjust for Vista theme - taskbar is visually smaller than actual size
+                // The Aero taskbars' glass starts below the top of their container
                 val themeManager = ThemeManager(context)
-                if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
-                    calculatedTaskbarTop += (5 * density)
-                }
+                calculatedTaskbarTop += themeManager.getTaskbarGlassInsetDp(themeManager.getSelectedTheme()) * density
 
                 // Update cached value
                 if (calculatedTaskbarTop > 0) {
@@ -297,11 +294,9 @@ class SnowfallManager(
                 taskbarTop = screenHeight - (70 * density)
             }
 
-            // Adjust for Vista theme - taskbar is visually smaller than actual size
+            // The Aero taskbars' glass starts below the top of their container
             val themeManager = ThemeManager(context)
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
-                taskbarTop += (5 * density)
-            }
+            taskbarTop += themeManager.getTaskbarGlassInsetDp(themeManager.getSelectedTheme()) * density
         }
     }
 

@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 start menu. Same ids as start_menu_vista.xml, so setupStartMenu wires it the same
+     way; the right column's links are real views rather than baked into a bitmap, and the ones
+     with somewhere to go are wired in setupWin7StartMenuLinks. Proportions follow a genuine
+     100% capture of the Windows 7 start menu. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/start_menu_content"
+    android:layout_width="wrap_content"
+    android:layout_height="560dp"
+    android:clickable="true"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="372dp"
+        android:layout_height="match_parent"
+        android:layout_marginTop="26dp"
+        android:background="@drawable/start_menu_win7_frame"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <!-- Left: programs pane and search box -->
+        <LinearLayout
+            android:layout_width="214dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="7dp"
+            android:layout_marginTop="7dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/start_menu_win7_programs"
+                android:orientation="vertical"
+                android:padding="4dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <LinearLayout
+                        android:id="@+id/command_list_wrapper"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/welcome_item"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/start_menu_win7_programs_item"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="6dp"
+                            android:paddingTop="7dp"
+                            android:paddingEnd="8dp"
+                            android:paddingBottom="7dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/start_getting_started_win7" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/segoeui_regular"
+                                android:maxLines="1"
+                                android:text="Getting Started"
+                                android:textColor="#000000"
+                                android:textSize="12.5sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/windows_update_item"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/start_menu_win7_programs_item"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="6dp"
+                            android:paddingTop="7dp"
+                            android:paddingEnd="8dp"
+                            android:paddingBottom="7dp">
+
+                            <ImageView
+                                android:id="@+id/windows_update_icon"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/update_available_win7" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/segoeui_regular"
+                                android:maxLines="1"
+                                android:text="Windows Update"
+                                android:textColor="#000000"
+                                android:textSize="12.5sp" />
+                        </LinearLayout>
+
+                        <androidx.recyclerview.widget.RecyclerView
+                            android:id="@+id/commands_recycler_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/app_list_wrapper"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone">
+
+                        <!-- Fixed height, not wrap_content - see start_menu_xp.xml. -->
+                        <rocks.gorjan.gokixp.BoundedHeightRecyclerView
+                            android:id="@+id/apps_recycler_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <!-- Separator above All Programs (aero.msstyles StartPanelPriv 816) -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="#D6E5F5" />
+
+                <LinearLayout
+                    android:id="@+id/all_programs"
+                    android:layout_width="match_parent"
+                    android:layout_height="32dp"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/start_menu_win7_programs_item"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp">
+
+                    <ImageView
+                        android:id="@+id/all_programs_arrow"
+                        android:layout_width="5dp"
+                        android:layout_height="9dp"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/start_menu_arrow_right_win7" />
+
+                    <TextView
+                        android:id="@+id/all_programs_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/segoeui_regular"
+                        android:maxLines="1"
+                        android:text="All Programs"
+                        android:textColor="#000000"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Search box -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp">
+
+                <EditText
+                    android:id="@+id/search_box"
+                    style="@android:style/Widget.EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/start_search_win7"
+                    android:fontFamily="@font/segoeui_regular"
+                    android:gravity="center_vertical"
+                    android:hint="Search programs and files"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:paddingStart="7dp"
+                    android:paddingEnd="26dp"
+                    android:textColor="#000000"
+                    android:textColorHint="#6D6D6D"
+                    android:textSize="12sp"
+                    android:textStyle="italic" />
+
+                <ImageView
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginEnd="12dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/start_search_glyph_win7" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Right: the places column on bare glass -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="7dp"
+            android:paddingTop="46dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="7dp">
+
+            <TextView
+                android:id="@+id/profile_name"
+                style="@style/Win7StartPlace"
+                android:text="User" />
+
+            <TextView
+                android:id="@+id/win7_documents_item"
+                style="@style/Win7StartPlace"
+                android:text="Documents" />
+
+            <TextView
+                android:id="@+id/win7_pictures_item"
+                style="@style/Win7StartPlace"
+                android:text="Pictures" />
+
+            <TextView
+                android:id="@+id/win7_music_item"
+                style="@style/Win7StartPlace"
+                android:text="Music" />
+
+            <View style="@style/Win7StartPlaceSeparator" />
+
+            <TextView
+                android:id="@+id/win7_games_item"
+                style="@style/Win7StartPlace"
+                android:text="Games" />
+
+            <TextView
+                android:id="@+id/win7_computer_item"
+                style="@style/Win7StartPlace"
+                android:text="Computer" />
+
+            <View style="@style/Win7StartPlaceSeparator" />
+
+            <LinearLayout
+                android:id="@+id/settings_item"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"
+                android:padding="0dp"
+                android:background="@drawable/start_places_item_win7"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    style="@style/Win7StartPlace"
+                    android:layout_marginBottom="0dp"
+                    android:background="@null"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:text="Control Panel" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/win7_devices_item"
+                style="@style/Win7StartPlace"
+                android:text="Devices and Printers" />
+
+            <TextView
+                android:id="@+id/win7_default_programs_item"
+                style="@style/Win7StartPlace"
+                android:text="Default Programs" />
+
+            <TextView
+                android:id="@+id/win7_help_item"
+                style="@style/Win7StartPlace"
+                android:text="Help and Support" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Shut down split button. shutdown_button stays an ImageView, which is what
+                 setupStartMenu looks it up as; its label sits on top and lets touches through. -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginBottom="7dp"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent">
+
+                    <ImageView
+                        android:id="@+id/shutdown_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/start_shutdown_win7"
+                        android:clickable="true"
+                        android:contentDescription="Shut down"
+                        android:focusable="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:fontFamily="@font/segoeui_regular"
+                        android:gravity="center"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:shadowColor="#99000000"
+                        android:shadowDy="1"
+                        android:shadowRadius="2"
+                        android:text="Shut down"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12.5sp" />
+                </FrameLayout>
+
+                <ImageView
+                    android:id="@+id/win7_shutdown_options"
+                    android:layout_width="26dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="1dp"
+                    android:clickable="true"
+                    android:contentDescription="Shut down options"
+                    android:focusable="true"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/start_shutdown_arrow_win7" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- User picture, overlapping the top edge above the places column -->
+    <FrameLayout
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="265dp">
+
+        <ImageView
+            android:id="@+id/profile_picture"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:src="@drawable/user" />
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:src="@drawable/start_menu_user_frame_win7" />
+    </FrameLayout>
+</RelativeLayout>

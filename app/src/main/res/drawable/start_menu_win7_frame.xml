@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 start menu glass, measured off a genuine start menu over a known wallpaper: the
+     glass darkens toward the middle and lifts again at the bottom, inside a 1dp dark outline
+     and a 1dp highlight. Real Aero blurs what is behind it; with no blur here the glass is kept
+     mostly opaque, its colours solved to still match the capture over that wallpaper. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <corners android:topLeftRadius="5dp" android:topRightRadius="5dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#E0416B8E"
+                android:centerColor="#E6182939"
+                android:endColor="#E04D7FAA" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <corners android:topLeftRadius="5dp" android:topRightRadius="5dp" />
+            <stroke android:width="1dp" android:color="#E018303F" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape>
+            <corners android:topLeftRadius="4dp" android:topRightRadius="4dp" />
+            <stroke android:width="1dp" android:color="#40FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

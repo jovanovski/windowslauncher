@@ -124,15 +124,5 @@ class IconManager(private val context: Context) {
      * @param theme The theme
      * @return The SharedPreferences key
      */
-    private fun getIconKey(theme: AppTheme): String = when (theme) {
-        AppTheme.WindowsClassic -> KEY_CUSTOM_ICONS_98
-        AppTheme.WindowsXP -> KEY_CUSTOM_ICONS_XP
-        AppTheme.WindowsVista -> KEY_CUSTOM_ICONS_VISTA
-    }
-
-    companion object {
-        private const val KEY_CUSTOM_ICONS_98 = "custom_icons_98"
-        private const val KEY_CUSTOM_ICONS_XP = "custom_icons_xp"
-        private const val KEY_CUSTOM_ICONS_VISTA = "custom_icons_vista"
-    }
+    private fun getIconKey(theme: AppTheme): String = theme.customIconsKey
 }

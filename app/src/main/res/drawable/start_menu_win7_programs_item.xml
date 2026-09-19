@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Row highlight in the white programs pane (aero.msstyles 830). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@drawable/start_programs_pressed_win7" />
+    <item android:state_hovered="true" android:drawable="@drawable/start_programs_hot_win7" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

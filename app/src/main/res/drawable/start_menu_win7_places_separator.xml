@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Right-column separator (aero.msstyles StartPanelPriv 810): a dark line over a light one. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:bottom="1dp">
+        <shape><solid android:color="#30000000" /></shape>
+    </item>
+    <item android:top="1dp">
+        <shape><solid android:color="#26FFFFFF" /></shape>
+    </item>
+</layer-list>

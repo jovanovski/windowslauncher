@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- aero.msstyles SearchBox (864) is only the box's translucent border; Windows fills the box
+     white underneath it. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+                <shape><solid android:color="#FFFFFFFF" /></shape>
+            </item>
+            <item android:drawable="@drawable/start_search_win7_focused" />
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+                <shape><solid android:color="#FFFFFFFF" /></shape>
+            </item>
+            <item android:drawable="@drawable/start_search_win7_normal" />
+        </layer-list>
+    </item>
+</selector>

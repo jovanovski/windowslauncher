@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Activated = its window is the focused one; see WindowsDialog.setFocused. -->
+    <item android:state_activated="true" android:state_pressed="true" android:drawable="@drawable/taskitem_win7_active_pressed" />
+    <item android:state_activated="true" android:drawable="@drawable/taskitem_win7_active" />
+    <item android:state_pressed="true" android:drawable="@drawable/taskitem_win7_running_pressed" />
+    <item android:state_hovered="true" android:drawable="@drawable/taskitem_win7_running_hot" />
+    <item android:drawable="@drawable/taskitem_win7_running" />
+</selector>

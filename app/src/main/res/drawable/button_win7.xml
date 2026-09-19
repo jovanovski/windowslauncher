@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Windows 7 push button, reporting no padding of its own: a 9-patch always carries padding,
+     and a view given it as a background in code would otherwise lose the padding it was set. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:paddingLeft="0dp"
+    android:paddingTop="0dp"
+    android:paddingRight="0dp"
+    android:paddingBottom="0dp">
+    <item android:drawable="@drawable/button_win7_states" />
+</layer-list>

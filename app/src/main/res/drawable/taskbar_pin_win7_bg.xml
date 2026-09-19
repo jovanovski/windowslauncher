@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- A pinned app with no window open draws no button until it is touched. -->
+    <item android:state_pressed="true" android:drawable="@drawable/taskitem_win7_running_pressed" />
+    <item android:state_hovered="true" android:drawable="@drawable/taskitem_win7_pin_hot" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

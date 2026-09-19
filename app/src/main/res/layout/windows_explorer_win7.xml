@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 Explorer. Same ids as windows_explorer_vista.xml. The bars are pieces of a genuine
+     Windows 7 capture (explorer_win7_*), each a fixed left and right with a stretching middle,
+     drawn at 0.62dp a pixel; the folder's own name and icon sit in the empty breadcrumb box. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    tools:ignore="ContentDescription">
+
+    <!-- Navigation row: back/forward, breadcrumb box, search box -->
+    <LinearLayout
+        android:id="@+id/explorer_win7_address_row"
+        android:layout_width="match_parent"
+        android:layout_height="21dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="46dp"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_address_left" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_address_middle" />
+
+        <ImageView
+            android:layout_width="184dp"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_address_right" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/folder_icon_small"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginStart="49dp"
+        android:layout_marginTop="4.5dp" />
+
+    <TextView
+        android:id="@+id/folder_name_small"
+        android:layout_width="match_parent"
+        android:layout_height="21dp"
+        android:layout_marginStart="65dp"
+        android:layout_marginEnd="196dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/segoeui_regular"
+        android:gravity="center_vertical"
+        android:lines="1"
+        android:text="Folder Name"
+        android:textColor="@color/black"
+        android:textSize="8.5sp" />
+
+    <!-- Command bar -->
+    <LinearLayout
+        android:id="@+id/explorer_win7_command_row"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:layout_below="@id/explorer_win7_address_row"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="206dp"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_commands_left" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_commands_middle" />
+
+        <ImageView
+            android:layout_width="89dp"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_commands_right" />
+    </LinearLayout>
+
+    <!-- Navigation pane and folder contents -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/explorer_win7_details"
+        android:layout_below="@id/explorer_win7_command_row"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="92dp"
+            android:layout_height="match_parent"
+            android:background="#FCFCFC">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:scaleType="fitXY"
+                android:src="@drawable/explorer_win7_navigation" />
+
+            <!-- The pane's right edge, carried on below the captured part -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:background="#D6E5F5" />
+        </FrameLayout>
+
+        <GridView
+            android:id="@+id/folder_icons_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/white"
+            android:columnWidth="50dp"
+            android:fadeScrollbars="false"
+            android:horizontalSpacing="0dp"
+            android:numColumns="auto_fit"
+            android:paddingTop="4dp"
+            android:paddingEnd="20dp"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarDefaultDelayBeforeFade="0"
+            android:scrollbarFadeDuration="0"
+            android:scrollbarSize="12dp"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarThumbVertical="@drawable/scrollbar_thumb_vista"
+            android:scrollbarTrackVertical="@drawable/scrollbar_track_vista"
+            android:scrollbars="vertical"
+            android:stretchMode="none"
+            android:verticalSpacing="0dp" />
+    </LinearLayout>
+
+    <!-- Details pane -->
+    <FrameLayout
+        android:id="@+id/explorer_win7_details"
+        android:layout_width="match_parent"
+        android:layout_height="35dp"
+        android:layout_alignParentBottom="true">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/explorer_win7_details_middle" />
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="10dp"
+            android:src="@drawable/folder_win7" />
+
+        <TextView
+            android:id="@+id/explorer_number_of_items"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="44dp"
+            android:fontFamily="@font/segoeui_regular"
+            android:text="12 items"
+            android:textColor="#1E395B"
+            android:textSize="10sp" />
+
+        <!-- Drag to resize. Windows 7 Explorer draws no gripper here, so neither does this;
+             it is an ImageView because that is what WindowsDialog looks it up as. -->
+        <ImageView
+            android:id="@+id/resize_drag_view"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="end|bottom" />
+    </FrameLayout>
+
+    <View
+        android:id="@+id/back_button"
+        android:layout_width="20dp"
+        android:layout_height="21dp" />
+
+    <View
+        android:id="@+id/forward_button"
+        android:layout_width="16dp"
+        android:layout_height="21dp"
+        android:layout_marginStart="20dp" />
+</RelativeLayout>

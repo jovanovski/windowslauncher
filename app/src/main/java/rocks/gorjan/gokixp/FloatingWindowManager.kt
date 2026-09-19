@@ -33,8 +33,8 @@ class FloatingWindowManager(private val context: Context, private val container:
         // Set the new window as focused
         windowsDialog.setFocused()
 
-        // Apply fade-in animation for Vista
-        if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+        // Apply fade-in animation for the Aero themes
+        if (themeManager.isAeroTheme()) {
             windowsDialog.alpha = 0f
             windowsDialog.animate()
                 .alpha(1f)
@@ -53,8 +53,8 @@ class FloatingWindowManager(private val context: Context, private val container:
             // Unregister from taskbar before removing
             windowsDialog.unregisterFromTaskbar()
 
-            // Apply fade-out animation for Vista
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsVista) {
+            // Apply fade-out animation for the Aero themes
+            if (themeManager.isAeroTheme()) {
                 windowsDialog.animate()
                     .alpha(0f)
                     .setDuration(150)
@@ -78,6 +78,36 @@ class FloatingWindowManager(private val context: Context, private val container:
 
     fun getAllActiveWindows(): List<WindowsDialog> {
         return activeWindows.toList()
+    }
+
+    /**
+     * Minimizes every window that is showing and returns them, in z-order, so the same set
+     * can be put back with [restoreWindows]. Windows 7's Show desktop button.
+     */
+    fun minimizeAll(): List<WindowsDialog> {
+        val showing = activeWindows.filter { !it.isMinimized() }
+        showing.forEach { it.minimizeWindow() }
+        return showing
+    }
+
+    /** Restores the windows [minimizeAll] put away, front-most last, skipping any since closed. */
+    fun restoreWindows(windows: List<WindowsDialog>) {
+        windows.filter { it in activeWindows && it.isMinimized() }.forEach { it.restore() }
+    }
+
+    /**
+     * Aero Peek: while [peeking], every window fades out so the desktop shows through, and
+     * fades back when it ends. Nothing is minimized, so nothing moves.
+     */
+    fun setPeek(peeking: Boolean) {
+        activeWindows.filter { !it.isMinimized() }.forEach { window ->
+            window.animate().cancel()
+            window.animate().alpha(if (peeking) 0f else 1f).setDuration(PEEK_FADE_MS).start()
+        }
+    }
+
+    private companion object {
+        const val PEEK_FADE_MS = 200L
     }
 
     fun bringToFront(windowsDialog: WindowsDialog) {

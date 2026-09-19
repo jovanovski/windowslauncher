@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 window chrome. Same ids as windows_dialog_content_vista.xml. The glass is one
+     surface on window_frame, so the title bar flows into the sides with no seam; WindowsDialog
+     swaps it for the unfocused frame, and marks the title bar activated for the caption buttons
+     (min | max | close, drawn edge to edge) to follow. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dialog_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clickable="true"
+    android:clipToPadding="false">
+
+    <!-- Movable window -->
+    <LinearLayout
+        android:id="@+id/window_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/win7_window_frame"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="20dp">
+
+        <!--  Title Bar -->
+        <LinearLayout
+            android:id="@+id/dialog_title_bar"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="6dp">
+
+            <ImageView
+                android:id="@+id/dialog_window_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_dialog_window"
+                android:layout_marginEnd="5dp"
+                android:layout_gravity="center_vertical"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/dialog_title_text"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:paddingTop="1dp"
+                android:text="Dialog Title"
+                android:textColor="#000000"
+                android:textSize="9.5sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginEnd="5dp"
+                android:shadowColor="#FFFFFFFF"
+                android:shadowRadius="8"
+                android:fontFamily="@font/segoeui_regular" />
+
+            <!-- The caption buttons hang from the frame's top edge; the bitmaps carry their
+                 own bottom shadow, so they are taller than the face they draw. -->
+            <ImageView
+                android:id="@+id/dialog_minimize_button"
+                android:layout_width="24dp"
+                android:layout_height="19dp"
+                android:layout_marginTop="1dp"
+                android:src="@drawable/caption_min_win7"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:id="@+id/dialog_maximize_button"
+                android:layout_width="24dp"
+                android:layout_height="19dp"
+                android:layout_marginTop="1dp"
+                android:src="@drawable/caption_max_win7"
+                android:scaleType="fitXY" />
+
+            <ImageView
+                android:id="@+id/dialog_close_button"
+                android:layout_width="44dp"
+                android:layout_height="19dp"
+                android:layout_marginTop="1dp"
+                android:src="@drawable/caption_close_win7"
+                android:scaleType="fitXY" />
+        </LinearLayout>
+
+        <!-- Content straight under the title bar, with glass down the sides and along the bottom -->
+        <FrameLayout
+            android:id="@+id/window_border"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="6dp"
+            android:background="@drawable/win7_window_client">
+
+                <LinearLayout
+                    android:id="@+id/dialog_content_area"
+                    android:clickable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

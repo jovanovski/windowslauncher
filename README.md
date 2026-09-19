@@ -13,6 +13,7 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     - Windows 2000/ME
     - Windows XP
     - Windows Vista
+    - Windows 7, with the superbar: pin apps to the taskbar, Aero Peek, and the notification area flyout
 - Working home screen, with desktop icons that can be renamed and changed (included are a bunch of icons from the era
 -   Working start menu as an app launcher
 -   Gestures:
@@ -24,6 +25,7 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     -   IE 6/7 - works as a browser (hold the homepage button to set current page as homepage)
     -   Winamp - plays local MP3 files
     -   Notepad - for storing notes but included tabs as well
+    -   Paint - the sixteen tools, the palette and the pixel-exact drawing, with pinch to zoom; opens and saves BMP, PNG and JPEG
     -   Phone Dialer - working phone with basic features and speed dial
     -   Registry Editor - to check locally stored settings, modify, export/sync to your Google Drive to later restore easily
     -   3 games: Minesweeper, Solitare, 3D Pinball Space Cadet

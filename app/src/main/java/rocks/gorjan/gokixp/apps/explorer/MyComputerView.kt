@@ -81,6 +81,7 @@ class MyComputerView : DesktopIconView, ThemeAware {
             when (currentTheme) {
                 is AppTheme.WindowsClassic -> R.drawable.my_computer_98_icon
                 is AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
+                is AppTheme.Windows7 -> R.drawable.my_computer_win7_icon
                 else -> R.drawable.my_computer_xp_icon
             }
         }
@@ -92,7 +93,9 @@ class MyComputerView : DesktopIconView, ThemeAware {
 
     // Backward compatible method
     fun setThemeIcon(isWindows98: Boolean) {
-        currentTheme = if (isWindows98) AppTheme.WindowsClassic else AppTheme.WindowsXP
+        // The boolean predates the Aero themes; read the real one when there is one to read.
+        currentTheme = (context as? MainActivity)?.themeManager?.getSelectedTheme()
+            ?: if (isWindows98) AppTheme.WindowsClassic else AppTheme.WindowsXP
         updateIcon()
     }
 }

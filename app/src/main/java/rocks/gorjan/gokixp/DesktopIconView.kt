@@ -220,7 +220,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
         if(currentTheme == AppTheme.WindowsClassic) {
             iconText.setLineSpacing(lineSpacingExtra.toFloat(), 1.0f)
         }
-        else if(currentTheme == AppTheme.WindowsVista){
+        else if(currentTheme.isAero){
             iconText.setLineSpacing(lineSpacingExtra.toFloat(), 0.8f)
             iconText.textScaleX = 1.025f
         }
@@ -240,7 +240,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
         val currentTheme = mainActivity?.themeManager?.getSelectedTheme() ?: AppTheme.WindowsXP
 
         // Set the appropriate shortcut overlay based on theme
-        val overlayDrawable = if (currentTheme is AppTheme.WindowsVista) {
+        val overlayDrawable = if (currentTheme.isAero) {
             R.drawable.overlay_shortcut_vista
         } else {
             R.drawable.overlay_shortcut

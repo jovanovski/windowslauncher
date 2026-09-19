@@ -72,10 +72,12 @@ class DialogBoxApp(
      * Play the appropriate sound based on dialog type
      */
     private fun playDialogSound() {
+        // Windows 7 has its own; every other theme has always used XP's.
+        val win7 = theme is AppTheme.Windows7
         val soundResId = when (dialogType) {
-            DialogType.ERROR -> R.raw.error_xp
-            DialogType.WARNING -> R.raw.warning_xp
-            DialogType.INFORMATION -> R.raw.information_xp
+            DialogType.ERROR -> if (win7) R.raw.error_win7 else R.raw.error_xp
+            DialogType.WARNING -> if (win7) R.raw.warning_win7 else R.raw.warning_xp
+            DialogType.INFORMATION -> if (win7) R.raw.information_win7 else R.raw.information_xp
         }
         onPlaySound?.invoke(soundResId)
     }
@@ -107,16 +109,19 @@ class DialogBoxApp(
                 AppTheme.WindowsClassic -> R.drawable.dialog_info_98
                 AppTheme.WindowsXP -> R.drawable.dialog_info_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_info_vista
+                AppTheme.Windows7 -> R.drawable.dialog_info_win7
             }
             DialogType.WARNING -> when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
                 AppTheme.WindowsXP -> R.drawable.dialog_warning_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
+                AppTheme.Windows7 -> R.drawable.dialog_warning_win7
             }
             DialogType.ERROR -> when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_error_98
                 AppTheme.WindowsXP -> R.drawable.dialog_error_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_error_vista
+                AppTheme.Windows7 -> R.drawable.dialog_error_win7
             }
         }
     }

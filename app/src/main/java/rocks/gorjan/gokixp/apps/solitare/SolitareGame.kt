@@ -72,7 +72,8 @@ class SolitareGame(
         fun isBlack(): Boolean = !isRed()
 
         fun getDrawableId(context: Context, cardBackIndex: Int): Int {
-            val postfix = if (ThemeManager(context).getSelectedTheme() is AppTheme.WindowsVista) "_vista" else ""
+            // Windows 7 shipped Vista's Solitaire, cards and all.
+            val postfix = if (ThemeManager(context).isAeroTheme()) "_vista" else ""
 
             if (!faceUp) {
                 val backName = "solitare_card_back_$cardBackIndex"

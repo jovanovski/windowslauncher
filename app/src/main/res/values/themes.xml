@@ -48,6 +48,45 @@
 
     </style>
 
+    <!-- Windows 7 Theme: Vista's Aero attributes, which Windows 7 kept -->
+    <style name="Theme.GokiXP.Win7" parent="Theme.GokiXP.Vista">
+        <item name="winButtonStyle">@style/Win7Button</item>
+    </style>
+
+    <style name="Win7Button" parent="WinVistaButton">
+        <item name="android:background">@drawable/button_win7</item>
+    </style>
+
+    <!-- A link in the Windows 7 start menu's right-hand column -->
+    <style name="Win7StartPlace">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_marginBottom">2dp</item>
+        <item name="android:background">@drawable/start_places_item_win7</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/segoeui_regular</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:shadowColor">#80000000</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">12.5sp</item>
+    </style>
+
+    <style name="Win7StartPlaceSeparator">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">2dp</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:layout_marginBottom">5dp</item>
+        <item name="android:background">@drawable/start_menu_win7_places_separator</item>
+    </style>
+
     <!-- Windows Classic Theme -->
     <style name="Theme.GokiXP.Classic" parent="Base.Theme.GokiXP">
         <item name="primaryFontFamily">@font/micross_font_family</item>

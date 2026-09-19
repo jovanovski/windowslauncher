@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 superbar. Keeps every id taskbar_vista.xml has, so the shared taskbar setup in
+     MainActivity finds its views; adds the Aero Peek strip at the far right. The container is
+     taller than the 40dp glass so the orb can overhang it (ThemeManager.getTaskbarHeightDp). -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="52dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:elevation="150dp">
+
+    <View
+        android:id="@+id/taskbar_background"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/taskbar_win7" />
+
+    <RelativeLayout
+        android:id="@+id/taskbar_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <!-- The orb fills the bar and rises just past its top edge. The artwork's circle is the
+             middle 60% of its frame (rows 23-87 of 106), so the 65dp frame puts a 39dp circle
+             1.4dp above the glass's top and lets the hover glow spill round it. -->
+        <ImageView
+            android:id="@+id/start_button"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="-4dp"
+            android:layout_marginBottom="-9.5dp"
+            android:contentDescription="Start button"
+            android:scaleType="fitXY"
+            android:src="@drawable/start_orb_win7"
+            tools:ignore="HardcodedText" />
+
+        <!-- Aero Peek: the glass strip at the very end of the bar -->
+        <ImageView
+            android:id="@+id/show_desktop"
+            android:layout_width="15dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="true"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Show desktop"
+            android:scaleType="fitXY"
+            android:src="@drawable/show_desktop_win7"
+            tools:ignore="HardcodedText" />
+
+        <LinearLayout
+            android:id="@+id/system_tray_wrapper"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_alignParentBottom="true"
+            android:layout_toStartOf="@id/show_desktop"
+            android:layout_marginEnd="2dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/system_tray"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Windows 7 keeps these behind the chevron; see setupWin7TrayOverflow -->
+                <LinearLayout
+                    android:id="@+id/system_tray_toggle_area"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:id="@+id/aqi_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:layout_marginTop="3dp"
+                        android:layout_marginEnd="2dp"
+                        android:layout_marginBottom="3dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/aqi_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/segoeui_regular"
+                            android:gravity="center"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:text=""
+                            android:textColor="@color/white"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/weather_temp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:fontFamily="@font/segoeui_regular"
+                        android:gravity="center"
+                        android:minWidth="24dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:text="\?"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/update_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/update_available_win7" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/volume_icon_wrapper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="5dp">
+
+                    <ImageView
+                        android:id="@+id/volume_icon"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/sound_win7" />
+                </LinearLayout>
+
+                <!-- Two-line clock: time over date -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:minWidth="62dp"
+                    android:orientation="vertical"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="6dp">
+
+                    <TextView
+                        android:id="@+id/clock_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/segoeui_regular"
+                        android:includeFontPadding="false"
+                        android:text="10:21 AM"
+                        android:textColor="@color/white"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:id="@+id/date_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/date_day"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/segoeui_regular"
+                            android:includeFontPadding="false"
+                            android:text="10/26/2009"
+                            android:textColor="@color/white"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/date_ordinal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textSize="1sp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Notification-area chevron -->
+        <ImageView
+            android:id="@+id/system_tray_toggle"
+            android:layout_width="20dp"
+            android:layout_height="40dp"
+            android:layout_alignParentBottom="true"
+            android:layout_toStartOf="@id/system_tray_wrapper"
+            android:clickable="true"
+            android:contentDescription="Show hidden icons"
+            android:focusable="true"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/tray_chevron_win7"
+            tools:ignore="HardcodedText" />
+
+        <!-- Pinned apps and open windows. Scrolls when there are more than fit; the strip
+             fills the space when there are fewer, so a tap on empty bar still lands on it. -->
+        <HorizontalScrollView
+            android:id="@+id/taskbar_strip_scroller"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_alignParentBottom="true"
+            android:layout_toStartOf="@id/system_tray_toggle"
+            android:layout_toEndOf="@id/start_button"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/taskbar_empty_space"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="@android:color/transparent"
+                android:gravity="start|center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+    </RelativeLayout>
+</RelativeLayout>

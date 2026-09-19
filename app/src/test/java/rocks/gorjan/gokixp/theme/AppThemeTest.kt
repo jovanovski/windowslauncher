@@ -17,10 +17,33 @@ import org.junit.Test
 class AppThemeTest {
 
     @Test
-    fun `the three desktop themes round-trip through their stored names`() {
+    fun `every desktop theme round-trips through its stored name`() {
         for (theme in AppTheme.all()) {
             assertEquals(theme, AppTheme.fromString(theme.toString()))
         }
+    }
+
+    @Test
+    fun `Windows 7 is offered and stored under its own name`() {
+        assertTrue(AppTheme.Windows7 in AppTheme.all())
+        assertEquals(AppTheme.Windows7, AppTheme.fromString("Windows 7"))
+    }
+
+    @Test
+    fun `every theme keeps its hand-picked icons in a map of its own`() {
+        // Two themes sharing a key would overwrite each other's icons, and a key missing from
+        // all() would have its imported icon files deleted by pruneUnusedImportedIcons.
+        val keys = AppTheme.all().map { it.customIconsKey }
+        assertEquals(keys.size, keys.toSet().size)
+        assertEquals("custom_icons_7", AppTheme.Windows7.customIconsKey)
+    }
+
+    @Test
+    fun `only Vista and 7 are Aero`() {
+        assertEquals(
+            setOf(AppTheme.WindowsVista, AppTheme.Windows7),
+            AppTheme.all().filter { it.isAero }.toSet()
+        )
     }
 
     @Test

@@ -11,6 +11,12 @@ data class ContextMenuItem(
     val subAction: (() -> Unit)? = null
 )
 
+/** "Pin to Taskbar" / "Unpin from Taskbar", offered only by the Windows 7 superbar. */
+data class TaskbarPinItem(val isPinned: Boolean, val onToggle: () -> Unit) {
+    fun toMenuItem() =
+        ContextMenuItem(if (isPinned) "Unpin from Taskbar" else "Pin to Taskbar", isEnabled = true, action = onToggle)
+}
+
 object ContextMenuItems {
     // Desktop context menu items
     fun getDesktopMenuItems(
@@ -43,14 +49,18 @@ object ContextMenuItems {
         onSetSwipeRightApp: () -> Unit,
         onSetWeatherApp: () -> Unit,
         isSystemApp: Boolean = false,
-        isUrlShortcut: Boolean = false
+        isUrlShortcut: Boolean = false,
+        taskbarPin: TaskbarPinItem? = null
     ): List<ContextMenuItem> {
         val items = mutableListOf(
-            ContextMenuItem("Open", isEnabled = true, action = onOpen),
+            ContextMenuItem("Open", isEnabled = true, action = onOpen)
+        )
+        taskbarPin?.let { items.add(it.toMenuItem()) }
+        items.addAll(listOf(
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Move Icon", isEnabled = true, action = onMoveIcon),
             ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon)
-        )
+        ))
 
         // "Set as Swipe/Weather App" only make sense for launchable apps, not URL shortcuts
         if (!isUrlShortcut) {
@@ -83,19 +93,23 @@ object ContextMenuItems {
         onChangeIcon: () -> Unit,
         onHideToggle: () -> Unit,
         isHidden: Boolean = false,
-        isSystemApp: Boolean = false
+        isSystemApp: Boolean = false,
+        taskbarPin: TaskbarPinItem? = null
     ): List<ContextMenuItem> {
         val pinText = if (isPinned) "Unpin from Start" else "Pin to Start"
         val hideText = if (isHidden) "Unhide app" else "Hide app"
         val items = mutableListOf(
             ContextMenuItem("Send to Desktop", isEnabled = true, action = onCreateShortcut),
-            ContextMenuItem(pinText, isEnabled = true, action = onPinToggle),
+            ContextMenuItem(pinText, isEnabled = true, action = onPinToggle)
+        )
+        taskbarPin?.let { items.add(it.toMenuItem()) }
+        items.addAll(listOf(
             ContextMenuItem(hideText, isEnabled = true, action = onHideToggle),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Set as Swipe Right App", isEnabled = true, action = onSetSwipeRightApp),
             ContextMenuItem("Set as Weather App", isEnabled = true, action = onSetWeatherApp),
             ContextMenuItem("Change Icon", isEnabled = true, action = onChangeIcon)
-        )
+        ))
 
         // Only add Uninstall and Properties for non-system apps
         if (!isSystemApp) {
@@ -219,10 +233,13 @@ object ContextMenuItems {
     fun getTaskbarMenuItems(
         isMinimized: Boolean,
         onMinimizeRestore: () -> Unit,
-        onClose: () -> Unit
+        onClose: () -> Unit,
+        taskbarPin: TaskbarPinItem? = null
     ): List<ContextMenuItem> {
         val minimizeRestoreText = if (isMinimized) "Restore" else "Minimize"
-        return listOf(
+        return listOfNotNull(
+            taskbarPin?.toMenuItem(),
+            taskbarPin?.let { ContextMenuItem("", isEnabled = false) }, // Divider
             ContextMenuItem(minimizeRestoreText, isEnabled = true, action = onMinimizeRestore),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Close", isEnabled = true, action = onClose)

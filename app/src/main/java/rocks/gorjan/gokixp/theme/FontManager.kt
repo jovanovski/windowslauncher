@@ -49,6 +49,7 @@ class FontManager(private val context: Context) {
         AppTheme.WindowsClassic -> R.font.micross_font_family
         AppTheme.WindowsXP -> R.font.tahoma_font_family
         AppTheme.WindowsVista -> R.font.tahoma_font_family
+        AppTheme.Windows7 -> R.font.segoeui_font_family
     }
 
     /**

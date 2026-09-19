@@ -86,6 +86,8 @@ class FolderView : DesktopIconView, ThemeAware {
                 R.drawable.folder_98
             } else if (currentTheme is AppTheme.WindowsVista) {
                 R.drawable.folder_vista
+            } else if (currentTheme is AppTheme.Windows7) {
+                R.drawable.folder_win7
             } else {
                 R.drawable.folder_xp
             }

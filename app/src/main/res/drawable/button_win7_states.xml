@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 7 push button states (aero.msstyles Button PUSHBUTTON). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:drawable="@drawable/button_win7_disabled" />
+    <item android:state_pressed="true" android:drawable="@drawable/button_win7_pressed" />
+    <item android:state_hovered="true" android:drawable="@drawable/button_win7_hot" />
+    <item android:state_focused="true" android:drawable="@drawable/button_win7_default" />
+    <item android:drawable="@drawable/button_win7_normal" />
+</selector>

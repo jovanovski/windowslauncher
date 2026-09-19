@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind a Windows 7 window's content: the dialog face, inside the glass on the sides and
+     bottom (window_border's padding) and straight up against the title bar. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="6dp" android:right="6dp" android:bottom="6dp">
+        <shape><solid android:color="#FFF0F0F0" /></shape>
+    </item>
+</layer-list>

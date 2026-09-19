@@ -66,6 +66,7 @@ class DefaultAppsGate(
         val chromeRes = themeManager?.getDialogLayoutRes(theme) ?: when (theme) {
             AppTheme.WindowsClassic -> R.layout.windows_dialog_content_98
             AppTheme.WindowsVista -> R.layout.windows_dialog_content_vista
+            AppTheme.Windows7 -> R.layout.windows_dialog_content_win7
             else -> R.layout.windows_dialog_content_xp
         }
 
@@ -117,6 +118,7 @@ class DefaultAppsGate(
             when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
                 AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
+                AppTheme.Windows7 -> R.drawable.dialog_warning_win7
                 else -> R.drawable.dialog_warning_xp
             }
         )

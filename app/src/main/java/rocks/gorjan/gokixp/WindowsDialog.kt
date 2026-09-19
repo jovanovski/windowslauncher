@@ -30,6 +30,14 @@ data class WindowState(
     val isMaximized: Boolean
 )
 
+/**
+ * How much more of a window the Windows 7 frame takes than Vista's, in dp. Vista: a 22dp title
+ * bar and a 2dp border all round. Windows 7 (windows_dialog_content_win7.xml): a 26dp title bar
+ * with the content right under it, and 6dp of glass down each side and along the bottom.
+ */
+private const val WIN7_EXTRA_CHROME_WIDTH_DP = 8
+private const val WIN7_EXTRA_CHROME_HEIGHT_DP = 6
+
 class WindowsDialog @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -164,7 +172,9 @@ class WindowsDialog @JvmOverloads constructor(
             // Fallback if not in MainActivity context
             if (currentTheme is AppTheme.WindowsClassic) {
                 R.layout.windows_dialog_content_98
-            } else if (currentTheme is AppTheme.WindowsVista){
+            } else if (currentTheme is AppTheme.Windows7) {
+                R.layout.windows_dialog_content_win7
+            } else if (currentTheme.isAero){
                 R.layout.windows_dialog_content_vista
             }
             else {
@@ -205,7 +215,7 @@ class WindowsDialog @JvmOverloads constructor(
         windowIcon = findViewById(R.id.dialog_window_icon)
 
         // Get border frame only for Windows XP theme
-        if (currentTheme is AppTheme.WindowsXP || currentTheme is AppTheme.WindowsVista) {
+        if (currentTheme is AppTheme.WindowsXP || currentTheme.isAero) {
             windowBorder = findViewById(R.id.window_border)
 
 
@@ -533,7 +543,12 @@ class WindowsDialog @JvmOverloads constructor(
         setupResizeDragView()
     }
 
-    fun setWindowSize(widthDp: Int? = null, heightDp: Int? = null) {
+    fun setWindowSize(requestedWidthDp: Int? = null, requestedHeightDp: Int? = null) {
+        // Sizes are given for Vista's chrome, and Windows 7 shares Vista's fixed-size program
+        // layouts. Its frame is thicker, so grow the window by the difference rather than
+        // squeeze those layouts.
+        val widthDp = requestedWidthDp?.plus(if (currentTheme is AppTheme.Windows7) WIN7_EXTRA_CHROME_WIDTH_DP else 0)
+        val heightDp = requestedHeightDp?.plus(if (currentTheme is AppTheme.Windows7) WIN7_EXTRA_CHROME_HEIGHT_DP else 0)
         val density = resources.displayMetrics.density
         windowFrame.updateLayoutParams<FrameLayout.LayoutParams> {
             if (widthDp != null) {
@@ -1160,42 +1175,18 @@ class WindowsDialog @JvmOverloads constructor(
     }
 
     fun registerWithTaskbar(taskbarContainerView: LinearLayout) {
-        taskbarContainer = taskbarContainerView
-        val buttonLayoutResId = ThemeManager(context).getTaskbarButtonLayoutRes(currentTheme)
-        taskbarButton = LayoutInflater.from(context).inflate(buttonLayoutResId, taskbarContainer, false)
-        taskbarButton?.findViewById<ImageView>(R.id.taskbar_button_icon)?.setImageResource(taskbarIconResId)
-        taskbarButton?.findViewById<TextView>(R.id.taskbar_button_text)?.text = titleText.text
-
-        applyPlus95TintToTaskbarButton()
-
-        // Regular click - minimize/restore/focus
-        taskbarButton?.setOnClickListener {
-            // Toggle behavior based on window state
-            when {
-                isMinimized -> restore() // If minimized, restore
-                isInFocus() -> minimize() // If in focus, minimize
-                else -> windowManager?.bringToFront(this) // Otherwise, bring to front
-            }
-        }
-
-        // Long press - show context menu
-        taskbarButton?.setOnLongClickListener { view ->
-            // Perform haptic feedback
-            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-
-            // Get button position on screen
-            val location = IntArray(2)
-            view.getLocationOnScreen(location)
-
-            // Show context menu at button position
-            showTaskbarContextMenu(location[0].toFloat(), location[1].toFloat())
-            true
-        }
-
-        taskbarContainer?.addView(taskbarButton)
+        registerWithTaskbar(taskbarContainerView) { windowManager?.bringToFront(this) }
     }
 
     fun registerWithTaskbar(taskbarContainerView: LinearLayout, dialogRef: AlertDialog) {
+        registerWithTaskbar(taskbarContainerView) {
+            // Bring to front: ensure windowFrame is last in z-order
+            windowFrame.bringToFront()
+            overlayRoot.invalidate()
+        }
+    }
+
+    private fun registerWithTaskbar(taskbarContainerView: LinearLayout, bringToFront: () -> Unit) {
         taskbarContainer = taskbarContainerView
         val buttonLayoutResId = ThemeManager(context).getTaskbarButtonLayoutRes(currentTheme)
         taskbarButton = LayoutInflater.from(context).inflate(buttonLayoutResId, taskbarContainer, false)
@@ -1210,11 +1201,7 @@ class WindowsDialog @JvmOverloads constructor(
             when {
                 isMinimized -> restore() // If minimized, restore
                 isInFocus() -> minimize() // If in focus, minimize
-                else -> {
-                    // Bring to front: ensure windowFrame is last in z-order
-                    windowFrame.bringToFront()
-                    overlayRoot.invalidate()
-                }
+                else -> bringToFront()
             }
         }
 
@@ -1232,8 +1219,17 @@ class WindowsDialog @JvmOverloads constructor(
             true
         }
 
-        taskbarContainer?.addView(taskbarButton)
+        // On the Windows 7 superbar a pinned program's window takes its pin's place.
+        val button = taskbarButton ?: return
+        val pins = (resolveActivity(context) as? MainActivity)?.win7TaskbarPins
+        if (pins == null || !pins.adoptWindowButton(windowIdentifier, button)) {
+            taskbarContainer?.addView(button)
+        }
+        button.isActivated = isInFocus() && !isMinimized
     }
+
+    /** This window's button on the taskbar, while it has one. */
+    fun getTaskbarButtonView(): View? = taskbarButton
 
     /**
      * Recolours the taskbar button to the active Plus! menu colour. The button is inflated when
@@ -1265,6 +1261,7 @@ class WindowsDialog @JvmOverloads constructor(
         taskbarButton?.let { taskbarContainer?.removeView(it) }
         taskbarButton = null
         taskbarContainer = null
+        (resolveActivity(context) as? MainActivity)?.win7TaskbarPins?.windowButtonRemoved(windowIdentifier)
     }
 
     fun updateTaskbarButtonTitle(title: String) {
@@ -1315,6 +1312,14 @@ class WindowsDialog @JvmOverloads constructor(
                 onClose = {
                     windowManager?.removeWindow(this)
                     onCloseListener?.invoke()
+                },
+                // The Windows 7 superbar lets a running launcher program be pinned from its button
+                taskbarPin = windowIdentifier?.takeIf { MainActivity.isSystemApp(it) }?.let { program ->
+                    (resolveActivity(context) as? MainActivity)?.win7TaskbarPins?.let { pins ->
+                        TaskbarPinItem(pins.isPinned(program)) {
+                            if (pins.isPinned(program)) pins.unpin(program) else pins.pin(program)
+                        }
+                    }
                 }
             )
 
@@ -1331,6 +1336,7 @@ class WindowsDialog @JvmOverloads constructor(
     fun minimize() {
         if (!isMinimized) {
             isMinimized = true
+            taskbarButton?.isActivated = false
             windowFrame.visibility = View.GONE
             onMinimizeListener?.invoke()
         }
@@ -1466,11 +1472,18 @@ class WindowsDialog @JvmOverloads constructor(
      * Sets the window as focused (active) with active title bar background
      */
     fun setFocused() {
+        // The focused window's taskbar button lights up (only Windows 7's button draws it)
+        taskbarButton?.isActivated = true
+
         // Skip if borderless
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
-            if(currentTheme is AppTheme.WindowsClassic || currentTheme is AppTheme.WindowsVista) {
+            if (currentTheme is AppTheme.Windows7) {
+                // One glass frame for the whole window; the caption buttons follow activation.
+                titleBar.isActivated = true
+                windowFrame.setBackgroundResource(R.drawable.win7_window_frame)
+            } else if(currentTheme is AppTheme.WindowsClassic || currentTheme.isAero) {
                 val activeBackground = if (currentTheme is AppTheme.WindowsClassic) {
                     R.drawable.windows_98_dialog_title_bar
                 } else {
@@ -1495,12 +1508,18 @@ class WindowsDialog @JvmOverloads constructor(
      * Sets the window as unfocused (inactive) with inactive title bar background
      */
     fun setUnfocused() {
+        taskbarButton?.isActivated = false
+
         // Skip if borderless
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
             if (currentTheme is AppTheme.WindowsClassic) {
                 titleBar.setBackgroundResource(R.drawable.windows_98_dialog_title_bar_inactive)
+            }
+            else if (currentTheme is AppTheme.Windows7) {
+                titleBar.isActivated = false
+                windowFrame.setBackgroundResource(R.drawable.win7_window_frame_inactive)
             }
             else if (currentTheme is AppTheme.WindowsXP){
                 windowBorder?.setBackgroundResource(R.drawable.windows_xp_dialog_border_inactive)

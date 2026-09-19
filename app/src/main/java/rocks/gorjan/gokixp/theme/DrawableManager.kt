@@ -37,7 +37,7 @@ class DrawableManager(private val context: Context) {
                 ContextCompat.getDrawable(context, R.drawable.context_menu_background)
                     ?: ColorDrawable(Color.WHITE)
             }
-            AppTheme.WindowsVista -> {
+            AppTheme.WindowsVista, AppTheme.Windows7 -> {
                 ContextCompat.getDrawable(context, R.drawable.context_menu_background)
                     ?: ColorDrawable(Color.WHITE)
             }
@@ -150,7 +150,7 @@ class DrawableManager(private val context: Context) {
     fun getScrollbarTrackRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98
         AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp
-        AppTheme.WindowsVista -> R.drawable.scrollbar_track_xp
+        AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_track_vista
     }
 
     /**
@@ -162,6 +162,6 @@ class DrawableManager(private val context: Context) {
     fun getScrollbarThumbRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
         AppTheme.WindowsXP -> R.drawable.scrollbar_thumb_xp
-        AppTheme.WindowsVista -> R.drawable.scrollbar_thumb_xp
+        AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_thumb_vista
     }
 }

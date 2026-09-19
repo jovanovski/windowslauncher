@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Selected = the overflow flyout is open. -->
+    <item android:state_pressed="true" android:drawable="@drawable/tray_chevron_win7_pressed" />
+    <item android:state_selected="true" android:drawable="@drawable/tray_chevron_win7_pressed" />
+    <item android:state_hovered="true" android:drawable="@drawable/tray_chevron_win7_hot" />
+    <item android:drawable="@drawable/tray_chevron_win7_normal" />
+</selector>

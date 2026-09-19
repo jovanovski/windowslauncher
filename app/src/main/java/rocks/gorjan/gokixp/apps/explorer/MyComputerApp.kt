@@ -303,8 +303,10 @@ class MyComputerApp(
      * Update the folder name and icon display
      */
     private fun updateFolderDisplay() {
+        // Windows 7 dropped the "My"
+        val computerName = if (theme is AppTheme.Windows7) "Computer" else "My Computer"
         val displayName = when {
-            currentPath == null -> "My Computer"
+            currentPath == null -> computerName
             isInWindowsFolder -> WINDOWS_FOLDER_NAME
             currentPath == Environment.getExternalStorageDirectory() -> "Local Disk (C:)"
             else -> currentPath!!.name
@@ -312,7 +314,7 @@ class MyComputerApp(
 
         // For the small folder name (address bar), show full Windows-style path
         val pathDisplayName = when {
-            currentPath == null -> "My Computer"
+            currentPath == null -> computerName
             isInWindowsFolder -> "C:\\$WINDOWS_FOLDER_NAME"
             else -> getWindowsStylePath(currentPath!!)
         }
@@ -549,6 +551,11 @@ class MyComputerApp(
         return file.extension.lowercase() == "pdf"
     }
 
+    /** Bitmaps open in Paint rather than the viewer, the way they always have. */
+    private fun isBitmapFile(file: File): Boolean {
+        return file.extension.lowercase() in listOf("bmp", "dib")
+    }
+
     /**
      * Open a file - audio files open in Winamp, video files open in WMP, images open in Photo Viewer, others use external app
      */
@@ -559,6 +566,9 @@ class MyComputerApp(
         } else if (isVideoFile(file)) {
             // Open video files in Windows Media Player
             openFileInWmp(file)
+        } else if (isBitmapFile(file)) {
+            // Bitmaps are Paint's own files
+            openFileInPaint(file)
         } else if (isImageFile(file) || isPdfFile(file)) {
             // Open image and PDF files in Photo Viewer
             openFileInPhotoViewer(file)
@@ -590,6 +600,14 @@ class MyComputerApp(
     private fun openFileInPhotoViewer(file: File) {
         val mainActivity = context as? MainActivity
         mainActivity?.openPhotoViewer(file.absolutePath)
+    }
+
+    /**
+     * Open a picture in Paint, for editing rather than looking at
+     */
+    private fun openFileInPaint(file: File) {
+        val mainActivity = context as? MainActivity
+        mainActivity?.openPaint(file.absolutePath)
     }
 
     /**
@@ -726,6 +744,20 @@ class MyComputerApp(
                 }
             )
         )
+
+        // Add "Edit", which is what a picture has instead of a second way of looking at it
+        if (isImage) {
+            menuItems.add(
+                rocks.gorjan.gokixp.ContextMenuItem(
+                    title = "Edit",
+                    isEnabled = true,
+                    action = {
+                        currentAdapter?.clearSelection()
+                        openFileInPaint(file)
+                    }
+                )
+            )
+        }
 
         // Add "Open in External App" for audio, video, and image files
         if (isAudio || isVideo || isImage) {
