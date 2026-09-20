@@ -24,7 +24,12 @@ class FileSystemAdapter(
     private val onItemClick: (FileSystemItem, View) -> Unit,
     private val onItemLongClick: ((FileSystemItem, Float, Float) -> Unit)? = null,
     private val isFileCut: ((File) -> Boolean)? = null,
-    private val getShortcutIcon: ((String) -> android.graphics.drawable.Drawable?)? = null
+    private val getShortcutIcon: ((String) -> android.graphics.drawable.Drawable?)? = null,
+    /**
+     * Drawn faint, the way a cut file is: My Briefcase uses it for a file that is on the
+     * computer but has not been fetched yet, and for one mid-transfer.
+     */
+    private val isFileDimmed: ((FileSystemItem) -> Boolean)? = null
 ) : BaseAdapter() {
 
     private var selectedPosition: Int = -1
@@ -148,12 +153,9 @@ class FileSystemAdapter(
         // Apply selection state
         iconView.isSelected = (position == selectedPosition)
 
-        // Apply opacity if file is cut
-        if (!item.isDrive && isFileCut != null && isFileCut.invoke(item.file)) {
-            iconView.alpha = 0.6f
-        } else {
-            iconView.alpha = 1.0f
-        }
+        // Apply opacity if the file is cut, or if the caller says it is only half here
+        val isCut = !item.isDrive && isFileCut != null && isFileCut.invoke(item.file)
+        iconView.alpha = if (isCut || isFileDimmed?.invoke(item) == true) 0.6f else 1.0f
 
         return iconView
     }

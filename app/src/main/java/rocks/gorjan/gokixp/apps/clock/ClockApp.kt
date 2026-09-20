@@ -2,7 +2,6 @@ package rocks.gorjan.gokixp.apps.clock
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
@@ -16,6 +15,7 @@ import android.widget.GridView
 import android.widget.ImageView
 import android.widget.TextView
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.winui.WinUi
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,6 +29,16 @@ class ClockApp(
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
+
+    /**
+     * The kit, for the one control in this window that is a control.
+     *
+     * Date/Time Properties is drawn from a screenshot of the 98 original with live views
+     * laid over it, so almost nothing here is built rather than photographed. The calendar
+     * is the exception: its days are a list, and a list's selected row is the kit's to
+     * paint.
+     */
+    private val ui = WinUi(context)
 
     // UI references
     private var monthTextView: TextView? = null
@@ -277,28 +287,22 @@ class ClockApp(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
 
-                // Set font
+                // Not the shell's font: the grid has to fall on the ruled columns of the
+                // screenshot behind it, and those were set in MS Sans Serif.
                 typeface = context.resources.getFont(R.font.micross_block)
 
                 if (day.day == 0) {
                     // Empty cell
                     text = ""
-                    setBackgroundColor(Color.TRANSPARENT)
+                    background = null
                 } else {
                     // Day cell
                     text = day.day.toString()
                     textSize = 11f
                     gravity = android.view.Gravity.CENTER
 
-                    if (day.isToday) {
-                        // Current day - blue background with white text
-                        setBackgroundColor(Color.parseColor("#0A246A"))
-                        setTextColor(Color.WHITE)
-                    } else {
-                        // Regular day - black text
-                        setBackgroundColor(Color.TRANSPARENT)
-                        setTextColor(Color.BLACK)
-                    }
+                    background = if (day.isToday) ui.rowBackground(selected = true) else null
+                    setTextColor(ui.rowTextColor(selected = day.isToday))
                 }
             }
 

@@ -107,6 +107,9 @@ class WindowsDialog @JvmOverloads constructor(
     // Reference to MyComputerApp instance (if this window is My Computer)
     var myComputerApp: Any? = null
 
+    // Reference to BriefcaseApp instance (if this window is My Briefcase)
+    var briefcaseApp: Any? = null
+
     // Dragging on the title bar
     private var initialX = 0f
     private var initialY = 0f

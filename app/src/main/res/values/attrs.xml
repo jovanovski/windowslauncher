@@ -18,4 +18,55 @@
     <attr name="notificationBubble" format="reference"/>
     <attr name="notificationBubbleTitleColor" format="color" />
 
+
+    <!-- ==================== The Windows control kit ====================
+         Sizes and positions here are DESIGN PIXELS - the pixels of a 1:1 Windows screen -
+         not dp, so the numbers in a layout match what a pixel ruler reads off a screenshot.
+         WinLayout turns them into device pixels; a WinSkin decides which Windows they wear. -->
+
+    <declare-styleable name="WinLayout">
+        <attr name="winDesignWidth" format="integer" />
+        <attr name="winDesignHeight" format="integer" />
+        <!-- Paint the shell's dialog face behind everything. For the root layout. -->
+        <attr name="winFace" format="boolean" />
+        <attr name="winFrame">
+            <enum name="none" value="0" />
+            <!-- The well a list box sits in. -->
+            <enum name="list" value="1" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="WinLayout_Layout">
+        <!-- Re-declared so a child can leave them out: position and size normally come from
+             the win attributes below, and ViewGroup.LayoutParams insists on these otherwise. -->
+        <attr name="android:layout_width" />
+        <attr name="android:layout_height" />
+        <attr name="layout_winX" format="integer" />
+        <attr name="layout_winY" format="integer" />
+        <attr name="layout_winW" format="integer" />
+        <attr name="layout_winH" format="integer" />
+    </declare-styleable>
+
+    <!-- Anything that draws a caption: buttons, labels, group boxes. "&amp;" marks the
+         accelerator, the letter Windows draws with an underline. -->
+    <declare-styleable name="WinCaptioned">
+        <attr name="winText" format="string" />
+        <attr name="winAlign">
+            <enum name="left" value="0" />
+            <enum name="center" value="1" />
+            <enum name="right" value="2" />
+        </attr>
+    </declare-styleable>
+
+    <!-- Insets in design pixels, so a field's text area tracks the grid like everything else. -->
+    <declare-styleable name="WinEditText">
+        <attr name="winPadStart" format="integer" />
+        <attr name="winPadTop" format="integer" />
+        <attr name="winPadEnd" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="WinSprite">
+        <attr name="winSrc" format="reference" />
+    </declare-styleable>
+
 </resources>

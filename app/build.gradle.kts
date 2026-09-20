@@ -33,6 +33,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    testOptions {
+        unitTests {
+            // The Briefcase's wire code logs; a unit test should not have to care.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

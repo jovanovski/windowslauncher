@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Everything this app sends goes over TLS, which is already the platform default for an app
+    targeting API 28 or later; saying so here makes it a rule rather than a default.
+
+    The exception is the loopback address, which BRIEFCASE-PROTOCOL.md section 6 allows while
+    the other end is being built: a winos desktop running on the same machine, reached through
+    `adb reverse`, never leaves the device, so there is nothing on the wire to read.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

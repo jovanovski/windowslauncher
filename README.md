@@ -21,13 +21,13 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     -   Swipe up on the desktop to open the start menu in search mode
     -   Swipe right on the desktop to open a favorite app (set via the start menu)
 -   Included wallpapers from the era, 3D pipes screen saver and customization options
+-   Backup & Restore in Display Properties - export every setting to a file, or sync it hourly to your Google Drive, and restore it on another phone
 -   Included retro apps, all coded from scratch to be as close as possible to the original but work on modern phones:
     -   IE 6/7 - works as a browser (hold the homepage button to set current page as homepage)
     -   Winamp - plays local MP3 files
     -   Notepad - for storing notes but included tabs as well
     -   Paint - the sixteen tools, the palette and the pixel-exact drawing, with pinch to zoom; opens and saves BMP, PNG and JPEG
     -   Phone Dialer - working phone with basic features and speed dial
-    -   Registry Editor - to check locally stored settings, modify, export/sync to your Google Drive to later restore easily
     -   3 games: Minesweeper, Solitare, 3D Pinball Space Cadet
 -   Calendar & Weather Integration
 -   Windows Update (checks for a new APK version and lets you download it)

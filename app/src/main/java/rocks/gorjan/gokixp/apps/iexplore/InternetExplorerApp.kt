@@ -23,6 +23,7 @@ import rocks.gorjan.gokixp.ContextMenuItem
 import rocks.gorjan.gokixp.Helpers
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.winui.WinUi
 
 /**
  * Data class for a favourite website
@@ -83,6 +84,21 @@ class InternetExplorerApp(
         val statusText = contentView.findViewById<android.widget.TextView>(R.id.status_text)
         val tabName = contentView.findViewById<android.widget.TextView>(R.id.tab_name)
 
+        // Almost all of this window is a photograph of the real browser - the menu bar, the
+        // toolbar, the sunken edge round the address box - and the only thing the program
+        // actually draws is the text sitting on top of it. That text still has to be the
+        // shell's own face, and the 9x chrome is one picture serving two shells: MS Sans
+        // Serif on 98, Tahoma on XP. The IE7 chrome keeps the Segoe UI its layout asks for,
+        // which the kit's font table does not yet hand out for the Aero shells.
+        val ui = WinUi(context)
+        if (!ui.isAero) {
+            ui.applyFont(urlEditText)
+            ui.applyFont(statusText)
+        }
+
+        // The page itself is a list like any other in this launcher, so it scrolls behind
+        // this shell's scrollbar rather than Android's.
+        ui.themeScrollbars(webView)
 
         // Configure WebView
         webView.settings.javaScriptEnabled = true

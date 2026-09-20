@@ -7,10 +7,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TableLayout
 import android.widget.TableRow
-import android.widget.TextView
 import android.widget.VideoView
 import rocks.gorjan.gokixp.R
-import rocks.gorjan.gokixp.theme.ThemeManager
+import rocks.gorjan.gokixp.winui.WinUi
 
 /**
  * Data class for video track
@@ -35,6 +34,9 @@ class WmpApp(
     companion object {
         private const val TAG = "WmpApp"
     }
+
+    /** The shell's own controls, for the parts of this window that are not skin art. */
+    private val ui = WinUi(context)
 
     // Video playback state
     private var videoView: VideoView? = null
@@ -158,9 +160,17 @@ class WmpApp(
 
     /**
      * Display the video list in the playlist view
+     *
+     * The rows are the one part of this window that is a common control rather than skin art,
+     * so they are painted by the kit - but only as far as the skin allows. The list sits in a
+     * hole cut in the screenshot, and what shows through it is black on the 98 and XP players
+     * and a pale panel on the Aero one: hence a row at rest taking its colour from the
+     * picture while only a selected row is the shell's own.
      */
     private fun displayVideoList() {
         playlistView?.removeAllViews()
+
+        val restingText = if (ui.isAero) ui.pal.text else android.graphics.Color.WHITE
 
         allVideos.forEachIndexed { index, video ->
             val tableRow = TableRow(context).apply {
@@ -176,10 +186,7 @@ class WmpApp(
             val durationStr = String.format("%02d:%02d", minutes, seconds)
 
             // Video name
-            val videoNameView = TextView(context).apply {
-                text = "${index + 1}. ${video.title}"
-                setTextColor(if (ThemeManager(context).isAeroTheme()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
-                textSize = 10f
+            val videoNameView = ui.label("${index + 1}. ${video.title}", size = ui.smallSp).apply {
                 maxLines = 1
                 setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
                 layoutParams = TableRow.LayoutParams(
@@ -187,49 +194,39 @@ class WmpApp(
                     TableRow.LayoutParams.WRAP_CONTENT,
                     1f
                 )
-
-                if (index == selectedVideoIndex) {
-                    setBackgroundColor(0xFF0000BE.toInt())
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
             }
 
             // Duration
-            val durationView = TextView(context).apply {
-                text = durationStr
-                setTextColor(if (ThemeManager(context).isAeroTheme()) { if(tableRow.isSelected || index == selectedVideoIndex){ 0xFFFFFFFF.toInt() } else {0xFF000000.toInt()} } else {0xFFFFFFFF.toInt()})
-                textSize = 10f
+            val durationView = ui.label(durationStr, size = ui.smallSp).apply {
                 gravity = android.view.Gravity.END
                 setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
                 layoutParams = TableRow.LayoutParams(
                     TableRow.LayoutParams.WRAP_CONTENT,
                     TableRow.LayoutParams.WRAP_CONTENT
                 )
-
-                if (index == selectedVideoIndex) {
-                    setBackgroundColor(0xFF0000BE.toInt())
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
             }
+
+            // A row lights as one bar rather than cell by cell: the Aero shells round the
+            // ends of the selection and outline it, so painting each cell separately would
+            // leave a seam down the middle of the row.
+            fun paintRow(selected: Boolean) {
+                tableRow.background = if (selected) ui.rowBackground(selected = true) else null
+                val ink = if (selected) ui.rowTextColor(true) else restingText
+                videoNameView.setTextColor(ink)
+                durationView.setTextColor(ink)
+            }
+            paintRow(index == selectedVideoIndex)
 
             // Touch listener for visual feedback
             val touchListener = View.OnTouchListener { _, event ->
                 when (event.action) {
                     android.view.MotionEvent.ACTION_DOWN -> {
-                        videoNameView.setBackgroundColor(0xFF0000BE.toInt())
-                        videoNameView.setTextColor(0xFFFFFFFF.toInt())
-                        durationView.setBackgroundColor(0xFF0000BE.toInt())
-                        durationView.setTextColor(0xFFFFFFFF.toInt())
+                        paintRow(true)
                         false
                     }
                     android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                         if (index != selectedVideoIndex) {
-                            videoNameView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            videoNameView.setTextColor(0xFF000000.toInt())
-                            durationView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            durationView.setTextColor(0xFF000000.toInt())
+                            paintRow(false)
                         }
                         false
                     }

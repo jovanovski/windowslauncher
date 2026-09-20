@@ -17,6 +17,14 @@ enum class FontStyle {
 /**
  * Manages font resources for different themes.
  * Provides centralized font loading and application.
+ *
+ * One face per shell: MS Sans Serif through Windows 2000, Tahoma for XP, and Segoe UI 9pt for
+ * Vista and 7 both - the Aero shells share a dialog font as they share their controls.
+ *
+ * The two functions below used to disagree with `themes.xml` and with each other: a `tahoma`
+ * fallback answered here for Vista *and* 7, while [getFontFamilyRes] gave 7 Segoe UI and Vista
+ * Tahoma, and `themes.xml` gave both Segoe UI. So a control built in code came out in a
+ * different face from the one beside it built in XML.
  */
 class FontManager(private val context: Context) {
 
@@ -31,9 +39,9 @@ class FontManager(private val context: Context) {
         val fontRes = when {
             theme is AppTheme.WindowsClassic && style == FontStyle.Bold -> R.font.micross_block_bold
             theme is AppTheme.WindowsClassic -> R.font.micross_block
-            theme is AppTheme.WindowsXP && style == FontStyle.Bold -> R.font.tahoma  // No separate bold
-            theme is AppTheme.WindowsXP -> R.font.tahoma
-            else -> R.font.tahoma  // Default fallback
+            theme is AppTheme.WindowsXP -> R.font.tahoma  // The Tahoma here has no separate bold
+            style == FontStyle.Bold -> R.font.segoeui_bold
+            else -> R.font.segoeui_regular
         }
         return ResourcesCompat.getFont(context, fontRes)
     }
@@ -48,8 +56,7 @@ class FontManager(private val context: Context) {
     fun getFontFamilyRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.font.micross_font_family
         AppTheme.WindowsXP -> R.font.tahoma_font_family
-        AppTheme.WindowsVista -> R.font.tahoma_font_family
-        AppTheme.Windows7 -> R.font.segoeui_font_family
+        AppTheme.WindowsVista, AppTheme.Windows7 -> R.font.segoeui_font_family
     }
 
     /**

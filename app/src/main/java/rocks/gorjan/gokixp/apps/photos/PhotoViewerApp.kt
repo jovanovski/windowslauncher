@@ -18,6 +18,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.rendering.PDFRenderer
 import pl.droidsonroids.gif.GifImageView
 import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.winui.WinUi
 import java.io.File
 
 /**
@@ -66,6 +67,11 @@ class PhotoViewerApp(
         gifView = contentView.findViewById(R.id.photos_gif)
         pdfScrollView = contentView.findViewById(R.id.pdfScrollView)
         pdfPagesContainer = contentView.findViewById(R.id.pdfPagesContainer)
+
+        // A document that runs past the bottom of the window gets the shell's own scrollbar,
+        // not the platform's fading hairline - it is the only chrome this viewer has, so it
+        // is the only thing that can say which Windows this is.
+        pdfScrollView?.let { WinUi(context).themeScrollbars(it) }
 
         // Set up pinch-to-zoom for images
         setupImageZoom()

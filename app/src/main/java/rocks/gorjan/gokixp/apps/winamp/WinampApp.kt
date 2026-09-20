@@ -14,6 +14,8 @@ import rocks.gorjan.gokixp.R
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import rocks.gorjan.gokixp.theme.ThemeManager
+import rocks.gorjan.gokixp.winui.WinUi
+import rocks.gorjan.gokixp.winui.showMenu
 import java.util.Locale
 
 /**
@@ -44,6 +46,7 @@ class WinampApp(
     private val hasAudioPermission: () -> Boolean,
     private val onShowRenameDialog: (title: String, initialText: String, hint: String, onConfirm: (String) -> Unit) -> Unit,
     private val onShowConfirmDialog: (title: String, message: String, onConfirm: () -> Unit) -> Unit,
+    /** Spare since the playlist's menu moved to the kit, and droppable once MainActivity stops passing it. */
     private val contextMenuView: rocks.gorjan.gokixp.ContextMenuView,
     private val fileToPlay: String? = null // Optional file path to play on launch
 ) {
@@ -74,6 +77,12 @@ class WinampApp(
             )
         )
     }
+
+    /**
+     * The shell's own controls. Winamp's window is skin art from edge to edge, so the only
+     * thing that asks the kit for anything is the playlist's menu.
+     */
+    private val ui = WinUi(context)
 
     // Media playback state
     private var mediaPlayer: MediaPlayer? = null
@@ -1146,15 +1155,15 @@ class WinampApp(
 
     /**
      * Show context menu for a track
+     *
+     * Winamp skinned its window but never its menus - right-clicking a track in the playlist
+     * editor put up an ordinary Windows menu - so this one comes from the control kit and
+     * follows the shell rather than the skin. It hangs off the row itself, which saves the
+     * old dance of reading the row's screen coordinates and asking the desktop to place a
+     * menu there.
      */
     private fun showTrackContextMenu(track: MusicTrack, trackIndex: Int, view: View) {
         val currentPlaylist = getCurrentPlaylist()
-
-        // Get the view's position on screen
-        val location = IntArray(2)
-        view.getLocationOnScreen(location)
-        val x = location[0].toFloat()
-        val y = location[1].toFloat() + view.height / 2
 
         // Create context menu items
         val menuItems = mutableListOf<rocks.gorjan.gokixp.ContextMenuItem>()
@@ -1198,7 +1207,10 @@ class WinampApp(
 
         // Show the context menu if we have items
         if (menuItems.isNotEmpty()) {
-            contextMenuView.showMenu(menuItems, x, y)
+            // The desktop's menu buzzed as it opened, and a long press that produces a menu
+            // without one feels broken.
+            rocks.gorjan.gokixp.Helpers.performHapticFeedback(context)
+            ui.showMenu(view, menuItems)
         } else {
             Log.d("WinampApp", "No context menu items to show")
         }

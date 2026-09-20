@@ -22,16 +22,15 @@
         android:layout_height="30dp"
         android:src="@drawable/dialog_warning_98"/>
 
+    <!-- Type and buttons are dressed from the winui kit in DialogBoxApp, so the shell in
+         force decides the face, the size and the button's edge. -->
     <TextView
         android:id="@+id/dialog_message"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="Error message, error message, error message, error message"
-        android:fontFamily="?primaryFontFamily"
-        android:textSize="11sp"
         android:layout_marginStart="20dp"
-        android:textColor="@color/black"
         />
     </LinearLayout>
 
@@ -45,21 +44,11 @@
             android:id="@+id/dialog_ok_button"
             android:layout_width="90dp"
             android:layout_height="wrap_content"
-            style="?winButtonStyle"
-            android:paddingLeft="25dp"
-            android:paddingRight="25dp"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
             android:text="OK"/>
         <TextView
             android:id="@+id/dialog_cancel_button"
             android:layout_width="90dp"
             android:layout_height="wrap_content"
-            style="?winButtonStyle"
-            android:paddingLeft="25dp"
-            android:paddingRight="25dp"
-            android:paddingTop="5dp"
-            android:paddingBottom="5dp"
             android:layout_marginStart="10dp"
             android:visibility="gone"
             android:text="Cancel"/>

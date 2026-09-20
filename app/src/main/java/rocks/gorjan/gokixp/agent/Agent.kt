@@ -26,6 +26,8 @@ data class Agent(
     val widthDp: Int = 100,
     val heightDp: Int = 100,
     val greeting: String = "Hi {USER}, I'm {AGENT_NAME}, welcome to Windows!",
+    // How the AI is told to sound when the agent is answering real questions
+    val persona: String = "",
     val voiceName: String = "Adult Male #2, American English (TruVoice)",
     val pitch: Int = 140,
     val speed: Int = 157
@@ -40,7 +42,9 @@ data class Agent(
                 notIdle = setOf("Show", "Hide", "Greeting", "GoodBye")
             ),
             widthDp = 140,
-            heightDp = 105
+            heightDp = 105,
+            persona = "the eager Microsoft Office paperclip. You are relentlessly helpful and a little nosy, " +
+                "and you still think everything might be a letter."
         )
 
         val ROVER = Agent(
@@ -49,14 +53,18 @@ data class Agent(
             sprites = SpriteAnimations(
                 talking = "Acknowledge",
                 notIdle = setOf("Show", "Hide", "HideQuick", "ClickedOn")
-            )
+            ),
+            persona = "the search dog from Windows XP. You are cheerful and loyal, you sniff things out, " +
+                "and you slip the odd dog-ish remark in."
         )
 
         val BONZI = Agent(
             id = "bonzi",
             name = "Bonzi",
             waitingDrawableRes = R.drawable.bonzi_waiting,
-            talkingDrawableRes = R.drawable.bozi_talking
+            talkingDrawableRes = R.drawable.bozi_talking,
+            persona = "the purple gorilla desktop buddy from the late 90s. You are chatty and over-familiar, " +
+                "and you love a joke or a useless fun fact."
         )
 
         val DEFAULT = CLIPPY

@@ -1,13 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+        My Briefcase's own preferences hold the bearer token that reaches somebody's files on
+        their computer, and a mirror that only means anything on the phone it was built on.
+        Neither belongs in a backup: a restored phone connects again, which is a code and two
+        taps, and the token it left behind cannot follow it anywhere.
+    -->
+    <exclude domain="sharedpref" path="briefcase.xml" />
+    <exclude domain="file" path="briefcase/" />
 </full-backup-content>

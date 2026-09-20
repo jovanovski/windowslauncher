@@ -11,4 +11,21 @@
         android:layout_height="match_parent"
         android:layout_gravity="center" />
 
+    <!-- The savers ported from winos draw here; hidden while a video screensaver plays. -->
+    <WebView
+        android:id="@+id/screensaver_web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- Over both, so a tap anywhere stops the screensaver. Without it the WebView
+         swallows the touch and the saver never goes away. -->
+    <View
+        android:id="@+id/screensaver_tap_catcher"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:contentDescription="@string/screensaver_dismiss_description"
+        android:focusable="true" />
+
 </FrameLayout>

@@ -85,16 +85,17 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.content.res.AppCompatResources
 import rocks.gorjan.gokixp.agent.Agent
+import rocks.gorjan.gokixp.agent.AgentAiMemory
+import rocks.gorjan.gokixp.agent.AgentAiService
+import rocks.gorjan.gokixp.agent.AgentAiSettings
 import rocks.gorjan.gokixp.agent.AgentView
+import rocks.gorjan.gokixp.agent.AiProvider
 import rocks.gorjan.gokixp.agent.TTSService
-import rocks.gorjan.gokixp.apps.dialer.DialerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
 import rocks.gorjan.gokixp.apps.lights.SnowfallManager
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
-import rocks.gorjan.gokixp.apps.regedit.RegistryEditorApp
-import rocks.gorjan.gokixp.apps.regedit.GoogleDriveHelper
 import rocks.gorjan.gokixp.apps.solitare.SolitareGame
 import rocks.gorjan.gokixp.quickglance.QuickGlanceWidget
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -102,8 +103,13 @@ import com.google.android.gms.common.api.ApiException
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import rocks.gorjan.gokixp.theme.*
+import rocks.gorjan.gokixp.winui.dialog.WinLayout
+import rocks.gorjan.gokixp.winui.dialog.WinSkin
+import rocks.gorjan.gokixp.winui.dialog.WinSpinButtons
+import rocks.gorjan.gokixp.winui.dialog.WinTabView
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 import androidx.core.graphics.toColorInt
 import androidx.core.view.isVisible
 import androidx.core.view.isEmpty
@@ -151,6 +157,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var desktopContainer: RelativeLayout
     private lateinit var recycleBin: RecycleBinView
     private var myComputer: rocks.gorjan.gokixp.apps.explorer.MyComputerView? = null
+    private var briefcaseIcon: rocks.gorjan.gokixp.apps.briefcase.BriefcaseView? = null
+
+    /** The folder shared with a winos computer. One for the whole app; see Briefcase. */
+    val briefcase: rocks.gorjan.gokixp.apps.briefcase.Briefcase by lazy {
+        rocks.gorjan.gokixp.apps.briefcase.Briefcase.get(this)
+    }
     private lateinit var agentView: AgentView
     private lateinit var speechBubbleView: SpeechBubbleView
     private lateinit var quickGlanceWidget: QuickGlanceWidget
@@ -227,6 +239,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val VIDEO_PERMISSION_REQUEST_CODE = 201
     private val STORAGE_PERMISSION_REQUEST_CODE = 202
 
+
     // When the wallpaper selection dialog is open, its Browse button sets this so the
     // picked image updates the dialog's live preview instead of jumping to the target dialog.
     private var onWallpaperImagePicked: ((Uri) -> Unit)? = null
@@ -262,8 +275,40 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    // The Screen Saver list's Custom... entry sets this before opening the picker, so the
+    // chosen video can go into the dialog's own preview.
+    private var onScreensaverVideoPicked: ((Uri?) -> Unit)? = null
+
+    // OpenDocument rather than GetContent: the screensaver has to be able to play this video
+    // again after a reboot, and only OpenDocument hands out a grant that survives one.
+    private val screensaverVideoPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            val pickedHandler = onScreensaverVideoPicked
+            onScreensaverVideoPicked = null
+            if (uri != null) {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: SecurityException) {
+                    Log.w("MainActivity", "Could not keep read access to the chosen video", e)
+                }
+            }
+            pickedHandler?.invoke(uri)
+        }
+
+    // My Briefcase's "Add a File..." - OpenDocument rather than GetContent so the bytes can
+    // be read straight through, whatever app is holding them.
+    private val briefcaseFilePickerLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri != null) putUriInBriefcase(uri)
+        }
+
     // Notepad image pickers
     private var currentNotepadApp: NotepadApp? = null
+
+
+
 
     private val notepadGalleryPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         currentNotepadApp?.onImageSelected(uri)
@@ -291,6 +336,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         false
     }
 
+    /** The wall, while it is up. Null the rest of the time. See [enforceDefaultAppRoles]. */
+    private var defaultAppsGate: DefaultAppsGate? = null
+
     /** Whether this app is the phone's messaging app. Read on the same terms as above. */
     private fun holdsSmsRole(): Boolean = try {
         getSystemService(android.app.role.RoleManager::class.java)
@@ -299,9 +347,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.w("MainActivity", "Could not ask about the messaging role", e)
         false
     }
-
-    /** The wall, while it is up. Null the rest of the time. See [enforceDefaultAppRoles]. */
-    private var defaultAppsGate: DefaultAppsGate? = null
 
     /**
      * The system's default-apps screen, come back from.
@@ -329,6 +374,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      *
      * So it is not a warning to be dismissed. The launcher is covered until the roles are
      * somewhere they can be answered.
+     *
+     * A Phone Dialer and a mail program were built for this desktop and the wall came down
+     * for them; both were then taken back out, so it is up again and covers both roles as
+     * it originally did. Anything that puts either program back has to take it down again.
      *
      * Called on every resume, which is what makes it self-clearing: the way out of here is
      * Android's own screens, and coming back from one is a resume.
@@ -436,11 +485,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     contentResolver.openOutputStream(selectedUri)?.use { outputStream ->
                         outputStream.write(jsonString.toByteArray())
                     }
-                    showNotification("Registry Editor", "Settings exported successfully")
+                    showNotification("Backup", "Settings exported successfully")
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error writing export file", e)
-                showNotification("Registry Editor", "Export failed: ${e.message}")
+                showNotification("Backup", "Export failed: ${e.message}")
             } finally {
                 pendingExportJson = null
             }
@@ -523,7 +572,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val autoSyncHandler = Handler(Looper.getMainLooper())
     private var autoSyncRunnable: Runnable? = null
     private val AUTO_SYNC_INTERVAL = 3600000L // 1 hour in milliseconds
-    private var registryEditorAppInstance: RegistryEditorApp? = null
+
+    /**
+     * Retells the last sync in Display Properties' Backup & Restore section.
+     *
+     * The Drive sync runs on its own hourly timer whether or not that window is open, so
+     * the line it writes into is only sometimes on screen; [createAndShowWallpaperDialog]
+     * points this at the current one, as the permission-error updaters below do.
+     */
+    private var updateLastDriveSyncText: (() -> Unit)? = null
 
     // Permission error update functions for wallpaper dialog
     private var updateEmailPermissionError: (() -> Unit)? = null
@@ -565,7 +622,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
          * [purgeRetiredSystemApps], which takes it back out of whatever the user had
          * done with it.
          */
-        private val RETIRED_SYSTEM_APPS = setOf("system.msn")
+        private val RETIRED_SYSTEM_APPS =
+            setOf("system.msn", "system.registry_editor", "system.dialer")
 
         /** Which of [RETIRED_SYSTEM_APPS] have already been swept out of the user's arrangement. */
         private const val KEY_RETIRED_APPS_PURGED = "retired_system_apps_purged"
@@ -604,6 +662,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_ROVER_VISIBLE = "rover_visible"
         private const val KEY_RECYCLE_BIN_VISIBLE = "recycle_bin_visible"
         private const val KEY_MY_COMPUTER_VISIBLE = "my_computer_visible"
+        private const val KEY_BRIEFCASE_VISIBLE = "briefcase_visible"
         private const val KEY_SHORTCUT_ARROW_VISIBLE = "shortcut_arrow_visible"
         private const val KEY_WALLPAPER_XP_PATH = "wallpaper_xp_path"
         private const val KEY_WALLPAPER_XP_URI = "wallpaper_xp_uri"
@@ -647,19 +706,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_TASKBAR_HEIGHT_OFFSET = "taskbar_height_offset"
         private const val KEY_SHOWN_WELCOME_FOR_VERSION = "shown_welcome_for_version"
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
+        // The int this used to be: the spinner's position back when the list was
+        // (None), 3D Pipes, Underwater. Read once and rewritten as KEY_SELECTED_SCREENSAVER_ID.
         private const val KEY_SELECTED_SCREENSAVER = "selected_screensaver"
+        private const val KEY_SELECTED_SCREENSAVER_ID = "selected_screensaver_id"
+        private const val KEY_SCREENSAVER_CUSTOM_VIDEO = "screensaver_custom_video"
         private const val KEY_SCREENSAVER_TIMEOUT = "screensaver_timeout"
         private const val KEY_LAST_GOOGLE_DRIVE_SYNC = "last_google_drive_sync"
+        private const val KEY_AUTO_SYNC_GOOGLE_DRIVE = "auto_sync_google_drive"
         private const val KEY_WINDOW_STATES = "window_states"
         private const val KEY_TAP_TO_HIDE_ICONS = "tap_to_hide_icons"
         private const val KEY_OPEN_URLS_IN_IE = "open_urls_in_ie"
         private const val KEY_SHOW_AQI = "show_aqi"
         private const val AIRCARE_URL = "https://getaircare.com"
 
-        // Screensaver types
-        private const val SCREENSAVER_NONE = 0
-        private const val SCREENSAVER_3D_PIPES = 1
-        private const val SCREENSAVER_UNDERWATER = 2
+        // The screensavers themselves are listed in SaverCatalog.kt
         private const val DEFAULT_SCREENSAVER_TIMEOUT = 30 // Default 30 seconds
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
@@ -1029,8 +1090,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         screensaverManager = ScreensaverManager(this, binding.root)
 
         // Load screensaver selection from SharedPreferences (default to 3D Pipes for backward compatibility)
-        val selectedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
-        screensaverManager.setSelectedScreensaver(selectedScreensaver)
+        screensaverManager.setCustomVideoUri(savedScreensaverVideoUri())
+        screensaverManager.setSelectedScreensaver(savedScreensaverId())
 
         // Load screensaver timeout from SharedPreferences (default to 30 seconds)
         val screensaverTimeout = prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
@@ -1045,8 +1106,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             googleDriveHelper.handleSignInResult(lastAccount)
         }
 
-        // Start auto-sync if enabled (should run regardless of Registry Editor being open)
-        val autoSyncEnabled = prefs.getBoolean("auto_sync_google_drive", false)
+        // Start auto-sync if enabled (should run regardless of any window being open)
+        val autoSyncEnabled = prefs.getBoolean(KEY_AUTO_SYNC_GOOGLE_DRIVE, false)
         if (autoSyncEnabled) {
             startAutoSync()
         }
@@ -1081,6 +1142,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set up keyboard detection for start menu adjustment
         setupKeyboardDetection()
+        setupTypingDetection()
 
         // Set up taskbar interactions
         setupTaskbar()
@@ -1157,7 +1219,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         handlePendingPackageAction()
 
         // Handle a URL shared into the launcher on cold start
-        handleSharedUrlIntent(intent)
+        // A shared file goes into the Briefcase; shared text is a web shortcut.
+        if (!handleSharedFileIntent(intent)) handleSharedUrlIntent(intent)
+
+
+        // Tell the person when something turns up from the computer while they are looking
+        // at something else. The folder itself says so when it is open.
+        briefcase.onFilesArrived = { names -> announceBriefcaseArrivals(names) }
 
         // Initialize app detection
         initializeAppDetection()
@@ -1588,16 +1656,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showInternetExplorerDialog(appInfo = appInfo)
         }
 
-        // Register Registry Editor
-        systemAppActions["system.registry_editor"] = { appInfo ->
-            showRegistryEditorDialog()
-        }
-
-        // Register Dialer
-        systemAppActions["system.dialer"] = { appInfo ->
-            showDialerDialog()
-        }
-
         // Register Notepad
         systemAppActions["system.notepad"] = { appInfo ->
             showNotepadDialog()
@@ -1655,28 +1713,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 packageName = "system.internet_explorer",
                 icon = createSquareDrawable(ieDrawable),
                 minWindowWidthDp = 360
-            ))
-        }
-
-        // Registry Editor - scale icon to match app icon size
-        val regeditDrawable = AppCompatResources.getDrawable(this,themeManager.getRegeditIcon())
-        if (regeditDrawable != null) {
-            systemApps.add(AppInfo(
-                name = "Registry Editor",
-                exeName = "regedit.exe",
-                packageName = "system.registry_editor",
-                icon = createSquareDrawable(regeditDrawable)
-            ))
-        }
-
-        // Dialer - scale icon to match app icon size
-        val dialerDrawable = AppCompatResources.getDrawable(this,R.drawable.dialer_icon)
-        if (dialerDrawable != null) {
-            systemApps.add(AppInfo(
-                name = "Phone Dialer",
-                exeName = "dialer.exe",
-                packageName = "system.dialer",
-                icon = createSquareDrawable(dialerDrawable)
             ))
         }
 
@@ -2049,16 +2085,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         switchToCommands()
                         true
                     } else if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
-                        val query = searchBox.text.toString().trim()
-                        if (query.isNotEmpty()) {
-                            if (query == "marti") {
-                                val url = "https://gorjan.rocks/clients/marti/"
-                                showInternetExplorerDialog(url)
-                            } else {
-                                openSearchWithQuery(query)
-                            }
-                            hideStartMenu()
-                        }
+                        handleSearchBoxEnter()
                         true
                     } else {
                         false
@@ -2177,6 +2204,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return AppCompatResources.getDrawable(this, R.drawable.recycle)
         }
 
+        if (packageName == "my.briefcase") {
+            return AppCompatResources.getDrawable(this, themeManager.getBriefcaseIcon())
+        }
+
         if(packageName.startsWith("folder_")){
             // Return appropriate folder icon based on theme
             return AppCompatResources.getDrawable(this, themeManager.getFolderIconRes(themeManager.getSelectedTheme()))
@@ -2192,7 +2223,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
-                "system.registry_editor" ->AppCompatResources.getDrawable(this, themeManager.getRegeditIcon())
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
                 else -> null
@@ -2336,6 +2366,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun isMyComputerVisible(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_MY_COMPUTER_VISIBLE, true) // Default to visible
+    }
+
+    private fun isBriefcaseVisible(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_BRIEFCASE_VISIBLE, true) // Default to visible
     }
 
     private fun isQuickGlanceVisible(): Boolean {
@@ -2753,17 +2788,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         if (::contextMenu.isInitialized) {
             // Create agent context menu items
-            val menuItems = listOf(
+            val menuItems = mutableListOf(
                 ContextMenuItem("Change Agent", isEnabled = true, action = {
                     Log.d("MainActivity", "Opening agent selection dialog from context menu")
                     showAgentSelectionDialog()
-                }),
-                ContextMenuItem("", isEnabled = false), // Divider
-                ContextMenuItem("Hide Agent", isEnabled = true, action = {
-                    Log.d("MainActivity", "Hiding agent: ${agent.name}")
-                    toggleRover() // This will hide the agent
                 })
             )
+
+            // Only worth offering while there is a chat the agent would otherwise carry on with
+            if (AgentAiSettings.isAiMode(this) && AgentAiMemory.hasConversation(this, agent)) {
+                menuItems.add(ContextMenuItem("Forget Conversation", isEnabled = true, action = {
+                    AgentAiMemory.forget(this)
+                    speechBubbleView.showSpeech(
+                        "Forgotten! What were we talking about?",
+                        agentView.x, agentView.y, agentView.width, agentView.height
+                    )
+                    Log.d("MainActivity", "Conversation with ${agent.name} forgotten")
+                }))
+            }
+
+            menuItems.add(ContextMenuItem("", isEnabled = false)) // Divider
+            menuItems.add(ContextMenuItem("Hide Agent", isEnabled = true, action = {
+                Log.d("MainActivity", "Hiding agent: ${agent.name}")
+                toggleRover() // This will hide the agent
+            }))
             
             // Show the menu at agent position
             contextMenu.showMenu(menuItems, agentX, agentY)
@@ -3053,6 +3101,52 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "My Computer hidden and removed from desktop")
     }
 
+    private fun toggleBriefcase() {
+        val newVisibility = !isBriefcaseVisible()
+
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit { putBoolean(KEY_BRIEFCASE_VISIBLE, newVisibility) }
+
+        if (newVisibility) showBriefcaseIcon() else hideBriefcaseIcon()
+
+        Log.d("MainActivity", "My Briefcase visibility changed to: ${if (newVisibility) "VISIBLE" else "GONE"}")
+    }
+
+    private fun showBriefcaseIcon() {
+        val briefcaseIcon = this.briefcaseIcon ?: return
+        if (briefcaseIcon.parent == null) {
+            val position = findFirstAvailableGridPosition()
+            val layoutParams = RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.WRAP_CONTENT,
+                RelativeLayout.LayoutParams.WRAP_CONTENT
+            )
+            layoutParams.leftMargin = position.first
+            layoutParams.topMargin = position.second
+
+            desktopContainer.addView(briefcaseIcon, layoutParams)
+            briefcaseIcon.visibility = View.VISIBLE
+            briefcaseIcon.x = position.first.toFloat()
+            briefcaseIcon.y = position.second.toFloat()
+
+            val desktopIcon = briefcaseIcon.getDesktopIcon()
+            if (desktopIcon != null) {
+                desktopIcon.x = position.first.toFloat()
+                desktopIcon.y = position.second.toFloat()
+                saveDesktopIconPosition(desktopIcon)
+            }
+        } else {
+            briefcaseIcon.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideBriefcaseIcon() {
+        val briefcaseIcon = this.briefcaseIcon ?: return
+        briefcaseIcon.visibility = View.GONE
+        val parent = briefcaseIcon.parent as? RelativeLayout
+        parent?.removeView(briefcaseIcon)
+        Log.d("MainActivity", "My Briefcase hidden and removed from desktop")
+    }
+
     private fun findFirstAvailableGridPosition(): Pair<Int, Int> {
         val iconSize = (90 * resources.displayMetrics.density).toInt()
         val margin = (12 * resources.displayMetrics.density).toInt()
@@ -3097,6 +3191,37 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return Pair(margin, margin)
     }
     
+    /**
+     * Keeps the screensaver away while text is being typed. Neither of the timer's usual signals
+     * sees a soft keyboard: its taps go to the IME's own window, never through dispatchTouchEvent,
+     * and letters are committed through the InputConnection rather than as key events. The field
+     * taking the text is the one place a keystroke does show up, so every EditText that gains
+     * focus gets [typingWatcher] hung on it.
+     */
+    private fun setupTypingDetection() {
+        watchTypingForScreensaver(currentFocus)
+        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+            watchTypingForScreensaver(newFocus)
+        }
+    }
+
+    private val typingWatcher = object : TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.resetInactivityTimer()
+            }
+        }
+        override fun afterTextChanged(s: Editable?) {}
+    }
+
+    /** Removing first keeps this idempotent - a field can take focus any number of times. */
+    private fun watchTypingForScreensaver(view: View?) {
+        val field = view as? EditText ?: return
+        field.removeTextChangedListener(typingWatcher)
+        field.addTextChangedListener(typingWatcher)
+    }
+
     private fun setupKeyboardDetection() {
         val rootView = findViewById<View>(android.R.id.content)
 
@@ -3111,6 +3236,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Only adjust if keyboard state changed and start menu is visible
             if (wasKeyboardOpen != isKeyboardOpen && isStartMenuVisible) {
                 adjustStartMenuForKeyboard()
+            }
+
+            // Someone at the keyboard is not idle, whatever the inactivity timer thinks
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.setKeyboardVisible(imeVisible)
             }
 
             // Return insets to allow other listeners to handle them
@@ -3297,22 +3427,35 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Handle search key press to open search intent
         searchBox.setOnKeyListener { _, keyCode, event ->
             if ((keyCode == android.view.KeyEvent.KEYCODE_SEARCH || keyCode == android.view.KeyEvent.KEYCODE_ENTER) && event.action == KeyEvent.ACTION_DOWN) {
-                val query = searchBox.text.toString().trim()
-                if (query.isNotEmpty()) {
-                    if(query == "marti"){
-                        val url = "https://gorjan.rocks/clients/marti/"
-                        showInternetExplorerDialog(url)
-                    }
-                    else {
-                        openSearchWithQuery(query)
-                    }
-                    hideStartMenu()
-                }
+                handleSearchBoxEnter()
                 true
             } else {
                 false
             }
         }
+    }
+
+    /**
+     * Enter in the Start menu search box opens the top result, the way the real Start menu
+     * runs its highlighted first hit. Only when nothing matched does the query fall through
+     * to the web search.
+     */
+    private fun handleSearchBoxEnter() {
+        val query = searchBox.text.toString().trim()
+        if (query.isEmpty()) return
+
+        if (appsAdapter?.launchFirstResult() == true) {
+            Log.d("MainActivity", "Enter launched first search result for '$query'")
+            return
+        }
+
+        if (query == "marti") {
+            val url = "https://gorjan.rocks/clients/marti/"
+            showInternetExplorerDialog(url)
+        } else {
+            openSearchWithQuery(query)
+        }
+        hideStartMenu()
     }
 
     private fun openSearchWithQuery(query: String) {
@@ -3806,63 +3949,40 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         speechBubbleView = SpeechBubbleView(this)
         Log.d("MainActivity", "SpeechBubbleView created")
         
-        // Set up speech request listener (when user types and clicks send)
+        // Set up speech request listener (when user types and clicks send). What was typed is
+        // either the agent's next line, or a question for the AI - see the Desktop Agent settings.
         speechBubbleView.setOnSpeechRequestListener { message ->
             Log.d("MainActivity", "Speech requested: '$message'")
-            val currentAgent = agentView.getCurrentAgent()
-            
-            // Show loading bubble manually instead of using clippyView.triggerSpeech()
-            speechBubbleView.showLoadingBubble(agentView.x, agentView.y, agentView.width, agentView.height)
-            
-            // Create TTS service instance and speak directly
-            val ttsService = TTSService(this)
-            ttsService.speakText(
-                text = message,
-                agent = currentAgent,
-                onStart = {
-                    Log.d("MainActivity", "TTS started for custom message: '$message'")
-                },
-                onAudioReady = { audioDurationMs ->
-                    // Update bubble with text and set talking state
-                    speechBubbleView.updateBubbleText(message, audioDurationMs)
-                    agentView.switchToTalkingState(audioDurationMs)
-                    Log.d("MainActivity", "Audio ready (${audioDurationMs}ms) for custom message")
-                },
-                onComplete = {
-                    // Return agent to waiting state
-                    agentView.switchToWaitingState()
-                    Log.d("MainActivity", "TTS completed for custom message")
-                },
-                onError = { exception ->
-                    Log.e("MainActivity", "TTS error for custom message", exception)
-                    // Fallback to text-only display
-                    val wordCount = message.split(" ").size
-                    val speechDurationMs = ((wordCount / 140.0) * 60 * 1000).toLong()
-                    val minDuration = 2000L
-                    val finalDuration = maxOf(speechDurationMs, minDuration)
-                    
-                    speechBubbleView.updateBubbleTextWithCountdown(message)
-                    agentView.switchToTalkingState(finalDuration)
-                }
-            )
+            if (AgentAiSettings.isAiMode(this)) {
+                askDesktopAgentAi(message)
+            } else {
+                speakAsAgent(message)
+            }
         }
         
         // Set up agent tap callback (shows input bubble)
         agentView.onAgentTapped = { agent, agentX, agentY, agentWidth, agentHeight ->
-            val defaultText = agent.getGreetingMessage(this)
-            speechBubbleView.showInputBubble(defaultText, agentX, agentY, agentWidth, agentHeight)
-            Log.d("MainActivity", "Agent '${agent.name}' tapped, showing input bubble with default: '$defaultText'")
+            if (AgentAiSettings.isAiMode(this)) {
+                // Nothing prefilled: whatever is typed is the question
+                val provider = AgentAiSettings.provider(this)
+                speechBubbleView.showAskBubble("Ask me anything...", provider.credit, agentX, agentY, agentWidth, agentHeight)
+                Log.d("MainActivity", "Agent '${agent.name}' tapped, asking ${provider.label}")
+            } else {
+                val defaultText = agent.getGreetingMessage(this)
+                speechBubbleView.showInputBubble(defaultText, agentX, agentY, agentWidth, agentHeight)
+                Log.d("MainActivity", "Agent '${agent.name}' tapped, showing input bubble with default: '$defaultText'")
+            }
         }
         
         // Set up agent speaking with audio callback (updates bubble with text)
         agentView.onAgentSpeakingWithAudio = { agent, message, _, _, _, _, audioDurationMs ->
-            speechBubbleView.updateBubbleText(message, audioDurationMs)
+            speechBubbleView.showResponse(message)
             Log.d("MainActivity", "Agent '${agent.name}' speaking with audio (${audioDurationMs}ms): '$message'")
         }
         
         // Set up agent speaking text-only callback (fallback)
         agentView.onAgentSpeakingTextOnly = { agent, message, _, _, _, _ ->
-            speechBubbleView.updateBubbleTextWithCountdown(message)
+            speechBubbleView.showResponse(message)
             Log.d("MainActivity", "Agent '${agent.name}' speaking text-only: '$message'")
         }
         
@@ -3933,6 +4053,76 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "Rover setup completed")
     }
     
+    /** Has the agent read out exactly what was typed, which is the launcher's original behaviour. */
+    private fun speakAsAgent(message: String) {
+        val currentAgent = agentView.getCurrentAgent()
+
+        // Show loading bubble manually instead of using clippyView.triggerSpeech()
+        speechBubbleView.showLoadingBubble(agentView.x, agentView.y, agentView.width, agentView.height)
+
+        // Create TTS service instance and speak directly
+        val ttsService = TTSService(this)
+        ttsService.speakText(
+            text = message,
+            agent = currentAgent,
+            onStart = {
+                Log.d("MainActivity", "TTS started for custom message: '$message'")
+            },
+            onAudioReady = { audioDurationMs ->
+                // Update bubble with text and set talking state
+                speechBubbleView.showResponse(message)
+                agentView.switchToTalkingState(audioDurationMs)
+                Log.d("MainActivity", "Audio ready (${audioDurationMs}ms) for custom message")
+            },
+            onComplete = {
+                // Return agent to waiting state
+                agentView.switchToWaitingState()
+                Log.d("MainActivity", "TTS completed for custom message")
+            },
+            onError = { exception ->
+                Log.e("MainActivity", "TTS error for custom message", exception)
+                // Fallback to text-only display
+                speechBubbleView.showResponse(message)
+                agentView.switchToTalkingState(readingTimeMs(message))
+            }
+        )
+    }
+
+    /**
+     * Sends the typed question to the configured AI and puts the reply in the bubble, in the
+     * agent's own voice if "Read response out loud" is on.
+     */
+    private fun askDesktopAgentAi(question: String) {
+        val currentAgent = agentView.getCurrentAgent()
+        speechBubbleView.showLoadingBubble(agentView.x, agentView.y, agentView.width, agentView.height)
+
+        AgentAiService.ask(
+            context = this,
+            agent = currentAgent,
+            question = question,
+            onReply = { reply ->
+                Log.d("MainActivity", "AI replied: '$reply'")
+                if (AgentAiSettings.readAloud(this)) {
+                    speakAsAgent(reply)
+                } else {
+                    speechBubbleView.showResponse(reply)
+                    agentView.switchToTalkingState(readingTimeMs(reply))
+                }
+            },
+            onError = { message ->
+                Log.w("MainActivity", "AI request failed: $message")
+                speechBubbleView.showResponse(message)
+                agentView.switchToWaitingState()
+            }
+        )
+    }
+
+    /** How long a line stays on screen when there is no audio to match its length to. */
+    private fun readingTimeMs(message: String): Long {
+        val wordCount = message.split(" ").size
+        return maxOf(((wordCount / 140.0) * 60 * 1000).toLong(), 2000L)
+    }
+
     private fun setupQuickGlanceWidget() {
         Log.d("MainActivity", "Setting up Quick Glance widget...")
         
@@ -4472,6 +4662,42 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             )
 
             // Show the menu
+            contextMenu.showMenu(menuItems, x, y)
+            isContextMenuVisible = true
+        } else {
+            Log.d("MainActivity", "Context menu not initialized")
+        }
+    }
+
+    fun showBriefcaseContextMenu(briefcaseView: rocks.gorjan.gokixp.apps.briefcase.BriefcaseView, x: Float, y: Float) {
+        Helpers.performHapticFeedback(this)
+
+        selectedIcon?.setSelected(false)
+        if (iconInMoveMode != null) {
+            exitIconMoveMode()
+        }
+
+        selectedIcon = briefcaseView
+        briefcaseView.setSelected(true)
+
+        if (::contextMenu.isInitialized) {
+            val menuItems = ContextMenuItems.getBriefcaseMenuItems(
+                onOpen = {
+                    openBriefcase(briefcaseView)
+                },
+                onUpdateAll = {
+                    // The same round the folder's own Update All runs, from the desktop.
+                    setCursorBusy()
+                    briefcase.sync(force = true) { setCursorNormal() }
+                },
+                onMove = {
+                    startIconMoveMode(briefcaseView)
+                },
+                onHideBriefcase = {
+                    toggleBriefcase()
+                }
+            )
+
             contextMenu.showMenu(menuItems, x, y)
             isContextMenuVisible = true
         } else {
@@ -6054,6 +6280,39 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * The chosen screensaver, as one of [SaverCatalog]'s ids.
+     *
+     * Versions up to 2.1.0 stored the spinner's position instead, back when the list was only
+     * (None), 3D Pipes and Underwater. That int is translated once and written back as an id,
+     * so the list is free to grow and be reordered from here on.
+     */
+    private fun savedScreensaverId(): String {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.getString(KEY_SELECTED_SCREENSAVER_ID, null)?.let { return it }
+        val legacy = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, -1)
+        val id = if (legacy >= 0) SaverCatalog.fromLegacyPosition(legacy) else SaverCatalog.DEFAULT
+        prefs.edit { putString(KEY_SELECTED_SCREENSAVER_ID, id) }
+        return id
+    }
+
+    /**
+     * The video behind the Custom... entry, or null if there is none the app can still read -
+     * the user can revoke the grant, or delete the file, long after it was picked.
+     */
+    private fun savedScreensaverVideoUri(): Uri? {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val saved = prefs.getString(KEY_SCREENSAVER_CUSTOM_VIDEO, null) ?: return null
+        val uri = saved.toUri()
+        val held = contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+        if (!held) {
+            Log.w("MainActivity", "Lost read access to the custom screensaver video, forgetting it")
+            prefs.edit { remove(KEY_SCREENSAVER_CUSTOM_VIDEO) }
+            return null
+        }
+        return uri
+    }
+
     private fun createAndShowWallpaperDialog(initScreen: String? = null) {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
@@ -6074,50 +6333,47 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create and set the unified content view using themed inflater
         val themedInflater = LayoutInflater.from(themedContext)
         val contentView = themedInflater.inflate(R.layout.wallpaper_selection_content, null)
+        // The dialog's geometry is Windows 98's whatever the shell; only the paint changes.
+        (contentView as? WinLayout)?.applySkin(WinSkin.of(currentTheme))
         windowsDialog.setContentView(contentView)
 
         // Inflate the theme-appropriate RecyclerView into the container
         val recyclerView = contentView.findViewById<RecyclerView>(R.id.wallpapers_recycler_view)
 
-        // Get references to tab buttons
-        val wallpaperSelectButton = contentView.findViewById<View>(R.id.wallpaper_select_screen_button)
-        val screensaverButton = contentView.findViewById<View>(R.id.wallpaper_screensaver_screen_button)
-        val appearanceButton = contentView.findViewById<View>(R.id.wallpaper_appearance_screen_button)
-        val settingsButton = contentView.findViewById<View>(R.id.wallpaper_settings_screen_button)
-
         // Get references to screen containers
-        val wallpaperSelectScreen = contentView.findViewById<RelativeLayout>(R.id.wallpaper_select_screen)
-        val screensaverScreen = contentView.findViewById<RelativeLayout>(R.id.wallpaper_screensaver_screen)
-        val appearanceScreen = contentView.findViewById<RelativeLayout>(R.id.wallpaper_appearance_screen)
-        val settingsScreen = contentView.findViewById<RelativeLayout>(R.id.wallpaper_settings_screen)
+        val wallpaperSelectScreen = contentView.findViewById<View>(R.id.wallpaper_select_screen)
+        val screensaverScreen = contentView.findViewById<View>(R.id.wallpaper_screensaver_screen)
+        val appearanceScreen = contentView.findViewById<View>(R.id.wallpaper_appearance_screen)
+        val settingsScreen = contentView.findViewById<View>(R.id.wallpaper_settings_screen)
 
-        // Function to switch screens
-        fun showScreen(screenToShow: RelativeLayout) {
-            wallpaperSelectScreen.visibility = View.GONE
-            screensaverScreen.visibility = View.GONE
-            appearanceScreen.visibility = View.GONE
-            settingsScreen.visibility = View.GONE
-            screenToShow.visibility = View.VISIBLE
+        // The tab row. Widths are design pixels off a real Display Properties window; Effects
+        // and Web are there for the look of the thing, greyed out as they never had anything
+        // to offer here.
+        val tabView = contentView.findViewById<WinTabView>(R.id.display_tabs)
+        tabView.setTabs(
+            listOf(
+                WinTabView.Tab("Background", 70),
+                WinTabView.Tab("Screen Saver", 77),
+                WinTabView.Tab("Appearance", 70),
+                WinTabView.Tab("Effects", 45, enabled = false),
+                WinTabView.Tab("Web", 42, enabled = false),
+                WinTabView.Tab("Settings", 53),
+            )
+        )
+        val tabPages = listOf(
+            wallpaperSelectScreen, screensaverScreen, appearanceScreen, null, null, settingsScreen
+        )
+
+        fun showScreen(screenToShow: View) {
+            val index = tabPages.indexOf(screenToShow).coerceAtLeast(0)
+            tabPages.forEachIndexed { i, page ->
+                page?.visibility = if (i == index) View.VISIBLE else View.GONE
+            }
+            tabView.selected = index
         }
 
-        // Set up tab button click listeners
-        wallpaperSelectButton.setOnClickListener {
-            showScreen(wallpaperSelectScreen)
-            playClickSound()
-        }
-
-        screensaverButton.setOnClickListener {
-            showScreen(screensaverScreen)
-            playClickSound()
-        }
-
-        appearanceButton.setOnClickListener {
-            showScreen(appearanceScreen)
-            playClickSound()
-        }
-
-        settingsButton.setOnClickListener {
-            showScreen(settingsScreen)
+        tabView.onTabSelected = { index ->
+            tabPages[index]?.let { showScreen(it) }
             playClickSound()
         }
 
@@ -6128,9 +6384,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val flavourSpinner = contentView.findViewById<android.widget.Spinner>(R.id.flavour_spinner)
         val gestureBarCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_under_taskbar_checkbox)
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
+        val agentSpinner = contentView.findViewById<android.widget.Spinner>(R.id.agent_spinner)
+        val agentAiProviderSpinner = contentView.findViewById<android.widget.Spinner>(R.id.agent_ai_provider_spinner)
+        val agentAiKeyInput = contentView.findViewById<EditText>(R.id.agent_ai_key_input)
+        val agentAiEnabledCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.agent_ai_enabled_checkbox)
+        val agentAiSpeakCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.agent_ai_speak_checkbox)
         val showQuickGlanceCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_quick_glance_checkbox)
         val alignRightCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.quick_glance_align_right_checkbox)
         val showRecycleBinCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_recycle_bin_checkbox)
+        val showBriefcaseCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_briefcase_checkbox)
         val showMyComputerCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_my_computer_checkbox)
         val showShortcutArrowOnIcons = contentView.findViewById<android.widget.CheckBox>(R.id.show_shortcut_arrow)
         val tapToHideIconsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.tap_to_hide_icons_checkbox)
@@ -6142,7 +6404,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val showNotificationDotsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_notification_dots_checkbox)
         val screensaverSelector = contentView.findViewById<android.widget.Spinner>(R.id.screensaver_selector)
         val previewScreensaverVideo = contentView.findViewById<VideoView>(R.id.preview_screensaver_video)
-        val previewScreensaverButton = contentView.findViewById<TextView>(R.id.preview_screensaver_button)
+        val previewScreensaverWeb = contentView.findViewById<android.webkit.WebView>(R.id.preview_screensaver_web)
+        val previewScreensaverButton = contentView.findViewById<View>(R.id.preview_screensaver_button)
         val customWallpaperButton = contentView.findViewById<View>(R.id.custom_wallpaper_button)
 
         // Set up theme spinner with appropriate layouts based on current theme.
@@ -6261,6 +6524,84 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
         }
 
+        // Set up the agent picker - the same list the agent's own context menu offers
+        val agents = Agent.ALL_AGENTS
+        val agentAdapter = android.widget.ArrayAdapter(this, spinnerLayoutId, agents.map { it.name })
+        agentAdapter.setDropDownViewResource(dropdownLayoutId)
+        agentSpinner.adapter = agentAdapter
+        val shownAgent = if (::agentView.isInitialized) agentView.getCurrentAgent() else Agent.DEFAULT
+        agentSpinner.setSelection(agents.indexOf(shownAgent).coerceAtLeast(0))
+        agentSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selected = agents[position]
+                if (::agentView.isInitialized && selected != agentView.getCurrentAgent()) {
+                    agentView.setCurrentAgent(selected)
+                    // Keeps the start menu's agent command naming the right character
+                    refreshCommandsList()
+                    Log.d("MainActivity", "Agent changed to: ${selected.name}")
+                }
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
+        }
+
+        // Set up the AI side: a key per service, and the two modes it unlocks
+        val aiProviders = AiProvider.entries
+        val aiProviderAdapter = android.widget.ArrayAdapter(this, spinnerLayoutId, aiProviders.map { it.label })
+        aiProviderAdapter.setDropDownViewResource(dropdownLayoutId)
+        agentAiProviderSpinner.adapter = aiProviderAdapter
+
+        // Whichever service the key field is currently showing, so a switch doesn't file one
+        // service's key under the other
+        var keyFieldProvider = AgentAiSettings.provider(this)
+
+        fun syncAiControls() {
+            val hasKey = AgentAiSettings.hasApiKey(this)
+            agentAiEnabledCheckbox.isEnabled = hasKey
+            agentAiEnabledCheckbox.alpha = if (hasKey) 1.0f else 0.5f
+            val aiMode = hasKey && agentAiEnabledCheckbox.isChecked
+            agentAiSpeakCheckbox.isEnabled = aiMode
+            agentAiSpeakCheckbox.alpha = if (aiMode) 1.0f else 0.5f
+        }
+
+        agentAiProviderSpinner.setSelection(aiProviders.indexOf(keyFieldProvider).coerceAtLeast(0))
+        agentAiKeyInput.setText(AgentAiSettings.apiKey(this, keyFieldProvider))
+        agentAiEnabledCheckbox.isChecked = AgentAiSettings.isAiModeChecked(this)
+        agentAiSpeakCheckbox.isChecked = AgentAiSettings.readAloud(this)
+        syncAiControls()
+
+        agentAiProviderSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selected = aiProviders[position]
+                AgentAiSettings.setProvider(this@MainActivity, selected)
+                keyFieldProvider = selected
+                agentAiKeyInput.setText(AgentAiSettings.apiKey(this@MainActivity, selected))
+                syncAiControls()
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
+        }
+
+        agentAiKeyInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: android.text.Editable?) {
+                AgentAiSettings.setApiKey(this@MainActivity, keyFieldProvider, s?.toString() ?: "")
+                syncAiControls()
+            }
+        })
+
+        agentAiEnabledCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            AgentAiSettings.setAiModeChecked(this, isChecked)
+            syncAiControls()
+        }
+
+        agentAiSpeakCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            AgentAiSettings.setReadAloud(this, isChecked)
+        }
+
         // Set up Show Quick Glance checkbox
         showQuickGlanceCheckbox.isChecked = isQuickGlanceVisible()
         showQuickGlanceCheckbox.setOnCheckedChangeListener { _, isChecked ->
@@ -6275,6 +6616,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         alignRightCheckbox.setOnCheckedChangeListener { _, isChecked ->
             if (::quickGlanceWidget.isInitialized && isChecked != quickGlanceWidget.isAlignRightEnabled()) {
                 quickGlanceWidget.setAlignRight(isChecked)
+            }
+        }
+
+        // Set up Show My Briefcase checkbox
+        showBriefcaseCheckbox.isChecked = isBriefcaseVisible()
+        showBriefcaseCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked != isBriefcaseVisible()) {
+                toggleBriefcase()
             }
         }
 
@@ -6440,6 +6789,51 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             updateNotificationDots()
         }
 
+        // Set up Backup & Restore - what the Registry Editor's bottom-left corner used to
+        // be. Export and Import act at once rather than waiting on OK, like everything
+        // else on this page; the checkbox only arms the hourly sync, which is driven from
+        // onCreate and keeps running with this window shut.
+        val exportSettingsButton = contentView.findViewById<TextView>(R.id.export_settings_button)
+        val importSettingsButton = contentView.findViewById<TextView>(R.id.import_settings_button)
+        val autoSyncDriveCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.auto_sync_drive_checkbox)
+        val lastDriveSyncText = contentView.findViewById<TextView>(R.id.last_drive_sync_text)
+
+        val updateLastDriveSyncTextFunc = { lastDriveSyncText.text = describeLastDriveSync() }
+        // Stored for the sync timer, which finishes long after this runs
+        updateLastDriveSyncText = updateLastDriveSyncTextFunc
+        updateLastDriveSyncTextFunc()
+
+        exportSettingsButton.setOnClickListener {
+            playClickSound()
+            askWhereToBackUp(
+                title = "Export Settings",
+                message = "Where would you like to export your settings?",
+                toLocalFile = { exportToLocalFile(prefs) },
+                toGoogleDrive = { exportToGoogleDrive(prefs) }
+            )
+        }
+
+        importSettingsButton.setOnClickListener {
+            playClickSound()
+            askWhereToBackUp(
+                title = "Import Settings",
+                message = "Where would you like to import your settings from?",
+                toLocalFile = { importFromLocalFile() },
+                toGoogleDrive = { importFromGoogleDrive() }
+            )
+        }
+
+        autoSyncDriveCheckbox.isChecked = prefs.getBoolean(KEY_AUTO_SYNC_GOOGLE_DRIVE, false)
+        autoSyncDriveCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            playClickSound()
+            prefs.edit { putBoolean(KEY_AUTO_SYNC_GOOGLE_DRIVE, isChecked) }
+            // Turning it on syncs straight away, so say so until that comes back. Only
+            // when there is an account to sync to, though: without one this opens the
+            // sign-in flow instead, which the user may well walk away from.
+            if (isChecked && googleDriveHelper.isSignedIn()) lastDriveSyncText.text = "Syncing..."
+            handleAutoSyncChanged(isChecked)
+        }
+
         // Set up Show Christmas Lights checkbox
         val showChristmasLightsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_christmas_lights_checkbox)
         val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
@@ -6563,32 +6957,34 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         })
 
         // Set up Screensaver Selector
-        val screensaverOptions = resources.getStringArray(R.array.screensaver_options)
-        val screensaverAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_screensaver, screensaverOptions)
+        val screensaverAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_screensaver, SaverCatalog.labels)
         screensaverAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_screensaver)
         screensaverSelector.adapter = screensaverAdapter
 
         // Load saved screensaver selection (default to 3D Pipes for backward compatibility)
-        val selectedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
-        screensaverSelector.setSelection(selectedScreensaver)
+        val selectedScreensaver = savedScreensaverId()
+        screensaverSelector.setSelection(SaverCatalog.positionOf(selectedScreensaver))
 
         // Track pending screensaver selection (don't save immediately)
-        var pendingScreensaverSelection: Int = selectedScreensaver
+        var pendingScreensaverSelection: String = selectedScreensaver
+        var pendingScreensaverVideo: Uri? = savedScreensaverVideoUri()
 
-        // Helper function to get video resource for screensaver type
-        fun getScreensaverVideoResource(screensaverType: Int): Int? {
-            return when (screensaverType) {
-                SCREENSAVER_3D_PIPES -> R.raw.screensaver_pipes
-                SCREENSAVER_UNDERWATER -> R.raw.screensaver_underwater
+        // Show whichever screensaver is picked in the dialog's little monitor: a video in the
+        // VideoView, one of the savers ported from winos in the WebView, and nothing for (None).
+        fun showPreview(saverId: String) {
+            val saver = SaverCatalog.byId(saverId)
+            val videoUri = when (saver.kind) {
+                SaverCatalog.Kind.VIDEO -> "android.resource://${packageName}/${R.raw.screensaver_underwater}".toUri()
+                SaverCatalog.Kind.CUSTOM_VIDEO -> pendingScreensaverVideo
                 else -> null
             }
-        }
 
-        // Helper function to play preview video
-        fun playPreviewVideo(screensaverType: Int) {
-            val videoResource = getScreensaverVideoResource(screensaverType)
-            if (videoResource != null) {
-                val videoUri = "android.resource://${packageName}/${videoResource}".toUri()
+            previewScreensaverVideo.stopPlayback()
+            previewScreensaverVideo.visibility = View.INVISIBLE
+            ScreensaverManager.stopWebSaver(previewScreensaverWeb)
+            previewScreensaverWeb.visibility = View.INVISIBLE
+
+            if (videoUri != null) {
                 previewScreensaverVideo.setVideoURI(videoUri)
                 previewScreensaverVideo.visibility = View.VISIBLE
                 previewScreensaverVideo.setOnPreparedListener { mediaPlayer ->
@@ -6597,21 +6993,59 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
                 // Start the VideoView to begin preparing and playing the video
                 previewScreensaverVideo.start()
-            } else {
-                // No video for "None" option
-                previewScreensaverVideo.stopPlayback()
-                previewScreensaverVideo.visibility = View.INVISIBLE
+            } else if (saver.kind == SaverCatalog.Kind.WEB) {
+                previewScreensaverWeb.visibility = View.VISIBLE
+                ScreensaverManager.startWebSaver(previewScreensaverWeb, saver.id, preview = true)
             }
         }
 
+        // Every way out of this dialog goes through here: the preview WebView has to be
+        // destroyed rather than dropped, and a video picker still out there must not come
+        // back to views that have gone.
+        fun releaseScreensaverPreview() {
+            onScreensaverVideoPicked = null
+            previewScreensaverVideo.stopPlayback()
+            ScreensaverManager.releaseWebSaver(previewScreensaverWeb)
+        }
+
         // Play initial preview
-        playPreviewVideo(selectedScreensaver)
+        showPreview(selectedScreensaver)
+
+        // Spinner.setSelection() only takes effect on the next layout pass, so the listener
+        // below can still hear the saved selection once before the user has touched anything.
+        // Only a move away from it is a choice, which is what may open the video picker.
+        var shownScreensaverPosition = SaverCatalog.positionOf(selectedScreensaver)
 
         // Handle screensaver selection changes
         screensaverSelector.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                pendingScreensaverSelection = position
-                playPreviewVideo(position)
+                val previousPosition = shownScreensaverPosition
+                shownScreensaverPosition = position
+                val saver = SaverCatalog.at(position)
+                pendingScreensaverSelection = saver.id
+
+                // Custom... asks for a video the first time it is picked, and every time it is
+                // picked again afterwards. Backing out of the picker leaves the old choice alone.
+                if (saver.kind == SaverCatalog.Kind.CUSTOM_VIDEO && position != previousPosition) {
+                    onScreensaverVideoPicked = { pickedUri ->
+                        if (pickedUri != null) {
+                            pendingScreensaverVideo = pickedUri
+                            showPreview(saver.id)
+                        } else if (pendingScreensaverVideo == null) {
+                            // Backed out with nothing to play - go back to what was picked before
+                            shownScreensaverPosition = previousPosition
+                            pendingScreensaverSelection = SaverCatalog.at(previousPosition).id
+                            screensaverSelector.setSelection(previousPosition)
+                        } else {
+                            // Backed out but an earlier video is still there, so keep playing it
+                            showPreview(saver.id)
+                        }
+                    }
+                    screensaverVideoPickerLauncher.launch(arrayOf("video/*"))
+                    return
+                }
+
+                showPreview(saver.id)
             }
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {
@@ -6621,8 +7055,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set up Preview Screensaver button
         previewScreensaverButton.setOnClickListener {
-            if (::screensaverManager.isInitialized && pendingScreensaverSelection != SCREENSAVER_NONE) {
+            if (::screensaverManager.isInitialized && pendingScreensaverSelection != SaverCatalog.NONE) {
                 // Temporarily set the selected screensaver to the pending selection for preview
+                screensaverManager.setCustomVideoUri(pendingScreensaverVideo)
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
                 screensaverManager.showScreensaver()
             }
@@ -6651,6 +7086,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
             }
         })
+
+        // The spin box beside the field, held to the same 10..60 a typed value is.
+        val screensaverTimeoutSpin = contentView.findViewById<WinSpinButtons>(R.id.screensaver_timeout_spin)
+        fun nudgeScreensaverTimeout(by: Int) {
+            val current = screensaverTimeoutInput.text.toString().toIntOrNull() ?: pendingScreensaverTimeout
+            screensaverTimeoutInput.setText((current + by).coerceIn(10, 60).toString())
+            screensaverTimeoutInput.setSelection(screensaverTimeoutInput.text?.length ?: 0)
+        }
+        screensaverTimeoutSpin.onUp = { nudgeScreensaverTimeout(1) }
+        screensaverTimeoutSpin.onDown = { nudgeScreensaverTimeout(-1) }
 
         // Note: the Browse (custom wallpaper) button handler is set up later, after the
         // preview ImageView exists, so a picked image can update the live preview.
@@ -6686,6 +7131,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // For now, do nothing (could implement maximize later)
         }
 
+        // Closing from the title bar or the back button skips the OK and Cancel handlers
+        windowsDialog.setOnCloseListener {
+            releaseScreensaverPreview()
+        }
+
         // Set up list layout for wallpapers
         recyclerView.layoutManager = LinearLayoutManager(this)
 
@@ -6698,8 +7148,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Track a custom image picked via Browse (mutually exclusive with selectedWallpaper)
         var pickedCustomUri: Uri? = null
 
-        // Clear any stale picker callback from a previous dialog instance
+        // Clear any stale picker callbacks from a previous dialog instance
         onWallpaperImagePicked = null
+        onScreensaverVideoPicked = null
 
         // Get wallpaper preview ImageView
         val wallpaperPreview = contentView.findViewById<ImageView>(R.id.wallpaper_preview)
@@ -6878,8 +7329,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             // Apply pending screensaver selection
-            prefs.edit { putInt(KEY_SELECTED_SCREENSAVER, pendingScreensaverSelection) }
+            prefs.edit {
+                putString(KEY_SELECTED_SCREENSAVER_ID, pendingScreensaverSelection)
+                putString(KEY_SCREENSAVER_CUSTOM_VIDEO, pendingScreensaverVideo?.toString())
+            }
             if (::screensaverManager.isInitialized) {
+                screensaverManager.setCustomVideoUri(pendingScreensaverVideo)
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
             }
 
@@ -6898,6 +7353,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 showWallpaperTargetDialog(selectedWallpaper)
             }
 
+            releaseScreensaverPreview()
             floatingWindowManager.removeWindow(windowsDialog)
         }
 
@@ -6906,9 +7362,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             playClickSound()
             // Restore the saved screensaver selection if it was changed during preview
             if (::screensaverManager.isInitialized) {
-                val savedScreensaver = prefs.safeGetInt(KEY_SELECTED_SCREENSAVER, SCREENSAVER_3D_PIPES)
-                screensaverManager.setSelectedScreensaver(savedScreensaver)
+                screensaverManager.setCustomVideoUri(savedScreensaverVideoUri())
+                screensaverManager.setSelectedScreensaver(savedScreensaverId())
             }
+            releaseScreensaverPreview()
             floatingWindowManager.removeWindow(windowsDialog)
         }
 
@@ -6953,8 +7410,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             // Apply pending screensaver selection
-            prefs.edit { putInt(KEY_SELECTED_SCREENSAVER, pendingScreensaverSelection) }
+            prefs.edit {
+                putString(KEY_SELECTED_SCREENSAVER_ID, pendingScreensaverSelection)
+                putString(KEY_SCREENSAVER_CUSTOM_VIDEO, pendingScreensaverVideo?.toString())
+            }
             if (::screensaverManager.isInitialized) {
+                screensaverManager.setCustomVideoUri(pendingScreensaverVideo)
                 screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
             }
 
@@ -7163,170 +7624,44 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }, 100) // Small delay to ensure window is fully rendered
     }
 
-    private fun showAddKeyDialog(prefs: android.content.SharedPreferences, refreshCallback: () -> Unit) {
-
-
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
-        }
-
-        val keyInput = EditText(this).apply {
-            hint = "Key name"
-            setTextColor(Color.BLACK)
-            setHintTextColor(Color.GRAY)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-
-        val valueInput = EditText(this).apply {
-            hint = "Value"
-            setTextColor(Color.BLACK)
-            setHintTextColor(Color.GRAY)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-
-        val typeSpinner = android.widget.Spinner(this)
-        val typeOptions = arrayOf("String", "Boolean", "Integer", "Float", "Long")
-        val spinnerAdapter = object : android.widget.ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, typeOptions) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = super.getView(position, convertView, parent)
-                (view as? TextView)?.setTextColor(Color.BLACK)
-                return view
-            }
-            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = super.getDropDownView(position, convertView, parent)
-                (view as? TextView)?.setTextColor(Color.BLACK)
-                return view
-            }
-        }
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        typeSpinner.adapter = spinnerAdapter
-
-        container.addView(TextView(this).apply {
-            text = "Key:"
-            setTextColor(Color.BLACK)
-            setPadding(0, 8, 0, 4)
-        })
-        container.addView(keyInput)
-        container.addView(TextView(this).apply {
-            text = "Value:"
-            setTextColor(Color.BLACK)
-            setPadding(0, 16, 0, 4)
-        })
-        container.addView(valueInput)
-        container.addView(TextView(this).apply {
-            text = "Type:"
-            setTextColor(Color.BLACK)
-            setPadding(0, 16, 0, 4)
-        })
-        container.addView(typeSpinner)
-
+    /**
+     * Asks whether a backup goes to (or comes from) a file or Google Drive.
+     *
+     * Three buttons rather than a list because that is what this asked when it lived in
+     * the Registry Editor, and a two-way choice is what Windows put in a message box.
+     */
+    private fun askWhereToBackUp(
+        title: String,
+        message: String,
+        toLocalFile: () -> Unit,
+        toGoogleDrive: () -> Unit
+    ) {
         android.app.AlertDialog.Builder(this, R.style.LightAlertDialog)
-            .setTitle("Add Preference Key")
-            .setView(container)
-            .setPositiveButton("Add") { _, _ ->
-                val key = keyInput.text.toString().trim()
-                val value = valueInput.text.toString().trim()
-                val type = typeSpinner.selectedItem.toString()
-
-                if (key.isEmpty()) {
-                    showNotification("Error", "Key cannot be empty")
-                    return@setPositiveButton
-                }
-
-                try {
-                    prefs.edit().apply {
-                        when (type) {
-                            "String" -> putString(key, value)
-                            "Boolean" -> putBoolean(key, value.toBoolean())
-                            "Integer" -> putInt(key, value.toInt())
-                            "Float" -> putFloat(key, value.toFloat())
-                            "Long" -> putLong(key, value.toLong())
-                        }
-                        apply()
-                    }
-                    showNotification("Registry Editor", "Key added successfully")
-                    refreshCallback()
-                } catch (e: Exception) {
-                    showNotification("Registry Editor", "Error adding key: ${e.message}")
-                }
-            }
-            .setNegativeButton("Cancel", null)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Local File") { _, _ -> toLocalFile() }
+            .setNegativeButton("Google Drive") { _, _ -> toGoogleDrive() }
+            .setNeutralButton("Cancel", null)
             .show()
     }
 
-    private fun showRegistryEditorDialog() {
-        // Set cursor to busy while loading
-        setCursorBusy()
+    /** How long ago the Drive sync last got through, in the words under the checkbox. */
+    private fun describeLastDriveSync(): String {
+        val lastSync = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getSafeLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L)
+        if (lastSync == 0L) return "Never synced"
 
-        // Defer the actual loading to allow cursor to render
-        Handler(Looper.getMainLooper()).post {
-            createAndShowRegistryEditor()
+        val elapsed = System.currentTimeMillis() - lastSync
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(elapsed)
+        val hours = TimeUnit.MILLISECONDS.toHours(elapsed)
+        val days = TimeUnit.MILLISECONDS.toDays(elapsed)
+        return when {
+            minutes < 1 -> "Synced just now"
+            minutes < 60 -> "Synced $minutes min ago"
+            hours < 24 -> "Synced $hours hr ago"
+            days == 1L -> "Synced yesterday"
+            else -> "Synced $days days ago"
         }
-    }
-
-    private fun createAndShowRegistryEditor() {
-        // Create Windows-style dialog with correct theme from start
-        val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.windowIdentifier = "system.registry_editor"  // Set identifier for tracking
-        windowsDialog.setTitle("Registry Editor")
-        windowsDialog.setTaskbarIcon(themeManager.getRegeditIcon())
-
-        // Inflate the Registry Editor content
-        val contentView = layoutInflater.inflate(R.layout.program_registry_editor, null)
-        windowsDialog.setContentView(contentView)
-
-        // Set window size to match the layout: 358dp width + borders/padding, 610dp height + title bar + borders/padding
-        windowsDialog.setWindowSizePercentage(90f, 60f)
-        windowsDialog.setMaximizable(true)
-
-        // Load SharedPreferences
-        val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-
-        // Create Registry Editor app instance
-        val regeditApp = RegistryEditorApp(
-            context = this,
-            onSoundPlay = { playClickSound() },
-            onShowNotification = { title, message -> showNotification(title, message) },
-            onShowAddKeyDialog = { prefs, refreshCallback -> showAddKeyDialog(prefs, refreshCallback) },
-            onExportToLocalFile = { prefsToExport -> exportToLocalFile(prefsToExport) },
-            onExportToGoogleDrive = { prefsToExport -> exportToGoogleDrive(prefsToExport) },
-            onImportFromLocalFile = { importFromLocalFile() },
-            onImportFromGoogleDrive = { importFromGoogleDrive() },
-            onAutoSyncChanged = { enabled -> handleAutoSyncChanged(enabled) },
-            getLastSyncTime = { preferences.getSafeLong(KEY_LAST_GOOGLE_DRIVE_SYNC, 0L) }
-        )
-
-        // Store instance for auto-sync updates
-        registryEditorAppInstance = regeditApp
-
-        regeditApp.setupApp(contentView, preferences)
-
-        // Auto-sync is already started in onCreate if enabled - no need to start it again here
-
-        // Set up window control handlers
-        windowsDialog.setOnMinimizeListener {
-            // Window is already minimized by minimize() method
-        }
-
-        windowsDialog.setOnMaximizeListener {
-            // Do nothing for now
-        }
-
-        windowsDialog.setOnCloseListener {
-            regeditApp.cleanup()
-            // Don't stop auto-sync when closing Registry Editor - it should continue running
-            registryEditorAppInstance = null
-        }
-
-        // Set context menu reference and show as floating window
-        windowsDialog.setContextMenuView(contextMenu)
-        floatingWindowManager.showWindow(windowsDialog)
-
-        // Set cursor back to normal after window is shown and loaded
-        Handler(Looper.getMainLooper()).postDelayed({
-            setCursorNormal()
-        }, 100) // Small delay to ensure window is fully rendered
     }
 
     private fun exportToLocalFile(prefs: android.content.SharedPreferences) {
@@ -7383,13 +7718,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         val currentTime = System.currentTimeMillis()
                         prefs.edit { putLong(KEY_LAST_GOOGLE_DRIVE_SYNC, currentTime) }
 
-                        // Update UI in Registry Editor if it's open
-                        registryEditorAppInstance?.onSyncCompleted()
+                        // Retell the sync in Display Properties, if it is open
+                        updateLastDriveSyncText?.invoke()
                     }.onFailure { error ->
                         Log.e("MainActivity", "Google Drive export failed", error)
+                        // Take "Syncing..." back down to whenever it last did work
+                        updateLastDriveSyncText?.invoke()
                     }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "Exception in coroutine", e)
+                    updateLastDriveSyncText?.invoke()
                     showNotification("Export Failed", "Error: ${e.message}")
                 }
             }
@@ -7428,7 +7766,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         Log.d("MainActivity", "Import successful, parsing JSON (${jsonString.length} bytes)")
                         PrefsBackup.restore(getSharedPreferences(PREFS_NAME, MODE_PRIVATE), jsonString)
                         Log.d("MainActivity", "Preferences imported successfully")
-                        showNotification("Registry Editor", "Settings imported successfully from Google Drive")
+                        showNotification("Restore", "Settings imported successfully from Google Drive")
                         recreate()
                     } catch (e: Exception) {
                         Log.e("MainActivity", "Error parsing imported data", e)
@@ -7495,81 +7833,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             autoSyncHandler.removeCallbacks(it)
             autoSyncRunnable = null
         }
-    }
-
-    private fun showDialerDialog() {
-        // Set cursor to busy while loading
-        setCursorBusy()
-
-        // Defer the actual loading to allow cursor to render
-        Handler(Looper.getMainLooper()).post {
-            createAndShowDialerDialog()
-        }
-    }
-
-    private fun createAndShowDialerDialog() {
-        // Request permissions when opening dialer
-        if (checkSelfPermission(android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
-            checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(
-                    android.Manifest.permission.CALL_PHONE,
-                    android.Manifest.permission.READ_CONTACTS
-                ),
-                100
-            )
-        }
-
-        // Create Windows-style dialog with correct theme from start
-        val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.windowIdentifier = "system.dialer"  // Set identifier for tracking
-        windowsDialog.setTitle("Phone Dialer")
-        windowsDialog.setTaskbarIcon(R.drawable.dialer_icon)
-
-        // Inflate the dialer content
-        val contentView = layoutInflater.inflate(R.layout.program_dialer, null)
-
-        // Create Dialer app instance
-        val dialerApp = DialerApp(
-            context = this,
-            onSoundPlay = { soundResource ->
-                playSound(soundResource)
-            },
-            onShowContextMenu = { menuItems, x, y ->
-                if (::contextMenu.isInitialized) {
-                    contextMenu.showMenu(menuItems, x, y)
-                }
-            }
-        )
-
-        // Setup the app
-        dialerApp.setupApp(contentView)
-
-        windowsDialog.setContentView(contentView)
-        windowsDialog.setWindowSize(364, 382)
-
-        // Set up window control handlers
-        windowsDialog.setOnMinimizeListener {
-            // Window is already minimized by minimize() method
-        }
-
-        windowsDialog.setOnMaximizeListener {
-            // Do nothing for now
-        }
-
-        // Cleanup on close
-        windowsDialog.setOnCloseListener {
-            dialerApp.cleanup()
-        }
-
-        // Set context menu reference and show as floating window
-        windowsDialog.setContextMenuView(contextMenu)
-        floatingWindowManager.showWindow(windowsDialog)
-
-        // Set cursor back to normal after window is shown and loaded
-        Handler(Looper.getMainLooper()).postDelayed({
-            setCursorNormal()
-        }, 100) // Small delay to ensure window is fully rendered
     }
 
     private fun showNotepadDialog() {
@@ -7865,7 +8128,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * Gets the button background drawable resource for the current theme
      */
-    private fun getThemedButtonBackground(): Int {
+    fun getThemedButtonBackground(): Int {
         return when (themeManager.getSelectedTheme()) {
             AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
             AppTheme.WindowsXP -> R.drawable.button_xp_background
@@ -9977,6 +10240,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val iconType = iconTypeOverride ?: when (appInfo.packageName) {
             "recycle.bin" -> IconType.RECYCLE_BIN
             "my.computer" -> IconType.MY_COMPUTER
+            "my.briefcase" -> IconType.BRIEFCASE
             else -> IconType.APP
         }
 
@@ -10013,6 +10277,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             "my.computer" -> {
                 rocks.gorjan.gokixp.apps.explorer.MyComputerView(this).apply {
+                    setDesktopIcon(desktopIcon)
+                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    setThemeFont(isClassic)
+                    setThemeIcon(isClassic)
+                }
+            }
+            "my.briefcase" -> {
+                rocks.gorjan.gokixp.apps.briefcase.BriefcaseView(this).apply {
                     setDesktopIcon(desktopIcon)
                     val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
                     setThemeFont(isClassic)
@@ -10249,6 +10521,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         when (packageName) {
                             "recycle.bin" -> IconType.RECYCLE_BIN
                             "my.computer" -> IconType.MY_COMPUTER
+                            "my.briefcase" -> IconType.BRIEFCASE
                             else -> IconType.APP
                         }
                     }
@@ -10256,6 +10529,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     when (packageName) {
                         "recycle.bin" -> IconType.RECYCLE_BIN
                         "my.computer" -> IconType.MY_COMPUTER
+                        "my.briefcase" -> IconType.BRIEFCASE
                         else -> IconType.APP
                     }
                 }
@@ -10276,6 +10550,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                             IconType.MY_COMPUTER -> {
                                 // Special case for My Computer - use theme-appropriate icon
                                 AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())!!
+                            }
+                            IconType.BRIEFCASE -> {
+                                getAppIcon(packageName)
+                                    ?: AppCompatResources.getDrawable(this, themeManager.getBriefcaseIcon())!!
                             }
                             IconType.FOLDER -> {
                                 // Use custom icon if available, otherwise use theme-appropriate folder icon
@@ -10334,6 +10612,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
                             }
                         }
+                        IconType.BRIEFCASE -> {
+                            rocks.gorjan.gokixp.apps.briefcase.BriefcaseView(this).apply {
+                                setDesktopIcon(desktopIcon)
+                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                if (!customIconMappings.containsKey(packageName)) {
+                                    setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                }
+                            }
+                        }
                         IconType.FOLDER -> {
                             FolderView(this).apply {
                                 setDesktopIcon(desktopIcon)
@@ -10390,6 +10677,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Ensure My Computer exists as desktop icon
         ensureMyComputerExists()
 
+        // And My Briefcase, which is a folder rather than a program and so has no other way
+        // onto the desktop.
+        ensureBriefcaseExists()
+
         // Whatever is wrong with what was saved is wrong the moment it is read, and every
         // screen is built from this list afterwards - so the one place it is loaded is the
         // place to put it right: nothing filed in a folder that is not there, and nothing
@@ -10423,6 +10714,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val resource = when (type) {
             IconType.RECYCLE_BIN -> R.drawable.recycle
             IconType.MY_COMPUTER -> themeManager.getMyComputerIcon()
+            IconType.BRIEFCASE -> themeManager.getBriefcaseIcon()
             IconType.FOLDER -> themeManager.getFolderIconRes(themeManager.getSelectedTheme())
             IconType.URL_SHORTCUT -> R.drawable.url_shortcut
             IconType.APP -> android.R.drawable.sym_def_app_icon
@@ -10606,6 +10898,223 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setContextMenuView(contextMenu)
         floatingWindowManager.showWindow(windowsDialog)
     }
+
+    // ===== My Briefcase =====
+
+    private fun ensureBriefcaseExists() {
+        val exists = desktopIcons.any { it.packageName == "my.briefcase" }
+
+        if (!exists) {
+            val drawable = AppCompatResources.getDrawable(this, themeManager.getBriefcaseIcon())!!
+            val appInfo = AppInfo(
+                name = "My Briefcase",
+                packageName = "my.briefcase",
+                icon = drawable
+            )
+
+            // Under My Computer, where the desktop puts it
+            addDesktopIcon(appInfo, 50f, 350f)
+            saveDesktopIcons()
+        }
+
+        Handler(Looper.getMainLooper()).post { updateBriefcaseReference() }
+    }
+
+    private fun updateBriefcaseReference() {
+        briefcaseIcon = desktopIconViews.find {
+            it is rocks.gorjan.gokixp.apps.briefcase.BriefcaseView
+        } as? rocks.gorjan.gokixp.apps.briefcase.BriefcaseView
+
+        if (!isBriefcaseVisible()) {
+            hideBriefcaseIcon()
+        }
+    }
+
+    fun openBriefcase(briefcaseView: rocks.gorjan.gokixp.apps.briefcase.BriefcaseView) {
+        val desktopIcon = briefcaseView.getDesktopIcon() ?: return
+        openBriefcaseWindow(desktopIcon.id)
+    }
+
+    /**
+     * Opens the My Briefcase window.
+     *
+     * Unlike My Computer this asks for no storage permission: when it cannot have a folder on
+     * the phone's own storage the Briefcase keeps its copies in the app's own, and works just
+     * the same.
+     */
+    private fun openBriefcaseWindow(iconId: String) {
+        val windowId = "briefcase:$iconId"
+        if (floatingWindowManager.findAndFocusWindow(windowId)) return
+
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = windowId
+        windowsDialog.setTitle(rocks.gorjan.gokixp.apps.briefcase.BriefcaseApp.TITLE)
+        windowsDialog.setTaskbarIcon(themeManager.getBriefcaseIcon())
+
+        val explorerLayoutRes = themeManager.getWindowsExplorerLayoutRes(themeManager.getSelectedTheme())
+        val contentView = layoutInflater.inflate(explorerLayoutRes, null)
+
+        val briefcaseApp = rocks.gorjan.gokixp.apps.briefcase.BriefcaseApp(
+            context = this,
+            theme = themeManager.getSelectedTheme(),
+            themeManager = themeManager,
+            onSoundPlay = { playClickSound() },
+            onUpdateWindowTitle = { title -> windowsDialog.setTitle(title) },
+            onSetCursorBusy = { setCursorBusy() },
+            onSetCursorNormal = { setCursorNormal() },
+            onShowDialog = { dialogType, message -> showDialogBox(dialogType, message) },
+            onShowContextMenu = { items, x, y ->
+                if (::contextMenu.isInitialized) {
+                    contextMenu.showMenu(items, x, y)
+                }
+            },
+            onShowRenameDialog = { file, onRename -> showFileRenameDialog(file, onRename) },
+            onShowConfirmDialog = { title, message, onConfirm -> showConfirmDialog(title, message, onConfirm) },
+            onConnect = { rocks.gorjan.gokixp.apps.briefcase.BriefcaseDialogs.showConnect(this) },
+            onAddFile = { pickFileForBriefcase() },
+            isWindowVisible = { !windowsDialog.isMinimized() }
+        )
+
+        briefcaseApp.setupApp(contentView)
+        if (::contextMenu.isInitialized) {
+            briefcaseApp.setupContextMenuCallback(contextMenu)
+        }
+
+        windowsDialog.briefcaseApp = briefcaseApp
+        // Closing the folder is what stops the polling: section 2.3 says not to ask anything
+        // of a computer nobody is looking at.
+        windowsDialog.setOnCloseListener { briefcaseApp.onWindowClosed() }
+
+        windowsDialog.setContentView(contentView)
+        windowsDialog.setWindowSizePercentage(90f, 30f)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+
+        // The Briefcase explains itself once, the way the desktop's own does, and then never
+        // again - whether or not a computer was connected in the end.
+        if (!briefcase.store.hasSeenWelcome) {
+            briefcase.store.hasSeenWelcome = true
+            Handler(Looper.getMainLooper()).postDelayed({
+                rocks.gorjan.gokixp.apps.briefcase.BriefcaseDialogs.showWelcome(this) {
+                    rocks.gorjan.gokixp.apps.briefcase.BriefcaseDialogs.showConnect(this)
+                }
+            }, 400)
+        }
+    }
+
+    private fun pickFileForBriefcase() {
+        try {
+            briefcaseFilePickerLauncher.launch(arrayOf("*/*"))
+        } catch (e: Exception) {
+            Log.e("MainActivity", "No file picker to open", e)
+            showDialogBox(
+                rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                "This phone has nothing to pick files with."
+            )
+        }
+    }
+
+    /** Copies whatever is behind [uri] into the Briefcase and starts it on its way up. */
+    private fun putUriInBriefcase(uri: Uri) {
+        val name = displayNameOf(uri)
+        briefcase.addStream({ contentResolver.openInputStream(uri) }, name) { result ->
+            result.onSuccess { saved ->
+                val site = briefcase.store.site
+                showNotification(
+                    "My Briefcase",
+                    if (site.isEmpty()) "'$saved' is in your Briefcase." else "'$saved' is on its way to $site."
+                )
+            }
+            result.onFailure { error ->
+                showNotification("My Briefcase", error.message ?: "That file could not be put in the Briefcase.")
+            }
+        }
+    }
+
+    /** The name a shared file goes by, as its own app reports it. */
+    private fun displayNameOf(uri: Uri): String {
+        try {
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val name = cursor.getString(0)
+                        if (!name.isNullOrBlank()) return name
+                    }
+                }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not read the name of $uri", e)
+        }
+        return uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "Shared file"
+    }
+
+    /**
+     * A file shared into the launcher from anywhere else - section 5.5, the thing that makes
+     * the Briefcase worth having. Returns whether the intent carried one.
+     */
+    private fun handleSharedFileIntent(intent: Intent?): Boolean {
+        if (intent == null) return false
+        val streams = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(streamExtra(intent))
+            Intent.ACTION_SEND_MULTIPLE -> streamExtras(intent)
+            else -> return false
+        }
+        if (streams.isEmpty()) return false
+
+        // Cleared so the same file is not put in twice on a rotation or a re-entry.
+        intent.removeExtra(Intent.EXTRA_STREAM)
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            streams.forEach { putUriInBriefcase(it) }
+        }, 500)
+        return true
+    }
+
+    @Suppress("DEPRECATION")
+    private fun streamExtra(intent: Intent): Uri? =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM)
+        }
+
+    @Suppress("DEPRECATION")
+    private fun streamExtras(intent: Intent): List<Uri> =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java) ?: emptyList()
+        } else {
+            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+        }
+
+    /**
+     * Says a file has turned up from the computer - but only when the folder is not open, in
+     * which case the person is already watching it arrive.
+     */
+    private fun announceBriefcaseArrivals(names: List<String>) {
+        if (names.isEmpty()) return
+        val folderIsOpen = floatingWindowManager.getAllActiveWindows().any {
+            it.windowIdentifier?.startsWith("briefcase:") == true && !it.isMinimized()
+        }
+        if (folderIsOpen) return
+
+        val from = briefcase.store.site.ifEmpty { "the computer" }
+        val text = if (names.size == 1) {
+            "'${names.first()}' arrived from $from."
+        } else {
+            "${names.size} files arrived from $from."
+        }
+        showNotification("My Briefcase", text) {
+            openBriefcaseWindow(briefcaseIcon?.getDesktopIcon()?.id ?: "my.briefcase")
+        }
+    }
+
+    /** Said when a phone has just been connected to a computer. */
+    fun showBriefcaseConnected(site: String) {
+        showNotification("My Briefcase", "Sharing with $site.")
+    }
+
+    /** The shell's one context menu, for the windows that put their own menus in it. */
+    fun contextMenuView(): ContextMenuView? = if (::contextMenu.isInitialized) contextMenu else null
 
     /**
      * Show a system dialog box (Information, Warning, or Error)
@@ -11726,6 +12235,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         super.onResume()
         refreshWeatherIfNeeded()
 
+        // Section 2.3, last row: with the folder closed, the Briefcase catches up when the
+        // launcher comes back, and no more often than that. Storage permission may also have
+        // been granted while we were away, which is what decides where the folder lives.
+        briefcase.store.forgetFolder()
+        briefcase.syncOnResume()
+
         // Check for new apps when resuming and start periodic checking
         checkForNewApps()
         // And for what the check above cannot see: an uninstall and an install between two
@@ -11751,7 +12266,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         updateNotificationDotsPermissionError?.invoke()
 
         // Last, because it covers everything above it: the launcher cannot be used while
-        // it is the phone's phone or messaging app, which no theme here can answer. Here
+        // it is the phone's phone or messaging app, which no program here can answer. Here
         // rather than in onCreate so that coming back from Android's default-apps screen
         // takes the wall down again, however the user left it.
         enforceDefaultAppRoles()
@@ -11837,8 +12352,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Update intent for activity
         setIntent(intent)
 
-        // Handle a URL shared into the launcher while it's already running (the common path)
-        handleSharedUrlIntent(intent)
+        // Handle what was shared into the launcher while it's already running (the common path)
+        if (!handleSharedFileIntent(intent)) handleSharedUrlIntent(intent)
+
     }
 
     override fun onDestroy() {
@@ -11887,11 +12403,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::agentView.isInitialized) {
             agentView.destroy()
             Log.d("MainActivity", "Clippy cleaned up")
-        }
-
-        if (::speechBubbleView.isInitialized) {
-            speechBubbleView.destroy()
-            Log.d("MainActivity", "Speech bubble cleaned up")
         }
 
         // Clean up Quick Glance widget
@@ -14072,6 +14583,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 screensaverManager.resetInactivityTimer()
             }
 
+            // The agent holds a reply up until it is tapped away, from anywhere on the screen. The
+            // touch itself carries on to whatever it landed on, so dismissing never costs a tap.
+            if (event.action == MotionEvent.ACTION_DOWN && ::speechBubbleView.isInitialized) {
+                speechBubbleView.dismissResponse()
+            }
+
             // Check if touch is on an editable EditText
             val isTouchingEditableEditText = isTouchOnEditableEditText(event)
 
@@ -14232,7 +14749,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * Creates a WindowsDialog with the correct theme from the start to avoid re-inflation
      */
-    private fun createThemedWindowsDialog(): WindowsDialog {
+    fun createThemedWindowsDialog(): WindowsDialog {
         val theme = themeManager.getSelectedTheme()
         return WindowsDialog(this, initialTheme = theme)
     }

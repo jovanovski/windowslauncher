@@ -1,697 +1,1021 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="359dp"
-    android:layout_height="380dp"
-    android:background="#d3cec7"
-    android:clickable="true">
+<!--
+    Display Properties, built out of the Windows control kit in
+    java/rocks/gorjan/gokixp/winui/dialog rather than out of a screenshot.
 
-<!-- Background -->
-    <RelativeLayout
+    Every layout_win* number below is a DESIGN PIXEL: a pixel of a real 1:1 Windows 98 Display
+    Properties window, 399 x 423 of them. WinLayout works out how many device pixels one of
+    those is worth, so these numbers can be checked against a screenshot with a pixel ruler and
+    the dialog lands on the same pixels however the window is sized.
+
+    The geometry is 98's for all four shells - it is the dialog 98 shipped - but the paint
+    is whichever Windows the launcher is currently wearing; see WinSkin.
+-->
+<rocks.gorjan.gokixp.winui.dialog.WinLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    app:winFace="true"
+    app:winDesignWidth="399"
+    app:winDesignHeight="423">
+
+    <!-- The tab row and the raised page under it. The pages stack on top of this. -->
+    <rocks.gorjan.gokixp.winui.dialog.WinTabView
+        android:id="@+id/display_tabs"
+        app:layout_winX="0"
+        app:layout_winY="0"
+        app:layout_winW="399"
+        app:layout_winH="423" />
+
+    <!-- ==================== Background ==================== -->
+    <rocks.gorjan.gokixp.winui.dialog.WinLayout
         android:id="@+id/wallpaper_select_screen"
-        android:layout_width="359dp"
-        android:layout_height="380dp">
-        <ImageView
-            android:layout_width="359dp"
-            android:layout_height="380dp"
-            android:src="@drawable/wallpaper_select"/>
+        app:layout_winX="0"
+        app:layout_winY="0"
+        app:layout_winW="399"
+        app:layout_winH="423">
 
+        <rocks.gorjan.gokixp.winui.dialog.WinSprite
+            app:layout_winX="108"
+            app:layout_winY="42"
+            app:layout_winW="184"
+            app:layout_winH="169"
+            app:winSrc="@drawable/monitor_98" />
+
+        <!-- Sits in the monitor's screen. -->
         <ImageView
             android:id="@+id/wallpaper_preview"
-            android:layout_width="138dp"
-            android:layout_height="102dp"
-            android:layout_marginTop="52dp"
-            android:layout_marginStart="109dp"
-            android:scaleType="centerCrop"
-            android:layout_alignParentStart="true"
-            android:layout_alignParentTop="true"/>
-        <View
+            app:layout_winX="123"
+            app:layout_winY="58"
+            app:layout_winW="153"
+            app:layout_winH="113"
+            android:scaleType="centerCrop" />
+
+        <rocks.gorjan.gokixp.winui.dialog.WinLabel
+            app:layout_winX="22"
+            app:layout_winY="244"
+            app:layout_winW="215"
+            app:layout_winH="12"
+            app:winText="&amp;Select a background picture as Wallpaper:" />
+
+        <rocks.gorjan.gokixp.winui.dialog.WinLayout
+            app:layout_winX="22"
+            app:layout_winY="258"
+            app:layout_winW="272"
+            app:layout_winH="114"
+            app:winFrame="list">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/wallpapers_recycler_view"
+                app:layout_winX="2"
+                app:layout_winY="2"
+                app:layout_winW="268"
+                app:layout_winH="110"
+                android:paddingEnd="18dp"
+                android:clipToPadding="false"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay"
+                android:scrollbarAlwaysDrawVerticalTrack="true"
+                android:scrollbarTrackVertical="?scrollbarTrackDrawable"
+                android:scrollbarThumbVertical="?scrollbarThumbDrawable"
+                android:scrollbarSize="16dp"
+                android:scrollbarFadeDuration="0"
+                android:scrollbarDefaultDelayBeforeFade="0"
+                android:fadeScrollbars="false" />
+
+        </rocks.gorjan.gokixp.winui.dialog.WinLayout>
+
+        <rocks.gorjan.gokixp.winui.dialog.WinButton
             android:id="@+id/custom_wallpaper_button"
-            android:layout_width="70dp"
-            android:layout_height="22dp"
-            android:layout_alignParentEnd="true"
-            android:layout_marginTop="233dp"
-            android:layout_marginEnd="17dp"/>
+            app:layout_winX="304"
+            app:layout_winY="260"
+            app:layout_winW="75"
+            app:layout_winH="23"
+            app:winText="&amp;Browse..." />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/wallpapers_recycler_view"
-            android:layout_width="238dp"
-            android:layout_marginStart="22dp"
-            android:layout_alignParentBottom="true"
-            android:layout_height="98dp"
-            android:layout_marginBottom="48dp"
-            android:paddingEnd="20dp"
-            android:clipToPadding="false"
-            android:scrollbars="vertical"
-            android:scrollbarStyle="outsideOverlay"
-            android:scrollbarAlwaysDrawVerticalTrack="true"
-            android:scrollbarTrackVertical="?scrollbarTrackDrawable"
-            android:scrollbarThumbVertical="?scrollbarThumbDrawable"
-            android:scrollbarSize="16dp"
-            android:scrollbarFadeDuration="0"
-            android:scrollbarDefaultDelayBeforeFade="0"
-            android:fadeScrollbars="false"/>
+        <!-- Windows greys these two out until a pattern is in play, and so do we. -->
+        <rocks.gorjan.gokixp.winui.dialog.WinLabel
+            android:enabled="false"
+            app:layout_winX="304"
+            app:layout_winY="298"
+            app:layout_winW="86"
+            app:layout_winH="12"
+            app:winText="Picture &amp;Display:" />
 
-    </RelativeLayout>
-<!-- Screen Saver-->
-    <RelativeLayout
-        android:visibility="gone"
+        <rocks.gorjan.gokixp.winui.dialog.WinComboBox
+            android:enabled="false"
+            app:layout_winX="304"
+            app:layout_winY="312"
+            app:layout_winW="75"
+            app:layout_winH="21"
+            app:winText="Center" />
+
+        <rocks.gorjan.gokixp.winui.dialog.WinButton
+            android:enabled="false"
+            app:layout_winX="304"
+            app:layout_winY="346"
+            app:layout_winW="75"
+            app:layout_winH="23"
+            app:winText="&amp;Pattern..." />
+
+    </rocks.gorjan.gokixp.winui.dialog.WinLayout>
+
+    <!-- ==================== Screen Saver ==================== -->
+    <rocks.gorjan.gokixp.winui.dialog.WinLayout
         android:id="@+id/wallpaper_screensaver_screen"
-        android:layout_width="359dp"
-        android:layout_height="380dp">
-        <ImageView
-            android:layout_width="359dp"
-            android:layout_height="380dp"
-            android:src="@drawable/wallpaper_screensaver"/>
+        android:visibility="gone"
+        android:clipChildren="false"
+        app:layout_winX="0"
+        app:layout_winY="0"
+        app:layout_winW="399"
+        app:layout_winH="423">
 
-        <Spinner
-            android:id="@+id/screensaver_selector"
-            android:layout_width="150dp"
-            android:layout_height="16dp"
-            android:layout_marginTop="209dp"
-            android:layout_marginStart="30dp"
-            android:paddingEnd="16dp"
-            android:paddingStart="3dp"
-            android:spinnerMode="dropdown"/>
+        <rocks.gorjan.gokixp.winui.dialog.WinSprite
+            app:layout_winX="108"
+            app:layout_winY="38"
+            app:layout_winW="184"
+            app:layout_winH="169"
+            app:winSrc="@drawable/monitor_98" />
 
+        <!-- The little monitor. A video screensaver plays in the VideoView, the savers
+             ported from winos draw in the WebView, and only one of the two is ever shown. -->
         <VideoView
             android:id="@+id/preview_screensaver_video"
-            android:layout_marginStart="110dp"
-            android:layout_marginTop="48dp"
-            android:layout_width="140dp"
-            android:layout_height="102dp"/>
+            app:layout_winX="123"
+            app:layout_winY="54"
+            app:layout_winW="153"
+            app:layout_winH="113" />
+
+        <WebView
+            android:id="@+id/preview_screensaver_web"
+            android:visibility="invisible"
+            app:layout_winX="123"
+            app:layout_winY="54"
+            app:layout_winW="153"
+            app:layout_winH="113" />
+
+        <rocks.gorjan.gokixp.winui.dialog.WinGroupBox
+            app:layout_winX="21"
+            app:layout_winY="219"
+            app:layout_winW="357"
+            app:layout_winH="72"
+            app:winText="&amp;Screen Saver">
+
+            <rocks.gorjan.gokixp.winui.dialog.WinSpinner
+                android:id="@+id/screensaver_selector"
+                app:layout_winX="9"
+                app:layout_winY="12"
+                app:layout_winW="173"
+                app:layout_winH="21" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinButton
+                android:enabled="false"
+                app:layout_winX="187"
+                app:layout_winY="10"
+                app:layout_winW="75"
+                app:layout_winH="23"
+                app:winText="Se&amp;ttings..." />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinButton
+                android:id="@+id/preview_screensaver_button"
+                app:layout_winX="268"
+                app:layout_winY="10"
+                app:layout_winW="75"
+                app:layout_winH="23"
+                app:winText="Pre&amp;view" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinLabel
+                app:layout_winX="215"
+                app:layout_winY="47"
+                app:layout_winW="34"
+                app:layout_winH="12"
+                app:winText="&amp;Wait:" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinEditText
+                android:id="@+id/preview_screensaver_timeout_time"
+                app:layout_winX="249"
+                app:layout_winY="41"
+                app:layout_winW="45"
+                app:layout_winH="20"
+                app:winPadStart="2"
+                app:winPadTop="6"
+                app:winPadEnd="17"
+                android:gravity="top|start"
+                android:text="30"
+                android:maxLength="3"
+                android:inputType="number"
+                android:digits="0123456789" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinSpinButtons
+                android:id="@+id/screensaver_timeout_spin"
+                app:layout_winX="277"
+                app:layout_winY="43"
+                app:layout_winW="15"
+                app:layout_winH="16" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinLabel
+                app:layout_winX="300"
+                app:layout_winY="47"
+                app:layout_winW="50"
+                app:layout_winH="12"
+                app:winText="seconds" />
+
+        </rocks.gorjan.gokixp.winui.dialog.WinGroupBox>
+
+        <rocks.gorjan.gokixp.winui.dialog.WinGroupBox
+            app:layout_winX="22"
+            app:layout_winY="300"
+            app:layout_winW="357"
+            app:layout_winH="79"
+            app:winText="&amp;Energy saving features of monitor">
+
+            <rocks.gorjan.gokixp.winui.dialog.WinSprite
+                app:layout_winX="28"
+                app:layout_winY="12"
+                app:layout_winW="73"
+                app:layout_winH="44"
+                app:winSrc="@drawable/energy_star_98" />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinLabel
+                app:layout_winX="106"
+                app:layout_winY="14"
+                app:layout_winW="250"
+                app:layout_winH="12"
+                app:winText="To adjust the power settings for your monitor," />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinLabel
+                app:layout_winX="106"
+                app:layout_winY="27"
+                app:layout_winW="70"
+                app:layout_winH="12"
+                app:winText="click Settings." />
+
+            <rocks.gorjan.gokixp.winui.dialog.WinButton
+                android:enabled="false"
+                app:layout_winX="267"
+                app:layout_winY="51"
+                app:layout_winW="75"
+                app:layout_winH="23"
+                app:winText="&amp;Settings..." />
+
+        </rocks.gorjan.gokixp.winui.dialog.WinGroupBox>
+
+    </rocks.gorjan.gokixp.winui.dialog.WinLayout>
+
+    <!-- ==================== Appearance ==================== -->
+    <rocks.gorjan.gokixp.winui.dialog.WinLayout
+        android:id="@+id/wallpaper_appearance_screen"
+        android:visibility="gone"
+        app:layout_winX="0"
+        app:layout_winY="0"
+        app:layout_winW="399"
+        app:layout_winH="423">
+
+        <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_winX="17"
+        app:layout_winY="39"
+        app:layout_winW="366"
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/preview_screensaver_button"
-            android:layout_width="70dp"
-            android:layout_height="20dp"
-            android:layout_alignParentEnd="true"
-            android:layout_marginTop="206dp"
-            android:layout_marginEnd="30dp"/>
-
-        <EditText
-            android:id="@+id/preview_screensaver_timeout_time"
-            android:layout_width="18dp"
-            android:layout_height="11dp"
-            android:background="@color/white"
-            android:layout_marginTop="237dp"
-            android:layout_marginStart="245dp"
-            android:text="30"
-            android:gravity="end"
-            android:fontFamily="@font/micross_block"
-            android:textSize="11sp"
-            android:textColor="@color/black"
-            android:maxLength="2"
-            android:inputType="number"
-            android:digits="0123456789"
-            android:padding="0dp"
-            android:includeFontPadding="false"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Theme"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:layout_marginBottom="4dp"
+            android:fontFamily="?attr/primaryFontFamily"
             />
 
-    </RelativeLayout>
-<!-- Appearance -->
-    <RelativeLayout
+        <Spinner
+            android:id="@+id/theme_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/spinner_background"
+            android:padding="2dp" />
 
+        <TextView
+            android:id="@+id/flavour_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Flavour"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:fontFamily="?attr/primaryFontFamily"
+            android:visibility="gone" />
+
+        <Spinner
+            android:id="@+id/flavour_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/spinner_background"
+            android:padding="2dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/plus_theme_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Plus! theme"
+            android:textSize="12sp"
+            android:textColor="#000000"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:fontFamily="?attr/primaryFontFamily"
+            android:visibility="gone" />
+
+        <Spinner
+            android:id="@+id/plus_theme_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/spinner_background"
+            android:padding="2dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    </rocks.gorjan.gokixp.winui.dialog.WinLayout>
+
+    <!-- ==================== Settings ==================== -->
+    <rocks.gorjan.gokixp.winui.dialog.WinLayout
+        android:id="@+id/wallpaper_settings_screen"
         android:visibility="gone"
-        android:id="@+id/wallpaper_appearance_screen"
-        android:layout_width="359dp"
-        android:layout_height="380dp">
-        <ImageView
-            android:layout_width="359dp"
-            android:layout_height="380dp"
-            android:src="@drawable/wallpaper_appearance"/>
+        app:layout_winX="0"
+        app:layout_winY="0"
+        app:layout_winW="399"
+        app:layout_winH="423">
+
+        <ScrollView
+        app:layout_winX="17"
+        app:layout_winY="39"
+        app:layout_winW="366"
+        app:layout_winH="339"
+        android:paddingEnd="20dp"
+        android:scrollbars="vertical"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbarAlwaysDrawVerticalTrack="true"
+        android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
+        android:scrollbarThumbVertical="@drawable/scrollbar_thumb_98"
+        android:scrollbarFadeDuration="0"
+        android:scrollbarDefaultDelayBeforeFade="0"
+        android:fadeScrollbars="false"
+        >
+    <LinearLayout
+        android:id="@+id/view_options_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ==================== Desktop Icons ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:layout_marginTop="0dp"
+            android:text="Desktop Icons" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/show_my_computer_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'My Computer'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <CheckBox
+            android:id="@+id/show_recycle_bin_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'Recycle Bin'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <CheckBox
+            android:id="@+id/show_briefcase_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'My Briefcase'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <CheckBox
+            android:id="@+id/show_shortcut_arrow"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show shortcut arrow on icons"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- ==================== Desktop ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Desktop" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/show_cursor_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show mouse cursor"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="15dp"
-            android:layout_marginEnd="15dp"
-            android:layout_marginTop="35dp"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <CheckBox
+                android:id="@+id/show_air_quality_checkbox"
+                style="@style/Win95.CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="20dp"
+                android:text="Show air quality"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:checked="false"
+                android:paddingLeft="4dp" />
 
             <TextView
-                android:layout_width="match_parent"
+                android:id="@+id/air_quality_attribution"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Theme"
-                android:textSize="12sp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="(provided by AirCare)"
                 android:textColor="#000000"
-                android:layout_marginBottom="4dp"
-                android:fontFamily="?attr/primaryFontFamily"
-                />
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
+
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/show_christmas_lights_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'Christmas Lights'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="2dp" />
+
+        <LinearLayout
+            android:id="@+id/christmas_lights_margin_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingLeft="24dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Top Margin:"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/christmas_lights_margin_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="0" />
+
+            <TextView
+                android:id="@+id/christmas_lights_margin_value"
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginStart="8dp"
+                android:gravity="end" />
+
+        </LinearLayout>
+
+        <!-- ==================== Desktop Agent ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Desktop Agent" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/show_agent_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'Desktop Agent'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="Agent:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
 
             <Spinner
-                android:id="@+id/theme_spinner"
-                android:layout_width="match_parent"
+                android:id="@+id/agent_spinner"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_weight="1"
                 android:background="@drawable/spinner_background"
                 android:padding="2dp" />
 
-            <TextView
-                android:id="@+id/flavour_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Flavour"
-                android:textSize="12sp"
-                android:textColor="#000000"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="4dp"
-                android:fontFamily="?attr/primaryFontFamily"
-                android:visibility="gone" />
-
-            <Spinner
-                android:id="@+id/flavour_spinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/spinner_background"
-                android:padding="2dp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/plus_theme_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Plus! theme"
-                android:textSize="12sp"
-                android:textColor="#000000"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="4dp"
-                android:fontFamily="?attr/primaryFontFamily"
-                android:visibility="gone" />
-
-            <Spinner
-                android:id="@+id/plus_theme_spinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/spinner_background"
-                android:padding="2dp"
-                android:visibility="gone" />
-
         </LinearLayout>
-    </RelativeLayout>
-<!-- Settings -->
-    <RelativeLayout
-        android:id="@+id/wallpaper_settings_screen"
-        android:visibility="gone"
-        android:layout_width="359dp"
-        android:layout_height="380dp"
-        >
-        <ImageView
-            android:layout_width="359dp"
-            android:layout_height="380dp"
-            android:src="@drawable/wallpaper_settings"/>
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="305dp"
-            android:layout_marginStart="15dp"
-            android:layout_marginEnd="15dp"
-            android:layout_marginTop="35dp"
-            android:paddingEnd="20dp"
-            android:scrollbars="vertical"
-            android:scrollbarStyle="outsideOverlay"
-            android:scrollbarAlwaysDrawVerticalTrack="true"
-            android:scrollbarTrackVertical="@drawable/scrollbar_track_98"
-            android:scrollbarThumbVertical="@drawable/scrollbar_thumb_98"
-            android:scrollbarFadeDuration="0"
-            android:scrollbarDefaultDelayBeforeFade="0"
-            android:fadeScrollbars="false"
-            >
+
         <LinearLayout
-            android:id="@+id/view_options_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
 
-            <!-- ==================== Desktop Icons ==================== -->
             <TextView
-                style="@style/Win95.SectionHeader"
-                android:layout_marginTop="0dp"
-                android:text="Desktop Icons" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/show_my_computer_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show 'My Computer'"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/show_recycle_bin_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show 'Recycle Bin'"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/show_shortcut_arrow"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show shortcut arrow on icons"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <!-- ==================== Desktop ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Desktop" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/show_cursor_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show mouse cursor"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/show_agent_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show 'Desktop Agent'"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="74dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="4dp">
-
-                <CheckBox
-                    android:id="@+id/show_air_quality_checkbox"
-                    style="@style/Win95.CheckBox"
-                    android:layout_width="wrap_content"
-                    android:layout_height="20dp"
-                    android:text="Show air quality"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:textSize="11dp"
-                    android:checked="false"
-                    android:paddingLeft="4dp" />
-
-                <TextView
-                    android:id="@+id/air_quality_attribution"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:text="(provided by AirCare)"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:textSize="11dp" />
-
-            </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/show_christmas_lights_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show 'Christmas Lights'"
+                android:text="AI service:"
                 android:textColor="#000000"
                 android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="2dp" />
+                android:textSize="11dp" />
 
-            <LinearLayout
-                android:id="@+id/christmas_lights_margin_container"
-                android:layout_width="match_parent"
+            <Spinner
+                android:id="@+id/agent_ai_provider_spinner"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingLeft="24dp"
-                android:layout_marginBottom="4dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Top Margin:"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginEnd="8dp" />
-
-                <SeekBar
-                    android:id="@+id/christmas_lights_margin_slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="100"
-                    android:progress="0" />
-
-                <TextView
-                    android:id="@+id/christmas_lights_margin_value"
-                    android:layout_width="30dp"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end" />
-
-            </LinearLayout>
-
-            <!-- ==================== Quick Glance ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Quick Glance" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/show_quick_glance_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show 'Quick Glance'"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/quick_glance_align_right_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Align right"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <!-- ==================== Taskbar ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Taskbar" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/show_under_taskbar_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show black under taskbar"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="4dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Taskbar Height:"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginEnd="8dp" />
-
-                <SeekBar
-                    android:id="@+id/taskbar_height_slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="60"
-                    android:progress="30" />
-
-                <TextView
-                    android:id="@+id/taskbar_height_value"
-                    android:layout_width="30dp"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end" />
-
-            </LinearLayout>
-
-            <!-- ==================== Wallpaper ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Wallpaper" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/slide_wallpaper_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Slide desktop wallpaper"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <LinearLayout
-                android:id="@+id/slide_wallpaper_duration_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Duration:"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginEnd="8dp" />
-
-                <SeekBar
-                    android:id="@+id/slide_wallpaper_duration_slider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:min="10"
-                    android:max="60"
-                    android:progress="10" />
-
-                <TextView
-                    android:id="@+id/slide_wallpaper_duration_value"
-                    android:layout_width="34dp"
-                    android:layout_height="wrap_content"
-                    android:text="10s"
-                    android:textSize="10sp"
-                    android:textColor="#000000"
-                    android:fontFamily="@font/micross_block"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end" />
-
-            </LinearLayout>
-
-            <!-- ==================== Behavior ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Behavior" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/tap_to_hide_icons_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Tap desktop to hide icons"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <CheckBox
-                android:id="@+id/open_urls_in_ie_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Open desktop URLs in Internet Explorer"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="false"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="4dp" />
-
-            <!-- ==================== Notifications ==================== -->
-            <TextView
-                style="@style/Win95.SectionHeader"
-                android:text="Notifications" />
-            <View style="@style/Win95.SectionDivider" />
-
-            <CheckBox
-                android:id="@+id/play_email_sound_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Play 'You've got mail' when receiving email"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="2dp" />
-
-            <TextView
-                android:id="@+id/email_permission_error"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Tap to grant permission"
-                android:textColor="#0000FF"
-                android:textSize="10sp"
-                android:fontFamily="@font/micross_block"
-                android:paddingLeft="24dp"
-                android:layout_marginBottom="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone"
-                android:textStyle="bold" />
-
-            <CheckBox
-                android:id="@+id/show_notification_dots_checkbox"
-                style="@style/Win95.CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="20dp"
-                android:text="Show notification dots on app icons"
-                android:textColor="#000000"
-                android:fontFamily="@font/micross_block"
-                android:textSize="11dp"
-                android:checked="true"
-                android:paddingLeft="4dp"
-                android:layout_marginBottom="2dp" />
-
-            <TextView
-                android:id="@+id/notification_dots_permission_error"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Tap to grant permission"
-                android:textColor="#0000FF"
-                android:textSize="10sp"
-                android:fontFamily="@font/micross_block"
-                android:paddingLeft="24dp"
-                android:layout_marginBottom="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone"
-                android:textStyle="bold" />
+                android:layout_weight="1"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
 
         </LinearLayout>
-        </ScrollView>
-    </RelativeLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="2dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:orientation="horizontal">
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="API key:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
 
-        <View
-            android:id="@+id/wallpaper_select_screen_button"
-            android:layout_width="67dp"
-            android:layout_height="20dp"/>
+            <EditText
+                android:id="@+id/agent_ai_key_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/win98_edit_text_border"
+                android:hint="Paste your key"
+                android:textColorHint="#808080"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp"
+                android:inputType="textVisiblePassword"
+                android:maxLines="1"
+                android:padding="4dp" />
 
-        <View
-            android:id="@+id/wallpaper_screensaver_screen_button"
-            android:layout_width="66dp"
-            android:layout_height="20dp"/>
+        </LinearLayout>
 
-        <View
-            android:id="@+id/wallpaper_appearance_screen_button"
-            android:layout_width="64dp"
-            android:layout_height="20dp"/>
+        <TextView
+            android:id="@+id/agent_ai_key_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="(kept on this device, one key per service)"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="10dp"
+            android:paddingLeft="74dp"
+            android:layout_marginBottom="4dp" />
 
-
-        <View
-            android:id="@+id/wallpaper_settings_screen_button"
-            android:layout_width="50dp"
+        <CheckBox
+            android:id="@+id/agent_ai_enabled_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
             android:layout_height="20dp"
-            android:layout_marginStart="76dp"
-            />
+            android:text="Send queries to AI"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
 
+        <CheckBox
+            android:id="@+id/agent_ai_speak_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:layout_marginStart="20dp"
+            android:text="Read response out loud"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- ==================== Quick Glance ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Quick Glance" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/show_quick_glance_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'Quick Glance'"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <CheckBox
+            android:id="@+id/quick_glance_align_right_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Align right"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- ==================== Taskbar ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Taskbar" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/show_under_taskbar_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show black under taskbar"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Taskbar Height:"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/taskbar_height_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="60"
+                android:progress="30" />
+
+            <TextView
+                android:id="@+id/taskbar_height_value"
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginStart="8dp"
+                android:gravity="end" />
+
+        </LinearLayout>
+
+        <!-- ==================== Wallpaper ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Wallpaper" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/slide_wallpaper_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Slide desktop wallpaper"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:id="@+id/slide_wallpaper_duration_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Duration:"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/slide_wallpaper_duration_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:min="10"
+                android:max="60"
+                android:progress="10" />
+
+            <TextView
+                android:id="@+id/slide_wallpaper_duration_value"
+                android:layout_width="34dp"
+                android:layout_height="wrap_content"
+                android:text="10s"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginStart="8dp"
+                android:gravity="end" />
+
+        </LinearLayout>
+
+        <!-- ==================== Behavior ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Behavior" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/tap_to_hide_icons_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Tap desktop to hide icons"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <CheckBox
+            android:id="@+id/open_urls_in_ie_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Open desktop URLs in Internet Explorer"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- ==================== Notifications ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Notifications" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <CheckBox
+            android:id="@+id/play_email_sound_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Play 'You've got mail' when receiving email"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/email_permission_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to grant permission"
+            android:textColor="#0000FF"
+            android:textSize="10sp"
+            android:fontFamily="@font/micross_block"
+            android:paddingLeft="24dp"
+            android:layout_marginBottom="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/show_notification_dots_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show notification dots on app icons"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="true"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/notification_dots_permission_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap to grant permission"
+            android:textColor="#0000FF"
+            android:textSize="10sp"
+            android:fontFamily="@font/micross_block"
+            android:paddingLeft="24dp"
+            android:layout_marginBottom="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:textStyle="bold" />
+
+        <!-- ==================== Backup & Restore ==================== -->
+        <!-- Everything here used to be the Registry Editor's bottom-left corner. -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Backup &amp; Restore" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save every setting on this page to a file or to your Google Drive, and put it all back on another phone."
+            android:textColor="#000000"
+            android:textSize="10dp"
+            android:fontFamily="@font/micross_block"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/export_settings_button"
+                style="?winButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Export..."
+                android:textSize="11sp"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/import_settings_button"
+                style="?winButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Import..."
+                android:textSize="11sp"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/auto_sync_drive_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Sync to Google Drive every hour"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/last_drive_sync_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Never synced"
+            android:textColor="#666666"
+            android:textSize="10dp"
+            android:fontFamily="@font/micross_block"
+            android:paddingLeft="24dp"
+            android:layout_marginBottom="4dp" />
 
     </LinearLayout>
+    </ScrollView>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="353dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp"
-        android:layout_alignParentEnd="true"
-        android:gravity="end"
+    </rocks.gorjan.gokixp.winui.dialog.WinLayout>
 
-        android:orientation="horizontal">
+    <!-- ==================== OK / Cancel / Apply ==================== -->
+    <rocks.gorjan.gokixp.winui.dialog.WinButton
+        android:id="@+id/wallpaper_ok_button"
+        app:layout_winX="155"
+        app:layout_winY="392"
+        app:layout_winW="75"
+        app:layout_winH="23"
+        app:winText="OK" />
 
-        <View
-            android:id="@+id/wallpaper_ok_button"
-            android:layout_marginEnd="8dp"
-            android:layout_width="67dp"
-            android:layout_height="20dp"/>
+    <rocks.gorjan.gokixp.winui.dialog.WinButton
+        android:id="@+id/wallpaper_cancel_button"
+        app:layout_winX="236"
+        app:layout_winY="392"
+        app:layout_winW="75"
+        app:layout_winH="23"
+        app:winText="Cancel" />
 
-        <View
-            android:id="@+id/wallpaper_cancel_button"
-            android:layout_marginEnd="6dp"
-            android:layout_width="66dp"
-            android:layout_height="20dp"/>
+    <rocks.gorjan.gokixp.winui.dialog.WinButton
+        android:id="@+id/wallpaper_apply_button"
+        app:layout_winX="317"
+        app:layout_winY="392"
+        app:layout_winW="75"
+        app:layout_winH="23"
+        app:winText="&amp;Apply" />
 
-        <View
-            android:id="@+id/wallpaper_apply_button"
-            android:layout_width="67dp"
-            android:layout_height="20dp"/>
-
-    </LinearLayout>
-</RelativeLayout>
+</rocks.gorjan.gokixp.winui.dialog.WinLayout>

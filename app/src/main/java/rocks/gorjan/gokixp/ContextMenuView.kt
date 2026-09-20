@@ -307,7 +307,14 @@ class ContextMenuView @JvmOverloads constructor(
 
         // Get taskbar position to avoid showing menu below it
         val taskbarTop = getTaskbarTopPosition()
-        val availableHeight = if (taskbarTop > 0) taskbarTop else screenHeight
+        var availableHeight = if (taskbarTop > 0) taskbarTop else screenHeight
+
+        // The soft keyboard (start menu search, dialog text fields) covers the taskbar, so when
+        // it is up the menu has to stay above the keyboard instead.
+        val keyboardTop = getKeyboardTopPosition()
+        if (keyboardTop > 0 && keyboardTop < availableHeight) {
+            availableHeight = keyboardTop
+        }
 
         // Smart positioning logic like Windows
         var finalX = x
@@ -330,6 +337,12 @@ class ContextMenuView @JvmOverloads constructor(
             finalX = 0f
         }
 
+        // Taller than the space above the keyboard/taskbar - pin it to the top edge so the
+        // first items stay reachable instead of running underneath them.
+        if (finalY + menuHeight > availableHeight) {
+            finalY = (availableHeight - menuHeight).toFloat().coerceAtLeast(0f)
+        }
+
         // Ensure menu doesn't go off top edge
         if (finalY < 0) {
             finalY = 0f
@@ -338,6 +351,30 @@ class ContextMenuView @JvmOverloads constructor(
         // Apply position
         translationX = finalX
         translationY = finalY
+    }
+
+    /**
+     * Screen Y of the top of the soft keyboard, or 0 when it isn't showing. The launcher runs
+     * edge-to-edge so the window never shrinks for the IME, which means an unclamped menu would
+     * simply be laid out underneath it.
+     */
+    private fun getKeyboardTopPosition(): Int {
+        try {
+            val root = rootView ?: return 0
+            val insets = androidx.core.view.ViewCompat.getRootWindowInsets(root) ?: return 0
+            if (!insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())) return 0
+            val imeHeight = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime()).bottom
+            if (imeHeight <= 0) return 0
+
+            // The inset is measured from the bottom of the window - convert it to a screen Y.
+            val location = IntArray(2)
+            root.getLocationOnScreen(location)
+            return location[1] + root.height - imeHeight
+        } catch (e: Exception) {
+            // Ignore - fall back to the taskbar/screen bounds
+        }
+
+        return 0
     }
 
     private fun getTaskbarTopPosition(): Int {

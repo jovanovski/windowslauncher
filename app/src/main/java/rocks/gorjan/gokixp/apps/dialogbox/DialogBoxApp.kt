@@ -1,12 +1,15 @@
 package rocks.gorjan.gokixp.apps.dialogbox
 
 import android.content.Context
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
+import rocks.gorjan.gokixp.winui.WinUi
 
 /**
  * Dialog type for system dialogs
@@ -33,6 +36,16 @@ class DialogBoxApp(
 ) {
 
     /**
+     * The kit the message box is dressed from.
+     *
+     * A message box is not a special kind of window - it is a dialog with a static, an icon
+     * and one or two push buttons, which is why `MessageBox` lives in user32 beside every
+     * other dialog. So its buttons are the kit's push button rather than a style of their
+     * own, and they change shell with everything else.
+     */
+    private val ui = WinUi(context, theme)
+
+    /**
      * Setup the dialog UI
      */
     fun setupDialog(contentView: View): View {
@@ -48,6 +61,12 @@ class DialogBoxApp(
 
         // Set the message
         dialogMessage.text = message
+        dialogMessage.setTextColor(ui.pal.text)
+        dialogMessage.setTextSize(TypedValue.COMPLEX_UNIT_SP, ui.textSp)
+        ui.applyFont(dialogMessage)
+
+        dressButton(okButton)
+        dressButton(cancelButton)
 
         // Show/hide cancel button based on configuration
         cancelButton.visibility = if (showCancelButton) View.VISIBLE else View.GONE
@@ -66,6 +85,23 @@ class DialogBoxApp(
         }
 
         return contentView
+    }
+
+    /**
+     * Turns the layout's plain `TextView` into this shell's push button.
+     *
+     * Padding goes on after the background and not before: Windows 7's button is a
+     * nine-patch, and handing a view a nine-patch replaces whatever padding it had with the
+     * bitmap's own.
+     */
+    private fun dressButton(button: TextView) {
+        button.background = ui.buttonBackground()
+        button.setPadding(ui.dp(6), 0, ui.dp(6), 0)
+        button.minHeight = ui.dp(23)
+        button.gravity = Gravity.CENTER
+        button.setTextColor(ui.pal.text)
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, ui.textSp)
+        ui.applyFont(button)
     }
 
     /**

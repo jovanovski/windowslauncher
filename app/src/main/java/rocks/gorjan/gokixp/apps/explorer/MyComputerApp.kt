@@ -1,8 +1,6 @@
 package rocks.gorjan.gokixp.apps.explorer
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -11,7 +9,6 @@ import android.view.View
 import android.widget.GridView
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.FileProvider
 import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
@@ -523,84 +520,19 @@ class MyComputerApp(
         currentSelectedView = null
     }
 
-    /**
-     * Check if a file is an audio file
-     */
-    private fun isAudioFile(file: File): Boolean {
-        val extension = file.extension.lowercase()
-        return extension in listOf("mp3", "wav", "ogg", "flac", "m4a", "aac", "wma")
-    }
+    // The open-with rules live in FileOpener, so a file opens the same way here as it does
+    // in My Briefcase.
+    private fun isAudioFile(file: File): Boolean = FileOpener.isAudio(file)
+
+    private fun isVideoFile(file: File): Boolean = FileOpener.isVideo(file)
+
+    private fun isImageFile(file: File): Boolean = FileOpener.isImage(file)
 
     /**
-     * Check if a file is a video file
+     * Open a file - audio files open in Winamp, video files open in WMP, images open in Photo
+     * Viewer, others use an external app
      */
-    private fun isVideoFile(file: File): Boolean {
-        val extension = file.extension.lowercase()
-        return extension in listOf("mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "3gp", "m4v")
-    }
-
-    /**
-     * Check if a file is an image file
-     */
-    private fun isImageFile(file: File): Boolean {
-        val extension = file.extension.lowercase()
-        return extension in listOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
-    }
-
-    private fun isPdfFile(file: File): Boolean {
-        return file.extension.lowercase() == "pdf"
-    }
-
-    /** Bitmaps open in Paint rather than the viewer, the way they always have. */
-    private fun isBitmapFile(file: File): Boolean {
-        return file.extension.lowercase() in listOf("bmp", "dib")
-    }
-
-    /**
-     * Open a file - audio files open in Winamp, video files open in WMP, images open in Photo Viewer, others use external app
-     */
-    private fun openFile(file: File) {
-        if (isAudioFile(file)) {
-            // Open audio files in Winamp
-            openFileInWinamp(file)
-        } else if (isVideoFile(file)) {
-            // Open video files in Windows Media Player
-            openFileInWmp(file)
-        } else if (isBitmapFile(file)) {
-            // Bitmaps are Paint's own files
-            openFileInPaint(file)
-        } else if (isImageFile(file) || isPdfFile(file)) {
-            // Open image and PDF files in Photo Viewer
-            openFileInPhotoViewer(file)
-        } else {
-            // Open other files with external app
-            openFileInExternalApp(file)
-        }
-    }
-
-    /**
-     * Open a file in Winamp
-     */
-    private fun openFileInWinamp(file: File) {
-        val mainActivity = context as? MainActivity
-        mainActivity?.openWinamp(file.absolutePath)
-    }
-
-    /**
-     * Open a file in Windows Media Player
-     */
-    private fun openFileInWmp(file: File) {
-        val mainActivity = context as? MainActivity
-        mainActivity?.openWmp(file.absolutePath)
-    }
-
-    /**
-     * Open a file in Photo Viewer
-     */
-    private fun openFileInPhotoViewer(file: File) {
-        val mainActivity = context as? MainActivity
-        mainActivity?.openPhotoViewer(file.absolutePath)
-    }
+    private fun openFile(file: File) = FileOpener.open(context, file)
 
     /**
      * Open a picture in Paint, for editing rather than looking at
@@ -613,32 +545,7 @@ class MyComputerApp(
     /**
      * Open a file with the default system app
      */
-    private fun openFileInExternalApp(file: File) {
-        try {
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
-            )
-
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, getMimeType(file))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            // Check if there's an app that can handle this file type
-            val packageManager = context.packageManager
-            if (intent.resolveActivity(packageManager) != null) {
-                context.startActivity(intent)
-            } else {
-                Log.w(TAG, "No app found to open file: ${file.name}")
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error opening file: ${file.name}", e)
-        }
-    }
+    private fun openFileInExternalApp(file: File) = FileOpener.openExternally(context, file)
 
     /**
      * Play drive sound effect with busy cursor and optionally show dialog
@@ -681,40 +588,6 @@ class MyComputerApp(
         } catch (e: Exception) {
             Log.e(TAG, "Error playing drive sound", e)
             onSetCursorNormal()
-        }
-    }
-
-    /**
-     * Get MIME type for a file based on extension
-     */
-    private fun getMimeType(file: File): String {
-        val extension = file.extension.lowercase()
-        return when (extension) {
-            "txt" -> "text/plain"
-            "pdf" -> "application/pdf"
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "gif" -> "image/gif"
-            "bmp" -> "image/bmp"
-            "webp" -> "image/webp"
-            "mp4", "m4v" -> "video/mp4"
-            "avi" -> "video/x-msvideo"
-            "mkv" -> "video/x-matroska"
-            "mov" -> "video/quicktime"
-            "wmv" -> "video/x-ms-wmv"
-            "flv" -> "video/x-flv"
-            "webm" -> "video/webm"
-            "3gp" -> "video/3gpp"
-            "mp3" -> "audio/mpeg"
-            "wav" -> "audio/wav"
-            "ogg" -> "audio/ogg"
-            "flac" -> "audio/flac"
-            "m4a" -> "audio/mp4"
-            "aac" -> "audio/aac"
-            "wma" -> "audio/x-ms-wma"
-            "zip" -> "application/zip"
-            "apk" -> "application/vnd.android.package-archive"
-            else -> "*/*"
         }
     }
 
@@ -768,6 +641,34 @@ class MyComputerApp(
                     action = {
                         currentAdapter?.clearSelection()
                         openFileInExternalApp(file)
+                    }
+                )
+            )
+        }
+
+        // "Send To" is where a file goes somewhere rather than opens - and the Briefcase is
+        // the one place on this phone that means another computer.
+        if (!item.isDirectory) {
+            menuItems.add(
+                rocks.gorjan.gokixp.ContextMenuItem(
+                    title = "Send To My Briefcase",
+                    isEnabled = true,
+                    action = {
+                        currentAdapter?.clearSelection()
+                        rocks.gorjan.gokixp.apps.briefcase.Briefcase.get(context).addFile(file) { result ->
+                            result.onSuccess { saved ->
+                                onShowDialog(
+                                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.INFORMATION,
+                                    "'$saved' is in My Briefcase."
+                                )
+                            }
+                            result.onFailure { error ->
+                                onShowDialog(
+                                    rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR,
+                                    error.message ?: "That file could not be put in the Briefcase."
+                                )
+                            }
+                        }
                     }
                 )
             )

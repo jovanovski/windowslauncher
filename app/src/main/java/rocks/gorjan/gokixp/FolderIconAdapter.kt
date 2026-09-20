@@ -45,6 +45,7 @@ class FolderIconAdapter(
                 IconType.RECYCLE_BIN -> RecycleBinView(context, R.layout.folder_icon)
                 IconType.FOLDER -> FolderView(context, theme, R.layout.folder_icon)
                 IconType.MY_COMPUTER -> rocks.gorjan.gokixp.apps.explorer.MyComputerView(context, R.layout.folder_icon)
+                IconType.BRIEFCASE -> rocks.gorjan.gokixp.apps.briefcase.BriefcaseView(context, R.layout.folder_icon)
                 IconType.APP -> DesktopIconView(context, R.layout.folder_icon)
                 IconType.URL_SHORTCUT -> DesktopIconView(context, R.layout.folder_icon)
             }

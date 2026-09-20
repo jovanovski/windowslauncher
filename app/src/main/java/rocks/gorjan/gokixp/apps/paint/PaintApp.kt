@@ -33,6 +33,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.winui.WinMenuTracker
+import rocks.gorjan.gokixp.winui.WinUi
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.FontManager
@@ -271,6 +273,10 @@ class PaintApp(
     private var lastMenuX = 0f
     private var lastMenuY = 0f
 
+    /** The menu-bar word a menu was last opened from, so the Image menu can drop back under it. */
+    private var lastMenuWord: TextView? = null
+    private var menuTracker: WinMenuTracker? = null
+
     private fun Int.dp(): Int = (this * density).roundToInt()
 
     /** The gap Paint leaves between the window and the picture's top left corner. */
@@ -320,8 +326,16 @@ class PaintApp(
             fontManager.applyThemeFont(this, theme)
         }
 
+    /**
+     * Paint's menus open themselves now, through the control kit's [WinMenuTracker], rather
+     * than asking the desktop to put a context menu up at a pair of screen coordinates. The
+     * visible difference is the behaviour a menu bar is supposed to have: the word stays lit
+     * while its menu is down, and pressing another word moves straight there.
+     */
     private fun buildMenuBar(bar: LinearLayout) {
         bar.setBackgroundColor(FACE)
+        val tracker = WinMenuTracker(WinUi(context))
+        menuTracker = tracker
         val menus = listOf("File", "Edit", "View", "Image", "Colors", "Help")
         for (title in menus) {
             val item = label(title).apply {
@@ -329,11 +343,8 @@ class PaintApp(
                 isClickable = true
                 setOnClickListener { v ->
                     onSoundPlay("click")
-                    val at = IntArray(2)
-                    v.getLocationOnScreen(at)
-                    lastMenuX = at[0].toFloat()
-                    lastMenuY = (at[1] + v.height).toFloat()
-                    onShowMenu(menuFor(title), lastMenuX, lastMenuY)
+                    lastMenuWord = v as TextView
+                    tracker.toggle(v, menuFor(title))
                 }
             }
             bar.addView(item)
@@ -1320,7 +1331,11 @@ class PaintApp(
                     }
                 })
             )
-        handler.post { onShowMenu(items, menuAnchorX(), menuAnchorY()) }
+        // Straight back under "Image", so a run of flips and rotations needs one trip to the bar.
+        val word = lastMenuWord
+        val tracker = menuTracker
+        if (word != null && tracker != null) handler.post { tracker.toggle(word, items) }
+        else handler.post { onShowMenu(items, menuAnchorX(), menuAnchorY()) }
     }
 
     private fun stretchSkew() {

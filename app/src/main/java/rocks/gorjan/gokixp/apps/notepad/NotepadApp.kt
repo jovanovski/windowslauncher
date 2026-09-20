@@ -5,19 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.text.Editable
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
+import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -56,12 +59,12 @@ class NotepadApp(
     private val notes = mutableListOf<Note>()
     private var currentNote: Note? = null
     private var isListExpanded = false
-    private var isProgrammaticChange = false
     private var noteInMoveMode: Note? = null
     private var showingArchivedNotes = false  // Track if we're viewing archived notes
 
     // UI references
-    private var notesEditText: EditText? = null
+    private var notesEditText: NoteEditor? = null
+    private var formatButton: TextView? = null
     private var notesListContainer: LinearLayout? = null
     private var notesList: RecyclerView? = null
     private var expandButton: TextView? = null
@@ -71,6 +74,11 @@ class NotepadApp(
     private var itemTouchHelper: ItemTouchHelper? = null
     private var imageGallery: RecyclerView? = null
     private var imageGalleryAdapter: ImageGalleryAdapter? = null
+
+    /** What the open note's markdown is drawn in. See [NoteMarkdown]. */
+    private var noteLook: NoteMarkdown.Look? = null
+    private val main = Handler(Looper.getMainLooper())
+    private val restyle = Runnable { restyleNow() }
 
     /**
      * Initialize the app UI
@@ -83,7 +91,20 @@ class NotepadApp(
         expandButton = contentView.findViewById(R.id.expand_button)
         addNoteButton = contentView.findViewById(R.id.add_note_button)
         archiveButton = contentView.findViewById(R.id.notepad_archive_button)
+        formatButton = contentView.findViewById(R.id.notepad_format_button)
         imageGallery = contentView.findViewById(R.id.image_gallery)
+
+        // Markdown, drawn on the note as it is written, with its marks hidden until the
+        // caret comes to one. The text itself is untouched - see NoteMarkdown. The look is
+        // built once per window, since the shell's theme cannot change while one is open.
+        noteLook = markdownLook()
+        notesEditText?.apply {
+            onSelection = { restyleSoon() }
+            // A note nobody is writing in has no caret, so it shows none of its marks.
+            setOnFocusChangeListener { _, _ -> restyleSoon() }
+            // Return in a list carries the list on, and on an empty item ends it.
+            filters = arrayOf(ListReturn(::endList))
+        }
 
         // Setup Notes RecyclerView
         notesAdapter = NotesAdapter()
@@ -187,10 +208,11 @@ class NotepadApp(
 
         // Load current note content and images
         currentNote?.let {
-            isProgrammaticChange = true
             notesEditText?.setText(it.content)
-            isProgrammaticChange = false
             loadNoteImages(it)
+            // The watcher that styles every later change is not on yet, so this first note
+            // is styled by hand.
+            restyleNow()
         }
 
         // Set initial title
@@ -235,12 +257,16 @@ class NotepadApp(
             // Switch to new note
             currentNote = newNote
             saveLastNoteId()
-            isProgrammaticChange = true
             notesEditText?.setText("")
-            isProgrammaticChange = false
             imageGallery?.visibility = View.GONE
             updateWindowTitle()
             refreshNotesList()
+        }
+
+        // Format menu - the markdown commands, on the selection or on what is typed next
+        formatButton?.setOnClickListener { view ->
+            onSoundPlay("click")
+            showFormatMenu(view)
         }
 
         // Add Image button
@@ -272,15 +298,11 @@ class NotepadApp(
 
             // Load the new current note
             currentNote?.let {
-                isProgrammaticChange = true
                 notesEditText?.setText(it.content)
-                isProgrammaticChange = false
                 loadNoteImages(it)
             } ?: run {
                 // No notes in this view
-                isProgrammaticChange = true
                 notesEditText?.setText("")
-                isProgrammaticChange = false
                 imageGallery?.visibility = View.GONE
             }
 
@@ -288,44 +310,22 @@ class NotepadApp(
             refreshNotesList()
         }
 
-        // Save notes as user types and handle automatic list continuation
+        // Save notes as user types, and draw the markdown on them as they are written.
+        // Carrying a list on past a return is the input filter's job now - see ListReturn -
+        // which knows about numbers and to-do boxes as well as bullets.
         notesEditText?.addTextChangedListener(object : android.text.TextWatcher {
-            private var isAutoInserting = false
-
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Skip automatic list logic if this is a programmatic change (loading a note)
-                if (isProgrammaticChange) return
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 
-                // Check if a newline was just added
-                if (!isAutoInserting && count > 0 && s != null && start + count > 0) {
-                    val insertedText = s.subSequence(start, start + count).toString()
-                    if (insertedText.contains('\n')) {
-                        val editText = notesEditText ?: return
-                        val text = s.toString()
-                        val newlinePos = start + insertedText.indexOf('\n')
+            override fun afterTextChanged(s: Editable?) {
+                val text = s ?: return
+                // Restyled after every change rather than parsed once: a note is short, and
+                // a code fence opened ten lines up changes how the line being typed is set.
+                noteLook?.let { NoteMarkdown.style(text, it, caret()) }
 
-                        // Find the start of the previous line
-                        val prevLineStart = text.lastIndexOf('\n', newlinePos - 1) + 1
-                        val prevLine = text.substring(prevLineStart, newlinePos)
-
-
-                        // Check if previous line starts with "- "
-                        if (prevLine.startsWith("- ")) {
-                            // Auto-insert "- " after the newline
-                            isAutoInserting = true
-                            val cursorPos = editText.selectionStart
-                            editText.text.insert(cursorPos, "- ")
-                            isAutoInserting = false
-                        }
-                    }
-                }
-            }
-
-            override fun afterTextChanged(s: android.text.Editable?) {
                 // Auto-save current note content
-                currentNote?.content = s.toString()
+                currentNote?.content = text.toString()
                 saveNotes()
             }
         })
@@ -363,6 +363,204 @@ class NotepadApp(
      */
     private fun refreshNotesList() {
         notesAdapter?.notifyDataSetChanged()
+    }
+
+    // ============================== Markdown ==============================
+
+    /**
+     * What the open note's markdown is drawn in.
+     *
+     * The page is white under every one of the shells - see program_notepad.xml - so only
+     * the accent moves with the theme; the rest are the greys Windows has always drawn its
+     * chrome in.
+     */
+    private fun markdownLook(): NoteMarkdown.Look {
+        val themes = ThemeManager(context)
+        val theme = themes.getSelectedTheme()
+        val bold = ResourcesCompat.getFont(context, themes.getBoldFontRes(theme))?.let { face ->
+            // Tahoma - XP's face and Vista's - is carried without a bold of its own, so
+            // there the platform emboldens it. Micross and Segoe have a real bold beside them.
+            if (theme is AppTheme.WindowsXP || theme is AppTheme.WindowsVista) {
+                Typeface.create(face, Typeface.BOLD)
+            } else {
+                face
+            }
+        } ?: Typeface.DEFAULT_BOLD
+
+        return NoteMarkdown.Look(
+            // Links, bullets and the bar down a quotation, in the shell's own blue.
+            accent = when (theme) {
+                AppTheme.WindowsClassic -> 0xFF000080.toInt()
+                AppTheme.WindowsXP -> 0xFF316AC5.toInt()
+                else -> 0xFF0066CC.toInt()
+            },
+            ink = Color.BLACK,
+            subtle = 0xFF808080.toInt(),
+            // The ground behind code: 9x greys it in the silver it greyed everything in,
+            // the later shells more lightly.
+            shade = if (theme is AppTheme.WindowsClassic) 0xFFC0C0C0.toInt() else 0xFFE8E8E8.toInt(),
+            bold = bold,
+            density = context.resources.displayMetrics.density
+        )
+    }
+
+    /**
+     * Restyles the open note once the event that moved its caret is over.
+     *
+     * Not there and then: the caret is moved from inside the text's own bookkeeping, and
+     * adding and taking off spans while the text is still telling its watchers about the
+     * last change is how an Editable ends up notifying a span twice or not at all.
+     * Coalesced, since a tap moves the caret and the focus together.
+     */
+    private fun restyleSoon() {
+        main.removeCallbacks(restyle)
+        main.post(restyle)
+    }
+
+    private fun restyleNow() {
+        val field = notesEditText ?: return
+        val look = noteLook ?: return
+        NoteMarkdown.style(field.text ?: return, look, caret())
+    }
+
+    /** The caret, for the marks it uncovers: none while the note is only being read. */
+    private fun caret(): IntRange? {
+        val field = notesEditText ?: return null
+        if (!field.isFocused) return null
+        val start = field.selectionStart
+        val end = field.selectionEnd
+        if (start < 0 || end < 0) return null
+        return minOf(start, end)..maxOf(start, end)
+    }
+
+    /**
+     * The Format menu: the markdown commands, ticked where they are in force at the caret.
+     *
+     * The note's text and selection are taken now and handed to whichever command is
+     * picked. The menu takes the focus while it is up, so by the time a command runs the
+     * caret is no longer the note's to read - and nothing can have been typed meanwhile,
+     * which is why taking it here is safe.
+     */
+    private fun showFormatMenu(anchorView: View) {
+        val field = notesEditText ?: return
+        val src = field.text?.toString() ?: return
+        val s = minOf(field.selectionStart, field.selectionEnd).coerceIn(0, src.length)
+        val e = maxOf(field.selectionStart, field.selectionEnd).coerceIn(0, src.length)
+        val active = NoteFormat.active(src, s, e)
+
+        fun command(title: String, tool: NoteFormat.Tool) = ContextMenuItem(
+            title = title,
+            isEnabled = true,
+            hasCheckbox = true,
+            isChecked = tool in active,
+            action = {
+                onSoundPlay("click")
+                applyFormat(tool, src, s, e)
+            }
+        )
+
+        val divider = ContextMenuItem("", isEnabled = false)
+        val menuItems = listOf(
+            command("Bold", NoteFormat.Tool.BOLD),
+            command("Italic", NoteFormat.Tool.ITALIC),
+            command("Underline", NoteFormat.Tool.UNDERLINE),
+            divider,
+            command("Heading 1", NoteFormat.Tool.H1),
+            command("Heading 2", NoteFormat.Tool.H2),
+            command("Heading 3", NoteFormat.Tool.H3),
+            ContextMenuItem(
+                title = "Normal",
+                isEnabled = true,
+                action = {
+                    onSoundPlay("click")
+                    applyFormat(NoteFormat.Tool.NORMAL, src, s, e)
+                }
+            ),
+            divider,
+            command("Bulleted List", NoteFormat.Tool.BULLETS),
+            command("Numbered List", NoteFormat.Tool.NUMBERS),
+            divider,
+            ContextMenuItem(
+                title = if (NoteFormat.Tool.LINK in active) "Edit Link..." else "Add Link...",
+                isEnabled = true,
+                action = {
+                    onSoundPlay("click")
+                    askForLink(src, s, e)
+                }
+            )
+        )
+
+        // Below the menu bar's own "Format", the way a menu drops in Windows.
+        val location = IntArray(2)
+        anchorView.getLocationOnScreen(location)
+        onShowContextMenu(
+            menuItems,
+            location[0].toFloat(),
+            location[1].toFloat() + anchorView.height
+        )
+    }
+
+    /** One of the Format menu's commands, on the selection - or, with none, on what is typed next. */
+    private fun applyFormat(tool: NoteFormat.Tool, src: String, s: Int, e: Int) {
+        val field = notesEditText ?: return
+        if (field.text?.toString() != src) return
+        NoteFormat.apply(tool, src, s, e)?.let { carryOut(field, it) }
+    }
+
+    /**
+     * Makes a command's changes and puts the selection where it says.
+     *
+     * As edits to the text like typing is, so the note saves and restyles the way it would
+     * if the marks had been typed by hand; batched, so the keyboard hears about them once
+     * rather than once each.
+     */
+    private fun carryOut(field: NoteEditor, result: NoteFormat.Result) {
+        val text = field.text ?: return
+        field.beginBatchEdit()
+        for (c in result.changes) text.replace(c.start, c.end, c.text)
+        field.endBatchEdit()
+        field.setSelection(
+            result.selStart.coerceIn(0, text.length),
+            result.selEnd.coerceIn(0, text.length)
+        )
+        // Back to the note, so the caret is the note's again and shows the marks the
+        // command just put down.
+        field.requestFocus()
+    }
+
+    /**
+     * Asks for the address to link the selection to - or, inside a link already, for its
+     * new one, with an empty answer taking the link off.
+     *
+     * The selection is taken before the prompt goes up and used when the answer comes back:
+     * nothing can be typed into the note meanwhile, and a note that has changed anyway -
+     * switched out from under the prompt - is left alone.
+     */
+    private fun askForLink(src: String, s: Int, e: Int) {
+        val existing = NoteFormat.linkAt(src, s, e)
+        onShowRenameDialog(
+            if (existing == null) "Add Link" else "Edit Link",
+            existing?.url.orEmpty(),
+            "Web address"
+        ) { typed ->
+            val field = notesEditText ?: return@onShowRenameDialog
+            if (field.text?.toString() != src) return@onShowRenameDialog
+            NoteFormat.link(src, s, e, typed)?.let { carryOut(field, it) }
+        }
+    }
+
+    /**
+     * Takes an empty list item's mark off, after the return that ended the list - see
+     * ListReturn - once it is certain the mark is still there to take.
+     */
+    private fun endList(start: Int, mark: String) {
+        main.post {
+            val text = notesEditText?.text ?: return@post
+            val end = start + mark.length
+            if (end <= text.length && text.subSequence(start, end).toString() == mark) {
+                text.delete(start, end)
+            }
+        }
     }
 
     /**
@@ -557,15 +755,11 @@ class NotepadApp(
                     saveLastNoteId()
 
                     currentNote?.let {
-                        isProgrammaticChange = true
                         notesEditText?.setText(it.content)
-                        isProgrammaticChange = false
                         loadNoteImages(it)
                     } ?: run {
                         // No notes left in this view
-                        isProgrammaticChange = true
                         notesEditText?.setText("")
-                        isProgrammaticChange = false
                         imageGallery?.visibility = View.GONE
                     }
 
@@ -593,9 +787,7 @@ class NotepadApp(
                         currentNote = newCurrentNote
                         saveLastNoteId()
                         newCurrentNote?.let {
-                            isProgrammaticChange = true
                             notesEditText?.setText(it.content)
-                            isProgrammaticChange = false
                         }
 
                         updateWindowTitle()
@@ -651,6 +843,7 @@ class NotepadApp(
         currentNote?.content = notesEditText?.text.toString()
         saveNotes()
         saveLastNoteId()
+        main.removeCallbacks(restyle)
     }
 
     /**
@@ -714,9 +907,7 @@ class NotepadApp(
                     // Switch to selected note
                     currentNote = note
                     saveLastNoteId()
-                    isProgrammaticChange = true
                     notesEditText?.setText(note.content)
-                    isProgrammaticChange = false
                     updateWindowTitle()
                     loadNoteImages(note)
                     notifyDataSetChanged()

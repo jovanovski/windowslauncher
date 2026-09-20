@@ -8,8 +8,27 @@ data class ContextMenuItem(
     val isChecked: Boolean = false,
     val action: (() -> Unit)? = null,
     val subActionIcon: Int? = null,  // Drawable resource ID
-    val subAction: (() -> Unit)? = null
-)
+    val subAction: (() -> Unit)? = null,
+    /**
+     * The key stroke shown right-aligned on a program's menu - "Ctrl+O", "F5", "Del".
+     *
+     * A phone has no keyboard to press it on, so it is decoration; it is also half of what
+     * makes a File menu read as a File menu, so programs still set it.
+     */
+    val shortcut: String? = null,
+    /** What opens to the side. Setting this implies [hasSubmenu]. */
+    val submenu: List<ContextMenuItem>? = null,
+) {
+    /** A menu separator is an item with nothing in it. */
+    val isSeparator: Boolean get() = title.isEmpty()
+
+    val opensSubmenu: Boolean get() = hasSubmenu || !submenu.isNullOrEmpty()
+
+    companion object {
+        /** The line between two groups of commands. */
+        fun separator() = ContextMenuItem("", isEnabled = false)
+    }
+}
 
 /** "Pin to Taskbar" / "Unpin from Taskbar", offered only by the Windows 7 superbar. */
 data class TaskbarPinItem(val isPinned: Boolean, val onToggle: () -> Unit) {
@@ -247,6 +266,22 @@ object ContextMenuItems {
     }
 
     // My Computer context menu items
+    // My Briefcase context menu items
+    fun getBriefcaseMenuItems(
+        onOpen: () -> Unit,
+        onUpdateAll: () -> Unit,
+        onMove: () -> Unit,
+        onHideBriefcase: () -> Unit
+    ): List<ContextMenuItem> {
+        return listOf(
+            ContextMenuItem("Open", isEnabled = true, action = onOpen),
+            ContextMenuItem("Update All", isEnabled = true, action = onUpdateAll),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Move Icon", isEnabled = true, action = onMove),
+            ContextMenuItem("Hide My Briefcase", isEnabled = true, action = onHideBriefcase)
+        )
+    }
+
     fun getMyComputerMenuItems(
         onOpen: () -> Unit,
         onMove: () -> Unit,

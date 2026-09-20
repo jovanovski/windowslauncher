@@ -4,12 +4,8 @@
     <string name="taskbar_widget_description">Windows XP-style taskbar widget with clock and system tray</string>
     <string name="accessibility_service_description">Allows the app to lock the screen using the shutdown button while preserving biometric unlock</string>
 
-    <!-- Screensaver options -->
-    <string-array name="screensaver_options">
-        <item>(None)</item>
-        <item>3D Pipes</item>
-        <item>Underwater</item>
-    </string-array>
+    <!-- Screensaver. The list itself lives in SaverCatalog.kt, next to the ids it saves. -->
+    <string name="screensaver_dismiss_description">Tap to stop the screen saver</string>
 
     <!-- Attribution tag labels -->
     <string name="attribution_weather">Weather location access</string>

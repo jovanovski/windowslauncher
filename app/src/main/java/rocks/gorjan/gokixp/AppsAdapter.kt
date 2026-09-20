@@ -60,19 +60,7 @@ class AppsAdapter(
             // the app back out of the list by position when they actually fire.
             itemView.setOnClickListener {
                 val app = boundApp() ?: return@setOnClickListener
-                if (MainActivity.isSystemApp(app.packageName)) {
-                    (context as? MainActivity)?.launchSystemApp(app.packageName)
-                } else {
-                    val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                    intent?.let {
-                        it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        context.startActivity(it)
-                        // Track as recently used app
-                        onAppLaunched?.invoke(app)
-                    }
-                }
-                // Close the start menu
-                onAppClick()
+                launchApp(app)
             }
 
             itemView.setOnLongClickListener {
@@ -188,6 +176,33 @@ class AppsAdapter(
         filteredItems = updated
         diff.dispatchUpdatesTo(this)
         return true
+    }
+
+    /**
+     * Opens the top entry of the current filtered list - what Enter in the search box acts
+     * on, like the highlighted first hit in the real Start menu. Returns false when the
+     * filter left no app to open, so the caller can fall back to a web search.
+     */
+    fun launchFirstResult(): Boolean {
+        val app = filteredItems.firstOrNull { it is AppInfo } as? AppInfo ?: return false
+        launchApp(app)
+        return true
+    }
+
+    private fun launchApp(app: AppInfo) {
+        if (MainActivity.isSystemApp(app.packageName)) {
+            (context as? MainActivity)?.launchSystemApp(app.packageName)
+        } else {
+            val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+            intent?.let {
+                it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(it)
+                // Track as recently used app
+                onAppLaunched?.invoke(app)
+            }
+        }
+        // Close the start menu
+        onAppClick()
     }
 
     private class FilterDiffCallback(

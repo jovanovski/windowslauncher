@@ -70,10 +70,9 @@ sealed class AppTheme {
             // This has to be here, at the point of reading, rather than done once as a
             // migration. The old string can re-enter preferences long after any migration
             // would have run: `allowBackup` is on with empty rules, so it arrives with a
-            // cloud restore onto a fresh install; PrefsBackup.restore clears and replaces
-            // wholesale from a Drive sync or an imported .reg; and the Registry Editor
-            // lets it be typed in by hand. Every one of those routes reads back through
-            // here.
+            // cloud restore onto a fresh install, and PrefsBackup.restore clears and
+            // replaces wholesale from a Drive sync or a backup file imported in Display
+            // Properties. Both of those routes read back through here.
             "Windows Phone 8", "Windows Phone 8.1" -> WindowsVista
             else -> WindowsXP // Default to XP if unknown
         }
@@ -286,13 +285,6 @@ class ThemeManager(private val context: Context) {
 
 
 
-    fun getRegeditIcon(): Int = when (getSelectedTheme()){
-        AppTheme.WindowsClassic -> R.drawable.regedit_icon_98
-        AppTheme.WindowsXP -> R.drawable.regedit_icon_xp
-        AppTheme.WindowsVista -> R.drawable.regedit_icon_vista
-        AppTheme.Windows7 -> R.drawable.regedit_icon_vista
-    }
-
     fun getSolitareIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.solitare_icon
         AppTheme.WindowsXP -> R.drawable.solitare_icon
@@ -359,6 +351,17 @@ class ThemeManager(private val context: Context) {
         AppTheme.WindowsXP -> R.drawable.my_computer_xp_icon
         AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
         AppTheme.Windows7 -> R.drawable.my_computer_win7_icon
+    }
+
+    /**
+     * My Briefcase. Windows 95 and 98 drew an actual briefcase; the Aero shells never had one
+     * and used a folder with the world on it for anything shared, which is what these are.
+     */
+    fun getBriefcaseIcon(): Int = when (getSelectedTheme()){
+        AppTheme.WindowsClassic -> R.drawable.briefcase_98_icon
+        AppTheme.WindowsXP -> R.drawable.briefcase_xp_icon
+        AppTheme.WindowsVista -> R.drawable.briefcase_vista_icon
+        AppTheme.Windows7 -> R.drawable.briefcase_win7_icon
     }
 
     fun getFileGenericIcon(): Int = when (getSelectedTheme()){

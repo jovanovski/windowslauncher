@@ -7,6 +7,7 @@ enum class IconType {
     FOLDER,
     RECYCLE_BIN,
     MY_COMPUTER,
+    BRIEFCASE,
     URL_SHORTCUT
 }
 
