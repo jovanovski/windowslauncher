@@ -215,7 +215,7 @@ class WinTabStrip(
         /** Where the first tab starts, leaving the page's corner visible beside it. */
         const val FIRST_TAB_X = 9
 
-        const val TAB_PAD_DP = 10
+        const val TAB_PAD_DP = 12
         const val MIN_TAB_DP = 40
         const val PAGE_INSET_DP = 4
     }

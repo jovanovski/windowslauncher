@@ -6352,12 +6352,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val tabView = contentView.findViewById<WinTabView>(R.id.display_tabs)
         tabView.setTabs(
             listOf(
-                WinTabView.Tab("Background", 70),
-                WinTabView.Tab("Screen Saver", 77),
-                WinTabView.Tab("Appearance", 70),
-                WinTabView.Tab("Effects", 45, enabled = false),
-                WinTabView.Tab("Web", 42, enabled = false),
-                WinTabView.Tab("Settings", 53),
+                WinTabView.Tab("Background", 74),
+                WinTabView.Tab("Screen Saver", 81),
+                WinTabView.Tab("Appearance", 74),
+                WinTabView.Tab("Effects", 49, enabled = false),
+                WinTabView.Tab("Web", 46, enabled = false),
+                WinTabView.Tab("Settings", 57),
             )
         )
         val tabPages = listOf(

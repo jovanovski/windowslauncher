@@ -88,7 +88,7 @@ abstract class WinSkin(val pal: WinPalette) {
     open val tabTop: Int = 9
     open val tabBottom: Int = 26
     open val selectedTabTop: Int = 7
-    open val tabTextBaseline: Int = 21
+    open val tabTextBaseline: Int = 23
 
     /** How far a selected tab spreads sideways past its natural bounds. */
     open val selectedTabBleed: Int = 2
