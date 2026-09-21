@@ -13,7 +13,7 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     - Windows 2000/ME
     - Windows XP
     - Windows Vista
-    - Windows 7, with the superbar: pin apps to the taskbar, Aero Peek, and the notification area flyout
+    - Windows 7
 - Working home screen, with desktop icons that can be renamed and changed (included are a bunch of icons from the era
 -   Working start menu as an app launcher
 -   Gestures:
@@ -31,6 +31,10 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     -   3 games: Minesweeper, Solitare, 3D Pinball Space Cadet
 -   Calendar & Weather Integration
 -   Windows Update (checks for a new APK version and lets you download it)
+
+## Keyboard
+Want a Windows keyboard to go along? Grab another one of my projects with a keyboard to fit all your themes: [https://github.com/jovanovski/WinBoard](https://github.com/jovanovski/WinBoard)
+![https://github.com/jovanovski/WinBoard](https://github.com/jovanovski/winboard/raw/main/docs/theme-windows-98.png)
 
 ## More Screenshots
 ![Start Menus](https://i.imgur.com/5ShmfUq.jpeg)
