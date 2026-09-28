@@ -14194,18 +14194,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val currentBanner = prefs.getString(KEY_START_BANNER_98, "start_banner_98") ?: "start_banner_98"
 
-        // Set the background using the asset image
+        // Set the background using the asset image, bottom-anchored at a fixed scale
         try {
-            val inputStream = assets.open("start_banners/$currentBanner.png")
-            val drawable = Drawable.createFromStream(inputStream, null)
-            bannerFrame.background = drawable
-            inputStream.close()
+            val bitmap = assets.open("start_banners/$currentBanner.png").use { BitmapFactory.decodeStream(it) }
+            bannerFrame.background = StartBannerDrawable(bitmap)
         } catch (e: Exception) {
             Log.w("MainActivity", "Failed to load start banner $currentBanner: ${e.message}")
             // Fallback to default drawable resource
             val resourceId = getBannerResourceId(currentBanner)
             if (resourceId != 0) {
-                bannerFrame.setBackgroundResource(resourceId)
+                BitmapFactory.decodeResource(resources, resourceId)?.let {
+                    bannerFrame.background = StartBannerDrawable(it)
+                }
             }
         }
     }
