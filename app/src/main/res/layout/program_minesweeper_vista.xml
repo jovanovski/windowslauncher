@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minesweeper as Vista and 7 drew it: glossy blue tiles, the time and mine counters in a bar below the board -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/minesweeper_vista_background"
+    android:orientation="vertical"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="8dp">
+
+    <!-- Menu Bar-->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/minesweeper_new_game"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItem"
+            android:text="New Game"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/MenuBarItemDisabled"
+            android:text="Help"/>
+
+    </LinearLayout>
+
+    <!-- 9x9 Grid -->
+    <GridLayout
+        android:id="@+id/mine_grid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:columnCount="9"
+        android:rowCount="9"
+        android:background="@drawable/minesweeper_vista_grid_border"
+        android:padding="2dp" />
+
+    <!-- Bottom bar: clock and time on the left, mine count and mine on the right -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_clock_vista" />
+
+        <TextView
+            android:id="@+id/timer_text"
+            android:layout_width="56dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/minesweeper_vista_counter"
+            android:fontFamily="@font/segoeui_font_family"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="0"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/bomb_text"
+            android:layout_width="56dp"
+            android:layout_height="24dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/minesweeper_vista_counter"
+            android:fontFamily="@font/segoeui_font_family"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="10"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
+
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/minesweeper_icon_vista" />
+    </LinearLayout>
+
+</LinearLayout>
