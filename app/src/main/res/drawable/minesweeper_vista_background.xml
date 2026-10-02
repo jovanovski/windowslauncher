@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Client area of the Vista/7 Minesweeper window: a pale blue wash that deepens toward the bottom -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#F4F7FB"
+        android:centerColor="#DCE6F2"
+        android:endColor="#BCCDE2" />
+</shape>

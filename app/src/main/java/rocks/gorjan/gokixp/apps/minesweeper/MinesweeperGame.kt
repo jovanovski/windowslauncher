@@ -19,6 +19,7 @@ import kotlin.random.Random
  */
 class MinesweeperGame(
     private val context: Context,
+    private val aero: Boolean,
     private val onSoundPlay: (String) -> Unit
 ) {
     companion object {
@@ -39,6 +40,14 @@ class MinesweeperGame(
     private var timerHandler: Handler? = null
     private var timerRunnable: Runnable? = null
 
+    // Cell sprites: the 98 board, or the glossy one Vista and 7 drew
+    private val buttonRes = if (aero) R.drawable.minesweeper_vista_button else R.drawable.minesweeper_button
+    private val flagRes = if (aero) R.drawable.minesweeper_vista_button_flag else R.drawable.minesweeper_button_flag
+    private val questionRes = if (aero) R.drawable.minesweeper_vista_button_question else R.drawable.minesweeper_button_question
+    private val emptyRes = if (aero) R.drawable.minesweeper_vista_grid_empty else R.drawable.minesweeper_grid_empty
+    private val mineRes = if (aero) R.drawable.minesweeper_vista_mine_unexploded else R.drawable.minesweeper_mine_unexploded
+    private val explodedRes = if (aero) R.drawable.minesweeper_vista_mine_exploded else R.drawable.minesweeper_mine_exploded
+
     // UI references
     private var bombDigit1: ImageView? = null
     private var bombDigit2: ImageView? = null
@@ -47,6 +56,9 @@ class MinesweeperGame(
     private var timerDigit2: ImageView? = null
     private var timerDigit3: ImageView? = null
     private var smileyButton: ImageView? = null
+    // The Vista/7 layout shows plain numbers instead of the seven-segment sprites
+    private var bombText: TextView? = null
+    private var timerText: TextView? = null
     private var newGameMenuItem: TextView? = null
     private var gridButtons = Array(GRID_SIZE) { Array<ImageView?>(GRID_SIZE) { null } }
 
@@ -70,6 +82,8 @@ class MinesweeperGame(
         timerDigit2 = contentView.findViewById(R.id.timer_digit_2)
         timerDigit3 = contentView.findViewById(R.id.timer_digit_3)
         smileyButton = contentView.findViewById(R.id.smiley_button)
+        bombText = contentView.findViewById(R.id.bomb_text)
+        timerText = contentView.findViewById(R.id.timer_text)
         newGameMenuItem = contentView.findViewById(R.id.minesweeper_new_game)
 
         val mineGrid = contentView.findViewById<GridLayout>(R.id.mine_grid)
@@ -78,7 +92,7 @@ class MinesweeperGame(
         for (row in 0 until GRID_SIZE) {
             for (col in 0 until GRID_SIZE) {
                 val button = ImageView(context).apply {
-                    setImageResource(R.drawable.minesweeper_button)
+                    setImageResource(buttonRes)
                     scaleType = ImageView.ScaleType.FIT_CENTER
 
                     val size = (28 * context.resources.displayMetrics.density).toInt()
@@ -194,7 +208,7 @@ class MinesweeperGame(
         for (row in 0 until GRID_SIZE) {
             for (col in 0 until GRID_SIZE) {
                 grid[row][col] = Cell()
-                gridButtons[row][col]?.setImageResource(R.drawable.minesweeper_button)
+                gridButtons[row][col]?.setImageResource(buttonRes)
             }
         }
 
@@ -304,20 +318,20 @@ class MinesweeperGame(
             !cell.isFlagged && !cell.isQuestionMarked -> {
                 // Place flag
                 cell.isFlagged = true
-                button.setImageResource(R.drawable.minesweeper_button_flag)
+                button.setImageResource(flagRes)
                 flagsPlaced++
             }
             cell.isFlagged -> {
                 // Change to question mark
                 cell.isFlagged = false
                 cell.isQuestionMarked = true
-                button.setImageResource(R.drawable.minesweeper_button_question)
+                button.setImageResource(questionRes)
                 flagsPlaced--
             }
             cell.isQuestionMarked -> {
                 // Remove question mark
                 cell.isQuestionMarked = false
-                button.setImageResource(R.drawable.minesweeper_button)
+                button.setImageResource(buttonRes)
             }
         }
 
@@ -338,20 +352,21 @@ class MinesweeperGame(
 
         when {
             cell.hasMine && exploded -> {
-                button.setImageResource(R.drawable.minesweeper_mine_exploded)
+                button.setImageResource(explodedRes)
             }
             cell.hasMine -> {
-                button.setImageResource(R.drawable.minesweeper_mine_unexploded)
+                button.setImageResource(mineRes)
             }
             cell.adjacentMines == 0 -> {
-                button.setImageResource(R.drawable.minesweeper_grid_empty)
+                button.setImageResource(emptyRes)
             }
-            cell.adjacentMines == 1 -> {
+            cell.adjacentMines == 1 && !aero -> {
                 button.setImageResource(R.drawable.minesweeper_1)
             }
             else -> {
-                // Use minesweeper_grid_2 through minesweeper_grid_8
-                val resourceName = "minesweeper_grid_${cell.adjacentMines}"
+                // minesweeper_grid_2..8 for 98, minesweeper_vista_grid_1..8 for Vista/7
+                val prefix = if (aero) "minesweeper_vista_grid_" else "minesweeper_grid_"
+                val resourceName = "$prefix${cell.adjacentMines}"
                 val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
                 button.setImageResource(resourceId)
             }
@@ -448,6 +463,7 @@ class MinesweeperGame(
     private fun updateBombCounter() {
         val remaining = MINE_COUNT - flagsPlaced
         val value = remaining.coerceIn(-99, 999)
+        bombText?.text = value.toString()
         updateDigitDisplay(bombDigit1, bombDigit2, bombDigit3, value)
     }
 
@@ -456,6 +472,7 @@ class MinesweeperGame(
      */
     private fun updateTimer() {
         val value = gameTime.coerceAtMost(999)
+        timerText?.text = value.toString()
         updateDigitDisplay(timerDigit1, timerDigit2, timerDigit3, value)
     }
 

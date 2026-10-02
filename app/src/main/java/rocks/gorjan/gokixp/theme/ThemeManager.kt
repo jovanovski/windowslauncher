@@ -321,6 +321,10 @@ class ThemeManager(private val context: Context) {
         AppTheme.Windows7 -> R.drawable.minesweeper_icon_vista
     }
 
+    // Vista and 7 shipped the redrawn Minesweeper; everything older keeps the 98 board.
+    fun getMinesweeperLayout(): Int =
+        if (isAeroTheme()) R.layout.program_minesweeper_vista else R.layout.program_minesweeper
+
 
     fun getPaintIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.paint_icon_98

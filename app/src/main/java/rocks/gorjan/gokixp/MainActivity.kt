@@ -8336,10 +8336,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         windowsDialog.setTaskbarIcon(themeManager.getMinesweeperIcon())
 
         // Inflate the minesweeper layout
-        val contentView = layoutInflater.inflate(R.layout.program_minesweeper, null)
+        val contentView = layoutInflater.inflate(themeManager.getMinesweeperLayout(), null)
 
         // Create Minesweeper game instance
-        val minesweeperGame = MinesweeperGame(this) { soundType ->
+        val minesweeperGame = MinesweeperGame(this, themeManager.isAeroTheme()) { soundType ->
             when (soundType) {
                 "click" -> playClickSound()
                 else -> playClickSound()
