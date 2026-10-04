@@ -266,7 +266,8 @@ internal class DesktopDestroyerView(
             lift()
         }
         // The original switched every bullet off when the picker came up, except termites.
-        bullets.removeAll { it.type != TERMITE }
+        // Fire stays too: changing weapons shouldn't put it out.
+        bullets.removeAll { it.type != TERMITE && it.type != FLAME && it.type != FLAME_FLY }
         sounds.stopLoops()
         mode = Mode.MENU
         invalidate()
