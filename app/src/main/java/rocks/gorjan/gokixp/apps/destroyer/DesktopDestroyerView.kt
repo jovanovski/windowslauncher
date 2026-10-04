@@ -440,8 +440,8 @@ internal class DesktopDestroyerView(
         deskCanvas.clipPath(washPath)
         deskCanvas.drawBitmap(original, 0f, 0f, null)
         deskCanvas.restore()
-        // Water puts out fires and washes termites away.
-        bullets.removeAll { (it.type == FLAME || it.type == TERMITE || it.type == FLAME_FLY) && hypot(it.x - px, it.y - py) < r * 1.5f }
+        // Water puts out fires. It does nothing to termites; only fire and a direct hit do.
+        bullets.removeAll { (it.type == FLAME || it.type == FLAME_FLY) && hypot(it.x - px, it.y - py) < r * 1.5f }
     }
 
     private fun releaseTermite(x: Float, y: Float) {
@@ -493,6 +493,13 @@ internal class DesktopDestroyerView(
             if (advance(b, landed)) it.remove()
         }
         bullets += landed
+
+        // Termites don't survive the flame-thrower.
+        val flames = bullets.filter { it.type == FLAME }
+        if (flames.isNotEmpty()) {
+            bullets.filter { t -> t.type == TERMITE && flames.any { hypot(it.x - t.x, it.y - t.y) < 24f * scale } }
+                .forEach { squish(it) }
+        }
 
         updateLoops()
     }
