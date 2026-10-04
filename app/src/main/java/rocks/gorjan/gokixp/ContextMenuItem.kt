@@ -42,7 +42,8 @@ object ContextMenuItems {
         onRefresh: () -> Unit,
         onChangeWallpaper: () -> Unit,
         onOpenInternetExplorer: () -> Unit,
-        onNewFolder: () -> Unit
+        onNewFolder: () -> Unit,
+        onAddWidget: () -> Unit
     ): List<ContextMenuItem> {
         return listOf(
             ContextMenuItem("Arrange Icons By", isEnabled = false, hasSubmenu = true),
@@ -52,9 +53,27 @@ object ContextMenuItems {
             ContextMenuItem("Paste Shortcut", isEnabled = false),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("New Folder", isEnabled = true, action = onNewFolder),
+            ContextMenuItem("Add Widget...", isEnabled = true, action = onAddWidget),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Properties", isEnabled = true, action = onChangeWallpaper)
         )
+    }
+
+    // An Android app widget on the desktop. Configure only for widgets that support it.
+    fun getDesktopWidgetMenuItems(
+        onMoveResize: () -> Unit,
+        onConfigure: (() -> Unit)?,
+        onRemove: () -> Unit
+    ): List<ContextMenuItem> {
+        val items = mutableListOf(
+            ContextMenuItem("Move / Resize", isEnabled = true, action = onMoveResize)
+        )
+        if (onConfigure != null) {
+            items.add(ContextMenuItem("Configure...", isEnabled = true, action = onConfigure))
+        }
+        items.add(ContextMenuItem.separator())
+        items.add(ContextMenuItem("Remove Widget", isEnabled = true, action = onRemove))
+        return items
     }
     
     // Desktop icon context menu items
