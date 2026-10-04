@@ -6,11 +6,13 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.UserManager
 import android.util.Log
+import android.view.LayoutInflater
 import android.widget.RelativeLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,6 +55,31 @@ class DesktopWidgetManager(
     private val density = activity.resources.displayMetrics.density
 
     private val widgetViews = mutableListOf<DesktopWidgetView>()
+
+    /** The Settings "Widget size" slider: how big widget content is drawn, 1 = as the app made it. */
+    var widgetScale: Float = readScale(prefs)
+        private set
+
+    fun setWidgetScale(scale: Float) {
+        widgetScale = scale
+        prefs.edit { putFloat(KEY_WIDGET_SCALE, scale) }
+        widgetViews.forEach { it.contentScale = scale }
+    }
+
+    /**
+     * The activity, but with a plain LayoutInflater. RemoteViews clones the host context's
+     * inflater, factory and all, and AppCompat's factory swaps ImageView/TextView for
+     * AppCompatImageView/MaterialTextView - whose setters aren't @RemotableViewMethod, so the
+     * provider's updates throw "can't use method with RemoteViews".
+     */
+    private val widgetContext: Context = object : ContextWrapper(activity) {
+        private val inflater by lazy {
+            LayoutInflater.from(activity.applicationContext).cloneInContext(this)
+        }
+
+        override fun getSystemService(name: String): Any? =
+            if (name == Context.LAYOUT_INFLATER_SERVICE) inflater else super.getSystemService(name)
+    }
 
     /** A widget part-way through being added: bound or being configured, not on the desktop yet. */
     private data class PendingAdd(val appWidgetId: Int, val info: AppWidgetProviderInfo, val centerX: Float, val centerY: Float)
@@ -239,8 +266,8 @@ class DesktopWidgetManager(
         val maxW = (container.width.takeIf { it > 0 } ?: activity.resources.displayMetrics.widthPixels)
         val maxH = (container.height.takeIf { it > 0 } ?: activity.resources.displayMetrics.heightPixels)
         val floor = (64 * density).toInt()
-        val width = info.minWidth.coerceAtLeast(floor).coerceAtMost(maxW)
-        val height = info.minHeight.coerceAtLeast(floor).coerceAtMost(maxH)
+        val width = (info.minWidth * widgetScale).toInt().coerceAtLeast(floor).coerceAtMost(maxW)
+        val height = (info.minHeight * widgetScale).toInt().coerceAtLeast(floor).coerceAtMost(maxH)
         val x = (add.centerX - width / 2f).coerceIn(0f, (maxW - width).toFloat().coerceAtLeast(0f))
         val y = (add.centerY - height / 2f).coerceIn(0f, (maxH - height).toFloat().coerceAtLeast(0f))
 
@@ -268,10 +295,11 @@ class DesktopWidgetManager(
         height: Int,
     ): DesktopWidgetView {
         // Created with the activity, not the application, so the widget inflates with a real theme
-        val hostView = host.createView(activity, appWidgetId, info)
+        val hostView = host.createView(widgetContext, appWidgetId, info)
         val view = DesktopWidgetView(activity, appWidgetId, hostView, info).apply {
             onLongPress = { v, sx, sy -> onWidgetLongPress?.invoke(v, sx, sy) }
             onGeometryChanged = { saveAll() }
+            contentScale = widgetScale
         }
         // Above the icons, level with Quick Glance, below windows and menus
         view.elevation = 5f * density
@@ -367,6 +395,16 @@ class DesktopWidgetManager(
         private const val HOST_ID = 0x5749
 
         const val KEY_DESKTOP_WIDGETS = "desktop_widgets"
+        const val KEY_WIDGET_SCALE = "desktop_widget_scale"
+
+        const val MIN_SCALE = 0.5f
+        const val MAX_SCALE = 1.5f
+
+        private fun readScale(prefs: android.content.SharedPreferences): Float = try {
+            prefs.getFloat(KEY_WIDGET_SCALE, 1f).coerceIn(MIN_SCALE, MAX_SCALE)
+        } catch (e: ClassCastException) {
+            1f
+        }
 
         private const val REQUEST_CONFIGURE_NEW = 0x5701
         private const val REQUEST_RECONFIGURE = 0x5702

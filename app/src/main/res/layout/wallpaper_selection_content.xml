@@ -709,6 +709,49 @@
             android:paddingLeft="4dp"
             android:layout_marginBottom="4dp" />
 
+        <!-- ==================== Widgets ==================== -->
+        <TextView
+            style="@style/Win95.SectionHeader"
+            android:text="Widgets" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Widget Size:"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/widget_scale_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="20"
+                android:progress="10" />
+
+            <TextView
+                android:id="@+id/widget_scale_value"
+                android:layout_width="36dp"
+                android:layout_height="wrap_content"
+                android:text="100%"
+                android:textSize="10sp"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:layout_marginStart="8dp"
+                android:gravity="end" />
+
+        </LinearLayout>
+
         <!-- ==================== Taskbar ==================== -->
         <TextView
             style="@style/Win95.SectionHeader"

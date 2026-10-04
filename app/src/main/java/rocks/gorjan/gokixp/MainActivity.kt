@@ -62,6 +62,7 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.core.graphics.scale
 import androidx.core.view.isNotEmpty
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.activity.result.contract.ActivityResultContracts
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -7031,6 +7032,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 applyTaskbarHeightOffset(offset)
 
                 Log.d("MainActivity", "Taskbar height offset changed to: $offset")
+            }
+
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        // Set up Widget Size slider: 50%..150% in steps of 5, applied live
+        val widgetScaleSlider = contentView.findViewById<android.widget.SeekBar>(R.id.widget_scale_slider)
+        val widgetScaleValue = contentView.findViewById<TextView>(R.id.widget_scale_value)
+        val currentWidgetPercent = (desktopWidgetManager.widgetScale * 100).roundToInt()
+        widgetScaleSlider.progress = (currentWidgetPercent - 50) / 5
+        widgetScaleValue.text = "$currentWidgetPercent%"
+        widgetScaleSlider.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val percent = 50 + progress * 5
+                widgetScaleValue.text = "$percent%"
+                desktopWidgetManager.setWidgetScale(percent / 100f)
             }
 
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}

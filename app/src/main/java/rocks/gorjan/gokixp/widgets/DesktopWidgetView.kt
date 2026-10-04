@@ -78,6 +78,21 @@ class DesktopWidgetView(
     }
 
     private val density = resources.displayMetrics.density
+
+    /**
+     * How big the widget's own content is drawn, 1 = as the app made it. The frame keeps its
+     * size; the widget is laid out at frame / scale and then scaled to fill it, so at 0.8 the
+     * app sees (and lays out for) a widget 25% bigger than the frame, with smaller text.
+     */
+    var contentScale = 1f
+        set(value) {
+            if (field == value) return
+            field = value
+            hostView.scaleX = value
+            hostView.scaleY = value
+            requestLayout()
+            if (layoutParams != null) reportSizeToProvider(layoutParams.width, layoutParams.height)
+        }
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
 
@@ -120,8 +135,20 @@ class DesktopWidgetView(
     init {
         clipChildren = true
         addView(hostView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        hostView.pivotX = 0f
+        hostView.pivotY = 0f
         // Draw the grips over the widget's own content
         setWillNotDraw(false)
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        if (contentScale == 1f) return
+        // Lay the widget out at frame / scale; the scale (pivot top-left) brings it back to fill the frame
+        hostView.measure(
+            MeasureSpec.makeMeasureSpec((measuredWidth / contentScale).toInt(), MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec((measuredHeight / contentScale).toInt(), MeasureSpec.EXACTLY),
+        )
     }
 
     fun setEditMode(enabled: Boolean) {
@@ -142,25 +169,25 @@ class DesktopWidgetView(
     private fun minWidthPx(): Int {
         if (!canResizeHorizontally) return width
         val declared = listOf(providerInfo.minResizeWidth, providerInfo.minWidth).filter { it > 0 }.minOrNull() ?: 0
-        return declared.coerceAtLeast(minFloor)
+        return (declared * contentScale).toInt().coerceAtLeast(minFloor)
     }
 
     private fun minHeightPx(): Int {
         if (!canResizeVertically) return height
         val declared = listOf(providerInfo.minResizeHeight, providerInfo.minHeight).filter { it > 0 }.minOrNull() ?: 0
-        return declared.coerceAtLeast(minFloor)
+        return (declared * contentScale).toInt().coerceAtLeast(minFloor)
     }
 
     private fun maxWidthPx(desktopWidth: Int): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && providerInfo.maxResizeWidth > 0) {
-            return providerInfo.maxResizeWidth.coerceAtMost(desktopWidth)
+            return (providerInfo.maxResizeWidth * contentScale).toInt().coerceAtMost(desktopWidth)
         }
         return desktopWidth
     }
 
     private fun maxHeightPx(desktopHeight: Int): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && providerInfo.maxResizeHeight > 0) {
-            return providerInfo.maxResizeHeight.coerceAtMost(desktopHeight)
+            return (providerInfo.maxResizeHeight * contentScale).toInt().coerceAtMost(desktopHeight)
         }
         return desktopHeight
     }
@@ -171,8 +198,9 @@ class DesktopWidgetView(
      */
     fun reportSizeToProvider(widthPx: Int, heightPx: Int) {
         if (widthPx <= 0 || heightPx <= 0) return
-        val widthDp = widthPx / density
-        val heightDp = heightPx / density
+        // The room the widget is laid out in, which is the frame before scaling
+        val widthDp = widthPx / contentScale / density
+        val heightDp = heightPx / contentScale / density
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 hostView.updateAppWidgetSize(Bundle(), listOf(SizeF(widthDp, heightDp)))
