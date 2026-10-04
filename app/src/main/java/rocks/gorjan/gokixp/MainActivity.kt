@@ -91,6 +91,7 @@ import rocks.gorjan.gokixp.agent.AgentAiSettings
 import rocks.gorjan.gokixp.agent.AgentView
 import rocks.gorjan.gokixp.agent.AiProvider
 import rocks.gorjan.gokixp.agent.TTSService
+import rocks.gorjan.gokixp.apps.destroyer.DesktopDestroyerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
 import rocks.gorjan.gokixp.apps.lights.SnowfallManager
@@ -170,6 +171,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val cursorHandler = Handler(Looper.getMainLooper())
     private var christmasLightsManager: ChristmasLightsManager? = null
     private var snowfallManager: SnowfallManager? = null
+    private var desktopDestroyer: DesktopDestroyerApp? = null
     private var jingleBellsMediaPlayer: MediaPlayer? = null
     private var cursorRunnable: Runnable? = null
     private lateinit var notificationBubble: RelativeLayout
@@ -1691,6 +1693,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showPinballDialog(appInfo = appInfo)
         }
 
+        // Register Desktop Destroyer
+        systemAppActions["system.destroyer"] = { _ ->
+            showDesktopDestroyer()
+        }
+
 
         // Register Clock
         systemAppActions["system.clock"] = { appInfo ->
@@ -1791,6 +1798,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "pinball.exe",
                 packageName = "system.pinball",
                 icon = createSquareDrawable(pinballDrawable)
+            ))
+        }
+
+        // Desktop Destroyer - the original program's own icon
+        val destroyerDrawable = AppCompatResources.getDrawable(this, R.drawable.desktop_destroyer)
+        if (destroyerDrawable != null) {
+            systemApps.add(AppInfo(
+                name = "Desktop Destroyer",
+                exeName = "stress.exe",
+                packageName = "system.destroyer",
+                icon = createSquareDrawable(destroyerDrawable)
             ))
         }
 
@@ -2175,7 +2193,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 listOf(
                     ContextMenuItem("Solitaire", action = { hideStartMenu(); launchSystemApp("system.solitare") }),
                     ContextMenuItem("Minesweeper", action = { hideStartMenu(); launchSystemApp("system.minesweeper") }),
-                    ContextMenuItem("Pinball", action = { hideStartMenu(); launchSystemApp("system.pinball") })
+                    ContextMenuItem("Pinball", action = { hideStartMenu(); launchSystemApp("system.pinball") }),
+                    ContextMenuItem("Desktop Destroyer", action = { hideStartMenu(); launchSystemApp("system.destroyer") })
                 ),
                 location[0] + view.width.toFloat(), location[1].toFloat()
             )
@@ -2223,6 +2242,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
+                "system.destroyer" ->AppCompatResources.getDrawable(this, R.drawable.desktop_destroyer)
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
                 else -> null
@@ -3743,6 +3763,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     // See enforceDefaultAppRoles.
                     defaultAppsGate != null -> {
                         Log.d("MainActivity", "Back pressed (modern): held by the default-apps wall")
+                    }
+                    desktopDestroyer?.onBackPressed() == true -> {
+                        Log.d("MainActivity", "Back pressed (modern): handled by Desktop Destroyer")
                     }
                     isStartMenuVisible -> {
                         // If start menu is open, close it
@@ -8402,6 +8425,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
+    /**
+     * Desktop Destroyer covers the whole launcher rather than opening a window: it snapshots
+     * the desktop and lets you wreck the snapshot, as the original did with Windows.
+     */
+    private fun showDesktopDestroyer() {
+        if (desktopDestroyer != null) return
+        desktopDestroyer = DesktopDestroyerApp(this) { desktopDestroyer = null }.also { it.launch() }
+    }
+
     private fun showPinballDialog(appInfo: AppInfo? = null) {
         // Create Windows-style dialog
         val windowsDialog = createThemedWindowsDialog()
@@ -12167,6 +12199,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             defaultAppsGate != null -> {
                 Log.d("MainActivity", "Back pressed (legacy): held by the default-apps wall")
             }
+            desktopDestroyer?.onBackPressed() == true -> {
+                Log.d("MainActivity", "Back pressed (legacy): handled by Desktop Destroyer")
+            }
             isStartMenuVisible -> {
                 // If start menu is open, close it
                 Log.d("MainActivity", "Back pressed: closing start menu")
@@ -12219,6 +12254,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Pause snowfall and save state
         snowfallManager?.pause()
 
+        // Desktop Destroyer stops its timer and its sounds while we're away
+        desktopDestroyer?.pause()
+
         // Stop sliding the wallpaper while backgrounded (restarts on return via reloadWallpaperBitmap)
         wallpaperSlideRunnable?.let { getWallpaperImageView()?.removeCallbacks(it) }
         wallpaperSlideRunnable = null
@@ -12234,6 +12272,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     override fun onResume() {
         super.onResume()
         refreshWeatherIfNeeded()
+        desktopDestroyer?.resume()
 
         // Section 2.3, last row: with the folder closed, the Briefcase catches up when the
         // launcher comes back, and no more often than that. Storage permission may also have
@@ -14593,7 +14632,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val isTouchingEditableEditText = isTouchOnEditableEditText(event)
 
             // Check if touch is in Solitaire or Minesweeper game window
-            val isTouchingGameWindow = isTouchInGameWindow(event)
+            val isTouchingGameWindow = isTouchInGameWindow(event) || desktopDestroyer != null
 
             when (event.action) {
                 MotionEvent.ACTION_DOWN,
