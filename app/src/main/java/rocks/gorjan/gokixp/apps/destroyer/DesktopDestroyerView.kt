@@ -17,6 +17,7 @@ import java.io.InputStream
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
@@ -78,6 +79,8 @@ internal class DesktopDestroyerView(
     private var sawDir = 5
     private var lastBurnX = 0f
     private var lastBurnY = 0f
+    private var lastWashX = 0f
+    private var lastWashY = 0f
     private var actionTicks = 0 // how long the hammer, stamp or hand stays down
     private var firedSincePress = false
     private var trackingButton = false
@@ -304,6 +307,10 @@ internal class DesktopDestroyerView(
                 lastX = px
                 lastY = py
             }
+            WASHER -> {
+                lastWashX = px
+                lastWashY = py
+            }
             FLAMER -> sounds.play("flame_begin", pan(px))
             COLORER -> shootColor()
             STAMP -> {
@@ -434,8 +441,17 @@ internal class DesktopDestroyerView(
 
     private fun wash() {
         val r = WASH_RADIUS * scale
+        // Clean the whole stroke since the last tick, not just where the finger is now, or a
+        // fast drag leaves a row of separate circles.
         washPath.reset()
-        washPath.addCircle(px, py, r, Path.Direction.CW)
+        val dx = px - lastWashX
+        val dy = py - lastWashY
+        val steps = max(1, (hypot(dx, dy) / (r / 3f)).toInt())
+        for (i in 0..steps) {
+            washPath.addCircle(lastWashX + dx * i / steps, lastWashY + dy * i / steps, r, Path.Direction.CW)
+        }
+        lastWashX = px
+        lastWashY = py
         deskCanvas.save()
         deskCanvas.clipPath(washPath)
         deskCanvas.drawBitmap(original, 0f, 0f, null)
@@ -454,10 +470,10 @@ internal class DesktopDestroyerView(
     }
 
     private fun termiteAt(x: Float, y: Float): Bullet? =
-        bullets.firstOrNull { it.type == TERMITE && hypot(it.x - x, it.y - y) < 20f * scale }
+        bullets.firstOrNull { it.type == TERMITE && hypot(it.x - x, it.y - y) < TERMITE_HIT_RADIUS * scale }
 
     private fun squishTermitesNear(x: Float, y: Float) {
-        bullets.filter { it.type == TERMITE && hypot(it.x - x, it.y - y) < 20f * scale }.forEach { squish(it) }
+        bullets.filter { it.type == TERMITE && hypot(it.x - x, it.y - y) < TERMITE_HIT_RADIUS * scale }.forEach { squish(it) }
     }
 
     private fun squish(t: Bullet) {
@@ -497,7 +513,7 @@ internal class DesktopDestroyerView(
         // Termites don't survive the flame-thrower.
         val flames = bullets.filter { it.type == FLAME }
         if (flames.isNotEmpty()) {
-            bullets.filter { t -> t.type == TERMITE && flames.any { hypot(it.x - t.x, it.y - t.y) < 24f * scale } }
+            bullets.filter { t -> t.type == TERMITE && flames.any { hypot(it.x - t.x, it.y - t.y) < 32f * scale } }
                 .forEach { squish(it) }
         }
 
@@ -538,6 +554,11 @@ internal class DesktopDestroyerView(
                                 y = b.ty
                                 life = random.nextInt(30, 70)
                                 frame = random.nextInt(8)
+                                // Landed fire creeps off slowly in a direction of its own.
+                                val heading = random.nextFloat() * 2f * PI.toFloat()
+                                val speed = random.nextFloat(0.4f, 1.2f) * scale
+                                vx = cos(heading) * speed
+                                vy = sin(heading) * speed
                             }
                         }
                     } else {
@@ -549,6 +570,10 @@ internal class DesktopDestroyerView(
             }
             FLAME -> {
                 if (b.t % 2 == 0) b.frame++
+                b.x = (b.x + b.vx).coerceIn(0f, width.toFloat())
+                b.y = (b.y + b.vy).coerceIn(0f, height.toFloat())
+                // ...burning the desktop underneath as it goes.
+                if (b.t % 6 == 0) stampOnDesk(art.scorches.random(random), b.x, b.y)
                 return b.t >= b.life
             }
             TERMITE -> moveTermite(b)
@@ -807,6 +832,7 @@ internal class DesktopDestroyerView(
         private const val COLORER_NOZZLE_Y = 105f
 
         private const val WASH_RADIUS = 30f
+        private const val TERMITE_HIT_RADIUS = 40f // generous, so a finger can hit one
 
         // The sawing chain-saw was drawn in eight poses; these are where each blade points
         // (degrees, counter-clockwise from right) and where its tip is.
