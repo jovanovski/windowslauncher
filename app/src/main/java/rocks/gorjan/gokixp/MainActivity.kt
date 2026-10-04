@@ -99,6 +99,9 @@ import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
 import rocks.gorjan.gokixp.apps.solitare.SolitareGame
 import rocks.gorjan.gokixp.quickglance.QuickGlanceWidget
+import rocks.gorjan.gokixp.widgets.DesktopWidgetManager
+import rocks.gorjan.gokixp.widgets.DesktopWidgetView
+import rocks.gorjan.gokixp.widgets.WidgetPickerView
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import androidx.lifecycle.lifecycleScope
@@ -167,6 +170,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var agentView: AgentView
     private lateinit var speechBubbleView: SpeechBubbleView
     private lateinit var quickGlanceWidget: QuickGlanceWidget
+    private lateinit var desktopWidgetManager: DesktopWidgetManager
     private lateinit var cursorEffect: ImageView
     private val cursorHandler = Handler(Looper.getMainLooper())
     private var christmasLightsManager: ChristmasLightsManager? = null
@@ -1154,6 +1158,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Set up Quick Glance widget
         setupQuickGlanceWidget()
+
+        // Put back the Android app widgets the user placed on the desktop
+        setupDesktopWidgets()
         
         // Start notification monitoring (after handler is initialized)
         startNotificationMonitoring()
@@ -3866,7 +3873,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 Log.d("MainActivity", "Single tap detected")
                 hideContextMenu()
-                if (isStartMenuVisible) {
+                if (::desktopWidgetManager.isInitialized && desktopWidgetManager.isEditing()) {
+                    // Tapping the wallpaper is how a widget's Move / Resize is finished
+                    exitDesktopWidgetEditMode()
+                } else if (isStartMenuVisible) {
                     hideStartMenu()
                 } else if (isTapToHideIconsEnabled()) {
                     // Tapping empty desktop space toggles icon visibility.
@@ -4146,6 +4156,85 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return maxOf(((wordCount / 140.0) * 60 * 1000).toLong(), 2000L)
     }
 
+    private fun setupDesktopWidgets() {
+        desktopWidgetManager = DesktopWidgetManager(this, desktopContainer)
+        desktopWidgetManager.onWidgetLongPress = { view, screenX, screenY ->
+            showDesktopWidgetContextMenu(view, screenX, screenY)
+        }
+        desktopWidgetManager.restoreWidgets()
+    }
+
+    private fun showDesktopWidgetContextMenu(view: DesktopWidgetView, screenX: Float, screenY: Float) {
+        if (!::contextMenu.isInitialized) return
+        selectedIcon?.setSelected(false)
+        selectedIcon = null
+
+        val menuItems = ContextMenuItems.getDesktopWidgetMenuItems(
+            onMoveResize = { startDesktopWidgetEditMode(view) },
+            onConfigure = if (desktopWidgetManager.canReconfigure(view)) {
+                { hideContextMenu(); desktopWidgetManager.reconfigure(view) }
+            } else null,
+            onRemove = {
+                hideContextMenu()
+                playRecycleSound()
+                desktopWidgetManager.removeWidget(view)
+            }
+        )
+        contextMenu.showMenu(menuItems, screenX, screenY)
+        isContextMenuVisible = true
+        if (isStartMenuVisible) hideStartMenu()
+    }
+
+    // Like an icon's "Move Icon": only one thing on the desktop is ever being moved
+    private fun startDesktopWidgetEditMode(view: DesktopWidgetView) {
+        selectedIcon?.setSelected(false)
+        selectedIcon = null
+        exitIconMoveMode()
+        exitQuickGlanceMoveMode()
+        hideContextMenu()
+        desktopWidgetManager.setEditing(view)
+    }
+
+    private fun exitDesktopWidgetEditMode() {
+        if (::desktopWidgetManager.isInitialized) desktopWidgetManager.exitEditMode()
+    }
+
+    /** The "Add Widget" window, opened from the desktop's context menu at ([x], [y]). */
+    private fun showAddWidgetDialog(x: Float, y: Float) {
+        hideContextMenu()
+        setCursorBusy()
+        // Listing every app's widgets takes a moment; let the busy cursor draw first
+        Handler(Looper.getMainLooper()).post {
+            val windowsDialog = createThemedWindowsDialog()
+            windowsDialog.setTitle("Add Widget")
+
+            val picker = WidgetPickerView(
+                context = this,
+                providers = desktopWidgetManager.availableProviders(),
+                appLabel = { desktopWidgetManager.appLabel(it) },
+                font = getThemePrimaryFont(),
+                onPicked = { info ->
+                    playClickSound()
+                    floatingWindowManager.removeWindow(windowsDialog)
+                    desktopWidgetManager.addWidget(info, x, y)
+                }
+            )
+            windowsDialog.setContentView(picker)
+            windowsDialog.setWindowSize(320, 440)
+            windowsDialog.setContextMenuView(contextMenu)
+            floatingWindowManager.showWindow(windowsDialog)
+            setCursorNormal()
+        }
+    }
+
+    @Deprecated("Widget configuration screens can only be started through AppWidgetHost, which reports here")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (::desktopWidgetManager.isInitialized) {
+            desktopWidgetManager.handleActivityResult(requestCode, resultCode)
+        }
+    }
+
     private fun setupQuickGlanceWidget() {
         Log.d("MainActivity", "Setting up Quick Glance widget...")
         
@@ -4309,7 +4398,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 },
                 onChangeWallpaper = { createAndShowWallpaperDialog() },
                 onOpenInternetExplorer = { showInternetExplorerDialog() },
-                onNewFolder = { createNewFolder(x, y) }
+                onNewFolder = { createNewFolder(x, y) },
+                onAddWidget = { showAddWidgetDialog(x, y) }
             )
             
             // Show the menu
@@ -5076,6 +5166,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         selectedIcon?.setSelected(false)
         selectedIcon = null
         exitQuickGlanceMoveMode()
+        exitDesktopWidgetEditMode()
         
         iconInMoveMode = iconView
         iconView.setSelected(true) // Use blue background selection effect
@@ -5097,6 +5188,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         selectedIcon?.setSelected(false)
         selectedIcon = null
         exitIconMoveMode()
+        exitDesktopWidgetEditMode()
         hideContextMenu()
         quickGlanceWidget.setMoveMode(true)
     }
@@ -12357,6 +12449,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Release wallpaper bitmap to save memory when fully backgrounded
         releaseWallpaperBitmap()
+
+        // Widgets don't need updating while nobody can see them
+        if (::desktopWidgetManager.isInitialized) {
+            desktopWidgetManager.stopListening()
+            desktopWidgetManager.exitEditMode()
+        }
     }
 
     override fun onRestart() {
@@ -12372,6 +12470,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // And pick the dots back up - see onStop, which puts them down.
         startNotificationMonitoring()
+
+        // Widgets catch up on whatever their apps sent while we were away
+        if (::desktopWidgetManager.isInitialized) desktopWidgetManager.startListening()
     }
 
     override fun onNewIntent(intent: Intent?) {
