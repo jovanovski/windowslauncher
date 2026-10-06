@@ -2108,6 +2108,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     if (!isStartMenuShowingApps) {
                         isStartMenuShowingApps = true
                         appListWrapper.visibility = View.VISIBLE
+                        scrollAppListToTop()
                         commandListWrapper?.visibility = View.GONE
                         allProgramsText?.text = if (selectedTheme is AppTheme.Windows7) "Back" else "Back to Pinned"
                         allProgramsArrow?.rotation = 180f
@@ -3472,6 +3473,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             hiddenApps = hiddenApps
         )
         appsRecyclerView.adapter = appsAdapter
+        // A new adapter has no scroll position, and stackFromEnd would lay it out from the
+        // last app. The list often arrives (async) after the menu already opened.
+        scrollAppListToTop()
 
         // Apply current theme to the adapter
         appsAdapter?.onThemeChanged(themeManager.getSelectedTheme())
@@ -3648,12 +3652,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 adjustStartMenuForKeyboard()
             }
 
-            // Scroll app list to top (async to avoid blocking)
-            if (::appsRecyclerView.isInitialized) {
-                appsRecyclerView.post {
-                    appsRecyclerView.scrollToPosition(0)
-                }
-            }
+            scrollAppListToTop()
 
             // Hide context menu if visible
             if (isContextMenuVisible) {
@@ -3742,9 +3741,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             appList98?.visibility = View.VISIBLE
             isProgramsMenuExpanded = true
             commandsAdapter?.setProgramsExpanded(true)
+            scrollAppListToTop()
         } else {
             isStartMenuShowingApps = true
             findViewById<LinearLayout>(R.id.app_list_wrapper)?.visibility = View.VISIBLE
+            scrollAppListToTop()
             findViewById<LinearLayout>(R.id.command_list_wrapper)?.visibility = View.GONE
             findViewById<TextView>(R.id.all_programs_text)?.text = "Back to Pinned"
             findViewById<ImageView>(R.id.all_programs_arrow)?.rotation = 180f
@@ -3781,10 +3782,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Adjust for keyboard if needed
             adjustStartMenuForKeyboard()
 
-            // Scroll app list to top
-            if (::appsRecyclerView.isInitialized) {
-                appsRecyclerView.scrollToPosition(0)
-            }
+            scrollAppListToTop()
 
             // Focus search box and show keyboard
             if (::searchBox.isInitialized) {
@@ -3797,12 +3795,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
 
+    /**
+     * Puts the start menu app list back on its first app. Only records a pending position,
+     * so it is cheap to call while the list is hidden; the next layout honours it.
+     */
+    private fun scrollAppListToTop() {
+        if (::appsRecyclerView.isInitialized) {
+            appsRecyclerView.scrollToPosition(0)
+        }
+    }
+
     private fun toggleProgramsMenu() {
         val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
 
         if (appList98 != null) {
             isProgramsMenuExpanded = !isProgramsMenuExpanded
             appList98.visibility = if (isProgramsMenuExpanded) View.VISIBLE else View.INVISIBLE
+            if (isProgramsMenuExpanded) scrollAppListToTop()
 
             // Update the adapter with the new expanded state
             commandsAdapter?.setProgramsExpanded(isProgramsMenuExpanded)
