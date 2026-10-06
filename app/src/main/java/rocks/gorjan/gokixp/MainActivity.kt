@@ -667,6 +667,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_CLOCK_24_HOUR = "clock_24_hour"
         private const val KEY_KNOWN_APPS = "known_apps"
         private const val KEY_ROVER_VISIBLE = "rover_visible"
+        private const val KEY_AGENT_ABOVE_WIDGETS = "agent_above_widgets"
         private const val KEY_RECYCLE_BIN_VISIBLE = "recycle_bin_visible"
         private const val KEY_MY_COMPUTER_VISIBLE = "my_computer_visible"
         private const val KEY_BRIEFCASE_VISIBLE = "briefcase_visible"
@@ -2420,6 +2421,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return prefs.getBoolean(KEY_ROVER_VISIBLE, true) // Default to visible
     }
     
+    /** Whether the desktop agent is drawn over the desktop widgets and Quick Glance, or under them. */
+    private fun isAgentAboveWidgets(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        return prefs.getBoolean(KEY_AGENT_ABOVE_WIDGETS, false) // Default to under, as it always was
+    }
+
+    /**
+     * Widgets and Quick Glance sit at 5dp, so an agent at the same height falls under them (they
+     * are added to the desktop after it). Half a dp more lifts it over them while staying below
+     * its own speech bubble (6dp) and every window and menu.
+     */
+    private fun applyAgentLayer() {
+        if (!::agentView.isInitialized) return
+        val dp = if (isAgentAboveWidgets()) 5.5f else 5f
+        agentView.elevation = dp * resources.displayMetrics.density
+    }
+
     private fun isRecycleBinVisible(): Boolean {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean(KEY_RECYCLE_BIN_VISIBLE, true) // Default to visible
@@ -4081,8 +4099,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Set elevation to render above desktop icons but below menus
         // Context menu: 100dp, Start menu: 10dp, Taskbar: 15dp
-        // Setting to 5dp puts it above desktop icons (0dp) but below all menus
-        agentView.elevation = 5f * resources.displayMetrics.density
+        // 5dp puts it above desktop icons (0dp) but below all menus; whether it also clears the
+        // widgets is the user's call (see applyAgentLayer)
+        applyAgentLayer()
         
         // Speech bubble should be above the agent
         speechBubbleView.elevation = 6f * resources.displayMetrics.density
@@ -6535,6 +6554,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val gestureBarCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_under_taskbar_checkbox)
         val showAgentCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_agent_checkbox)
         val agentSpinner = contentView.findViewById<android.widget.Spinner>(R.id.agent_spinner)
+        val agentAboveWidgetsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.agent_above_widgets_checkbox)
         val agentAiProviderSpinner = contentView.findViewById<android.widget.Spinner>(R.id.agent_ai_provider_spinner)
         val agentAiKeyInput = contentView.findViewById<EditText>(R.id.agent_ai_key_input)
         val agentAiEnabledCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.agent_ai_enabled_checkbox)
@@ -6693,6 +6713,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
+        }
+
+        // Set up whether the agent is drawn over or under the desktop widgets
+        agentAboveWidgetsCheckbox.isChecked = isAgentAboveWidgets()
+        agentAboveWidgetsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit { putBoolean(KEY_AGENT_ABOVE_WIDGETS, isChecked) }
+            applyAgentLayer()
         }
 
         // Set up the AI side: a key per service, and the two modes it unlocks
