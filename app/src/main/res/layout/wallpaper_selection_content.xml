@@ -910,6 +910,123 @@
             android:paddingLeft="4dp"
             android:layout_marginBottom="4dp" />
 
+        <!-- ==================== Default Apps ==================== -->
+        <TextView
+            android:id="@+id/default_apps_header"
+            style="@style/Win95.SectionHeader"
+            android:text="Default Apps" />
+        <View style="@style/Win95.SectionDivider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="The apps opened by the weather, the clock, the date, and a swipe right on the desktop."
+            android:textColor="#000000"
+            android:textSize="10dp"
+            android:fontFamily="@font/micross_block"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="Weather:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
+
+            <Spinner
+                android:id="@+id/default_weather_app_spinner"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="Clock:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
+
+            <Spinner
+                android:id="@+id/default_clock_app_spinner"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="Calendar:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
+
+            <Spinner
+                android:id="@+id/default_calendar_app_spinner"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="74dp"
+                android:layout_height="wrap_content"
+                android:text="Swipe right:"
+                android:textColor="#000000"
+                android:fontFamily="@font/micross_block"
+                android:textSize="11dp" />
+
+            <Spinner
+                android:id="@+id/default_swipe_right_app_spinner"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp" />
+
+        </LinearLayout>
+
         <!-- ==================== Notifications ==================== -->
         <TextView
             style="@style/Win95.SectionHeader"

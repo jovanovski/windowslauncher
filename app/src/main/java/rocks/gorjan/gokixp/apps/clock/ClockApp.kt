@@ -1,12 +1,8 @@
 package rocks.gorjan.gokixp.apps.clock
 
 import android.content.Context
-import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import android.provider.AlarmClock
-import android.provider.CalendarContract
-import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -25,7 +21,9 @@ import java.util.*
 class ClockApp(
     private val context: Context,
     private val onSoundPlay: () -> Unit,
-    private val onCloseWindow: () -> Unit
+    private val onCloseWindow: () -> Unit,
+    private val onOpenClock: () -> Unit,
+    private val onOpenCalendar: () -> Unit
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
@@ -135,12 +133,12 @@ class ClockApp(
         // Setup click listeners for opening default apps
         openCalendarView?.setOnClickListener {
             onSoundPlay()
-            openDefaultCalendar()
+            onOpenCalendar()
         }
 
         openClockView?.setOnClickListener {
             onSoundPlay()
-            openDefaultClock()
+            onOpenClock()
         }
 
         // Setup calendar
@@ -307,54 +305,6 @@ class ClockApp(
             }
 
             return textView
-        }
-    }
-
-    /**
-     * Open the default calendar app
-     */
-    private fun openDefaultCalendar() {
-        try {
-            val calendarIntent = Intent(Intent.ACTION_VIEW)
-            calendarIntent.data = CalendarContract.CONTENT_URI.buildUpon()
-                .appendPath("time")
-                .build()
-            calendarIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(calendarIntent)
-        } catch (e: Exception) {
-            Log.e("ClockApp", "Error opening calendar", e)
-            // Fallback: try to open calendar app directly
-            try {
-                val fallbackIntent = Intent(Intent.ACTION_MAIN)
-                fallbackIntent.addCategory(Intent.CATEGORY_APP_CALENDAR)
-                fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                context.startActivity(fallbackIntent)
-            } catch (e2: Exception) {
-                Log.e("ClockApp", "Error opening calendar fallback", e2)
-            }
-        }
-    }
-
-    /**
-     * Open the default clock/alarm app
-     */
-    private fun openDefaultClock() {
-        try {
-            val clockIntent = Intent(AlarmClock.ACTION_SHOW_ALARMS)
-            clockIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            context.startActivity(clockIntent)
-        } catch (e: Exception) {
-            Log.e("ClockApp", "Error opening clock", e)
-            // Fallback: try generic clock action
-            try {
-                val fallbackIntent = Intent(Intent.ACTION_MAIN)
-                fallbackIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-                fallbackIntent.setPackage("com.google.android.deskclock")
-                fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                context.startActivity(fallbackIntent)
-            } catch (e2: Exception) {
-                Log.e("ClockApp", "Error opening clock fallback", e2)
-            }
         }
     }
 
