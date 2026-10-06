@@ -28,7 +28,7 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
     -   Notepad - for storing notes but included tabs as well
     -   Paint - the sixteen tools, the palette and the pixel-exact drawing, with pinch to zoom; opens and saves BMP, PNG and JPEG
     -   Phone Dialer - working phone with basic features and speed dial
-    -   6 games: Minesweeper, Solitare, FreeCell (the original game numbers 1-32000 deal the same cards), Hearts (with three computer players), 3D Pinball Space Cadet and Desktop Destroyer (stress.exe) - the original Gemtree game's art and sounds, wrecking a snapshot of your actual desktop
+    -   7 games: Minesweeper, Solitare, FreeCell (the original game numbers 1-32000 deal the same cards), Hearts (with three computer players), 3D Pinball Space Cadet, Desktop Destroyer (stress.exe) - the original Gemtree game's art and sounds, wrecking a snapshot of your actual desktop - and Elf Bowling, on the 1998 original's own elves, art and sounds, with drag-and-tap touch controls
 -   Calendar & Weather Integration
 -   Windows Update (checks for a new APK version and lets you download it)
 

@@ -1717,6 +1717,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showDesktopDestroyer()
         }
 
+        // Register Elf Bowling
+        systemAppActions["system.elfbowling"] = { _ ->
+            showElfBowlingDialog()
+        }
+
 
         // Register Clock
         systemAppActions["system.clock"] = { appInfo ->
@@ -1846,6 +1851,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "stress.exe",
                 packageName = "system.destroyer",
                 icon = createSquareDrawable(destroyerDrawable)
+            ))
+        }
+
+        // Elf Bowling - the original program's own icon
+        AppCompatResources.getDrawable(this, R.drawable.elf_bowling)?.let {
+            systemApps.add(AppInfo(
+                name = "Elf Bowling",
+                exeName = "elfbowl.exe",
+                packageName = "system.elfbowling",
+                icon = createSquareDrawable(it)
             ))
         }
 
@@ -2244,7 +2259,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     ContextMenuItem("FreeCell", action = { hideStartMenu(); launchSystemApp("system.freecell") }),
                     ContextMenuItem("Hearts", action = { hideStartMenu(); launchSystemApp("system.hearts") }),
                     ContextMenuItem("Pinball", action = { hideStartMenu(); launchSystemApp("system.pinball") }),
-                    ContextMenuItem("Desktop Destroyer", action = { hideStartMenu(); launchSystemApp("system.destroyer") })
+                    ContextMenuItem("Desktop Destroyer", action = { hideStartMenu(); launchSystemApp("system.destroyer") }),
+                    ContextMenuItem("Elf Bowling", action = { hideStartMenu(); launchSystemApp("system.elfbowling") })
                 ),
                 location[0] + view.width.toFloat(), location[1].toFloat()
             )
@@ -2295,6 +2311,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.freecell" ->AppCompatResources.getDrawable(this, R.drawable.freecell_icon)
                 "system.hearts" ->AppCompatResources.getDrawable(this, R.drawable.hearts_icon)
                 "system.destroyer" ->AppCompatResources.getDrawable(this, R.drawable.desktop_destroyer)
+                "system.elfbowling" ->AppCompatResources.getDrawable(this, R.drawable.elf_bowling)
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
                 else -> null
@@ -8777,6 +8794,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         floatingWindowManager.showWindow(windowsDialog)
     }
 
+    private fun showElfBowlingDialog() {
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.elfbowling"
+        windowsDialog.setTitle("Elf Bowling")
+        windowsDialog.setTaskbarIcon(R.drawable.elf_bowling)
+        val game = rocks.gorjan.gokixp.apps.elfbowling.ElfBowlingGame(
+            this,
+            isMuted = { isSoundMuted() },
+            onQuit = { windowsDialog.closeWindow() },
+        )
+        windowsDialog.setContentView(game.root)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setWindowSizePercentage(96f, 80f)
+        windowsDialog.setOnCloseListener { game.cleanup() }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
     /**
      * Desktop Destroyer covers the whole launcher rather than opening a window: it snapshots
      * the desktop and lets you wreck the snapshot, as the original did with Windows.
@@ -14960,7 +14995,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         while (currentView != null) {
             val id = currentView.id
             if (id == R.id.solitare_game_area || id == R.id.mine_grid || id == R.id.pinball_web_view ||
-                id == R.id.freecell_table || id == R.id.hearts_table) {
+                id == R.id.freecell_table || id == R.id.hearts_table || id == R.id.elf_bowling_lane) {
                 return true
             }
             currentView = currentView.parent as? View
