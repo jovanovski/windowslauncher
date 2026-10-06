@@ -94,6 +94,8 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
     private var oldNum = 0
     private var sel: At? = null
     private var undo: List<Move> = emptyList()
+    /** How many of the undo moves are the player's own multi-card transfer, which flies as one stack. */
+    private var undoBlock = 0
     private var inProgress = false
     private var restartable = false
     private var wonState = false
@@ -107,7 +109,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
     )
     private var session = intArrayOf(0, 0)
 
-    private var flying: Flying? = null
+    private var flying: List<Flying> = emptyList()
     private var drag: Drag? = null
     private var reveal: At? = null
     private var tap: Tap? = null
@@ -348,18 +350,28 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
         val mine = s.moves.size
         cleanupHome(s)
         sel = null
-        playMoves(s.moves.toList(), if (instant) mine else 0)
+        val moves = s.moves.toList()
+        playMoves(moves, if (instant) mine else 0, if (isTransfer(moves, mine)) mine else 0)
     }
 
-    private fun playMoves(moves: List<Move>, instant: Int) {
+    /** The first [n] moves carry several cards from one column to another, through free cells or empty columns. */
+    private fun isTransfer(moves: List<Move>, n: Int) =
+        n > 1 && moves[0].f.isCol && moves[n - 1].t.isCol && moves[0].f.col != moves[n - 1].t.col
+
+    /** How many cards a transfer takes out of its source column: each leaves it once and none comes back. */
+    private fun transferSize(moves: List<Move>, n: Int) = moves.take(n).count { it.f.isCol && it.f.col == moves[0].f.col }
+
+    private fun playMoves(moves: List<Move>, instant: Int, block: Int) {
         busy = true
         update()
         scope.launch {
+            // A multi-card move flies straight to its column as one stack, then the steps behind it land at once
+            if (block > instant) glideStack(moves[0].f.col, moves[block - 1].t.col, transferSize(moves, block))
             for (i in moves.indices) {
                 if (dead) return@launch
                 val (f, t) = moves[i]
                 val c = take(b, f, t) ?: continue
-                if (i >= instant) glide(c, f, t)
+                if (i >= max(instant, block)) glide(c, f, t)
                 put(b, t, c)
                 if (t.isTop) king = if (t.top < 4) KING_LEFT else KING_RIGHT
                 update()
@@ -367,6 +379,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
             if (dead) return@launch
             busy = false
             undo = if (moves.size > 1 || (moves.isNotEmpty() && colOf(moves[0].f) != colOf(moves[0].t))) moves else emptyList()
+            undoBlock = block
             update()
             if (num != 0 && cardsLeft(b) == 0) won()
             else if (num != 0) checkLost()
@@ -394,24 +407,51 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
         val e = place(t, true)
         val dist = hypot(e.first - a.first, e.second - a.second) / density
         val fly = Flying(c, a.first, a.second)
-        flying = fly
+        flying = listOf(fly)
         tween(max(40f, dist / 2.4f)) { k ->
             fly.x = a.first + (e.first - a.first) * k
             fly.y = a.second + (e.second - a.second) * k
             table.invalidate()
         }
-        flying = null
+        flying = emptyList()
+    }
+
+    /** The bottom [n] cards of column [f] fly together onto column [t]; the board itself is left as it was. */
+    private suspend fun glideStack(f: Int, t: Int, n: Int) {
+        val l = table.l
+        if (opts.quick || l == null || n <= 0) return
+        val src = b.cols[f]
+        val from = colYs(f).takeLast(n)
+        val to = colYs(t, b.cols[t].size + n).takeLast(n)
+        val cards = src.takeLast(n)
+        val (ax, ex) = l.colX(f) to l.colX(t)
+        repeat(n) { src.removeAt(src.size - 1) }
+        val fly = cards.mapIndexed { j, c -> Flying(c, ax, from[j]) }
+        flying = fly
+        val dist = hypot(ex - ax, to[0] - from[0]) / density
+        tween(max(40f, dist / 2.4f)) { k ->
+            fly.forEachIndexed { j, p ->
+                p.x = ax + (ex - ax) * k
+                p.y = from[j] + (to[j] - from[j]) * k
+            }
+            table.invalidate()
+        }
+        src.addAll(cards)
+        flying = emptyList()
     }
 
     /** Undo takes back the last move, including the cards that went home after it. */
     private fun undo() {
         if (undo.isEmpty() || busy || num == 0) return
         val moves = undo
+        val block = undoBlock
         undo = emptyList()
         busy = true
         scope.launch {
             for (i in moves.indices.reversed()) {
                 if (dead) return@launch
+                // A multi-card move goes back the way it came, as one stack
+                if (i == block - 1) glideStack(moves[i].t.col, moves[0].f.col, transferSize(moves, block))
                 val to = moves[i].f
                 val from = moves[i].t
                 if (from.isCol && from.col == to.col) break
@@ -424,7 +464,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
                 } else {
                     c = take(b, from, null) ?: continue
                 }
-                glide(c, from, to)
+                if (i >= block) glide(c, from, to)
                 if (to.isTop) b.top[to.top] = c else b.cols[to.col].add(c)
                 update()
             }
@@ -997,7 +1037,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
                 if (d.from.isTop) ghost(canvas, l.topX(d.from.top), 0f, l.w, l.h)
                 cards.forEachIndexed { j, c -> card(canvas, c, d.x, d.y + j * l.step) }
             }
-            flying?.let { card(canvas, it.c, it.x, it.y) }
+            flying.forEach { card(canvas, it.c, it.x, it.y) }
 
             // Winning: the big smiling king
             if (wonState) {
