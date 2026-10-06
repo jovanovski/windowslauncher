@@ -704,8 +704,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WIDGET_Y = "widget_y"
         private const val KEY_SHOW_CALENDAR_EVENTS = "show_calendar_events"
         private const val KEY_IE_HOMEPAGE = "ie_homepage"
-        private const val KEY_SWIPE_RIGHT_APP = "swipe_right_app"
-        private const val KEY_WEATHER_APP = "weather_app"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
         private const val KEY_START_BANNER_98 = "start_banner_98"
         private const val KEY_GESTURE_BAR_VISIBLE = "gesture_bar_visible"
@@ -1920,7 +1918,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onSoundPlay = { playClickSound() },
             onCloseWindow = {
                 windowsDialog.closeWindow()
-            }
+            },
+            onOpenClock = { openDefaultClockApp() },
+            onOpenCalendar = { openCalendarApp() }
         )
 
         // Setup the app
@@ -1947,42 +1947,50 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
 
 
-    private fun openCalendarApp() {
-        try {
-            // Try to open the calendar app
-            val calendarIntent = Intent(Intent.ACTION_MAIN)
-            calendarIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-            
-            // First try Google Calendar
-            calendarIntent.setPackage("com.google.android.calendar")
-            try {
-                startActivity(calendarIntent)
-                return
-            } catch (e: Exception) {
-                // Google Calendar not available, try system calendar
-            }
-            
-            // Try system calendar
-            calendarIntent.setPackage("com.android.calendar")
-            try {
-                startActivity(calendarIntent)
-                return
-            } catch (e: Exception) {
-                // System calendar not available
-            }
-            
-            // Fallback: try to open any calendar app
-            val genericCalendarIntent = Intent(Intent.ACTION_VIEW)
-            genericCalendarIntent.data = android.provider.CalendarContract.CONTENT_URI
-            genericCalendarIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(genericCalendarIntent)
-            
-        } catch (e: Exception) {
-            // All calendar opening methods failed
-            Log.e("MainActivity", "Failed to open calendar app", e)
+    /**
+     * Opens the calendar: the one chosen in Settings > Default Apps, or else whichever the
+     * phone has, and if it has none, a nudge towards choosing one.
+     */
+    fun openCalendarApp() {
+        if (launchDefaultApp(DefaultAppRole.CALENDAR)) return
+
+        // The calendars known by name, so the phone's own is preferred over whatever else
+        // happens to answer a calendar intent
+        val knownCalendars = listOf(
+            "com.google.android.calendar",     // Google Calendar
+            "com.samsung.android.calendar",    // Samsung Calendar
+            "com.android.calendar",            // AOSP Calendar
+            "com.htc.calendar",                // HTC Calendar
+            "com.lge.calendar",                // LG Calendar
+            "com.miui.calendar",               // MIUI Calendar
+            "com.huawei.calendar"              // Huawei Calendar
+        )
+        for (pkg in knownCalendars) {
+            val intent = packageManager.getLaunchIntentForPackage(pkg) ?: continue
+            if (startIfResolvable(intent)) return
         }
+
+        val byCategory = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
+        if (startIfResolvable(byCategory)) return
+        val byContent = Intent(Intent.ACTION_VIEW, android.provider.CalendarContract.CONTENT_URI.buildUpon()
+            .appendPath("time").appendPath(System.currentTimeMillis().toString()).build())
+        if (startIfResolvable(byContent)) return
+
+        showNoDefaultAppNotification(DefaultAppRole.CALENDAR)
     }
-    
+
+    /**
+     * Opens the clock: the one chosen in Settings > Default Apps, or else whichever answers
+     * the system's show-alarms action, and if nothing does, a nudge towards choosing one.
+     */
+    fun openDefaultClockApp() {
+        if (launchDefaultApp(DefaultAppRole.CLOCK)) return
+        if (startIfResolvable(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))) return
+        val deskClock = packageManager.getLaunchIntentForPackage("com.google.android.deskclock")
+        if (deskClock != null && startIfResolvable(deskClock)) return
+        showNoDefaultAppNotification(DefaultAppRole.CLOCK)
+    }
+
     private fun setupStartMenu(theme: String? = null) {
         try {
             Log.d("MainActivity", "Setting up start menu...")
@@ -3051,28 +3059,130 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun setSwipeRightApp(appInfo: AppInfo) {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        prefs.edit {putString(KEY_SWIPE_RIGHT_APP, appInfo.packageName) }
+        setDefaultApp(DefaultAppRole.SWIPE_RIGHT, appInfo.packageName)
 
         Log.d("MainActivity", "Set swipe right app to: ${appInfo.name} (${appInfo.packageName})")
         showNotification("Swipe Right App changed", "Swipe right app set to ${appInfo.name}")
     }
 
-    private fun getSwipeRightApp(): String? {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        return prefs.getString(KEY_SWIPE_RIGHT_APP, null)
-    }
-
     private fun setWeatherApp(appInfo: AppInfo) {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        prefs.edit { putString(KEY_WEATHER_APP, appInfo.packageName) }
+        setDefaultApp(DefaultAppRole.WEATHER, appInfo.packageName)
 
         showNotification("Weather app set", "Tap the weather icon to open ${appInfo.name}")
     }
 
-    private fun getWeatherApp(): String? {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        return prefs.getString(KEY_WEATHER_APP, null)
+    private fun getDefaultApp(role: DefaultAppRole): String? =
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(role.prefKey, null)
+
+    private fun setDefaultApp(role: DefaultAppRole, packageName: String?) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
+            if (packageName == null) remove(role.prefKey) else putString(role.prefKey, packageName)
+        }
+    }
+
+    /**
+     * Opens the app chosen for [role] in Settings > Default Apps.
+     *
+     * False when none is chosen, or the one that was can no longer be opened - uninstalled,
+     * or a launcher program that has since been retired - so the caller can fall back to
+     * whatever the phone itself has to offer.
+     */
+    private fun launchDefaultApp(role: DefaultAppRole): Boolean {
+        val chosen = getDefaultApp(role) ?: return false
+        if (isSystemApp(chosen)) {
+            if (chosen !in systemAppActions) return false
+            launchSystemApp(chosen)
+            return true
+        }
+        val intent = packageManager.getLaunchIntentForPackage(chosen) ?: return false
+        return try {
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Couldn't open default ${role.label} app $chosen", e)
+            false
+        }
+    }
+
+    /** Starts [intent] only if something on this phone will answer it. */
+    private fun startIfResolvable(intent: Intent): Boolean {
+        if (intent.resolveActivity(packageManager) == null) return false
+        return try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Couldn't start $intent", e)
+            false
+        }
+    }
+
+    /**
+     * Says there is nothing to open for [role], and takes a tap on the bubble straight to
+     * the setting that fixes it. A phone without Google's apps - GrapheneOS, say - may have
+     * no clock or weather app the launcher knows to look for, and a tap that silently does
+     * nothing reads as a broken launcher.
+     */
+    private fun showNoDefaultAppNotification(role: DefaultAppRole) {
+        val what = role.label.lowercase()
+        showNotification(
+            "No $what app",
+            "There's no $what app set. Tap here to choose one in Settings."
+        ) { createAndShowWallpaperDialog("default_apps") }
+    }
+
+    /**
+     * Fills the Default Apps section of Settings: one picker per [DefaultAppRole], listing
+     * every app that can be opened, with "(Not set)" first to hand the choice back to the
+     * phone.
+     */
+    private fun setupDefaultAppSpinners(contentView: View, spinnerLayoutId: Int, dropdownLayoutId: Int) {
+        val spinners = mapOf(
+            DefaultAppRole.WEATHER to R.id.default_weather_app_spinner,
+            DefaultAppRole.CLOCK to R.id.default_clock_app_spinner,
+            DefaultAppRole.CALENDAR to R.id.default_calendar_app_spinner,
+            DefaultAppRole.SWIPE_RIGHT to R.id.default_swipe_right_app_spinner
+        )
+
+        // Names only - the Start menu's own list carries an icon for every app, which this
+        // has no use for and would be slow to build here
+        val choices = mutableMapOf<String, String>()
+        getSystemAppsList().forEach { choices[it.packageName] = it.name }
+        try {
+            val launchable = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            packageManager.queryIntentActivities(launchable, 0).forEach { info ->
+                val pkg = info.activityInfo.packageName
+                if (pkg != packageName && pkg !in choices) {
+                    choices[pkg] = info.loadLabel(packageManager).toString()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Couldn't list apps for Default Apps", e)
+        }
+        val apps = choices.entries.sortedBy { it.value.lowercase() }
+        val packages = listOf<String?>(null) + apps.map { it.key }
+        val names = listOf("(Not set)") + apps.map { it.value }
+
+        for ((role, spinnerId) in spinners) {
+            val spinner = contentView.findViewById<android.widget.Spinner>(spinnerId) ?: continue
+            val adapter = android.widget.ArrayAdapter(this, spinnerLayoutId, names)
+            adapter.setDropDownViewResource(dropdownLayoutId)
+            spinner.adapter = adapter
+            // A choice whose app has since gone shows as not set, which is what it now is
+            spinner.setSelection(packages.indexOf(getDefaultApp(role)).coerceAtLeast(0))
+            spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
+                    val picked = packages[position]
+                    // Setting the selection above calls this too; only a real change is saved,
+                    // so opening Settings never clears a choice whose app is gone for now
+                    if (picked == null && position == 0 && getDefaultApp(role) !in packages) return
+                    if (picked != getDefaultApp(role)) setDefaultApp(role, picked)
+                }
+
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
+            }
+        }
     }
     
     private fun showRecycleBin() {
@@ -6006,7 +6116,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
 
                 // The gestures that are pointed at one particular program.
-                for (key in listOf(KEY_SWIPE_RIGHT_APP, KEY_WEATHER_APP)) {
+                for (key in DefaultAppRole.entries.map { it.prefKey }) {
                     if (prefs.getString(key, null) in retiring) remove(key)
                 }
 
@@ -6730,6 +6840,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit { putBoolean(KEY_AGENT_ABOVE_WIDGETS, isChecked) }
             applyAgentLayer()
         }
+
+        setupDefaultAppSpinners(contentView, spinnerLayoutId, dropdownLayoutId)
 
         // Set up the AI side: a key per service, and the two modes it unlocks
         val aiProviders = AiProvider.entries
@@ -7651,6 +7763,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "screensaver" -> showScreen(screensaverScreen)
                 "appearance" -> showScreen(appearanceScreen)
                 "settings" -> showScreen(settingsScreen)
+                "default_apps" -> {
+                    showScreen(settingsScreen)
+                    // Straight to the section the notification was about, rather than the
+                    // top of a page it is some way down
+                    val header = contentView.findViewById<View>(R.id.default_apps_header)
+                    (header.parent?.parent as? android.widget.ScrollView)?.let { scroller ->
+                        scroller.post { scroller.smoothScrollTo(0, header.top) }
+                    }
+                }
             }
         }, 100) // Small delay to ensure window is fully rendered
     }
@@ -12294,65 +12415,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     fun launchSwipeRightApp() {
-        val swipeRightPackage = getSwipeRightApp()
-        
-        if (swipeRightPackage != null) {
-            Log.d("MainActivity", "📱 Launching swipe right app: $swipeRightPackage")
-            try {
-                if (isSystemApp(swipeRightPackage)) {
-                    launchSystemApp(swipeRightPackage)
-                } else {
-                    val intent = packageManager.getLaunchIntentForPackage(swipeRightPackage)
-                    if (intent != null) {
-                        intent.flags =
-                            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                        startActivity(intent)
-                        Log.d("MainActivity", "✅ Successfully launched swipe right app")
-                    } else {
-                        Log.w(
-                            "MainActivity",
-                            "Swipe right app not found, falling back to Google magazines"
-                        )
-                        launchGoogleMagazines()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Failed to launch swipe right app, falling back to Google magazines", e)
-                launchGoogleMagazines()
-            }
-        } else {
-            Log.d("MainActivity", "No swipe right app set, showing instruction toast")
-            showNotification("Tip", "Long press an app in the Start menu and select 'Set as Swipe Right App'")
-        }
-    }
-
-    private fun launchGoogleMagazines() {
-        Log.d("MainActivity", "📰 launchGoogleMagazines() called")
-        try {
-            // Try to launch Google magazines app directly
-            val magazinesIntent = packageManager.getLaunchIntentForPackage("com.google.android.apps.magazines")
-            if (magazinesIntent != null) {
-                Log.d("MainActivity", "✅ Launching Google magazines app")
-                magazinesIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                startActivity(magazinesIntent)
-                return
-            } else {
-                Log.w("MainActivity", "Google magazines app not found")
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to launch Google magazines: ${e.message}")
-        }
-
-        // Fallback: try to open in Play Store if app not installed
-        try {
-            val playStoreIntent = Intent(Intent.ACTION_VIEW)
-            playStoreIntent.data = "market://details?id=com.google.android.apps.magazines".toUri()
-            playStoreIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(playStoreIntent)
-            Log.d("MainActivity", "✅ Opened Google magazines in Play Store")
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to open Google magazines in Play Store: ${e.message}")
-        }
+        if (launchDefaultApp(DefaultAppRole.SWIPE_RIGHT)) return
+        Log.d("MainActivity", "No swipe right app to open")
+        showNoDefaultAppNotification(DefaultAppRole.SWIPE_RIGHT)
     }
 
     private fun launchGoogleSearch() {
@@ -12932,36 +12997,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     private fun handleWeatherTempTap() {
-        Log.d("MainActivity", "🌤️ Weather temp tapped - checking for saved weather app")
-
-        // Check if a custom weather app is set
-        val weatherAppPackage = getWeatherApp()
-
-        if (weatherAppPackage != null) {
-            // Launch the saved weather app
-            Log.d("MainActivity", "📱 Launching saved weather app: $weatherAppPackage")
-            try {
-                if (isSystemApp(weatherAppPackage)) {
-                    launchSystemApp(weatherAppPackage)
-                } else {
-                    val intent = packageManager.getLaunchIntentForPackage(weatherAppPackage)
-                    if (intent != null) {
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                        startActivity(intent)
-                        Log.d("MainActivity", "✅ Successfully launched saved weather app")
-                    } else {
-                        Log.w("MainActivity", "Saved weather app not found, falling back to default")
-                        launchDefaultWeatherApp()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error launching saved weather app, falling back to default", e)
-                launchDefaultWeatherApp()
-            }
-        } else {
-            // No custom app set, use default behavior
-            launchDefaultWeatherApp()
+        Log.d("MainActivity", "🌤️ Weather temp tapped - checking for a default weather app")
+        if (launchDefaultApp(DefaultAppRole.WEATHER)) return
+        // None chosen, or the one that was is gone: Google's, if this phone has it. Asked
+        // first, so a phone without it isn't put through a location prompt for nothing
+        if (packageManager.getLaunchIntentForPackage("com.google.android.apps.weather") == null) {
+            showNoDefaultAppNotification(DefaultAppRole.WEATHER)
+            return
         }
+        launchDefaultWeatherApp()
     }
 
     private fun launchDefaultWeatherApp() {
@@ -13011,31 +13055,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     private fun launchGoogleWeatherApp() {
         Log.d("MainActivity", "🌤️ launchGoogleWeatherApp() called")
-        try {
-            // Try to launch Google weather app directly
-            val weatherIntent = packageManager.getLaunchIntentForPackage("com.google.android.apps.weather")
-            if (weatherIntent != null) {
-                Log.d("MainActivity", "✅ Launching Google weather app")
-                weatherIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                startActivity(weatherIntent)
-                return
-            } else {
-                Log.w("MainActivity", "Google weather app not found")
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to launch Google weather app: ${e.message}")
-        }
+        val weatherIntent = packageManager.getLaunchIntentForPackage("com.google.android.apps.weather")
+        if (weatherIntent != null && startIfResolvable(weatherIntent)) return
 
-        // Fallback: try to open in Play Store if app not installed
-        try {
-            val playStoreIntent = Intent(Intent.ACTION_VIEW)
-            playStoreIntent.data = "market://details?id=com.google.android.apps.weather".toUri()
-            playStoreIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            startActivity(playStoreIntent)
-            Log.d("MainActivity", "✅ Opened Google weather app in Play Store")
-        } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to open Google weather app in Play Store: ${e.message}")
-        }
+        // Not a Play Store page for it: a phone without Google's apps may not have the
+        // Play Store either, and the user may well want some other weather app anyway
+        Log.w("MainActivity", "Google weather app not found")
+        showNoDefaultAppNotification(DefaultAppRole.WEATHER)
     }
 
     private fun handleWeatherTempRefresh() {

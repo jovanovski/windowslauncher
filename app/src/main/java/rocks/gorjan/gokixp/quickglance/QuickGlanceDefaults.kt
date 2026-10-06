@@ -97,6 +97,14 @@ object QuickGlanceDefaults {
     }
 
     private fun createCalendarTapAction(context: Context): TapAction {
+        // The launcher's own way to the calendar, which honours Settings > Default Apps
+        // and says so when there is no calendar to open
+        if (MainActivity.getInstance() != null) {
+            return TapAction.CustomAction {
+                MainActivity.getInstance()?.openCalendarApp()
+            }
+        }
+
         // Try common calendar apps in order of preference
         val calendarPackages = listOf(
             "com.google.android.calendar",     // Google Calendar
