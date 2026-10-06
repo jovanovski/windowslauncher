@@ -135,7 +135,8 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
     }
 
     init {
-        update()
+        // Opening FreeCell deals a game straight away, rather than waiting on Game > New Game.
+        newGame(NEW)
     }
 
     private fun gameMenu() = listOf(
