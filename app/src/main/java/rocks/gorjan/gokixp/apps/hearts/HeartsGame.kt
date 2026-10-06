@@ -82,8 +82,8 @@ class HeartsGame(private val context: Context, private val host: CardHost) {
 
     private val ui = WinUi(context)
     private val modals = CardModals(host, ui)
-    private val art = CardArt(context)
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val art = CardArt(context).apply { large = prefs.getBoolean("large", CardArt.solitaireLarge(context)) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val density = context.resources.displayMetrics.density
 
@@ -142,6 +142,7 @@ class HeartsGame(private val context: Context, private val host: CardHost) {
         ContextMenuItem("Options...", shortcut = "F7", action = { options() }),
         ContextMenuItem("Sound", shortcut = "F8", hasCheckbox = true, isChecked = sound, action = { toggleSound() }),
         ContextMenuItem("Score...", shortcut = "F9", action = { scoreSheet() }),
+        ContextMenuItem("Large Cards", hasCheckbox = true, isChecked = art.large, action = { toggleLarge() }),
         ContextMenuItem.separator(),
         ContextMenuItem("Exit", action = { host.closeWindow() }),
     )
@@ -169,6 +170,13 @@ class HeartsGame(private val context: Context, private val host: CardHost) {
     private fun toggleSound() {
         sound = !sound
         prefs.edit { putBoolean("sound", sound) }
+    }
+
+    /** Solitaire's high-visibility faces; the computer players' hands stay face down either way. */
+    private fun toggleLarge() {
+        art.large = !art.large
+        prefs.edit { putBoolean("large", art.large) }
+        table.invalidate()
     }
 
     private fun speed() = prefs.getString("speed", "normal") ?: "normal"

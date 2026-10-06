@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
@@ -12,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import kotlinx.coroutines.delay
+import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
 import rocks.gorjan.gokixp.winui.WinUi
 
@@ -35,9 +37,23 @@ interface CardHost {
 /**
  * The card faces and backs Solitaire already ships - the 98 deck, or Vista's on the Aero shells,
  * as Solitaire picks them - with the back Solitaire's Change Deck chose.
+ *
+ * [large] swaps the faces for Solitaire's high-visibility style ("Card Style"): one big rank
+ * and suit per card, readable on a phone where the 71x96 originals shrink to a thumbnail.
  */
 class CardArt(private val context: Context) {
-    private val aero = ThemeManager(context).isAeroTheme()
+    private val themeManager = ThemeManager(context)
+    private val aero = themeManager.isAeroTheme()
+    private val classic = themeManager.getSelectedTheme() == AppTheme.WindowsClassic
+    var large = false
+    private val rankPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = try {
+            context.resources.getFont(themeManager.getPrimaryFontRes(themeManager.getSelectedTheme()))
+        } catch (e: Exception) {
+            null
+        }
+    }
     private val backIndex = context.getSharedPreferences("SolitarePrefs", Context.MODE_PRIVATE).getInt("cardBack", 1)
     private val cache = HashMap<String, Drawable?>()
     private val clip = Path()
@@ -60,7 +76,7 @@ class CardArt(private val context: Context) {
      * shows no specks; [hilite] inverts it, which is how 98 shows the card a click picked up.
      */
     fun draw(canvas: Canvas, s: Int, r: Int, up: Boolean, x: Float, y: Float, w: Float, h: Float, hilite: Boolean = false) {
-        val d = (if (up) face(s, r) else drawable("solitare_card_back_$backIndex")) ?: return
+        val d = (if (up && large) drawable("solitare_card_empty") else if (up) face(s, r) else drawable("solitare_card_back_$backIndex")) ?: return
         val k = w / 71f * if (aero) 4f else 2f
         clip.reset()
         clip.addRoundRect(x, y, x + w, y + h, k, k, Path.Direction.CW)
@@ -70,11 +86,48 @@ class CardArt(private val context: Context) {
         d.colorFilter = if (hilite) invert else null
         d.draw(canvas)
         d.colorFilter = null
+        if (up && large) drawLarge(canvas, s, r, x, y, w, h, hilite)
         canvas.restore()
+    }
+
+    /**
+     * Solitaire's drawLargeCard, with its pixel offsets turned into fractions of the card's
+     * width so the same layout holds on FreeCell's narrower cards: the rank top left, the suit
+     * top right, and a big suit along the bottom.
+     */
+    private fun drawLarge(canvas: Canvas, s: Int, r: Int, x: Float, y: Float, w: Float, h: Float, hilite: Boolean) {
+        val red = s == 1 || s == 2
+        val ink = if (red) 0xFFFF0000.toInt() else 0xFF000000.toInt()
+        rankPaint.color = if (hilite) ink.inv() or 0xFF000000.toInt() else ink
+        rankPaint.textSize = w * if (classic) 0.69f else 0.46f
+        val pad = w * 0.05f
+        var rankX = x + w * 0.20f
+        if (r == 10) rankX += w * 0.054f
+        if (classic) rankX += w * 0.04f
+        canvas.drawText(RANKS[r - 1], rankX, y + pad + w * if (classic) 0.5f else 0.42f, rankPaint)
+
+        val symbol = drawable("solitare_${SUITS[s]}_symbol_large") ?: return
+        symbol.colorFilter = if (hilite) invert else null
+        val small = w * 0.35f
+        val sx = x + w * 0.75f - small / 2f + w * 0.03f
+        val sy = y + pad + w * 0.023f
+        symbol.setBounds(sx.toInt(), sy.toInt(), (sx + small).toInt(), (sy + small).toInt())
+        symbol.draw(canvas)
+        val big = w * 0.7f
+        val bx = x + (w - big) / 2f
+        val by = y + h - big - pad
+        symbol.setBounds(bx.toInt(), by.toInt(), (bx + big).toInt(), (by + big).toInt())
+        symbol.draw(canvas)
+        symbol.colorFilter = null
     }
 
     companion object {
         val SUITS = listOf("club", "diamond", "heart", "spade")
+        private val RANKS = listOf("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
+
+        /** The games start in whatever Card Style Solitaire was last left in. */
+        fun solitaireLarge(context: Context) =
+            context.getSharedPreferences("SolitarePrefs", Context.MODE_PRIVATE).getBoolean("largeCards", false)
     }
 }
 

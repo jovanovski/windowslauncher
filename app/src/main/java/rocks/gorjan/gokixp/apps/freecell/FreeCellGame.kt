@@ -80,8 +80,8 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
 
     private val ui = WinUi(context)
     private val modals = CardModals(host, ui)
-    private val art = CardArt(context)
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val art = CardArt(context).apply { large = prefs.getBoolean("large", CardArt.solitaireLarge(context)) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val handler = Handler(Looper.getMainLooper())
     private val density = context.resources.displayMetrics.density
@@ -143,6 +143,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
         ContextMenuItem.separator(),
         ContextMenuItem("Statistics...", shortcut = "F4", action = { statsDialog() }),
         ContextMenuItem("Options...", shortcut = "F5", action = { options() }),
+        ContextMenuItem("Large Cards", hasCheckbox = true, isChecked = art.large, action = { toggleLarge() }),
         ContextMenuItem.separator(),
         ContextMenuItem("Undo", shortcut = "F10", isEnabled = undo.isNotEmpty(), action = { undo() }),
         ContextMenuItem.separator(),
@@ -154,6 +155,13 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
             modals.message("About FreeCell", "FreeCell\nby Jim Horne\n\nGame numbers 1 to 32000 deal the same cards they always have.")
         }),
     )
+
+    /** Solitaire's high-visibility faces, for a table of cards shrunk to fit a phone. */
+    private fun toggleLarge() {
+        art.large = !art.large
+        prefs.edit { putBoolean("large", art.large) }
+        table.invalidate()
+    }
 
     /** The window is going: a game still being played counts as resigned, as it would after Yes. */
     fun cleanup() {
@@ -167,24 +175,14 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
 
     // ---------------------------------------------------------------- the deal
 
-    /** Microsoft's C library rand(), seeded with the game number. Games -1 and -2 are the hidden special deals. */
+    /**
+     * Microsoft's C library rand(), seeded with the game number.
+     *
+     * winos also had the hidden deals -1 and -2, which are impossible on purpose; they are left
+     * out here, along with #11982 (see [UNWINNABLE]), so that every game this deals can be won.
+     */
     private fun deal(n: Int): Array<MutableList<Card>> {
-        val cols = Array(8) { MutableList<Card?>(8) { null } }
         fun card(i: Int) = Card(i % 4, i / 4 + 1)
-        if (n == -1) {
-            var i = 0
-            for (pos in 0 until 7) { for (c in 0 until 4) cols[c][pos] = card(i++); i += 4 }
-            for (pos in 0 until 6) { i -= 12; for (c in 4 until 8) cols[c][pos] = card(i++) }
-            return Array(8) { c -> cols[c].filterNotNull().toMutableList() }
-        }
-        if (n == -2) {
-            var i = 3
-            for (c in 0 until 4) cols[c][0] = card(i--)
-            i = 51
-            for (pos in 1 until 7) for (c in 0 until 4) cols[c][pos] = card(i--)
-            for (pos in 0 until 6) for (c in 4 until 8) cols[c][pos] = card(i--)
-            return Array(8) { c -> cols[c].filterNotNull().toMutableList() }
-        }
         val out = Array(8) { mutableListOf<Card>() }
         var seed = n.toLong()
         fun rand(): Int {
@@ -667,7 +665,8 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
             if (kind == RESTART) start(if (was) num else oldNum)
             else {
                 selecting = kind == SELECT
-                val n = 1 + Random.nextInt(32000)
+                var n: Int
+                do n = 1 + Random.nextInt(32000) while (n == UNWINNABLE)
                 if (kind == NEW) start(n) else selectDialog(n)
             }
         }
@@ -676,7 +675,7 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
 
     private fun selectDialog(n: Int) {
         val input = ui.field(numeric = true).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
+            inputType = InputType.TYPE_CLASS_NUMBER
             setText(n.toString())
             selectAll()
             gravity = Gravity.CENTER
@@ -685,7 +684,11 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
         val ok = {
             val v = input.text.toString().trim()
             val chosen = v.toIntOrNull() ?: 0
-            if (chosen < -2 || chosen > 32000 || chosen == 0) input.selectAll()
+            if (chosen == UNWINNABLE) {
+                modals.message("FreeCell", "Game #$UNWINNABLE is the one deal that cannot be won. Choose another game number.") {
+                    input.selectAll()
+                }
+            } else if (chosen < 1 || chosen > 32000) input.selectAll()
             else { close(); start(chosen) }
         }
         val content = modals.panel().apply {
@@ -1006,6 +1009,12 @@ class FreeCellGame(private val context: Context, private val host: CardHost) {
 
     companion object {
         private const val PREFS = "FreeCellPrefs"
+
+        /**
+         * The only one of the 32,000 numbered deals that cannot be won with four free cells, as
+         * every exhaustive solver run since the Internet FreeCell Project (1994) has found.
+         */
+        private const val UNWINNABLE = 11982
         private const val NEW = 0
         private const val SELECT = 1
         private const val RESTART = 2
