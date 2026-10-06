@@ -414,7 +414,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                         val mainActivity = context as? MainActivity
 
                         // Check if over folder first (higher priority than recycle bin)
-                        val folderUnder = mainActivity?.isOverFolder(x + width / 2, y + height / 2)
+                        val folderUnder = if (canGoInFolder()) mainActivity?.isOverFolder(x + width / 2, y + height / 2) else null
 
                         if (folderUnder != null && !wasOverFolder) {
                             Helpers.performHapticFeedback(context)
@@ -461,7 +461,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                     val mainActivity = context as? MainActivity
 
                     // Check if dropped on folder first (only for regular icons, not folders or recycle bin)
-                    if (this !is RecycleBinView && this !is FolderView) {
+                    if (this !is RecycleBinView && this !is FolderView && canGoInFolder()) {
                         val folderUnder = mainActivity?.isOverFolder(x + width/2, y + height/2)
                         if (folderUnder != null) {
                             // Add icon to folder
@@ -574,6 +574,11 @@ open class DesktopIconView : LinearLayout, ThemeAware {
         updateSelectionTint()
     }
     
+    private fun canGoInFolder(): Boolean {
+        val type = getDesktopIcon()?.type ?: return true
+        return (context as? MainActivity)?.canGoInFolder(type) ?: true
+    }
+
     protected open fun showIconContextMenu(x: Float, y: Float) {
         // Use custom handler if set, otherwise use default desktop context menu
         if (customLongClickHandler != null) {

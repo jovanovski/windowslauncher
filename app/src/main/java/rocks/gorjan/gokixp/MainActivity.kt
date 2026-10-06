@@ -10753,6 +10753,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val json = prefs.getString(KEY_DESKTOP_ICONS, null) ?: return
 
+        // Icons taken out of a folder below, which need a free slot rather than their old one
+        val unfiledIds = mutableSetOf<String>()
 
         try {
             val gson = Gson()
@@ -10768,13 +10770,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 val x = (iconData["x"] as Double).toFloat()
                 val y = (iconData["y"] as Double).toFloat()
                 val id = iconData["id"] as String
-                val parentFolderId = iconData["parentFolderId"] as? String
+                val savedParentFolderId = iconData["parentFolderId"] as? String
                 val typeStr = iconData["type"] as? String
                 val targetUrl = iconData["targetUrl"] as? String
 
                 // Read grid indices (may be null for old data)
-                val portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
-                val landscapeGridIndex = (iconData["landscapeGridIndex"] as? Double)?.toInt()
+                var portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
+                var landscapeGridIndex = (iconData["landscapeGridIndex"] as? Double)?.toInt()
 
 
                 val iconType = if (typeStr != null) {
@@ -10795,6 +10797,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         "my.briefcase" -> IconType.BRIEFCASE
                         else -> IconType.APP
                     }
+                }
+
+                // Recycle Bin, My Computer and My Briefcase belong on the desktop: inside a
+                // folder their own click and menu do nothing and Settings can neither hide
+                // nor show them. One filed away by an older build comes back to the desktop
+                // in the first free slot, since its old one may have been taken since.
+                var parentFolderId = savedParentFolderId
+                if (parentFolderId != null && !canGoInFolder(iconType)) {
+                    Log.d("MainActivity", "Taking $name out of folder $parentFolderId")
+                    parentFolderId = null
+                    portraitGridIndex = null
+                    landscapeGridIndex = null
+                    unfiledIds.add(id)
                 }
 
                 try {
@@ -10953,7 +10968,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Post to ensure container has dimensions
         desktopContainer.post {
             // Migrate old x/y positions to grid indices if needed
-            migrateIconsToGridSystem()
+            migrateIconsToGridSystem(skipIds = unfiledIds)
 
             // Position icons based on grid indices for current orientation
             positionIconsFromGridIndices()
@@ -11509,6 +11524,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                y <= recycleBinY + recycleBinHeight + tolerance
     }
 
+    /** Whether an icon of this kind may be filed inside a folder. */
+    fun canGoInFolder(type: IconType): Boolean = when (type) {
+        IconType.RECYCLE_BIN, IconType.MY_COMPUTER, IconType.BRIEFCASE -> false
+        IconType.APP, IconType.FOLDER, IconType.URL_SHORTCUT -> true
+    }
+
     fun isOverFolder(x: Float, y: Float): FolderView? {
         // Check all desktop icon views to see if any folders are under the coordinates
         desktopIconViews.forEach { iconView ->
@@ -11838,13 +11859,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /**
      * Migrate icons from old x/y system to new grid index system
      */
-    private fun migrateIconsToGridSystem() {
+    private fun migrateIconsToGridSystem(skipIds: Set<String> = emptySet()) {
         val currentOrientation = getCurrentOrientation()
         var migrationCount = 0
 
         desktopIcons.forEach { icon ->
             // Skip icons in folders - they don't need grid positions
             if (icon.parentFolderId != null) return@forEach
+            // Left for reflowIconsWithoutPosition to put in a free slot
+            if (icon.id in skipIds) return@forEach
 
             // Check if icon needs migration (has no grid indices)
             if (icon.portraitGridIndex == null && icon.landscapeGridIndex == null) {
