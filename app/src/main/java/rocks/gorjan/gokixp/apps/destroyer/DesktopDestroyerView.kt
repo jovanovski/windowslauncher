@@ -360,14 +360,14 @@ internal class DesktopDestroyerView(
     private fun shootMachineGun() {
         firedSincePress = true
         sounds.play("mg_shot", pan(px))
-        val hx = px + random.nextFloat(-12f, 12f) * scale
-        val hy = py + random.nextFloat(-12f, 12f) * scale
+        val hx = px + random.nextFloat(-6f, 6f) * scale
+        val hy = py + random.nextFloat(-6f, 6f) * scale
         squishTermitesNear(hx, hy)
         stampOnDesk(art.holes.random(random), hx, hy)
         bullets += Bullet(SPARK).apply { x = hx; y = hy }
         bullets += Bullet(SHELL).apply {
-            x = px + 70f * scale
-            y = py + 42f * scale
+            x = px + (MG_EJECT_X - MG_HOT_X) * scale
+            y = py + (MG_EJECT_Y - MG_HOT_Y) * scale
             vx = random.nextFloat(3f, 7f) * scale
             vy = random.nextFloat(-9f, -5f) * scale
             floor = y + random.nextFloat(40f, 90f) * scale
@@ -662,11 +662,11 @@ internal class DesktopDestroyerView(
             }
             FLAME_FLY -> {
                 val f = (b.t * (art.flameFly.frames - 1) / b.life).coerceAtMost(art.flameFly.frames - 1)
-                drawSprite(canvas, art.flameFly, f, 0, b.x - 32 * scale, b.y - 32 * scale)
+                drawCentred(canvas, art.flameFly, f, b.x, b.y)
             }
             BLOB -> {
                 val f = (b.t * (art.blobs[b.kind].frames - 1) / b.life).coerceAtMost(art.blobs[b.kind].frames - 1)
-                drawSprite(canvas, art.blobs[b.kind], f, 0, b.x - 32 * scale, b.y - 32 * scale)
+                drawCentred(canvas, art.blobs[b.kind], f, b.x, b.y)
             }
         }
     }
@@ -680,8 +680,8 @@ internal class DesktopDestroyerView(
                 val tip = SAW_TIPS[sawDir]
                 at(canvas, art.sawCut, anim, sawDir, tip[0], tip[1])
             } else at(canvas, art.sawIdle, anim, 0, 58f, 31f)
-            MACHINE_GUN -> if (down) at(canvas, art.mgFire, anim, 0, 30f, 48f)
-                else at(canvas, art.mgIdle, 0, 0, 30f, 48f)
+            MACHINE_GUN -> if (down) at(canvas, art.mgFire, anim, 0, MG_HOT_X, MG_HOT_Y)
+                else at(canvas, art.mgIdle, 0, 0, MG_HOT_X, MG_HOT_Y)
             FLAMER -> at(canvas, art.flamer, if (down) anim else 0, 0, FLAMER_HOT_X, FLAMER_HOT_Y)
             COLORER -> at(canvas, art.colorer, if (down) anim else 0, 0, FLAMER_HOT_X, FLAMER_HOT_Y)
             PHASER -> if (down) at(canvas, art.phaserFire, anim, 0, 34f, 34f)
@@ -698,6 +698,12 @@ internal class DesktopDestroyerView(
     /** Draws a tool so that its hot spot (in the original's pixels) lands on the finger. */
     private fun at(canvas: Canvas, sheet: Sheet, frame: Int, dir: Int, hotX: Float, hotY: Float) =
         drawSprite(canvas, sheet, frame, dir, px - hotX * scale, py - hotY * scale)
+
+    /** Draws a frame with the middle of what is painted in it on (x, y), wherever in the frame that is. */
+    private fun drawCentred(canvas: Canvas, sheet: Sheet, frame: Int, x: Float, y: Float) {
+        val c = sheet.centre(frame)
+        drawSprite(canvas, sheet, frame, 0, x - c[0] * scale, y - c[1] * scale)
+    }
 
     private fun drawSprite(canvas: Canvas, sheet: Sheet, frame: Int, dir: Int, left: Float, top: Float) {
         dstRect.set(left, top, left + sheet.fw * scale, top + sheet.fh * scale)
@@ -827,10 +833,17 @@ internal class DesktopDestroyerView(
         // The throwers aim at the empty corner of their picture; their shots leave the nozzle.
         private const val FLAMER_HOT_X = 36f
         private const val FLAMER_HOT_Y = 40f
-        private const val FLAMER_NOZZLE_X = 101f
-        private const val FLAMER_NOZZLE_Y = 105f
-        private const val COLORER_NOZZLE_X = 113f
-        private const val COLORER_NOZZLE_Y = 105f
+        // The middle of the barrel's open end (the flamer's pilot light sits just left of it).
+        private const val FLAMER_NOZZLE_X = 107f
+        private const val FLAMER_NOZZLE_Y = 111f
+        private const val COLORER_NOZZLE_X = 107f
+        private const val COLORER_NOZZLE_Y = 111f
+
+        // The machine gun aims with its red laser dot; spent shells leave the breech.
+        private const val MG_HOT_X = 90.5f
+        private const val MG_HOT_Y = 85f
+        private const val MG_EJECT_X = 100f
+        private const val MG_EJECT_Y = 90f
 
         private const val WASH_RADIUS = 30f
         private const val TERMITE_HIT_RADIUS = 40f // generous, so a finger can hit one

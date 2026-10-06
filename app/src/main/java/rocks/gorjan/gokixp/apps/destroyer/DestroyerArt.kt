@@ -19,6 +19,26 @@ internal class Sheet(val bitmap: Bitmap, val frames: Int, val dirs: Int = 1) {
         out.set(f * fw, d * fh, f * fw + fw, d * fh + fh)
         return out
     }
+
+    // Where the painted pixels of each frame (first direction) are centred, in frame pixels.
+    // The flying flames and paint grow out of a corner of their frames, not the middle.
+    private val centres: Array<FloatArray> by lazy {
+        val px = IntArray(fw * fh)
+        Array(frames) { f ->
+            bitmap.getPixels(px, 0, fw, f * fw, 0, fw, fh)
+            var sx = 0L
+            var sy = 0L
+            var n = 0
+            for (i in px.indices) if (px[i] ushr 24 > 128) {
+                sx += i % fw
+                sy += i / fw
+                n++
+            }
+            if (n == 0) floatArrayOf(fw / 2f, fh / 2f) else floatArrayOf(sx.toFloat() / n, sy.toFloat() / n)
+        }
+    }
+
+    fun centre(frame: Int): FloatArray = centres[frame.mod(frames)]
 }
 
 /**
