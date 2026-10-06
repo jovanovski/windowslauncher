@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.StateListDrawable
 import android.util.TypedValue
+import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.CompoundButton
@@ -196,6 +197,9 @@ fun WinUi.radioButton(
     checked: Boolean = false,
     onChange: ((Boolean) -> Unit)? = null,
 ): RadioButton = RadioButton(context).apply {
+    // RadioGroup notes a child that arrives checked by its id before it hands out ids to
+    // children without one, so without an id of its own the first choice never unchecks.
+    id = View.generateViewId()
     dressChoice(this, text)
     val glyph = tickStates(radio = true)
     glyph.setBounds(0, 0, dp(13), dp(13))

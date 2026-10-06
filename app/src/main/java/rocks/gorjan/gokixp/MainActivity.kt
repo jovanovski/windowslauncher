@@ -1561,6 +1561,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.error_win7] = soundPool.load(audioContext, R.raw.error_win7, 1)
         soundIds[R.raw.warning_win7] = soundPool.load(audioContext, R.raw.warning_win7, 1)
         soundIds[R.raw.information_win7] = soundPool.load(audioContext, R.raw.information_win7, 1)
+        soundIds[R.raw.hearts_glass] = soundPool.load(audioContext, R.raw.hearts_glass, 1)
+        soundIds[R.raw.hearts_timpani] = soundPool.load(audioContext, R.raw.hearts_timpani, 1)
 
         // Preload egg sounds
         for (resourceId in eggSounds) {
@@ -1696,6 +1698,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             showSolitareDialog(appInfo = appInfo)
         }
 
+        // Register FreeCell
+        systemAppActions["system.freecell"] = { _ ->
+            showFreeCellDialog()
+        }
+
+        // Register Hearts
+        systemAppActions["system.hearts"] = { _ ->
+            showHeartsDialog()
+        }
+
         // Register Pinball
         systemAppActions["system.pinball"] = { appInfo ->
             showPinballDialog(appInfo = appInfo)
@@ -1795,6 +1807,24 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "solitare.exe",
                 packageName = "system.solitare",
                 icon = createSquareDrawable(solitareDrawable)
+            ))
+        }
+
+        // FreeCell and Hearts - winos's icons, the 98 ones
+        AppCompatResources.getDrawable(this, R.drawable.freecell_icon)?.let {
+            systemApps.add(AppInfo(
+                name = "FreeCell",
+                exeName = "freecell.exe",
+                packageName = "system.freecell",
+                icon = createSquareDrawable(it)
+            ))
+        }
+        AppCompatResources.getDrawable(this, R.drawable.hearts_icon)?.let {
+            systemApps.add(AppInfo(
+                name = "Hearts",
+                exeName = "mshearts.exe",
+                packageName = "system.hearts",
+                icon = createSquareDrawable(it)
             ))
         }
 
@@ -2201,6 +2231,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 listOf(
                     ContextMenuItem("Solitaire", action = { hideStartMenu(); launchSystemApp("system.solitare") }),
                     ContextMenuItem("Minesweeper", action = { hideStartMenu(); launchSystemApp("system.minesweeper") }),
+                    ContextMenuItem("FreeCell", action = { hideStartMenu(); launchSystemApp("system.freecell") }),
+                    ContextMenuItem("Hearts", action = { hideStartMenu(); launchSystemApp("system.hearts") }),
                     ContextMenuItem("Pinball", action = { hideStartMenu(); launchSystemApp("system.pinball") }),
                     ContextMenuItem("Desktop Destroyer", action = { hideStartMenu(); launchSystemApp("system.destroyer") })
                 ),
@@ -2250,6 +2282,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
+                "system.freecell" ->AppCompatResources.getDrawable(this, R.drawable.freecell_icon)
+                "system.hearts" ->AppCompatResources.getDrawable(this, R.drawable.hearts_icon)
                 "system.destroyer" ->AppCompatResources.getDrawable(this, R.drawable.desktop_destroyer)
                 "system.winamp" ->AppCompatResources.getDrawable(this, themeManager.getWinampIcon())
                 "system.wmp" ->AppCompatResources.getDrawable(this, themeManager.getWmpIcon())
@@ -8537,6 +8571,56 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
+     * The window a card game draws in, and the dialogs it opens: each a window of its own, as
+     * the originals' were, sized for a phone rather than for 640x480.
+     */
+    private fun cardHost(windowsDialog: WindowsDialog, iconRes: Int) = object : rocks.gorjan.gokixp.apps.cards.CardHost {
+        override fun openDialog(title: String, content: View, widthDp: Int, onClosed: () -> Unit): () -> Unit {
+            val dialog = createThemedWindowsDialog()
+            dialog.setTitle(title)
+            dialog.setTaskbarIcon(iconRes)
+            dialog.setContentView(content)
+            dialog.setWindowSize(widthDp)
+            dialog.setMinimizable(false)
+            dialog.setOnCloseListener(onClosed)
+            dialog.setContextMenuView(contextMenu)
+            floatingWindowManager.showWindow(dialog)
+            return { dialog.closeWindow() }
+        }
+
+        override fun playSound(resId: Int) = this@MainActivity.playSound(resId)
+        override fun setTitle(title: String) = windowsDialog.setTitle(title)
+        override fun closeWindow() = windowsDialog.closeWindow()
+    }
+
+    private fun showFreeCellDialog() {
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.freecell"
+        windowsDialog.setTitle("FreeCell")
+        windowsDialog.setTaskbarIcon(R.drawable.freecell_icon)
+        val game = rocks.gorjan.gokixp.apps.freecell.FreeCellGame(this, cardHost(windowsDialog, R.drawable.freecell_icon))
+        windowsDialog.setContentView(game.root)
+        windowsDialog.setMaximizable(true)
+        windowsDialog.setWindowSizePercentage(96f, 70f)
+        windowsDialog.setOnCloseListener { game.cleanup() }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
+    private fun showHeartsDialog() {
+        val windowsDialog = createThemedWindowsDialog()
+        windowsDialog.windowIdentifier = "system.hearts"
+        windowsDialog.setTitle("The Microsoft Hearts Network")
+        windowsDialog.setTaskbarIcon(R.drawable.hearts_icon)
+        val game = rocks.gorjan.gokixp.apps.hearts.HeartsGame(this, cardHost(windowsDialog, R.drawable.hearts_icon))
+        windowsDialog.setContentView(game.root)
+        windowsDialog.setWindowSizePercentage(96f, 70f)
+        windowsDialog.setOnCloseListener { game.cleanup() }
+        windowsDialog.setContextMenuView(contextMenu)
+        floatingWindowManager.showWindow(windowsDialog)
+    }
+
+    /**
      * Desktop Destroyer covers the whole launcher rather than opening a window: it snapshots
      * the desktop and lets you wreck the snapshot, as the original did with Windows.
      */
@@ -14790,7 +14874,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         var currentView: View? = touchedView
         while (currentView != null) {
             val id = currentView.id
-            if (id == R.id.solitare_game_area || id == R.id.mine_grid || id == R.id.pinball_web_view) {
+            if (id == R.id.solitare_game_area || id == R.id.mine_grid || id == R.id.pinball_web_view ||
+                id == R.id.freecell_table || id == R.id.hearts_table) {
                 return true
             }
             currentView = currentView.parent as? View

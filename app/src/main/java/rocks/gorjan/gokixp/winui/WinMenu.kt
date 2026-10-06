@@ -160,7 +160,12 @@ class WinMenuPopup(private val ui: WinUi) {
         }
         for (item in items) body.addView(rowFor(item))
 
-        window = PopupWindow(body, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+        // As wide as its longest command, not as wide as the screen will let it be: every row
+        // is match-parent with a weighted label, which a wrap-content popup otherwise stretches.
+        val unbounded = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        body.measure(unbounded, unbounded)
+
+        window = PopupWindow(body, body.measuredWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             isOutsideTouchable = true
             isFocusable = true
             elevation = if (ui.isClassic) 0f else 4f * ui.density

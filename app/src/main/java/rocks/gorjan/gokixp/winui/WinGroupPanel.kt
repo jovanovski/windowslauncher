@@ -36,14 +36,31 @@ class WinGroupPanel(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var caption = WinCaption(title)
 
+    /**
+     * How far the caption reaches above the frame's top line. The skins put the caption's
+     * baseline only a few pixels below that line, which on the fixed dialog grid lands in the
+     * gap above the box; a view clips to its own bounds, so here the frame is dropped by this
+     * much instead and the caption drawn inside.
+     */
+    private var overhang = 0f
+
     init {
         setWillNotDraw(false)
+        measureOverhang()
+    }
+
+    private fun measureOverhang() {
+        skin.textPaint(context, density, paint)
+        val top = kotlin.math.round(skin.groupTitleBaseline * density) + paint.fontMetrics.ascent
+        overhang = if (caption.text.isEmpty()) 0f else maxOf(0f, -top)
+        setPadding(0, kotlin.math.ceil(overhang).toInt(), 0, 0)
     }
 
     var title: String
         get() = caption.text
         set(value) {
             caption = WinCaption(value)
+            measureOverhang()
             invalidate()
         }
 
@@ -52,12 +69,16 @@ class WinGroupPanel(
         skin.textPaint(context, density, paint)
         val titleWidth = if (caption.text.isEmpty()) 0f else paint.measureText(caption.text)
 
-        skin.groupBox(e, width.toFloat(), height.toFloat(), titleWidth)
-        if (titleWidth <= 0f) return
-        skin.caption(
-            e, caption, paint,
-            e.px(skin.groupTitleX), e.px(skin.groupTitleBaseline),
-            isEnabled, skin.groupTitleColor
-        )
+        canvas.save()
+        canvas.translate(0f, overhang)
+        skin.groupBox(e, width.toFloat(), height - overhang, titleWidth)
+        if (titleWidth > 0f) {
+            skin.caption(
+                e, caption, paint,
+                e.px(skin.groupTitleX), e.px(skin.groupTitleBaseline),
+                isEnabled, skin.groupTitleColor
+            )
+        }
+        canvas.restore()
     }
 }
