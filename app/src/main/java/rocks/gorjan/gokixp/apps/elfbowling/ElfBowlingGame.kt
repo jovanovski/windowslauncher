@@ -32,7 +32,7 @@ import kotlin.random.Random
  * What changed for phones: the mouse that moved Santa is a finger dragged across the screen,
  * and the space bar that stopped the slider in front of him is a tap anywhere (the space bar
  * still works too). In a tall window the two halves of the screen stack, the elves over the
- * lane, so the game fills a phone held upright instead of shrinking to a strip.
+ * lane as on the Nintendo DS version, so the game fills a phone held upright.
  */
 class ElfBowlingGame(context: Context, isMuted: () -> Boolean, onQuit: () -> Unit) {
 
@@ -52,7 +52,7 @@ private class ElfBowlingView(
 ) : View(context) {
 
     private enum class Mode { TITLE, RULES, PLAY, OVER }
-    private enum class Phase { READY, ROLL_LEFT, ROLL_RIGHT, SETTLE, RAKE }
+    private enum class Phase { READY, WINDUP, ROLL_LEFT, ROLL_RIGHT, SETTLE, RAKE, CAGES }
     private enum class State { STAND, FLY, DOWN, GONE }
     private enum class Act { NONE, SIGN1, SIGN2, SIGN3, SMOKE, MOON, FART, HOLD_NOSE, DANCE, TALK, BLUSH, KICK }
 
@@ -111,7 +111,7 @@ private class ElfBowlingView(
         setShadowLayer(3f, 2f, 2f, Color.WHITE)
     }
     private val bestPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(40, 48, 110)
+        color = Color.rgb(255, 236, 150)
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
         textSize = 13f
@@ -156,6 +156,7 @@ private class ElfBowlingView(
     private var santaU = 0f
     private var santaPose = "santa1"
     private var santaPoseTicks = 0
+    private var santaY = SANTA_LOW
     private var slider = 7f
     private var sliderDir = 1f
     private var ballU0 = 0f
@@ -169,6 +170,8 @@ private class ElfBowlingView(
     private var rakeY = RAKE_UP
     private var rakeDir = 0
     private var rakeHold = 0
+    private var cageStage = 0
+    private var cageOff = CAGE_TOP
     private var lightsTicks = 0
     private var tauntCooldown = 60
     private var best = prefs.getInt(KEY_BEST, 0)
@@ -263,6 +266,10 @@ private class ElfBowlingView(
         gameOver = false
         showHint = true
         santaU = 0f
+        santaY = SANTA_LOW
+        santaPose = "santa1"
+        santaPoseTicks = 0
+        cageOff = CAGE_TOP
         rack()
         rakeY = RAKE_UP
         rakeDir = 0
@@ -296,8 +303,15 @@ private class ElfBowlingView(
         rowHit.fill(false)
         standingBefore = standing()
         showHint = false
+        santaPose = "santa1"
+        santaPoseTicks = 0
+        phase = Phase.WINDUP
+    }
+
+    /** Santa is up from behind the lane with the ball: off it goes. */
+    private fun letGo() {
         santaPose = "santa2"
-        santaPoseTicks = 14
+        santaPoseTicks = 8
         phase = Phase.ROLL_LEFT
         sounds.play("bowl_drop")
         sounds.roll(true)
@@ -323,7 +337,7 @@ private class ElfBowlingView(
             for (elf in titleElves) taunt(elf, titleElves, 140)
             return
         }
-        if (santaPoseTicks > 0 && --santaPoseTicks == 0) santaPose = "santa1"
+        stepSanta()
         if (lightsTicks > 0) {
             lightsTicks--
             if (lightsTicks % 4 == 0) sounds.play("light", 0.5f)
@@ -378,7 +392,9 @@ private class ElfBowlingView(
                 if (settleTicks > 0) settleTicks--
                 if (settleTicks == 0 && knocks.isEmpty() && elves.none { it.state == State.FLY }) scoreRoll()
             }
+            Phase.WINDUP -> if (santaY <= SANTA_HIGH) letGo()
             Phase.RAKE -> stepRake()
+            Phase.CAGES -> stepCages()
         }
         stepKnocks()
         stepElves()
@@ -565,10 +581,6 @@ private class ElfBowlingView(
                     rakeDir = 0
                     rakeHold = 10
                     for (elf in elves) if (elf.state != State.STAND) elf.state = State.GONE
-                    if (newRack) {
-                        rack()
-                        sounds.play(if (random.nextBoolean()) "rackpins" else "rack_pins2")
-                    }
                 }
             }
             rakeDir == 0 -> if (--rakeHold <= 0) rakeDir = -1
@@ -577,16 +589,69 @@ private class ElfBowlingView(
                 if (rakeY <= RAKE_UP) {
                     rakeY = RAKE_UP
                     rakeDir = 0
-                    if (gameOver) {
-                        finishGame()
-                    } else {
-                        sounds.play("bowl_back")
-                        phase = Phase.READY
-                        tauntCooldown = 30
+                    when {
+                        gameOver -> finishGame()
+                        newRack -> {
+                            // The cages come down for whoever is still standing, lift them away,
+                            // and bring down a fresh rack.
+                            phase = Phase.CAGES
+                            cageOff = CAGE_TOP
+                            cageStage = if (standing() > 0) 0 else 2
+                            if (cageStage == 2) rack()
+                        }
+                        else -> ready()
                     }
                 }
             }
         }
+    }
+
+    private fun ready() {
+        sounds.play("bowl_back")
+        phase = Phase.READY
+        tauntCooldown = 30
+    }
+
+    private fun stepCages() {
+        when (cageStage) {
+            0 -> {
+                cageOff += 12f
+                if (cageOff >= 0f) { cageOff = 0f; cageStage = 1; sounds.play("click") }
+            }
+            1 -> {
+                cageOff -= 10f
+                if (cageOff <= CAGE_TOP) { cageOff = CAGE_TOP; rack(); cageStage = 2 }
+            }
+            2 -> {
+                cageOff += 10f
+                if (cageOff >= 0f) {
+                    cageOff = 0f
+                    cageStage = 3
+                    sounds.play(if (random.nextBoolean()) "rackpins" else "rack_pins2")
+                }
+            }
+            else -> {
+                cageOff -= 12f
+                if (cageOff <= CAGE_TOP) { cageOff = CAGE_TOP; ready() }
+            }
+        }
+    }
+
+    /**
+     * Santa waits ducked down behind the near end of the lane with only his hat showing, comes
+     * up to bowl, turns round to watch the ball go, and ducks back down.
+     */
+    private fun stepSanta() {
+        if (santaPoseTicks > 0) {
+            santaPoseTicks--
+            if (santaPoseTicks == 0 && santaPose == "santa2") {
+                santaPose = "santa_walk_back"
+                santaPoseTicks = 36
+            }
+        }
+        val target = if (phase == Phase.WINDUP || santaPoseTicks > 0) SANTA_HIGH else SANTA_LOW
+        santaY += (target - santaY).coerceIn(-14f, 10f)
+        if (santaY >= SANTA_LOW && santaPoseTicks == 0) santaPose = "santa1"
     }
 
     private fun finishGame() {
@@ -701,12 +766,12 @@ private class ElfBowlingView(
         if (mirror) canvas.restore()
     }
 
-    private fun drawBackdrop(canvas: Canvas, fromX: Float, toX: Float) {
+    private fun drawBackdrop(canvas: Canvas, fromX: Float, toX: Float, bases: Boolean) {
         canvas.drawRect(fromX, 0f, toX, 480f, blackPaint)
         sprite(canvas, "mountains", 107f, 107f)
         sprite(canvas, "mountains", 319f, 129f)
         sprite(canvas, "mountains", 532f, 107f, mirror = true)
-        for (i in 0 until 20) {
+        if (bases) for (i in 0 until 20) {
             val x = 16f + 32f * i
             if (x + 16f > fromX && x - 16f < toX) sprite(canvas, "mountain_base", x, 347f)
         }
@@ -720,11 +785,21 @@ private class ElfBowlingView(
     private fun drawLeft(canvas: Canvas, pinsX: Float? = null, pinsY: Float = 0f) {
         canvas.save()
         canvas.clipRect(0f, 0f, 320f, 480f)
-        drawBackdrop(canvas, 0f, 320f)
+        drawBackdrop(canvas, 0f, 320f, bases = false)
         sprite(canvas, "left_scene_top", 80f, 92f)
         sprite(canvas, "left_scene_top", 240f, 92f, mirror = true)
         sprite(canvas, "left_scene_bottom", 80f, 332f)
         sprite(canvas, "left_scene_bottom", 240f, 332f, mirror = true)
+
+        // The same elves, small, in the dark at the far end of the lane.
+        canvas.drawRect(121f, 184f, 199f, 217f, blackPaint)
+        canvas.save()
+        canvas.clipRect(116f, 184f, 204f, 240f)
+        canvas.translate(160f, MINI_FEET)
+        canvas.scale(MINI, MINI)
+        canvas.translate(-480f, -322f)
+        drawElves(canvas, withBall = false)
+        canvas.restore()
 
         if (!birdX.isNaN()) {
             val frames = if (birdCarries) BIRD_FROG else BIRD
@@ -747,7 +822,7 @@ private class ElfBowlingView(
         val rolling = mode == Mode.PLAY && phase == Phase.ROLL_LEFT
         if (rolling) {
             val y = leftBallY()
-            sprite(canvas, ballSprite(32f - 18f * ballT), leftBallX(), y)
+            sprite(canvas, ballSprite(52f - 38f * ballT), leftBallX(), y)
         }
 
         // The slider, and the sign that explains it.
@@ -757,11 +832,12 @@ private class ElfBowlingView(
                 val name = when (abs(i - lit)) { 0 -> "marker_on"; 1 -> "marker_half"; else -> "marker_off" }
                 sprite(canvas, name, 76f + 12f * i, 370f)
             }
+            sprite(canvas, "marker_off", 160f, 357f)
         }
 
         val santaX = santaBallX() - 66f
-        sprite(canvas, santaPose, santaX, 420f)
-        if (mode != Mode.PLAY || phase == Phase.READY) sprite(canvas, "ball60", santaX + 66f, 465f)
+        sprite(canvas, santaPose, santaX, santaY)
+        if (phase == Phase.WINDUP) sprite(canvas, "ball60", santaX + 66f, santaY + 45f)
         if (mode == Mode.PLAY && phase == Phase.READY && showHint) sprite(canvas, "hint1a", 160f, 335f)
 
         drawSnow(canvas)
@@ -773,15 +849,24 @@ private class ElfBowlingView(
     private fun drawRight(canvas: Canvas) {
         canvas.save()
         canvas.clipRect(320f, 0f, 640f, 480f)
-        drawBackdrop(canvas, 320f, 640f)
+        canvas.drawRect(320f, 0f, 640f, 480f, blackPaint)
         sprite(canvas, "right_scene_top", 400f, 40f)
         sprite(canvas, "right_scene_top", 560f, 40f, mirror = true)
         sprite(canvas, "right_scene_bottom", 400f, 280f)
         sprite(canvas, "right_scene_bottom", 560f, 280f, mirror = true)
+        drawElves(canvas, withBall = true)
+        if (mode == Mode.OVER) drawFinalScore(canvas)
+        drawSnow(canvas)
+        canvas.restore()
+    }
 
+    /** The elves, the ball among them, and the rake and cages that clear them. */
+    private fun drawElves(canvas: Canvas, withBall: Boolean) {
         for (elf in elves) if (elf.state == State.DOWN) sprite(canvas, elf.downSprite, elf.x, elf.y - 45f, elf.vx < 0f)
 
-        val showBall = mode == Mode.PLAY && phase == Phase.ROLL_RIGHT
+        val caged = phase == Phase.CAGES
+        val hanging = if (caged && (cageStage == 1 || cageStage == 2)) cageOff else 0f
+        val showBall = withBall && mode == Mode.PLAY && phase == Phase.ROLL_RIGHT
         val by = rightBallY()
         val size = 80f - 56f * min(1f, ballQ)
         val ballBottom = by + size / 2f
@@ -792,17 +877,16 @@ private class ElfBowlingView(
                 drawRightBall(canvas, by, size)
                 ballDrawn = true
             }
-            drawElf(canvas, elf, elf.homeX, elf.feetY - 45f)
+            drawElf(canvas, elf, elf.homeX, elf.feetY - 45f + hanging)
         }
         if (!ballDrawn) drawRightBall(canvas, by, size)
 
         for (elf in elves) if (elf.state == State.FLY) sprite(canvas, "elf_fly0", elf.x, elf.y - 45f, elf.vx < 0f)
 
+        if (caged) for (elf in elves) {
+            if (cageStage >= 2 || elf.state == State.STAND) sprite(canvas, "one_racker", elf.homeX, elf.feetY - 142f + cageOff)
+        }
         sprite(canvas, "rake", 480f, rakeY)
-
-        if (mode == Mode.OVER) drawFinalScore(canvas)
-        drawSnow(canvas)
-        canvas.restore()
     }
 
     private fun drawRightBall(canvas: Canvas, y: Float, size: Float) {
@@ -859,9 +943,9 @@ private class ElfBowlingView(
         sprite(canvas, if (ball >= 1) "ball_on" else "ball_off", 300f + dx, 473f + dy)
     }
 
-    private fun drawScoreboard(canvas: Canvas) {
+    private fun drawScoreboard(canvas: Canvas, lights: Boolean = true) {
         val lightsOn = lightsTicks > 0 && (lightsTicks / 4) % 2 == 0
-        sprite(canvas, if (lightsOn) "lights_on" else "lights_off", 317f, 66f)
+        if (lights) sprite(canvas, if (lightsOn) "lights_on" else "lights_off", 317f, 66f)
         sprite(canvas, "score_board", 317f, 66f)
         if (pressed == "exit") sprite(canvas, "quit_on", 507f, 66f)
         val marks = marks()
@@ -880,17 +964,27 @@ private class ElfBowlingView(
         }
     }
 
+    /** Just the scoreboard's frames, with the lights strung round them. */
+    private fun drawBoardCrop(canvas: Canvas) {
+        val lightsOn = lightsTicks > 0 && (lightsTicks / 4) % 2 == 0
+        art[if (lightsOn) "lights_on" else "lights_off"]?.let { canvas.drawBitmap(it, null, BOARD_CROP, paint) }
+        canvas.save()
+        canvas.clipRect(BOARD_INNER)
+        drawScoreboard(canvas, lights = false)
+        canvas.restore()
+    }
+
     private fun drawFinalScore(canvas: Canvas) {
         val total = totals().lastOrNull { it != null } ?: 0
-        sprite(canvas, "score", 480f, 200f)
-        canvas.drawText(total.toString(), 480f, 254f, bigPaint)
-        canvas.drawText(context.getString(R.string.elf_bowling_best, best), 480f, 278f, bestPaint)
-        sprite(canvas, if (pressed == "again") "play_on" else "play_off", 440f, 330f)
-        sprite(canvas, if (pressed == "quit") "intro_quit_on" else "intro_quit_off", 520f, 330f)
+        sprite(canvas, "score", 480f, 170f)
+        canvas.drawText(total.toString(), 480f, 222f, bigPaint)
+        canvas.drawText(context.getString(R.string.elf_bowling_best, best), 480f, 244f, bestPaint)
+        sprite(canvas, if (pressed == "again") "play_on" else "play_off", 440f, 290f)
+        sprite(canvas, if (pressed == "quit") "intro_quit_on" else "intro_quit_off", 520f, 290f)
     }
 
     private fun drawTitle(canvas: Canvas) {
-        drawBackdrop(canvas, 0f, 640f)
+        drawBackdrop(canvas, 0f, 640f, bases = true)
         sprite(canvas, "bowling_logo", 340f, 130f)
         val (left, right) = titleElfX()
         drawElf(canvas, titleElves[0], left, 380f)
@@ -936,12 +1030,16 @@ private class ElfBowlingView(
             vw = src.width()
             vh = src.height()
         } else if (tall) {
-            val boardH = 132f * 320f / 538f
-            panels.add(Panel(RectF(48f, 0f, 586f, 132f), RectF(0f, 0f, 320f, boardH)) { drawScoreboard(it) })
-            panels.add(Panel(RectF(320f, 140f, 640f, 400f), RectF(0f, boardH, 320f, boardH + 260f)) { drawRight(it) })
-            panels.add(Panel(RectF(0f, 150f, 320f, 480f), RectF(0f, boardH + 260f, 320f, boardH + 590f)) { drawLeft(it, 272f, 433f) })
+            // Two screens, as on the DS: the elves up close under the scoreboard with the pin
+            // board in the corner, and Santa's lane below with the elves small at its end.
+            panels.add(Panel(RectF(320f, 50f, 640f, 330f), RectF(0f, 0f, 320f, 280f)) {
+                drawRight(it)
+                drawPinsBoard(it, 594f, 285f)
+            })
+            panels.add(Panel(RectF(BOARD_CROP), RectF(0f, 0f, 320f, BOARD_CROP.height() * 320f / BOARD_CROP.width())) { drawBoardCrop(it) })
+            panels.add(Panel(RectF(0f, 150f, 320f, 480f), RectF(0f, 280f, 320f, 610f)) { drawLeft(it) })
             vw = 320f
-            vh = boardH + 590f
+            vh = 610f
         } else {
             panels.add(Panel(RectF(0f, 0f, 640f, 480f), RectF(0f, 0f, 640f, 480f)) {
                 drawLeft(it)
@@ -1000,8 +1098,8 @@ private class ElfBowlingView(
             Mode.RULES -> null
             Mode.PLAY -> if (hit(507f, 66f, 57f, 21f)) "exit" else null
             Mode.OVER -> when {
-                hit(440f, 330f, 73f, 27f) -> "again"
-                hit(520f, 330f, 73f, 27f) -> "quit"
+                hit(440f, 290f, 73f, 27f) -> "again"
+                hit(520f, 290f, 73f, 27f) -> "quit"
                 hit(507f, 66f, 57f, 21f) -> "exit"
                 else -> null
             }
@@ -1169,7 +1267,14 @@ private class ElfBowlingView(
         private const val KEY_BEST = "best_score"
         private const val RAKE_UP = -190f
         private const val RAKE_DOWN = 160f
-        private const val STACKED_H = 132f * 320f / 538f + 590f
+        private const val STACKED_H = 610f
+        private const val SANTA_LOW = 548f
+        private const val SANTA_HIGH = 420f
+        private const val CAGE_TOP = -340f
+        private const val MINI = 0.2f
+        private const val MINI_FEET = 221f
+        private val BOARD_CROP = RectF(140f, 10f, 494f, 98f)
+        private val BOARD_INNER = RectF(150f, 24f, 484f, 85f)
 
         private val HEADS = listOf("elf0", "elf1", "elf2")
         private val DOWN_SPRITES = listOf("elf_dead0", "elf_dead1", "elf_fall_back")
