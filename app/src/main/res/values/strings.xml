@@ -52,6 +52,4 @@
         libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
-    <string name="elf_bowling_best">Best: %1$d</string>
-    <string name="elf_bowling_rules">The elves have gone on strike.\nShow them who\'s boss, Santa!\n\nDrag left or right to move Santa.\nThe slider in front of him sweeps\nback and forth: tap when it points\nwhere the ball should go.\nTen frames, scored like real bowling.\n(Tap to go back)</string>
 </resources>
