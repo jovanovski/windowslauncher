@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <!-- Padlock, open: the left leg of the shackle has come out of the body -->
+    <path android:fillColor="#7F7F7F" android:pathData="M5,1h6v2h-6z M4,2h2v3h-2z M10,2h2v6h-2z" />
+    <!-- Body: dark rim, gold face, a lighter top edge and the keyhole -->
+    <path android:fillColor="#8C6A12" android:pathData="M2,8h12v7h-12z" />
+    <path android:fillColor="#F2C53D" android:pathData="M3,9h10v5h-10z" />
+    <path android:fillColor="#FFE38A" android:pathData="M3,9h10v1h-10z" />
+    <path android:fillColor="#3A2A00" android:pathData="M7,10h2v3h-2z" />
+</vector>

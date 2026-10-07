@@ -563,6 +563,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var soundPool: SoundPool
     private val soundIds = mutableMapOf<Int, Int>() // Maps resource ID to sound ID
     private var chargingReceiver: BroadcastReceiver? = null
+    private var privateSpaceReceiver: BroadcastReceiver? = null
 
     // Easter egg sounds (sorted by filename)
     private val eggSounds = listOf(
@@ -1134,6 +1135,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Setup charging detection
         setupChargingDetection()
 
+        // Rebuild the app list when the private space is locked or unlocked
+        setupPrivateSpaceReceiver()
+
         // Initialize system apps
         initializeSystemApps()
 
@@ -1661,6 +1665,32 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "Charging detection setup complete")
     }
 
+    /**
+     * The private space's lock state changes outside this activity - the credential prompt,
+     * the system's auto-lock, the quick settings tile - so listen for it rather than assume.
+     * AVAILABLE comes as soon as quiet mode is off, ACCESSIBLE once the profile has actually
+     * unlocked and can list its apps; both rebuild the list.
+     */
+    private fun setupPrivateSpaceReceiver() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        privateSpaceReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.d("MainActivity", "Private space changed: ${intent?.action}")
+                cachedAppList = null
+                isAppListLoading = false
+                if (isStartMenuVisible) loadInstalledApps()
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
+            addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+        }
+        registerReceiver(privateSpaceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    }
+
     private fun initializeSystemApps() {
         // Register Internet Explorer
         systemAppActions["system.internet_explorer"] = { appInfo ->
@@ -2036,7 +2066,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // filtered result still grows upward from the search box like the real Start menu.
             // It replaces the old wrap_content + alignParentBottom trick, which forced a full
             // RecyclerView layout pass inside every onMeasure.
-            appsRecyclerView.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
+            appsRecyclerView.layoutManager = AppListLayoutManager(this)
             // The list box is a fixed size now, so adapter updates can never change our
             // bounds - this skips the requestLayout that walked all the way to root_container
             // (re-measuring the whole desktop) on every keystroke.
@@ -3549,7 +3579,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             Log.e("MainActivity", "Error loading apps", e)
         }
 
-        return appInfoMap.values.toList().sortedBy { it.name.lowercase() }
+        val mainApps = appInfoMap.values.toList().sortedBy { it.name.lowercase() }
+
+        // Private space apps ride along at the end, already sorted. Empty while it is locked.
+        val privateApps = PrivateSpace.profile(this)?.let { PrivateSpace.loadApps(this, it) }.orEmpty()
+
+        return mainApps + privateApps
     }
 
     private fun setupAppsAdapterFromList(appList: List<AppInfo>) {
@@ -3558,15 +3593,28 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val hiddenApps = getHiddenApps()
 
         // Hidden apps are only listed when the menu was opened with them explicitly requested
+        val (privateApps, mainApps) = appList.partition { it.isPrivate }
         val visibleApps = if (isShowingHiddenApps) {
-            appList
+            mainApps
         } else {
-            appList.filterNot { hiddenApps.contains(it.packageName) }
+            mainApps.filterNot { hiddenApps.contains(it.packageName) }
         }
 
         // Create final list with all apps
         val finalAppsList = mutableListOf<Any>()
         finalAppsList.addAll(visibleApps)
+
+        // The private space goes last, under its own "Private" row, the way Android's own
+        // app drawer lays it out. Locked, the row is all there is - unless the user asked for
+        // the space to disappear entirely while locked.
+        PrivateSpace.profile(this)?.let { user ->
+            val isLocked = PrivateSpace.isLocked(this, user)
+            if (!isLocked || !PrivateSpace.isHiddenWhenLocked(this)) {
+                finalAppsList.add("") // Separator
+                finalAppsList.add(PrivateSpaceHeader(isLocked))
+                if (!isLocked) finalAppsList.addAll(privateApps)
+            }
+        }
 
         Log.d("MainActivity", "Setting up apps adapter with ${visibleApps.size} apps (${pinnedApps.size} pinned, ${hiddenApps.size} hidden)")
 
@@ -3580,7 +3628,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // No automatic tracking - apps must be manually pinned
             },
             recentApps = pinnedApps.toSet(),
-            hiddenApps = hiddenApps
+            hiddenApps = hiddenApps,
+            onPrivateSpaceClick = { header -> setPrivateSpaceLocked(!header.isLocked) },
+            onPrivateSpaceLongClick = { header, x, y -> showPrivateSpaceContextMenu(header, x, y) }
         )
         appsRecyclerView.adapter = appsAdapter
         // A new adapter has no scroll position, and stackFromEnd would lay it out from the
@@ -3907,11 +3957,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     /**
      * Puts the start menu app list back on its first app. Only records a pending position,
-     * so it is cheap to call while the list is hidden; the next layout honours it.
+     * so it is cheap to call while the list is hidden; the layouts that follow honour it.
      */
     private fun scrollAppListToTop() {
         if (::appsRecyclerView.isInitialized) {
-            appsRecyclerView.scrollToPosition(0)
+            (appsRecyclerView.layoutManager as? AppListLayoutManager)?.pinToTop()
         }
     }
 
@@ -4655,6 +4705,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         selectedIcon?.setSelected(false)
         selectedIcon = null
 
+        if (::contextMenu.isInitialized && appInfo.isPrivate) {
+            val menuItems = ContextMenuItems.getPrivateSpaceAppMenuItems(
+                onOpen = {
+                    PrivateSpace.launch(this, appInfo)
+                    hideStartMenu()
+                },
+                onProperties = {
+                    PrivateSpace.openAppDetails(this, appInfo)
+                    hideStartMenu()
+                },
+                onLock = { setPrivateSpaceLocked(true) }
+            )
+            contextMenu.showMenu(menuItems, x, y)
+            isContextMenuVisible = true
+            return
+        }
+
         if (::contextMenu.isInitialized) {
             // Check if this is a system app
             val isSystemApp = isSystemApp(appInfo.packageName)
@@ -4731,6 +4798,30 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
     }
     
+    private fun showPrivateSpaceContextMenu(header: PrivateSpaceHeader, x: Float, y: Float) {
+        if (!::contextMenu.isInitialized) return
+        Helpers.performHapticFeedback(this)
+        val menuItems = ContextMenuItems.getPrivateSpaceMenuItems(
+            isLocked = header.isLocked,
+            onToggleLock = { setPrivateSpaceLocked(!header.isLocked) },
+            onSettings = {
+                PrivateSpace.openSettings(this)
+                hideStartMenu()
+            }
+        )
+        contextMenu.showMenu(menuItems, x, y)
+        isContextMenuVisible = true
+    }
+
+    /**
+     * Unlocking hands over to the system's credential prompt; either way the list catches up
+     * when the profile broadcast lands (see [setupPrivateSpaceReceiver]), not here.
+     */
+    private fun setPrivateSpaceLocked(locked: Boolean) {
+        val user = PrivateSpace.profile(this) ?: return
+        PrivateSpace.setLocked(this, user, locked)
+    }
+
     fun showDesktopIconContextMenu(iconView: DesktopIconView, x: Float, y: Float) {
         Log.v("GOKII", "OPA2")
 
@@ -12739,6 +12830,15 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Stop update checker
         stopUpdateChecker()
+
+        privateSpaceReceiver?.let { receiver ->
+            try {
+                unregisterReceiver(receiver)
+            } catch (e: IllegalArgumentException) {
+                Log.w("MainActivity", "Private space receiver was not registered")
+            }
+        }
+        privateSpaceReceiver = null
 
         // Unregister charging receiver
         chargingReceiver?.let { receiver ->

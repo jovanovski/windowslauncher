@@ -25,14 +25,18 @@ class AppsAdapter(
     private val recentApps: Set<String> = emptySet(),
     // Apps the user chose to hide. They only reach this adapter at all when the menu was
     // opened via "Open Start with hidden apps", where they're drawn dimmed.
-    private val hiddenApps: Set<String> = emptySet()
+    private val hiddenApps: Set<String> = emptySet(),
+    // The "Private" row: a tap locks or unlocks the private space, a long press opens its menu
+    private val onPrivateSpaceClick: ((PrivateSpaceHeader) -> Unit)? = null,
+    private val onPrivateSpaceLongClick: ((PrivateSpaceHeader, Float, Float) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ThemeAware {
 
     private var filteredItems: List<Any> = originalItems
     private var currentTheme: AppTheme = AppTheme.WindowsXP
 
     // Lowercased names, aligned with originalItems, so filtering doesn't allocate two
-    // strings per app on every keystroke. Null for non-app entries (separators).
+    // strings per app on every keystroke. Null for non-app entries (separators, the
+    // private space row), which is also what keeps them out of search results.
     private val searchKeys: List<String?> = originalItems.map {
         (it as? AppInfo)?.name?.trim()?.lowercase()
     }
@@ -49,6 +53,7 @@ class AppsAdapter(
     companion object {
         private const val TYPE_APP = 0
         private const val TYPE_SEPARATOR = 1
+        private const val TYPE_PRIVATE_SPACE = 2
     }
 
     inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -86,10 +91,38 @@ class AppsAdapter(
 
     class SeparatorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 
+    inner class PrivateSpaceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val icon: ImageView = itemView.findViewById(R.id.app_icon)
+        val label: TextView = itemView.findViewById(R.id.app_name)
+
+        init {
+            itemView.setOnClickListener {
+                val header = boundHeader() ?: return@setOnClickListener
+                onPrivateSpaceClick?.invoke(header)
+            }
+            itemView.setOnLongClickListener {
+                val header = boundHeader() ?: return@setOnLongClickListener false
+                itemView.isHapticFeedbackEnabled = false
+                val location = IntArray(2)
+                itemView.getLocationOnScreen(location)
+                onPrivateSpaceLongClick?.invoke(
+                    header,
+                    location[0] + itemView.width / 2f,
+                    location[1] + itemView.height / 2f
+                )
+                true
+            }
+        }
+
+        private fun boundHeader(): PrivateSpaceHeader? =
+            filteredItems.getOrNull(bindingAdapterPosition) as? PrivateSpaceHeader
+    }
+
     override fun getItemViewType(position: Int): Int {
         return when (filteredItems[position]) {
             is AppInfo -> TYPE_APP
             is String -> TYPE_SEPARATOR
+            is PrivateSpaceHeader -> TYPE_PRIVATE_SPACE
             else -> TYPE_APP
         }
     }
@@ -123,6 +156,11 @@ class AppsAdapter(
                 containerView.addView(separatorLine)
                 SeparatorViewHolder(containerView)
             }
+            TYPE_PRIVATE_SPACE -> {
+                val view = LayoutInflater.from(parent.context)
+                    .inflate(R.layout.app_list_item, parent, false)
+                PrivateSpaceViewHolder(view)
+            }
             else -> {
                 val view = LayoutInflater.from(parent.context)
                     .inflate(R.layout.app_list_item, parent, false)
@@ -132,6 +170,16 @@ class AppsAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is PrivateSpaceViewHolder) {
+            val header = filteredItems[position] as PrivateSpaceHeader
+            holder.icon.setImageResource(
+                if (header.isLocked) R.drawable.private_space_locked else R.drawable.private_space_unlocked
+            )
+            holder.label.text = if (header.isLocked) "Private (locked)" else "Private"
+            holder.label.setTextColor(textColors)
+            holder.label.typeface = themeTypeface
+            return
+        }
         if (holder !is AppViewHolder) return // Separators need no binding
 
         val app = filteredItems[position] as AppInfo
@@ -141,7 +189,7 @@ class AppsAdapter(
         holder.appName.text = app.name
 
         // Hidden apps show through at half opacity so they read as "not normally here"
-        holder.itemView.alpha = if (hiddenApps.contains(app.packageName)) 0.5f else 1f
+        holder.itemView.alpha = if (!app.isPrivate && hiddenApps.contains(app.packageName)) 0.5f else 1f
 
         // Both are no-ops when the value hasn't changed, so this only costs anything
         // on the bind right after a theme switch.
@@ -190,7 +238,9 @@ class AppsAdapter(
     }
 
     private fun launchApp(app: AppInfo) {
-        if (MainActivity.isSystemApp(app.packageName)) {
+        if (app.isPrivate) {
+            PrivateSpace.launch(context, app)
+        } else if (MainActivity.isSystemApp(app.packageName)) {
             (context as? MainActivity)?.launchSystemApp(app.packageName)
         } else {
             val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
@@ -215,7 +265,7 @@ class AppsAdapter(
         override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
             val oldItem = old[oldItemPosition]
             val newItem = new[newItemPosition]
-            // AppInfo.equals already compares by packageName only
+            // AppInfo.equals compares by package and profile
             return if (oldItem is AppInfo && newItem is AppInfo) oldItem == newItem
             else oldItem === newItem
         }

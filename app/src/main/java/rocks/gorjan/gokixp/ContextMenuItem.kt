@@ -159,6 +159,36 @@ object ContextMenuItems {
         return items
     }
     
+    // Start menu app that lives in the private space. Pinning, hiding, desktop shortcuts and
+    // icon overrides are all stored by package name, which can't tell this copy of an app
+    // from the one outside, so they aren't offered. Uninstalling is on the app's info page.
+    fun getPrivateSpaceAppMenuItems(
+        onOpen: () -> Unit,
+        onProperties: () -> Unit,
+        onLock: () -> Unit
+    ): List<ContextMenuItem> {
+        return listOf(
+            ContextMenuItem("Open", isEnabled = true, action = onOpen),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Lock Private Space", isEnabled = true, action = onLock),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Properties", isEnabled = true, action = onProperties)
+        )
+    }
+
+    // The "Private" row heading the private space's apps
+    fun getPrivateSpaceMenuItems(
+        isLocked: Boolean,
+        onToggleLock: () -> Unit,
+        onSettings: () -> Unit
+    ): List<ContextMenuItem> {
+        return listOf(
+            ContextMenuItem(if (isLocked) "Unlock" else "Lock", isEnabled = true, action = onToggleLock),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("Private Space Settings", isEnabled = true, action = onSettings)
+        )
+    }
+
     // Pinned app context menu items (in commands panel)
     fun getPinnedAppMenuItems(
         onUnpin: () -> Unit,
