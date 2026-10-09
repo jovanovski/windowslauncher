@@ -633,6 +633,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private val RETIRED_SYSTEM_APPS =
             setOf("system.msn", "system.registry_editor", "system.dialer")
 
+        /** What Start's app list files under Accessories, and in which of its folders. */
+        private val ACCESSORIES_ENTERTAINMENT = listOf("system.wmp")
+        private val ACCESSORIES_GAMES = listOf(
+            "system.freecell", "system.hearts", "system.minesweeper",
+            "system.pinball", "system.solitare", "system.destroyer"
+        )
+        private val ACCESSORIES_OWN = listOf("system.clock", "system.notepad", "system.paint")
+        private val ACCESSORIES_PROGRAMS =
+            (ACCESSORIES_ENTERTAINMENT + ACCESSORIES_GAMES + ACCESSORIES_OWN).toSet()
+
         /** Which of [RETIRED_SYSTEM_APPS] have already been swept out of the user's arrangement. */
         private const val KEY_RETIRED_APPS_PURGED = "retired_system_apps_purged"
 
@@ -3600,9 +3610,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             mainApps.filterNot { hiddenApps.contains(it.packageName) }
         }
 
-        // Create final list with all apps
+        // Create final list with all apps. The launcher's own programs open from
+        // Accessories at the top, the way All Programs keeps Windows' own.
         val finalAppsList = mutableListOf<Any>()
-        finalAppsList.addAll(visibleApps)
+        val (accessoryApps, otherApps) = visibleApps.partition { it.packageName in ACCESSORIES_PROGRAMS }
+        accessoriesFolder(accessoryApps)?.let { finalAppsList.add(it) }
+        finalAppsList.addAll(otherApps)
 
         // The private space goes last, under its own "Private" row, the way Android's own
         // app drawer lays it out. Locked, the row is all there is - unless the user asked for
@@ -3639,6 +3652,20 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Apply current theme to the adapter
         appsAdapter?.onThemeChanged(themeManager.getSelectedTheme())
+    }
+
+    /**
+     * Accessories, laid out as the web desktop's: Entertainment and Games inside it, then its
+     * own programs. A folder left with nothing in it (all hidden, say) is not shown.
+     */
+    private fun accessoriesFolder(apps: List<AppInfo>): StartMenuFolder? {
+        val byPackage = apps.associateBy { it.packageName }
+        fun programs(packages: List<String>) = packages.mapNotNull { byPackage[it] }.sortedBy { it.name.lowercase() }
+        val children = mutableListOf<Any>()
+        programs(ACCESSORIES_ENTERTAINMENT).takeIf { it.isNotEmpty() }?.let { children.add(StartMenuFolder("Entertainment", it)) }
+        programs(ACCESSORIES_GAMES).takeIf { it.isNotEmpty() }?.let { children.add(StartMenuFolder("Games", it)) }
+        children.addAll(programs(ACCESSORIES_OWN))
+        return if (children.isEmpty()) null else StartMenuFolder("Accessories", children)
     }
 
     private fun refreshAppListManually() {
@@ -3855,6 +3882,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Clear search text
                 searchBox.setText("")
             }
+            appsAdapter?.closeFolders()
 
             // Reset keyboard state flag and restore original layout
             isKeyboardOpen = false
