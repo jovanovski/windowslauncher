@@ -138,6 +138,9 @@ internal object WinMenuMetrics {
     /** The wider strip of a menu of programs, which holds each one's icon. */
     const val ICON_GUTTER_DP = 28
 
+    /** How wide every menu of programs is. */
+    const val PROGRAMS_WIDTH_DP = 180
+
     /** Room kept on the right for a shortcut, so two menus' commands line up. */
     const val SHORTCUT_GAP_DP = 18
 }
@@ -178,8 +181,13 @@ class WinMenuPopup(private val ui: WinUi) {
 
         // As wide as its longest command, not as wide as the screen will let it be: every row
         // is match-parent with a weighted label, which a wrap-content popup otherwise stretches.
+        // A menu of programs is the exception: every one of those is the same width, as the
+        // Start menu's were, and a name too long for it ends in an ellipsis.
         val unbounded = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        body.measure(unbounded, unbounded)
+        val width = if (withIcons) {
+            View.MeasureSpec.makeMeasureSpec(ui.dp(WinMenuMetrics.PROGRAMS_WIDTH_DP), View.MeasureSpec.EXACTLY)
+        } else unbounded
+        body.measure(width, unbounded)
 
         window = PopupWindow(body, body.measuredWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             isOutsideTouchable = true
@@ -299,6 +307,7 @@ class WinMenuPopup(private val ui: WinUi) {
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, ui.textSp)
                 ui.applyFont(this)
                 isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
             },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 if (withIcons) leftMargin = ui.dp(4)
