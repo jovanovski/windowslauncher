@@ -1430,6 +1430,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             currentTheme is AppTheme.Windows7 -> R.drawable.tray_chevron_win7
             currentTheme is AppTheme.WindowsVista && isVisible -> R.drawable.system_tray_collapse_vista
             currentTheme is AppTheme.WindowsVista && !isVisible -> R.drawable.system_tray_expand_vista
+            currentTheme is AppTheme.WindowsClassic && isVisible -> R.drawable.system_tray_collapse_98
+            currentTheme is AppTheme.WindowsClassic && !isVisible -> R.drawable.system_tray_expand_98
             isVisible -> R.drawable.system_tray_collapse_xp
             else -> R.drawable.system_tray_expand_xp
         }
@@ -14324,14 +14326,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Swap to Windows 98 taskbar layout
         swapTaskbarLayout(R.layout.taskbar_98)
 
-        // For Windows Classic, always show the system tray toggle area
-        val systemTrayToggleArea = findViewById<LinearLayout>(R.id.system_tray_toggle_area)
-        systemTrayToggleArea?.visibility = View.VISIBLE
-        saveSystemTrayVisibility(true) // Save as visible for Windows Classic
-
-        // Update toggle icon to reflect visible state
-        val systemTrayToggle = findViewById<ImageView>(R.id.system_tray_toggle)
-        updateSystemTrayToggleIcon(systemTrayToggle, true)
+        // Set up system tray toggle after layout is loaded; it restores the saved visibility
+        setupSystemTrayToggle()
 
         // Reload start menu with Windows 98 layout
         setupStartMenu("Windows Classic")

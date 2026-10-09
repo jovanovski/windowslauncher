@@ -52,12 +52,26 @@
             android:id="@+id/taskbar_empty_space"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_toLeftOf="@id/system_tray"
+            android:layout_toLeftOf="@id/system_tray_toggle"
             android:layout_toRightOf="@id/start_and_divider"
             android:background="@android:color/transparent"
             android:orientation="horizontal"
             android:gravity="start|center_vertical"
             android:paddingLeft="4dp" />
+
+        <!-- Tray collapse button - 98 had none, so it is a plain 98 push button -->
+        <ImageView
+            android:id="@+id/system_tray_toggle"
+            android:layout_width="28dp"
+            android:layout_height="match_parent"
+            android:layout_toLeftOf="@id/system_tray"
+            android:layout_marginEnd="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Show or hide notification area"
+            android:scaleType="fitXY"
+            android:src="@drawable/system_tray_collapse_98"
+            tools:ignore="HardcodedText" />
 
         <!-- System Tray - Windows 98 style with custom borders -->
         <LinearLayout
@@ -69,6 +83,13 @@
             android:gravity="center_vertical"
             android:paddingStart="4dp"
             android:orientation="horizontal">
+
+            <!-- Everything but the clock folds away behind the toggle button -->
+            <LinearLayout
+                android:id="@+id/system_tray_toggle_area"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal">
 
             <!-- AQI (Air Quality Index) -->
             <LinearLayout
@@ -179,6 +200,8 @@
                     android:layout_marginBottom="4dp"
                     android:layout_marginLeft="1dp"
                     android:fontFamily="@font/micross_block" />
+
+            </LinearLayout>
 
             </LinearLayout>
             <!-- Clock (time only) -->
