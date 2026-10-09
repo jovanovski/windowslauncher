@@ -142,11 +142,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var searchBox: EditText
     private var isKeyboardOpen = false
     private var originalStartMenuLayoutParams: RelativeLayout.LayoutParams? = null
+    // The menu an app-list folder (Accessories) opened, put away with the start menu
+    private var startMenuFolderMenu: WinMenuPopup? = null
     // Adapters auto-(un)register for theme notifications as they're replaced, so a stale adapter
     // is never left in themeAwareComponents. (The `= null` initializer skips the setter.)
     private var appsAdapter: AppsAdapter? = null
-    // The menu an app-list folder (Accessories) opened, put away with the start menu
-    private var startMenuFolderMenu: WinMenuPopup? = null
         set(value) {
             field?.let { unregisterThemeAware(it) }
             field = value
