@@ -17,6 +17,8 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import rocks.gorjan.gokixp.ContextMenuItem
+import rocks.gorjan.gokixp.R
+import rocks.gorjan.gokixp.theme.MenuAnimator
 
 /**
  * The drop-downs a menu bar opens.
@@ -170,12 +172,26 @@ class WinMenuPopup(private val ui: WinUi) {
             isFocusable = true
             elevation = if (ui.isClassic) 0f else 4f * ui.density
             setBackgroundDrawable(null)
+            // XP and Aero fade the whole window in and out; 9x slides the menu out of the bar
+            // (or out of the row, for a submenu) below, and drops it with no animation.
+            animationStyle = if (ui.isClassic) 0 else R.style.MenuFadeAnimation
             setOnDismissListener {
                 child?.dismiss()
                 onDismiss?.invoke()
             }
             if (toTheSide) showAsDropDown(anchor, anchor.width - ui.dp(4), -anchor.height)
             else showAsDropDown(anchor, 0, 0)
+            if (ui.isClassic) {
+                MenuAnimator.show(
+                    body,
+                    ui.theme,
+                    when {
+                        toTheSide -> MenuAnimator.Direction.RIGHT
+                        isAboveAnchor -> MenuAnimator.Direction.UP
+                        else -> MenuAnimator.Direction.DOWN
+                    },
+                )
+            }
         }
     }
 

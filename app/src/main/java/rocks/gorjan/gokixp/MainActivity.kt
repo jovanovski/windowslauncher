@@ -3804,6 +3804,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::startMenu.isInitialized) {
             startMenu.visibility = View.VISIBLE
             isStartMenuVisible = true
+            MenuAnimator.show(
+                startMenu, themeManager.getSelectedTheme(), MenuAnimator.Direction.UP, isStartMenu = true,
+            )
 
             // The start menu lives outside main_background, so applyPlus95Theme's walk never
             // reaches it — tint (or reset) it here every time it opens. Passing CLASSIC_GRAY when
@@ -3850,8 +3853,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     
     fun hideStartMenu() {
         if (::startMenu.isInitialized) {
-            startMenu.visibility = View.GONE
             isStartMenuVisible = false
+            // Fades out under XP and Aero, goes at once under 9x. Reopening during the fade
+            // cancels it, so the check only guards against a callback that outlived a reopen.
+            MenuAnimator.hide(startMenu, themeManager.getSelectedTheme()) {
+                if (!isStartMenuVisible) startMenu.visibility = View.GONE
+            }
 
             // Hide context menu if visible
             if (isContextMenuVisible) {
@@ -3944,6 +3951,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (::startMenu.isInitialized) {
             startMenu.visibility = View.VISIBLE
             isStartMenuVisible = true
+            MenuAnimator.show(
+                startMenu, themeManager.getSelectedTheme(), MenuAnimator.Direction.UP, isStartMenu = true,
+            )
 
             // For Windows Classic theme, make app list visible when opened via swipe up
             // For Vista, keep showing command list until user starts typing
