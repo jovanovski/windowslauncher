@@ -1,5 +1,7 @@
 package rocks.gorjan.gokixp
 
+import android.graphics.drawable.Drawable
+
 data class ContextMenuItem(
     val title: String,
     val isEnabled: Boolean = true,
@@ -18,6 +20,11 @@ data class ContextMenuItem(
     val shortcut: String? = null,
     /** What opens to the side. Setting this implies [hasSubmenu]. */
     val submenu: List<ContextMenuItem>? = null,
+    /**
+     * The picture beside the words, for a menu of programs - the Start menu's folders. A menu
+     * where any item has one is laid out like the Start menu's, roomier and with icons.
+     */
+    val icon: Drawable? = null,
 ) {
     /** A menu separator is an item with nothing in it. */
     val isSeparator: Boolean get() = title.isEmpty()

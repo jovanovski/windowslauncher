@@ -5,6 +5,12 @@
             <solid android:color="@color/context_menu_item_selected" />
         </shape>
     </item>
+    <!-- A folder whose menu is open -->
+    <item android:state_selected="true">
+        <shape>
+            <solid android:color="@color/context_menu_item_selected" />
+        </shape>
+    </item>
     <item>
         <shape>
             <solid android:color="@android:color/transparent" />

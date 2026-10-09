@@ -108,6 +108,8 @@ import com.google.android.gms.common.api.ApiException
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import rocks.gorjan.gokixp.theme.*
+import rocks.gorjan.gokixp.winui.WinMenuPopup
+import rocks.gorjan.gokixp.winui.WinUi
 import rocks.gorjan.gokixp.winui.dialog.WinLayout
 import rocks.gorjan.gokixp.winui.dialog.WinSkin
 import rocks.gorjan.gokixp.winui.dialog.WinSpinButtons
@@ -143,6 +145,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     // Adapters auto-(un)register for theme notifications as they're replaced, so a stale adapter
     // is never left in themeAwareComponents. (The `= null` initializer skips the setter.)
     private var appsAdapter: AppsAdapter? = null
+    // The menu an app-list folder (Accessories) opened, put away with the start menu
+    private var startMenuFolderMenu: WinMenuPopup? = null
         set(value) {
             field?.let { unregisterThemeAware(it) }
             field = value
@@ -3645,7 +3649,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             recentApps = pinnedApps.toSet(),
             hiddenApps = hiddenApps,
             onPrivateSpaceClick = { header -> setPrivateSpaceLocked(!header.isLocked) },
-            onPrivateSpaceLongClick = { header, x, y -> showPrivateSpaceContextMenu(header, x, y) }
+            onPrivateSpaceLongClick = { header, x, y -> showPrivateSpaceContextMenu(header, x, y) },
+            onFolderClick = { folder, row -> showStartMenuFolder(folder, row) }
         )
         appsRecyclerView.adapter = appsAdapter
         // A new adapter has no scroll position, and stackFromEnd would lay it out from the
@@ -3668,6 +3673,35 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         programs(ACCESSORIES_GAMES).takeIf { it.isNotEmpty() }?.let { children.add(StartMenuFolder("Games", it)) }
         children.addAll(programs(ACCESSORIES_OWN))
         return if (children.isEmpty()) null else StartMenuFolder("Accessories", children)
+    }
+
+    /**
+     * Opens a folder of the app list as Windows did: its own menu beside the folder's row,
+     * the folders inside it opening further menus of their own, and the row lit meanwhile.
+     */
+    private fun showStartMenuFolder(folder: StartMenuFolder, row: View) {
+        startMenuFolderMenu?.dismiss()
+        val folderIcon = AppCompatResources.getDrawable(this, themeManager.getFolderIconRes(themeManager.getSelectedTheme()))
+        fun itemsOf(children: List<Any>): List<ContextMenuItem> = children.mapNotNull { child ->
+            when (child) {
+                is StartMenuFolder -> ContextMenuItem(
+                    child.name.replace("&", "&&"), icon = folderIcon, submenu = itemsOf(child.children)
+                )
+                is AppInfo -> ContextMenuItem(
+                    child.name.replace("&", "&&"), icon = child.icon,
+                    action = { appsAdapter?.launchApp(child) }
+                )
+                else -> null
+            }
+        }
+        row.isSelected = true
+        startMenuFolderMenu = WinMenuPopup(WinUi(this)).also { menu ->
+            menu.onPicked = { menu.dismiss() }
+            menu.show(row, itemsOf(folder.children), toTheSide = true) {
+                row.isSelected = false
+                if (startMenuFolderMenu === menu) startMenuFolderMenu = null
+            }
+        }
     }
 
     private fun refreshAppListManually() {
@@ -3884,7 +3918,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Clear search text
                 searchBox.setText("")
             }
-            appsAdapter?.closeFolders()
+            startMenuFolderMenu?.dismiss()
 
             // Reset keyboard state flag and restore original layout
             isKeyboardOpen = false
