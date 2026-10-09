@@ -3698,6 +3698,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         row.isSelected = true
         startMenuFolderMenu = WinMenuPopup(WinUi(this)).also { menu ->
             menu.onPicked = { menu.dismiss() }
+            // Tapping the next folder in the list opens it straight away
+            menu.passTapsToSiblings = true
             menu.show(row, itemsOf(folder.children), toTheSide = true) {
                 row.isSelected = false
                 if (startMenuFolderMenu === menu) startMenuFolderMenu = null
