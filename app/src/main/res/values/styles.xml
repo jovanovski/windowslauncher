@@ -32,4 +32,10 @@
         <item name="android:background">@drawable/settings_section_divider</item>
         <item name="android:layout_marginBottom">6dp</item>
     </style>
+
+    <!-- The fade a menu-bar drop-down opens and closes with under XP, Vista and 7. -->
+    <style name="MenuFadeAnimation">
+        <item name="android:windowEnterAnimation">@anim/menu_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/menu_fade_out</item>
+    </style>
 </resources>
