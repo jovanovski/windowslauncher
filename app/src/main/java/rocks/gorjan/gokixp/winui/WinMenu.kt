@@ -14,6 +14,7 @@ import android.text.style.UnderlineSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -154,6 +155,23 @@ class WinMenuPopup(private val ui: WinUi) {
     private var window: PopupWindow? = null
     private var child: WinMenuPopup? = null
 
+    // The menu this one is a submenu of, and the row it was opened from
+    private var parent: WinMenuPopup? = null
+    private var anchorView: View? = null
+    private var body: View? = null
+
+    // Where a menu beside its row sits, and what keeps it there while the row moves
+    private var placedX = 0
+    private var placedY = 0
+    private var follow: ViewTreeObserver.OnPreDrawListener? = null
+
+    /**
+     * Whether a tap outside this menu, on a row beside the one it opened from, goes on to that
+     * row - so tapping the next Start menu folder opens it rather than only closing this one.
+     * Submenus always pass a tap on their parent menu's rows along.
+     */
+    var passTapsToSiblings: Boolean = false
+
     val isShowing: Boolean get() = window?.isShowing == true
 
     /**
@@ -168,6 +186,7 @@ class WinMenuPopup(private val ui: WinUi) {
         onDismiss: (() -> Unit)? = null,
     ) {
         dismiss()
+        anchorView = anchor
         val withIcons = items.any { it.icon != null }
         val body = LinearLayout(ui.context).apply {
             orientation = LinearLayout.VERTICAL
@@ -188,6 +207,7 @@ class WinMenuPopup(private val ui: WinUi) {
             View.MeasureSpec.makeMeasureSpec(ui.dp(WinMenuMetrics.PROGRAMS_WIDTH_DP), View.MeasureSpec.EXACTLY)
         } else unbounded
         body.measure(width, unbounded)
+        this.body = body
 
         window = PopupWindow(body, body.measuredWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             isOutsideTouchable = true
@@ -198,26 +218,39 @@ class WinMenuPopup(private val ui: WinUi) {
             // (or out of the row, for a submenu) below, and drops it with no animation.
             animationStyle = if (ui.isClassic) 0 else R.style.MenuFadeAnimation
             setOnDismissListener {
+                stopFollowing()
                 child?.dismiss()
                 onDismiss?.invoke()
+            }
+            // A tap outside the menu closes it, and - since the menu otherwise swallows that
+            // tap - is handed on to the row it landed on, if that is one worth handing it to.
+            setTouchInterceptor { _, event ->
+                val outside = event.actionMasked == android.view.MotionEvent.ACTION_OUTSIDE ||
+                    (event.actionMasked == android.view.MotionEvent.ACTION_DOWN &&
+                        (event.x < 0 || event.y < 0 || event.x >= body.width || event.y >= body.height))
+                if (outside) tappedOutside(event.rawX, event.rawY)
+                outside
             }
             var toTheLeft = false
             if (toTheSide) {
                 // Placed on the activity's own window rather than the anchor's, which for a
                 // submenu is the small popup it hangs from.
                 val screen = activityRoot(anchor)
-                val at = IntArray(2)
-                anchor.getLocationOnScreen(at)
-                val origin = IntArray(2)
-                screen.getLocationOnScreen(origin)
-                val left = at[0] - origin[0]
-                val top = at[1] - origin[1]
-                val overlap = ui.dp(4)
-                val right = left + anchor.width - overlap
-                toTheLeft = right + body.measuredWidth > screen.width
-                val x = if (toTheLeft) (left + overlap - body.measuredWidth).coerceAtLeast(0) else right
-                val y = top.coerceAtMost(screen.height - body.measuredHeight).coerceAtLeast(0)
+                val (x, y, left) = besideAnchor(anchor, body)
+                toTheLeft = left
+                placedX = x
+                placedY = y
                 showAtLocation(screen, Gravity.NO_GRAVITY, x, y)
+                // A menu hanging off a row in the activity (not off another menu) moves with
+                // it - as when the keyboard goes away under the Start menu and it drops - and
+                // takes its submenus along.
+                if (parent == null) {
+                    follow = ViewTreeObserver.OnPreDrawListener {
+                        val (nx, ny, _) = besideAnchor(anchor, body)
+                        if (nx != placedX || ny != placedY) moveBy(nx - placedX, ny - placedY)
+                        true
+                    }.also { anchor.viewTreeObserver.addOnPreDrawListener(it) }
+                }
             } else {
                 showAsDropDown(anchor, 0, 0)
             }
@@ -236,6 +269,88 @@ class WinMenuPopup(private val ui: WinUi) {
         }
     }
 
+    /** Where a menu goes beside [anchor]: x, y on the activity's window, and whether it went left. */
+    private fun besideAnchor(anchor: View, body: View): Triple<Int, Int, Boolean> {
+        val screen = activityRoot(anchor)
+        val at = IntArray(2)
+        anchor.getLocationOnScreen(at)
+        val origin = IntArray(2)
+        screen.getLocationOnScreen(origin)
+        val left = at[0] - origin[0]
+        val top = at[1] - origin[1]
+        val overlap = ui.dp(4)
+        val right = left + anchor.width - overlap
+        val toTheLeft = right + body.measuredWidth > screen.width
+        val x = if (toTheLeft) (left + overlap - body.measuredWidth).coerceAtLeast(0) else right
+        val y = top.coerceAtMost(screen.height - body.measuredHeight).coerceAtLeast(0)
+        return Triple(x, y, toTheLeft)
+    }
+
+    /** Moves this menu and every submenu open off it by the same amount. */
+    private fun moveBy(dx: Int, dy: Int) {
+        val w = window ?: return
+        placedX += dx
+        placedY += dy
+        w.update(placedX, placedY, -1, -1)
+        child?.moveBy(dx, dy)
+    }
+
+    private fun stopFollowing() {
+        val listener = follow ?: return
+        follow = null
+        anchorView?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnPreDrawListener(listener)
+    }
+
+    /** The menu row under a point on the screen, if the point is on this menu at all. */
+    private fun rowAt(x: Float, y: Float): View? {
+        val menu = body as? ViewGroup ?: return null
+        val at = IntArray(2)
+        for (i in 0 until menu.childCount) {
+            val row = menu.getChildAt(i)
+            row.getLocationOnScreen(at)
+            if (x >= at[0] && x < at[0] + row.width && y >= at[1] && y < at[1] + row.height) return row
+        }
+        return null
+    }
+
+    private fun contains(x: Float, y: Float): Boolean {
+        val menu = body ?: return false
+        val at = IntArray(2)
+        menu.getLocationOnScreen(at)
+        return x >= at[0] && x < at[0] + menu.width && y >= at[1] && y < at[1] + menu.height
+    }
+
+    /**
+     * A tap landed outside this menu: it closes, and the tap goes to whatever it landed on
+     * below - a row of the menu this one came out of, or with [passTapsToSiblings], a row
+     * beside the one this menu opened from. The row that opened it only closes it again.
+     */
+    private fun tappedOutside(x: Float, y: Float) {
+        val opener = anchorView
+        val above = parent
+        dismiss()
+        if (above != null) {
+            if (!above.contains(x, y)) {
+                above.tappedOutside(x, y)
+                return
+            }
+            above.rowAt(x, y)?.takeIf { it !== opener && it.isClickable }?.performClick()
+            return
+        }
+        if (!passTapsToSiblings) return
+        val list = opener?.parent as? ViewGroup ?: return
+        val at = IntArray(2)
+        for (i in 0 until list.childCount) {
+            val row = list.getChildAt(i)
+            if (row === opener || !row.isClickable) continue
+            row.getLocationOnScreen(at)
+            if (x >= at[0] && x < at[0] + row.width && y >= at[1] && y < at[1] + row.height) {
+                row.performClick()
+                return
+            }
+        }
+    }
+
     private fun activityRoot(view: View): View {
         var context = view.context
         while (context is ContextWrapper) {
@@ -246,6 +361,7 @@ class WinMenuPopup(private val ui: WinUi) {
     }
 
     fun dismiss() {
+        stopFollowing()
         child?.dismiss()
         child = null
         window?.dismiss()
@@ -359,6 +475,7 @@ class WinMenuPopup(private val ui: WinUi) {
                     row.isSelected = true
                     words.forEach { it.setTextColor(hot) }
                     child = WinMenuPopup(ui).also { menu ->
+                        menu.parent = this
                         // A command down there puts this menu away too
                         menu.onPicked = { dismiss(); onPicked?.invoke() }
                         menu.show(row, sub, toTheSide = true) {
