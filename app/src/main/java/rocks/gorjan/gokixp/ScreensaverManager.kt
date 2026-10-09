@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -110,6 +111,18 @@ class ScreensaverManager(
             screensaverView.findViewById<View>(R.id.screensaver_tap_catcher).setOnClickListener {
                 hideScreensaver()
                 resetInactivityTimer()
+            }
+
+            // A key press wakes it as a tap does. The screensaver is its own window, so keys
+            // typed while it is up never reach the activity's dispatchKeyEvent. Volume keys
+            // still change the volume on the way.
+            setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    hideScreensaver()
+                    resetInactivityTimer()
+                }
+                keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN &&
+                    keyCode != KeyEvent.KEYCODE_VOLUME_MUTE
             }
 
             setOnDismissListener {
