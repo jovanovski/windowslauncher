@@ -638,12 +638,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             setOf("system.msn", "system.registry_editor", "system.dialer")
 
         /** What Start's app list files under Accessories, and in which of its folders. */
-        private val ACCESSORIES_ENTERTAINMENT = listOf("system.wmp")
+        private val ACCESSORIES_ENTERTAINMENT = listOf("system.winamp", "system.wmp")
         private val ACCESSORIES_GAMES = listOf(
             "system.freecell", "system.hearts", "system.minesweeper",
             "system.pinball", "system.solitare", "system.destroyer"
         )
-        private val ACCESSORIES_OWN = listOf("system.clock", "system.notepad", "system.paint")
+        private val ACCESSORIES_OWN =
+            listOf("system.clock", "system.internet_explorer", "system.notepad", "system.paint")
         private val ACCESSORIES_PROGRAMS =
             (ACCESSORIES_ENTERTAINMENT + ACCESSORIES_GAMES + ACCESSORIES_OWN).toSet()
 
@@ -3662,8 +3663,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
-     * Accessories, laid out as the web desktop's: Entertainment and Games inside it, then its
-     * own programs. A folder left with nothing in it (all hidden, say) is not shown.
+     * Accessories, laid out like the web desktop's: Entertainment and Games inside it, then its
+     * own programs. Every program the launcher brings is in there somewhere. A folder left with nothing in it (all hidden, say) is not shown.
      */
     private fun accessoriesFolder(apps: List<AppInfo>): StartMenuFolder? {
         val byPackage = apps.associateBy { it.packageName }
