@@ -3,4 +3,5 @@
     <!-- The card tables FreeCell and Hearts draw on, so the desktop's cursor stays off them -->
     <item name="freecell_table" type="id" />
     <item name="hearts_table" type="id" />
+    <item name="menu_animator_tag" type="id" />
 </resources>

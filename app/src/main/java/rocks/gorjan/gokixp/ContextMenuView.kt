@@ -9,6 +9,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import rocks.gorjan.gokixp.theme.AppTheme
+import rocks.gorjan.gokixp.theme.MenuAnimator
 import rocks.gorjan.gokixp.theme.ThemeAware
 
 class ContextMenuView @JvmOverloads constructor(
@@ -20,6 +21,16 @@ class ContextMenuView @JvmOverloads constructor(
     private var onItemClickListener: ((ContextMenuItem) -> Unit)? = null
     private var onMenuHiddenListener: (() -> Unit)? = null
     private var currentTheme: AppTheme = AppTheme.WindowsXP
+
+    /**
+     * Whether the menu is up. False as soon as it is put away, even while it is still fading
+     * out, so a tap during the fade goes to whatever is underneath rather than to the menu.
+     */
+    var isOpen = false
+        private set
+
+    /** Set by [positionMenu]: true when the menu didn't fit below the touch and went above. */
+    private var openedAbove = false
 
     // Backward compatible property
     private var isWindows98Theme = false
@@ -45,6 +56,10 @@ class ContextMenuView @JvmOverloads constructor(
     fun showMenu(items: List<ContextMenuItem>, x: Float, y: Float) {
         // Trigger haptic feedback when opening context menu
         Helpers.performHapticFeedback(context)
+
+        // Settle any open or close still playing before positionMenu sets the new place,
+        // since a cancelled slide puts the menu back where it started.
+        MenuAnimator.cancel(this)
         
         // Clear existing items
         removeAllViews()
@@ -63,15 +78,34 @@ class ContextMenuView @JvmOverloads constructor(
         
         // Show the menu
         visibility = VISIBLE
+        isOpen = true
         
         // Ensure it renders above everything else
         bringToFront()
+
+        MenuAnimator.show(
+            this,
+            selectedTheme(),
+            if (openedAbove) MenuAnimator.Direction.UP else MenuAnimator.Direction.DOWN,
+        )
     }
     
     fun hideMenu() {
-        visibility = GONE
+        isOpen = false
+        MenuAnimator.hide(this, selectedTheme()) {
+            if (!isOpen) visibility = GONE
+        }
         onMenuHiddenListener?.invoke()
     }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        // Fading out: the menu is already put away, so its rows must not fire a second time.
+        if (!isOpen) return false
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun selectedTheme(): AppTheme =
+        (context as? MainActivity)?.themeManager?.getSelectedTheme() ?: currentTheme
 
     fun setOnItemClickListener(listener: (ContextMenuItem) -> Unit) {
         onItemClickListener = listener
@@ -347,6 +381,8 @@ class ContextMenuView @JvmOverloads constructor(
         if (finalY < 0) {
             finalY = 0f
         }
+
+        openedAbove = finalY + menuHeight <= y && finalY < y
 
         // Apply position
         translationX = finalX

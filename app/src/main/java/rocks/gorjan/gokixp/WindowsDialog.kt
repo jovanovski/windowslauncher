@@ -1087,7 +1087,7 @@ class WindowsDialog @JvmOverloads constructor(
         ev?.let { event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 // If context menu is visible, intercept ALL touches to prevent passthrough
-                if (contextMenuView != null && contextMenuView?.visibility == View.VISIBLE) {
+                if (contextMenuView?.isOpen == true) {
                     // Check if touch is within window frame
                     val x = event.x
                     val y = event.y
@@ -1133,7 +1133,7 @@ class WindowsDialog @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         // If context menu was visible, consume the touch event to prevent passthrough
         if (event?.actionMasked == MotionEvent.ACTION_DOWN &&
-            contextMenuView != null && contextMenuView?.visibility == View.VISIBLE) {
+            contextMenuView?.isOpen == true) {
             return true // Consume the event
         }
         // Don't consume touches - let them pass through
