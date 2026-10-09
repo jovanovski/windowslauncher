@@ -441,7 +441,7 @@ const Savers = {
     // env.w/env.h are the canvas size in device pixels; env.unit is device pixels per emulated screen pixel.
     run(canvas, kind, preview, cfg, real) {
         const def = this.impl[kind] || this.impl.blank;
-        const env = { canvas, preview, kind, cfg: cfg || this.cfg(kind), w: 0, h: 0, unit: 1, gl: null, ctx: null, fixed: null };
+        const env = { canvas, preview, kind, cfg: cfg || this.cfg(kind), w: 0, h: 0, unit: 1, gl: null, ctx: null };
         if (def.gl) {
             env.gl = SaverGL.context(canvas, def.glAttrs);
             // Without WebGL the 3D savers can't run; Mystify keeps the screen moving instead
@@ -455,15 +455,10 @@ const Savers = {
         const fit = () => {
             const r = canvas.getBoundingClientRect();
             if (!r.width || !r.height) return false;
-            let w, hh;
-            if (env.fixed) [w, hh] = env.fixed;
-            else {
-                let s = Math.min(3, window.devicePixelRatio || 1);
-                if (def.maxPixels) s = Math.min(s, Math.sqrt(def.maxPixels / (r.width * r.height)));
-                w = Math.max(1, Math.round(r.width * s));
-                hh = Math.max(1, Math.round(r.height * s));
-            }
-            canvas.style.imageRendering = env.fixed ? 'pixelated' : '';
+            let s = Math.min(3, window.devicePixelRatio || 1);
+            if (def.maxPixels) s = Math.min(s, Math.sqrt(def.maxPixels / (r.width * r.height)));
+            const w = Math.max(1, Math.round(r.width * s));
+            const hh = Math.max(1, Math.round(r.height * s));
             if (w === env.w && hh === env.h) return true;
             canvas.width = env.w = w;
             canvas.height = env.h = hh;
@@ -1400,9 +1395,6 @@ Savers.impl.maze = {
 
         const render = () => {
             const full = cfg.full;
-            // Full Screen draws a 320×200 picture and stretches it, as 98 did
-            const q = cfg.quality ? 2 : 1;
-            env.fixed = full ? (env.canvas.clientWidth >= env.canvas.clientHeight ? [320 * q, 200 * q] : [200 * q, 320 * q]) : null;
             let vx = 0, vy = 0, vw2 = env.w, vh = env.h;
             gl.viewport(0, 0, env.w, env.h);
             gl.disable(gl.SCISSOR_TEST);
