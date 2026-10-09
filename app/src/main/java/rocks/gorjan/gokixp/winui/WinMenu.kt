@@ -1,5 +1,7 @@
 package rocks.gorjan.gokixp.winui
 
+import android.app.Activity
+import android.content.ContextWrapper
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -13,6 +15,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -87,6 +90,7 @@ private class GlyphDrawable(
  */
 private class MenuBackgroundDrawable(
     private val ui: WinUi,
+    private val gutterDp: Int = WinMenuMetrics.GUTTER_DP,
 ) : Drawable() {
 
     private val fill = Paint()
@@ -115,7 +119,7 @@ private class MenuBackgroundDrawable(
         fill.color = if (ui.isXp) ui.pal.face else 0xFFF1F1F1.toInt()
         canvas.drawRect(
             b.left.toFloat(), b.top.toFloat(),
-            (b.left + ui.dp(WinMenuMetrics.GUTTER_DP)).toFloat(), b.bottom.toFloat(), fill,
+            (b.left + ui.dp(gutterDp)).toFloat(), b.bottom.toFloat(), fill,
         )
         line.color = ui.pal.shadow
         canvas.drawRect(b.left + h / 2, b.top + h / 2, b.right - h / 2, b.bottom - h / 2, line)
@@ -130,6 +134,9 @@ private class MenuBackgroundDrawable(
 internal object WinMenuMetrics {
     /** The strip a tick sits in, and how far a command's text starts from the left. */
     const val GUTTER_DP = 22
+
+    /** The wider strip of a menu of programs, which holds each one's icon. */
+    const val ICON_GUTTER_DP = 28
 
     /** Room kept on the right for a shortcut, so two menus' commands line up. */
     const val SHORTCUT_GAP_DP = 18
@@ -146,7 +153,11 @@ class WinMenuPopup(private val ui: WinUi) {
 
     val isShowing: Boolean get() = window?.isShowing == true
 
-    /** Shows [items] under [anchor] (a menu-bar word) or beside it (a submenu row). */
+    /**
+     * Shows [items] under [anchor] (a menu-bar word) or beside it (a submenu row, or a Start
+     * menu folder). Beside means to the right, or to the left when the right has no room for
+     * it, top level with the row and moved up as far as it needs to fit on the screen.
+     */
     fun show(
         anchor: View,
         items: List<ContextMenuItem>,
@@ -154,13 +165,16 @@ class WinMenuPopup(private val ui: WinUi) {
         onDismiss: (() -> Unit)? = null,
     ) {
         dismiss()
+        val withIcons = items.any { it.icon != null }
         val body = LinearLayout(ui.context).apply {
             orientation = LinearLayout.VERTICAL
-            background = MenuBackgroundDrawable(ui)
+            background = MenuBackgroundDrawable(
+                ui, if (withIcons) WinMenuMetrics.ICON_GUTTER_DP else WinMenuMetrics.GUTTER_DP,
+            )
             val edge = if (ui.isClassic) ui.dp(3) else ui.dp(2)
             setPadding(edge, edge, edge, edge)
         }
-        for (item in items) body.addView(rowFor(item))
+        for (item in items) body.addView(rowFor(item, withIcons))
 
         // As wide as its longest command, not as wide as the screen will let it be: every row
         // is match-parent with a weighted label, which a wrap-content popup otherwise stretches.
@@ -179,13 +193,32 @@ class WinMenuPopup(private val ui: WinUi) {
                 child?.dismiss()
                 onDismiss?.invoke()
             }
-            if (toTheSide) showAsDropDown(anchor, anchor.width - ui.dp(4), -anchor.height)
-            else showAsDropDown(anchor, 0, 0)
+            var toTheLeft = false
+            if (toTheSide) {
+                // Placed on the activity's own window rather than the anchor's, which for a
+                // submenu is the small popup it hangs from.
+                val screen = activityRoot(anchor)
+                val at = IntArray(2)
+                anchor.getLocationOnScreen(at)
+                val origin = IntArray(2)
+                screen.getLocationOnScreen(origin)
+                val left = at[0] - origin[0]
+                val top = at[1] - origin[1]
+                val overlap = ui.dp(4)
+                val right = left + anchor.width - overlap
+                toTheLeft = right + body.measuredWidth > screen.width
+                val x = if (toTheLeft) (left + overlap - body.measuredWidth).coerceAtLeast(0) else right
+                val y = top.coerceAtMost(screen.height - body.measuredHeight).coerceAtLeast(0)
+                showAtLocation(screen, Gravity.NO_GRAVITY, x, y)
+            } else {
+                showAsDropDown(anchor, 0, 0)
+            }
             if (ui.isClassic) {
                 MenuAnimator.show(
                     body,
                     ui.theme,
                     when {
+                        toTheLeft -> MenuAnimator.Direction.LEFT
                         toTheSide -> MenuAnimator.Direction.RIGHT
                         isAboveAnchor -> MenuAnimator.Direction.UP
                         else -> MenuAnimator.Direction.DOWN
@@ -195,6 +228,15 @@ class WinMenuPopup(private val ui: WinUi) {
         }
     }
 
+    private fun activityRoot(view: View): View {
+        var context = view.context
+        while (context is ContextWrapper) {
+            if (context is Activity) return context.window.decorView
+            context = context.baseContext
+        }
+        return view.rootView
+    }
+
     fun dismiss() {
         child?.dismiss()
         child = null
@@ -202,7 +244,7 @@ class WinMenuPopup(private val ui: WinUi) {
         window = null
     }
 
-    private fun rowFor(item: ContextMenuItem): View {
+    private fun rowFor(item: ContextMenuItem, withIcons: Boolean): View {
         if (item.isSeparator) {
             return View(ui.context).apply {
                 background = ui.separator().background
@@ -224,16 +266,24 @@ class WinMenuPopup(private val ui: WinUi) {
         val row = LinearLayout(ui.context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = ui.dp(ui.rowHeightDp + 2)
+            minimumHeight = ui.dp(ui.rowHeightDp + if (withIcons) 10 else 2)
             isClickable = enabled
             background = if (enabled) ui.rowSelector() else null
         }
 
         val tick = FrameLayout(ui.context).apply {
             layoutParams = LinearLayout.LayoutParams(
-                ui.dp(WinMenuMetrics.GUTTER_DP), ViewGroup.LayoutParams.MATCH_PARENT,
+                ui.dp(if (withIcons) WinMenuMetrics.ICON_GUTTER_DP else WinMenuMetrics.GUTTER_DP),
+                ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            if (item.hasCheckbox && item.isChecked) {
+            val icon = item.icon
+            if (icon != null) {
+                addView(
+                    // Its own copy, since the same drawable may be on show in the list too
+                    ImageView(ui.context).apply { setImageDrawable(icon.constantState?.newDrawable()?.mutate() ?: icon) },
+                    FrameLayout.LayoutParams(ui.dp(18), ui.dp(18), Gravity.CENTER),
+                )
+            } else if (item.hasCheckbox && item.isChecked) {
                 addView(
                     View(ui.context).apply { background = GlyphDrawable(ui.density, textColor, arrow = false) },
                     FrameLayout.LayoutParams(ui.dp(12), ui.dp(12), Gravity.CENTER),
@@ -250,7 +300,9 @@ class WinMenuPopup(private val ui: WinUi) {
                 ui.applyFont(this)
                 isSingleLine = true
             },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                if (withIcons) leftMargin = ui.dp(4)
+            },
         )
 
         item.shortcut?.let { keys ->
@@ -294,7 +346,17 @@ class WinMenuPopup(private val ui: WinUi) {
                 val sub = item.submenu
                 if (!sub.isNullOrEmpty()) {
                     child?.dismiss()
-                    child = WinMenuPopup(ui).also { it.show(row, sub, toTheSide = true) }
+                    // The row stays lit for as long as what it opened is open
+                    row.isSelected = true
+                    words.forEach { it.setTextColor(hot) }
+                    child = WinMenuPopup(ui).also { menu ->
+                        // A command down there puts this menu away too
+                        menu.onPicked = { dismiss(); onPicked?.invoke() }
+                        menu.show(row, sub, toTheSide = true) {
+                            row.isSelected = false
+                            words.forEach { it.setTextColor(cold) }
+                        }
+                    }
                     return@setOnClickListener
                 }
                 // A command closes every menu above it, not just the one it was on.

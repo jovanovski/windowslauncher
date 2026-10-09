@@ -17,7 +17,7 @@ import rocks.gorjan.gokixp.theme.ThemeAware
 
 /**
  * A folder in the app list, the way All Programs has Accessories. Its [children] are
- * [AppInfo]s and further folders; a tap opens it in place, under its own row.
+ * [AppInfo]s and further folders; a tap opens them in a menu of their own beside its row.
  */
 data class StartMenuFolder(val name: String, val children: List<Any>)
 
@@ -34,18 +34,13 @@ class AppsAdapter(
     private val hiddenApps: Set<String> = emptySet(),
     // The "Private" row: a tap locks or unlocks the private space, a long press opens its menu
     private val onPrivateSpaceClick: ((PrivateSpaceHeader) -> Unit)? = null,
-    private val onPrivateSpaceLongClick: ((PrivateSpaceHeader, Float, Float) -> Unit)? = null
+    private val onPrivateSpaceLongClick: ((PrivateSpaceHeader, Float, Float) -> Unit)? = null,
+    // A folder row: the activity opens its contents as a menu beside the row it hands over
+    private val onFolderClick: ((StartMenuFolder, View) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ThemeAware {
 
-    /** A row inside an open folder, indented [depth] steps. */
-    private data class Nested(val item: Any, val depth: Int)
-
-    // Folders open by name. All of them close again with the start menu.
-    private val openFolders = mutableSetOf<String>()
-
-    private var filteredItems: List<Any> = browseRows()
+    private var filteredItems: List<Any> = originalItems
     private var currentTheme: AppTheme = AppTheme.WindowsXP
-    private var isSearching = false
 
     // A search looks inside the folders too, so what it runs over is every app, flat, in
     // name order with the private space's after as before.
@@ -82,30 +77,8 @@ class AppsAdapter(
         private const val TYPE_SEPARATOR = 1
         private const val TYPE_PRIVATE_SPACE = 2
         private const val TYPE_FOLDER = 3
-
-        private fun unwrap(row: Any): Any = (row as? Nested)?.item ?: row
-        private fun depthOf(row: Any): Int = (row as? Nested)?.depth ?: 0
     }
 
-    /** The list as browsed: every row, with what is in the open folders under each. */
-    private fun browseRows(): List<Any> {
-        val rows = mutableListOf<Any>()
-        fun add(items: List<Any>, depth: Int) {
-            items.forEach { item ->
-                rows.add(if (depth == 0) item else Nested(item, depth))
-                if (item is StartMenuFolder && item.name in openFolders) add(item.children, depth + 1)
-            }
-        }
-        add(originalItems, 0)
-        return rows
-    }
-
-    /** Indents a row by how deep in the folders it sits. */
-    private fun indent(view: View, depth: Int) {
-        val density = context.resources.displayMetrics.density
-        val start = ((8 + 16 * depth) * density).toInt()
-        if (view.paddingLeft != start) view.setPadding(start, view.paddingTop, view.paddingRight, view.paddingBottom)
-    }
 
     inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appIcon: ImageView = itemView.findViewById(R.id.app_icon)
@@ -137,8 +110,7 @@ class AppsAdapter(
             }
         }
 
-        private fun boundApp(): AppInfo? =
-            filteredItems.getOrNull(bindingAdapterPosition)?.let { unwrap(it) } as? AppInfo
+        private fun boundApp(): AppInfo? = filteredItems.getOrNull(bindingAdapterPosition) as? AppInfo
     }
 
     inner class FolderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -146,14 +118,21 @@ class AppsAdapter(
         val label: TextView = itemView.findViewById(R.id.app_name)
 
         init {
+            // The arrow at the far end that says a menu opens from here
+            label.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            (itemView as ViewGroup).addView(TextView(context).apply {
+                text = "\u25B8"
+                textSize = 13f
+            })
             itemView.setOnClickListener {
-                val folder = filteredItems.getOrNull(bindingAdapterPosition)
-                    ?.let { unwrap(it) } as? StartMenuFolder ?: return@setOnClickListener
+                val folder = filteredItems.getOrNull(bindingAdapterPosition) as? StartMenuFolder
+                    ?: return@setOnClickListener
                 (context as? MainActivity)?.playClickSound()
-                if (!openFolders.remove(folder.name)) openFolders.add(folder.name)
-                show(browseRows())
+                onFolderClick?.invoke(folder, itemView)
             }
         }
+
+        val arrow: TextView get() = (itemView as ViewGroup).getChildAt(2) as TextView
     }
 
     class SeparatorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
@@ -186,7 +165,7 @@ class AppsAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
-        return when (unwrap(filteredItems[position])) {
+        return when (filteredItems[position]) {
             is AppInfo -> TYPE_APP
             is String -> TYPE_SEPARATOR
             is PrivateSpaceHeader -> TYPE_PRIVATE_SPACE
@@ -254,20 +233,19 @@ class AppsAdapter(
             return
         }
         if (holder is FolderViewHolder) {
-            val folder = unwrap(filteredItems[position]) as StartMenuFolder
-            indent(holder.itemView, depthOf(filteredItems[position]))
+            val folder = filteredItems[position] as StartMenuFolder
             (context as? MainActivity)?.let {
                 holder.icon.setImageResource(it.themeManager.getFolderIconRes(currentTheme))
             }
             holder.label.text = folder.name
             holder.label.setTextColor(textColors)
             holder.label.typeface = themeTypeface
+            holder.arrow.setTextColor(textColors)
             return
         }
         if (holder !is AppViewHolder) return // Separators need no binding
 
-        val app = unwrap(filteredItems[position]) as AppInfo
-        indent(holder.itemView, depthOf(filteredItems[position]))
+        val app = filteredItems[position] as AppInfo
 
         // Use pre-loaded icon from AppInfo (icons loaded when start menu opened)
         holder.appIcon.setImageDrawable(app.icon)
@@ -290,20 +268,12 @@ class AppsAdapter(
      */
     fun filter(query: String): Boolean {
         val trimmedQuery = query.trim().lowercase()
-        isSearching = trimmedQuery.isNotEmpty()
-        val updated = if (!isSearching) {
-            browseRows()
+        val updated = if (trimmedQuery.isEmpty()) {
+            originalItems
         } else {
             searchItems.filterIndexed { index, _ -> searchKeys[index].contains(trimmedQuery) }
         }
         return show(updated)
-    }
-
-    /** Closes every open folder, so the menu opens next time as it first did. */
-    fun closeFolders() {
-        if (openFolders.isEmpty()) return
-        openFolders.clear()
-        if (!isSearching) show(browseRows())
     }
 
     /** Puts [updated] on screen. Returns false when it is what was already there. */
@@ -327,12 +297,13 @@ class AppsAdapter(
      * filter left no app to open, so the caller can fall back to a web search.
      */
     fun launchFirstResult(): Boolean {
-        val app = filteredItems.map { unwrap(it) }.firstOrNull { it is AppInfo } as? AppInfo ?: return false
+        val app = filteredItems.firstOrNull { it is AppInfo } as? AppInfo ?: return false
         launchApp(app)
         return true
     }
 
-    private fun launchApp(app: AppInfo) {
+    /** Opens [app] the way its row in the list would, closing the start menu. */
+    fun launchApp(app: AppInfo) {
         if (app.isPrivate) {
             PrivateSpace.launch(context, app)
         } else if (MainActivity.isSystemApp(app.packageName)) {
@@ -358,8 +329,8 @@ class AppsAdapter(
         override fun getNewListSize(): Int = new.size
 
         override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            val oldItem = unwrap(old[oldItemPosition])
-            val newItem = unwrap(new[newItemPosition])
+            val oldItem = old[oldItemPosition]
+            val newItem = new[newItemPosition]
             // AppInfo.equals compares by package and profile
             return when {
                 oldItem is AppInfo && newItem is AppInfo -> oldItem == newItem
@@ -369,10 +340,8 @@ class AppsAdapter(
         }
 
         override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            // An app that moves in or out of a folder's indent has to be bound again
-            if (depthOf(old[oldItemPosition]) != depthOf(new[newItemPosition])) return false
-            val oldItem = unwrap(old[oldItemPosition])
-            val newItem = unwrap(new[newItemPosition])
+            val oldItem = old[oldItemPosition]
+            val newItem = new[newItemPosition]
             return if (oldItem is AppInfo && newItem is AppInfo) {
                 oldItem.name == newItem.name && oldItem.icon === newItem.icon
             } else true

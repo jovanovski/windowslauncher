@@ -24,7 +24,7 @@ import rocks.gorjan.gokixp.R
 object MenuAnimator {
 
     /** Which way a 9x menu unrolls: the edge it grows away from. */
-    enum class Direction { DOWN, UP, RIGHT }
+    enum class Direction { DOWN, UP, RIGHT, LEFT }
 
     private const val SLIDE_MS = 120L
     private const val START_SLIDE_MS = 200L
@@ -127,6 +127,12 @@ object MenuAnimator {
                         val hidden = (w * (1f - f)).toInt()
                         view.translationX = restX - hidden
                         clip.set(hidden, 0, w, h)
+                    }
+                    Direction.LEFT -> {
+                        // A submenu with no room on the right opens to the left, out of it.
+                        val hidden = (w * (1f - f)).toInt()
+                        view.translationX = restX + hidden
+                        clip.set(0, 0, w - hidden, h)
                     }
                 }
                 view.clipBounds = clip
