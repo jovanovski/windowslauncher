@@ -7540,10 +7540,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Set up Preview Screensaver button
         previewScreensaverButton.setOnClickListener {
             if (::screensaverManager.isInitialized && pendingScreensaverSelection != SaverCatalog.NONE) {
-                // Temporarily set the selected screensaver to the pending selection for preview
-                screensaverManager.setCustomVideoUri(pendingScreensaverVideo)
-                screensaverManager.setSelectedScreensaver(pendingScreensaverSelection)
-                screensaverManager.showScreensaver()
+                // Shows the pending pick without making it the chosen one - only OK and Apply do that
+                screensaverManager.showScreensaver(pendingScreensaverSelection, pendingScreensaverVideo)
             }
         }
 

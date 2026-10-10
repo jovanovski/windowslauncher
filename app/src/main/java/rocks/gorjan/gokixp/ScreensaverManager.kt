@@ -55,14 +55,21 @@ class ScreensaverManager(
         handler.postDelayed(screensaverRunnable, inactivityTimeout)
     }
 
-    fun showScreensaver() {
+    /**
+     * Puts a saver up now. With no arguments it is the chosen one, as the inactivity timer
+     * shows it. The Display Properties Preview button passes the saver and video still pending
+     * in the dialog instead, so trying one out never changes what the timer will show: the
+     * dialog can be closed from its title bar or the back button without OK or Cancel running,
+     * and a preview that had swapped the choice in would leave it on after it was turned off.
+     */
+    fun showScreensaver(saverId: String = selectedScreensaver, videoUri: Uri? = customVideoUri) {
         if (screensaverDialog?.isShowing == true) return
 
         val activity = context as? Activity ?: return
-        val saver = SaverCatalog.byId(selectedScreensaver)
+        val saver = SaverCatalog.byId(saverId)
         if (saver.kind == SaverCatalog.Kind.NONE) return
         // Custom... with nothing picked yet has nothing to play
-        if (saver.kind == SaverCatalog.Kind.CUSTOM_VIDEO && customVideoUri == null) return
+        if (saver.kind == SaverCatalog.Kind.CUSTOM_VIDEO && videoUri == null) return
 
         // Create fullscreen dialog
         screensaverDialog = Dialog(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
@@ -104,7 +111,7 @@ class ScreensaverManager(
             } else {
                 webView.visibility = View.GONE
                 videoView.visibility = View.VISIBLE
-                startVideoSaver(videoView, saver)
+                startVideoSaver(videoView, saver, videoUri)
             }
 
             // Tap to dismiss - the catcher sits over the video and the WebView both
@@ -140,9 +147,9 @@ class ScreensaverManager(
     }
 
     /** Plays the bundled aquarium, or whatever the user chose for Custom..., scaled to fill. */
-    private fun startVideoSaver(videoView: VideoView, saver: SaverCatalog.Saver) {
+    private fun startVideoSaver(videoView: VideoView, saver: SaverCatalog.Saver, customVideo: Uri?) {
         val videoUri = when (saver.kind) {
-            SaverCatalog.Kind.CUSTOM_VIDEO -> customVideoUri ?: return
+            SaverCatalog.Kind.CUSTOM_VIDEO -> customVideo ?: return
             else -> Uri.parse("android.resource://${context.packageName}/${R.raw.screensaver_underwater}")
         }
         videoView.setVideoURI(videoUri)
