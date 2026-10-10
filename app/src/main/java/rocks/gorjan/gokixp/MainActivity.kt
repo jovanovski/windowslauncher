@@ -1441,6 +1441,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             else -> R.drawable.system_tray_expand_xp
         }
         toggleButton?.setImageResource(iconRes)
+
+        // 98's tray leads with 4dp for its icons; with only the clock left, match the clock's own right padding
+        if (currentTheme is AppTheme.WindowsClassic) {
+            val tray = findViewById<LinearLayout>(R.id.system_tray)
+            val clock = findViewById<TextView>(R.id.clock_time)
+            if (tray != null && clock != null) {
+                val start = if (isVisible) (4 * resources.displayMetrics.density).toInt() else clock.paddingRight
+                tray.setPaddingRelative(start, tray.paddingTop, tray.paddingEnd, tray.paddingBottom)
+            }
+        }
     }
 
     private fun isSystemTrayVisible(): Boolean {

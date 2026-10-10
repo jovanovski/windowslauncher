@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The pressed 98 push button: bevel inverted, arrow nudged one pixel down and right. -->
+<!-- Pressed: the arrow nudged one pixel down and right, as a 98 push button would. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="28dp"
     android:height="28dp"
     android:viewportWidth="28"
     android:viewportHeight="28">
-    <path android:fillColor="#FFFFFF" android:pathData="M0,0h28v28h-28z" />
-    <path android:fillColor="#0A0A0A" android:pathData="M0,0h27v1h-26v26h-1z" />
-    <path android:fillColor="#DFDFDF" android:pathData="M1,1h26v26h-26z" />
-    <path android:fillColor="#808080" android:pathData="M1,1h25v1h-24v24h-1z" />
-    <path android:fillColor="#D3CEC7" android:pathData="M2,2h24v24h-24z" />
     <path android:fillColor="#000000" android:pathData="M13,11h1v1h1v1h1v1h1v1h-1v1h-1v1h-1v1h-1z" />
 </vector>
