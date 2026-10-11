@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Windows 3.1 menu command: the highlight's dark blue under a finger. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape><solid android:color="#000080" /></shape>
+    </item>
+    <item>
+        <shape><solid android:color="@android:color/transparent" /></shape>
+    </item>
+</selector>

@@ -41,6 +41,10 @@ open class DesktopIconView : LinearLayout, ThemeAware {
     private var customLongClickHandler: ((Float, Float) -> Unit)? = null
     private var hadSignificantMovement = false
     private var originalTextColor: Int = Color.WHITE // Store original text color
+    /** False once the icon is shown inside a window (a folder) rather than on the desktop. */
+    private var isOnDesktop = true
+    /** The label's desktop shadow from the layout (radius, dx, dy, colour), kept to put back. */
+    private var desktopShadow: FloatArray? = null
 
     @JvmOverloads
     constructor(
@@ -187,7 +191,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
      * single notifyThemeChanged() fully re-themes every icon.
      */
     override fun onThemeChanged(theme: AppTheme) {
-        setThemeFont(theme is AppTheme.WindowsClassic)
+        setThemeFont(theme.isClassic)
     }
 
     fun getDesktopIcon(): DesktopIcon? = desktopIcon
@@ -207,7 +211,31 @@ open class DesktopIconView : LinearLayout, ThemeAware {
     }
 
     fun removeTextShadow() {
+        isOnDesktop = false
         iconText.setShadowLayer(0F,0F,0F,0)
+        updateSelectionTint()
+    }
+
+    private fun isWin31(): Boolean =
+        MainActivity.getInstance()?.themeManager?.getSelectedTheme() is AppTheme.Windows31
+
+    /**
+     * Windows 3.1 wrote an icon's title in black on a box of the desktop colour, with no shadow,
+     * so it read the same over any wallpaper. Other themes keep the layout's white, shadowed label.
+     */
+    private fun applyWin31DesktopLabel() {
+        if (!isOnDesktop) return
+        if (desktopShadow == null) {
+            desktopShadow = floatArrayOf(
+                iconText.shadowRadius, iconText.shadowDx, iconText.shadowDy, iconText.shadowColor.toFloat()
+            )
+        }
+        if (isWin31()) {
+            iconText.setShadowLayer(0f, 0f, 0f, 0)
+        } else {
+            desktopShadow?.let { iconText.setShadowLayer(it[0], it[1], it[2], it[3].toInt()) }
+        }
+        updateSelectionTint()
     }
 
     fun setThemeFont(isWindows98: Boolean) {
@@ -224,9 +252,13 @@ open class DesktopIconView : LinearLayout, ThemeAware {
             iconText.setLineSpacing(lineSpacingExtra.toFloat(), 0.8f)
             iconText.textScaleX = 1.025f
         }
+        else if(currentTheme == AppTheme.Windows31) {
+            iconText.setLineSpacing(0f, 1.0f)
+        }
         else{
             iconText.setLineSpacing(lineSpacingExtra.toFloat(), 0.85f)
         }
+        applyWin31DesktopLabel()
 
     }
 
@@ -590,12 +622,19 @@ open class DesktopIconView : LinearLayout, ThemeAware {
     }
     
     private fun updateSelectionTint() {
+        val win31 = isWin31()
         if (isSelected) {
-            // Apply blue background to text and white text color
-            iconText.setBackgroundColor(Color.parseColor("#0000FF")) // Solid blue background
+            // Apply blue background to text and white text color. 3.1 highlights in its dark blue.
+            iconText.setBackgroundColor(Color.parseColor(if (win31) "#000080" else "#0000FF"))
             iconText.setTextColor(Color.WHITE) // White text
             iconText.maxLines = Int.MAX_VALUE // Remove line limit to show full filename
             // Remove background from the whole view
+            setBackgroundColor(Color.TRANSPARENT)
+        } else if (win31 && isOnDesktop) {
+            // Black on the desktop colour, as 3.1 drew icon titles
+            iconText.setBackgroundColor(Color.parseColor("#C0C0C0"))
+            iconText.setTextColor(Color.BLACK)
+            iconText.maxLines = 2
             setBackgroundColor(Color.TRANSPARENT)
         } else {
             // Remove text background

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 3.1's caption button, as its display driver drew it, up and pushed in. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@drawable/win31_caption_min_pressed" />
+    <item android:drawable="@drawable/win31_caption_min" />
+</selector>

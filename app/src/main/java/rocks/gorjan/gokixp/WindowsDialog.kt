@@ -18,6 +18,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.updateLayoutParams
 import rocks.gorjan.gokixp.theme.AppTheme
 import rocks.gorjan.gokixp.theme.ThemeManager
+import rocks.gorjan.gokixp.winui.WinUi
+import rocks.gorjan.gokixp.winui.showMenu
 
 /**
  * Data class to store window state for persistence
@@ -173,7 +175,9 @@ class WindowsDialog @JvmOverloads constructor(
             mainActivity.themeManager.getDialogLayoutRes(currentTheme)
         } else {
             // Fallback if not in MainActivity context
-            if (currentTheme is AppTheme.WindowsClassic) {
+            if (currentTheme is AppTheme.Windows31) {
+                R.layout.windows_dialog_content_31
+            } else if (currentTheme is AppTheme.WindowsClassic) {
                 R.layout.windows_dialog_content_98
             } else if (currentTheme is AppTheme.Windows7) {
                 R.layout.windows_dialog_content_win7
@@ -216,6 +220,7 @@ class WindowsDialog @JvmOverloads constructor(
         maximizeButton = findViewById(R.id.dialog_maximize_button)
         contentArea = findViewById(R.id.dialog_content_area)
         windowIcon = findViewById(R.id.dialog_window_icon)
+        setupWin31ControlMenuBox()
 
         // Get border frame only for Windows XP theme
         if (currentTheme is AppTheme.WindowsXP || currentTheme.isAero) {
@@ -1229,6 +1234,7 @@ class WindowsDialog @JvmOverloads constructor(
             taskbarContainer?.addView(button)
         }
         button.isActivated = isInFocus() && !isMinimized
+        updateWin31IconVisibility()
     }
 
     /** This window's button on the taskbar, while it has one. */
@@ -1341,6 +1347,7 @@ class WindowsDialog @JvmOverloads constructor(
             isMinimized = true
             taskbarButton?.isActivated = false
             windowFrame.visibility = View.GONE
+            updateWin31IconVisibility()
             onMinimizeListener?.invoke()
         }
     }
@@ -1352,6 +1359,7 @@ class WindowsDialog @JvmOverloads constructor(
         if (isMinimized) {
             isMinimized = false
             windowFrame.visibility = View.VISIBLE
+            updateWin31IconVisibility()
             windowManager?.bringToFront(this)
         }
     }
@@ -1469,6 +1477,55 @@ class WindowsDialog @JvmOverloads constructor(
         return isMinimized
     }
 
+    // ——— Windows 3.1 Control menu ———
+
+    /**
+     * The box at the left of a Windows 3.1 caption. A tap drops down the Control menu; a double
+     * tap closes the window, which is how most people closed anything in 3.1.
+     */
+    private fun setupWin31ControlMenuBox() {
+        val box = findViewById<ImageView>(R.id.dialog_sysmenu_button) ?: return
+        val boxGestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                showWin31ControlMenu(box)
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                closeWindow()
+                return true
+            }
+        })
+        box.setOnTouchListener { _, event -> boxGestures.onTouchEvent(event) }
+    }
+
+    private fun showWin31ControlMenu(anchor: View) {
+        val items = listOf(
+            ContextMenuItem("&Restore", isEnabled = isMaximized, action = { restoreWindow() }),
+            ContextMenuItem("&Move", isEnabled = false),
+            ContextMenuItem("&Size", isEnabled = false),
+            ContextMenuItem("Mi&nimize", isEnabled = canMinimize, action = { minimizeWindow() }),
+            ContextMenuItem("Ma&ximize", isEnabled = canMaximize && !isMaximized, action = { maximizeWindow() }),
+            ContextMenuItem.separator(),
+            ContextMenuItem("&Close", shortcut = "Alt+F4", action = { closeWindow() }),
+            ContextMenuItem.separator(),
+            ContextMenuItem("S&witch To...", shortcut = "Ctrl+Esc", isEnabled = false)
+        )
+        // Hangs from the box, in 3.1's white menu and System font
+        WinUi(context, AppTheme.Windows31).showMenu(anchor, items)
+    }
+
+    /**
+     * Windows 3.1 had no taskbar: a running window has no button anywhere, and only a minimized
+     * one leaves its icon on the desktop. So under 3.1 the button is shown only while minimized.
+     */
+    private fun updateWin31IconVisibility() {
+        if (currentTheme !is AppTheme.Windows31) return
+        taskbarButton?.visibility = if (isMinimized) View.VISIBLE else View.GONE
+    }
+
     // ——— Focus State ———
 
     /**
@@ -1482,7 +1539,11 @@ class WindowsDialog @JvmOverloads constructor(
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
-            if (currentTheme is AppTheme.Windows7) {
+            if (currentTheme is AppTheme.Windows31) {
+                windowFrame.setBackgroundResource(R.drawable.win31_window_frame)
+                titleBar.setBackgroundResource(R.drawable.win31_caption_active)
+                titleText.setTextColor(Color.WHITE)
+            } else if (currentTheme is AppTheme.Windows7) {
                 // One glass frame for the whole window; the caption buttons follow activation.
                 titleBar.isActivated = true
                 windowFrame.setBackgroundResource(R.drawable.win7_window_frame)
@@ -1517,7 +1578,12 @@ class WindowsDialog @JvmOverloads constructor(
         if (isBorderless) return
 
         if (::titleBar.isInitialized) {
-            if (currentTheme is AppTheme.WindowsClassic) {
+            if (currentTheme is AppTheme.Windows31) {
+                windowFrame.setBackgroundResource(R.drawable.win31_window_frame_inactive)
+                titleBar.setBackgroundResource(R.drawable.win31_caption_inactive)
+                titleText.setTextColor(Color.BLACK)
+            }
+            else if (currentTheme is AppTheme.WindowsClassic) {
                 titleBar.setBackgroundResource(R.drawable.windows_98_dialog_title_bar_inactive)
             }
             else if (currentTheme is AppTheme.Windows7) {

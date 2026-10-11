@@ -100,6 +100,17 @@ private class MenuBackgroundDrawable(
     override fun draw(canvas: Canvas) {
         val b = bounds
         val h = hair(ui.density)
+        if (ui.isWin31) {
+            // White, a black line round it, and a dark shadow cast on the right and bottom
+            val s = 2 * h
+            fill.color = ui.pal.shadow
+            canvas.drawRect(b.left + s, b.top + s, b.right.toFloat(), b.bottom.toFloat(), fill)
+            fill.color = Color.BLACK
+            canvas.drawRect(b.left.toFloat(), b.top.toFloat(), b.right - s, b.bottom - s, fill)
+            fill.color = ui.pal.window
+            canvas.drawRect(b.left + h, b.top + h, b.right - s - h, b.bottom - s - h, fill)
+            return
+        }
         if (ui.isClassic) {
             fill.color = ui.pal.face
             canvas.drawRect(b, fill)
@@ -193,8 +204,13 @@ class WinMenuPopup(private val ui: WinUi) {
             background = MenuBackgroundDrawable(
                 ui, if (withIcons) WinMenuMetrics.ICON_GUTTER_DP else WinMenuMetrics.GUTTER_DP,
             )
-            val edge = if (ui.isClassic) ui.dp(3) else ui.dp(2)
-            setPadding(edge, edge, edge, edge)
+            if (ui.isWin31) {
+                // Inside the line, and clear of the shadow on the right and bottom
+                setPadding(ui.dp(1), ui.dp(1), ui.dp(3), ui.dp(3))
+            } else {
+                val edge = if (ui.isClassic) ui.dp(3) else ui.dp(2)
+                setPadding(edge, edge, edge, edge)
+            }
         }
         for (item in items) body.addView(rowFor(item, withIcons))
 
@@ -369,6 +385,16 @@ class WinMenuPopup(private val ui: WinUi) {
     }
 
     private fun rowFor(item: ContextMenuItem, withIcons: Boolean): View {
+        if (item.isSeparator && ui.isWin31) {
+            // A single black line, the full width of the menu
+            return View(ui.context).apply {
+                setBackgroundColor(Color.BLACK)
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(1)).apply {
+                    topMargin = ui.dp(3)
+                    bottomMargin = ui.dp(3)
+                }
+            }
+        }
         if (item.isSeparator) {
             return View(ui.context).apply {
                 background = ui.separator().background
@@ -421,7 +447,7 @@ class WinMenuPopup(private val ui: WinUi) {
                 text = accelerated(item.title)
                 setTextColor(textColor)
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, ui.textSp)
-                ui.applyFont(this)
+                ui.applyMenuFont(this)
                 isSingleLine = true
                 ellipsize = android.text.TextUtils.TruncateAt.END
             },
@@ -434,9 +460,10 @@ class WinMenuPopup(private val ui: WinUi) {
             row.addView(
                 TextView(ui.context).apply {
                     text = keys
-                    setTextColor(ui.pal.grayText)
+                    // 3.1 drew a command's keys in the same black as the command
+                    setTextColor(if (ui.isWin31) textColor else ui.pal.grayText)
                     setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, ui.textSp)
-                    ui.applyFont(this)
+                    ui.applyMenuFont(this)
                     isSingleLine = true
                 },
                 LinearLayout.LayoutParams(
@@ -525,7 +552,8 @@ class WinMenuTracker(private val ui: WinUi) {
         popup.show(word, items) { restore() }
     }
 
-    private fun close() {
+    /** Puts the open menu away, if one is down, and unlights its word. */
+    fun close() {
         popup.dismiss()
         restore()
     }

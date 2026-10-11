@@ -15,6 +15,7 @@ import rocks.gorjan.gokixp.R
  * - Windows 9x ([AppTheme.WindowsClassic]) used the "scroll" effect: a menu slid out of the
  *   edge it hangs from - down from a menu bar, up out of the taskbar for Start, sideways for
  *   a submenu - and vanished the instant it was put away.
+ * - Windows 3.1 ([AppTheme.Windows31]) drew a menu at once and took it away at once.
  * - XP, Vista and 7 faded menus in, and faded them back out.
  *
  * Works on the menu's own view rather than a window animation, so the same code serves the
@@ -35,7 +36,7 @@ object MenuAnimator {
     private val CLOSING = Any()
 
     /** Whether [theme] puts a menu away with an animation; 9x simply drops it. */
-    fun animatesClose(theme: AppTheme): Boolean = theme !is AppTheme.WindowsClassic
+    fun animatesClose(theme: AppTheme): Boolean = !theme.isClassic
 
     /**
      * Plays [view]'s opening animation. Call after the view is made visible and positioned;
@@ -43,6 +44,10 @@ object MenuAnimator {
      */
     fun show(view: View, theme: AppTheme, direction: Direction = Direction.DOWN, isStartMenu: Boolean = false) {
         cancel(view)
+        if (theme is AppTheme.Windows31) {
+            // Windows 3.1 had no menu animation at all: a menu was simply there.
+            return
+        }
         if (theme is AppTheme.WindowsClassic) {
             slide(view, direction, if (isStartMenu) START_SLIDE_MS else SLIDE_MS)
         } else {

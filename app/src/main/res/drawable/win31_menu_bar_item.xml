@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A menu bar title: inverted to the highlight while its menu is pulled down. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true"><shape><solid android:color="#000080" /></shape></item>
+    <item android:state_selected="true"><shape><solid android:color="#000080" /></shape></item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

@@ -38,7 +38,9 @@ class FontManager(private val context: Context) {
     fun getFontForTheme(theme: AppTheme, style: FontStyle = FontStyle.Normal): Typeface? {
         val fontRes = when {
             theme is AppTheme.WindowsClassic && style == FontStyle.Bold -> R.font.micross_block_bold
-            theme is AppTheme.WindowsClassic -> R.font.micross_block
+            // Windows 3.1's bold face is its System font, the one on every caption and menu
+            theme is AppTheme.Windows31 && style == FontStyle.Bold -> R.font.w31_system
+            theme.isClassic -> R.font.micross_block
             theme is AppTheme.WindowsXP -> R.font.tahoma  // The Tahoma here has no separate bold
             style == FontStyle.Bold -> R.font.segoeui_bold
             else -> R.font.segoeui_regular
@@ -54,7 +56,7 @@ class FontManager(private val context: Context) {
      * @return The font family resource ID
      */
     fun getFontFamilyRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic -> R.font.micross_font_family
+        AppTheme.WindowsClassic, AppTheme.Windows31 -> R.font.micross_font_family
         AppTheme.WindowsXP -> R.font.tahoma_font_family
         AppTheme.WindowsVista, AppTheme.Windows7 -> R.font.segoeui_font_family
     }

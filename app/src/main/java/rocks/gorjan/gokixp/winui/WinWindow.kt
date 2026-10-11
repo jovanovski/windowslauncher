@@ -165,6 +165,7 @@ class WinWindow(
  */
 fun backdropColor(theme: AppTheme): Int = when (theme) {
     AppTheme.WindowsClassic -> 0xFF008080.toInt()
+    AppTheme.Windows31 -> 0xFFC0C0C0.toInt()
     AppTheme.WindowsXP -> 0xFF3A6EA5.toInt()
     AppTheme.WindowsVista -> 0xFF1B3A5C.toInt()
     AppTheme.Windows7 -> 0xFF1A2B44.toInt()

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inactive window: the border is InactiveBorder, white.
+     Windows 3.1's sizing frame: a black line, three pixels of border colour, another black
+     line, with the corner ticks cut across the border. The window's padding (5dp) keeps the
+     caption and client inside it. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle"><solid android:color="#FFFFFF" /></shape>
+    </item>
+    <item android:left="4dp" android:top="4dp" android:right="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="top|left" android:left="22dp" android:width="1dp" android:height="4dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="top|right" android:right="22dp" android:width="1dp" android:height="4dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="bottom|left" android:left="22dp" android:width="1dp" android:height="4dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="bottom|right" android:right="22dp" android:width="1dp" android:height="4dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="top|left" android:top="22dp" android:width="4dp" android:height="1dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="top|right" android:top="22dp" android:width="4dp" android:height="1dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="bottom|left" android:bottom="22dp" android:width="4dp" android:height="1dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:gravity="bottom|right" android:bottom="22dp" android:width="4dp" android:height="1dp">
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+</layer-list>

@@ -63,6 +63,12 @@ class ContextMenuView @JvmOverloads constructor(
         
         // Clear existing items
         removeAllViews()
+
+        // 3.1's menus are as wide as their longest command, set in the wide System font
+        if (isWin31()) {
+            layoutParams?.let { it.width = LayoutParams.WRAP_CONTENT; layoutParams = it }
+            minimumWidth = 180.dpToPx()
+        }
         
         // Add new items
         items.forEach { item ->
@@ -106,6 +112,8 @@ class ContextMenuView @JvmOverloads constructor(
 
     private fun selectedTheme(): AppTheme =
         (context as? MainActivity)?.themeManager?.getSelectedTheme() ?: currentTheme
+
+    private fun isWin31(): Boolean = selectedTheme() is AppTheme.Windows31
 
     fun setOnItemClickListener(listener: (ContextMenuItem) -> Unit) {
         onItemClickListener = listener
@@ -197,7 +205,15 @@ class ContextMenuView @JvmOverloads constructor(
         when {
             item.title.isEmpty() -> {
                 // Add divider - different styles for different themes
-                if (isWindows98Theme) {
+                if (isWin31()) {
+                    // Windows 3.1: one black line across the whole menu
+                    val divider = View(context)
+                    val dividerParams = LayoutParams(LayoutParams.MATCH_PARENT, 1.dpToPx())
+                    dividerParams.setMargins(0, 3.dpToPx(), 0, 3.dpToPx())
+                    divider.layoutParams = dividerParams
+                    divider.setBackgroundColor(android.graphics.Color.BLACK)
+                    addView(divider)
+                } else if (isWindows98Theme) {
                     // Windows 98 style: 2px divider with #909090 top, #FFFFFF bottom
                     val dividerContainer = LinearLayout(context)
                     dividerContainer.orientation = LinearLayout.VERTICAL
@@ -245,6 +261,13 @@ class ContextMenuView @JvmOverloads constructor(
 
                 // Apply theme-appropriate font
                 MainActivity.getInstance()?.applyThemeFontToTextView(textView)
+                if (isWin31()) {
+                    // 3.1 set its menus in the System font, one font pixel to the dp
+                    textView.typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.w31_system)
+                    textView.textSize = 16f
+                    textView.includeFontPadding = false
+                    textView.isSingleLine = true
+                }
                 if (item.isEnabled) {
                     textView.setTextColor(context.getColorStateList(R.color.context_menu_text_selector))
                 } else {
@@ -253,8 +276,9 @@ class ContextMenuView @JvmOverloads constructor(
                 
                 // Set background
                 itemView.setBackgroundResource(
-                    if (item.isEnabled) R.drawable.context_menu_item_enabled
-                    else R.drawable.context_menu_item_disabled
+                    if (!item.isEnabled) R.drawable.context_menu_item_disabled
+                    else if (isWin31()) R.drawable.win31_menu_item
+                    else R.drawable.context_menu_item_enabled
                 )
                 
                 // Show/hide checkbox
@@ -452,7 +476,8 @@ class ContextMenuView @JvmOverloads constructor(
      */
     private fun refreshThemedBackground() {
         val mainActivity = context as? MainActivity ?: return
-        if (!mainActivity.themeManager.isClassicTheme()) return
+        // 98 only: 3.1's white menu is set once by updateBackground and has no Plus! colours
+        if (mainActivity.themeManager.getSelectedTheme() !is AppTheme.WindowsClassic) return
         val fill = mainActivity.themeManager.getActivePlus95()?.menuColor
             ?: androidx.core.content.ContextCompat.getColor(context, R.color.window_98_background)
         val topLeft = androidx.core.content.ContextCompat.getColor(context, R.color.border_white)

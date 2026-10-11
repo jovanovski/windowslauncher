@@ -65,19 +65,37 @@ class AppsAdapter(
 
     // Resolved once instead of per bind - looking these up in onBindViewHolder meant a
     // resource lookup and a font resolution for every row, every frame.
-    private var textColors: ColorStateList = context.getColorStateList(R.color.context_menu_text_selector)
+    private var textColors: ColorStateList = context.getColorStateList(textColorsRes())
     private var themeTypeface: Typeface? = (context as? MainActivity)?.getThemePrimaryFont()
 
     // Backward compatible property
     private var isWindows98Theme = false
-        get() = currentTheme is AppTheme.WindowsClassic
+        get() = currentTheme.isClassic
 
     companion object {
         private const val TYPE_APP = 0
         private const val TYPE_SEPARATOR = 1
         private const val TYPE_PRIVATE_SPACE = 2
         private const val TYPE_FOLDER = 3
+
+        /**
+         * Added to the view type under Windows 3.1, whose program group lays items out as icons
+         * with titles beneath rather than as menu rows, so holders of one kind are never
+         * recycled for the other after a theme switch.
+         */
+        private const val TYPE_OFFSET_WIN31 = 100
     }
+
+    private val isWin31: Boolean get() = currentTheme is AppTheme.Windows31
+
+    private fun textColorsRes(): Int =
+        if (isWin31) R.color.win31_icon_title_text else R.color.context_menu_text_selector
+
+    private val itemLayoutRes: Int
+        get() = if (isWin31) R.layout.app_grid_item_31 else R.layout.app_list_item
+
+    /** Whether the item at [position] is a separator, which spans a whole row of a grid. */
+    fun isSeparator(position: Int): Boolean = filteredItems.getOrNull(position) is String
 
 
     inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -118,12 +136,15 @@ class AppsAdapter(
         val label: TextView = itemView.findViewById(R.id.app_name)
 
         init {
-            // The arrow at the far end that says a menu opens from here
-            label.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            (itemView as ViewGroup).addView(TextView(context).apply {
-                text = "\u25B8"
-                textSize = 13f
-            })
+            // The arrow at the far end that says a menu opens from here. A Windows 3.1 group
+            // is an icon like any other item, with nothing to say it opens anything.
+            if (!isWin31) {
+                label.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                (itemView as ViewGroup).addView(TextView(context).apply {
+                    text = "\u25B8"
+                    textSize = 13f
+                })
+            }
             itemView.setOnClickListener {
                 val folder = filteredItems.getOrNull(bindingAdapterPosition) as? StartMenuFolder
                     ?: return@setOnClickListener
@@ -132,7 +153,7 @@ class AppsAdapter(
             }
         }
 
-        val arrow: TextView get() = (itemView as ViewGroup).getChildAt(2) as TextView
+        val arrow: TextView? get() = (itemView as ViewGroup).getChildAt(2) as? TextView
     }
 
     class SeparatorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
@@ -165,17 +186,18 @@ class AppsAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
-        return when (filteredItems[position]) {
+        val type = when (filteredItems[position]) {
             is AppInfo -> TYPE_APP
             is String -> TYPE_SEPARATOR
             is PrivateSpaceHeader -> TYPE_PRIVATE_SPACE
             is StartMenuFolder -> TYPE_FOLDER
             else -> TYPE_APP
         }
+        return if (isWin31) type + TYPE_OFFSET_WIN31 else type
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return when (viewType) {
+        return when (viewType % TYPE_OFFSET_WIN31) {
             TYPE_SEPARATOR -> {
                 // Create a container for the separator with proper padding
                 val containerView = LinearLayout(parent.context).apply {
@@ -205,17 +227,17 @@ class AppsAdapter(
             }
             TYPE_PRIVATE_SPACE -> {
                 val view = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.app_list_item, parent, false)
+                    .inflate(itemLayoutRes, parent, false)
                 PrivateSpaceViewHolder(view)
             }
             TYPE_FOLDER -> {
                 val view = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.app_list_item, parent, false)
+                    .inflate(itemLayoutRes, parent, false)
                 FolderViewHolder(view)
             }
             else -> {
                 val view = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.app_list_item, parent, false)
+                    .inflate(itemLayoutRes, parent, false)
                 AppViewHolder(view)
             }
         }
@@ -235,12 +257,15 @@ class AppsAdapter(
         if (holder is FolderViewHolder) {
             val folder = filteredItems[position] as StartMenuFolder
             (context as? MainActivity)?.let {
-                holder.icon.setImageResource(it.themeManager.getFolderIconRes(currentTheme))
+                // Under 3.1 a folder of apps is a program group, and shows the group icon
+                holder.icon.setImageResource(
+                    if (isWin31) R.drawable.win31_group else it.themeManager.getFolderIconRes(currentTheme)
+                )
             }
             holder.label.text = folder.name
             holder.label.setTextColor(textColors)
             holder.label.typeface = themeTypeface
-            holder.arrow.setTextColor(textColors)
+            holder.arrow?.setTextColor(textColors)
             return
         }
         if (holder !is AppViewHolder) return // Separators need no binding
@@ -351,7 +376,7 @@ class AppsAdapter(
     // Phase 3: Implement ThemeAware interface
     override fun onThemeChanged(theme: AppTheme) {
         currentTheme = theme
-        textColors = context.getColorStateList(R.color.context_menu_text_selector)
+        textColors = context.getColorStateList(textColorsRes())
         themeTypeface = (context as? MainActivity)?.getThemePrimaryFont()
         notifyDataSetChanged()
     }

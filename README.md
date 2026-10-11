@@ -9,6 +9,7 @@ Looking for the Windows Phone 8 launcher? It's [moved to it's own repo](https://
 
 ## Features
 - Themes to faithfully recreate:
+    - Windows 3.1
     - Windows 95/98
     - Windows 2000/ME
     - Windows XP

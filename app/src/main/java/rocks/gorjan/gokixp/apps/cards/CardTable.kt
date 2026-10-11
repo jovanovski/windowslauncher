@@ -44,7 +44,7 @@ interface CardHost {
 class CardArt(private val context: Context) {
     private val themeManager = ThemeManager(context)
     private val aero = themeManager.isAeroTheme()
-    private val classic = themeManager.getSelectedTheme() == AppTheme.WindowsClassic
+    private val classic = themeManager.getSelectedTheme().isClassic
     var large = false
     private val rankPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER

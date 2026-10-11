@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 3.1 had no taskbar. Program Manager and every other minimized window sat as an
+     icon with its title along the bottom of the desktop, so that is what this row is: the
+     Program Manager icon opens the Program Manager (the start menu), minimized windows add
+     their icons beside it, and the Clock sits at the right with the time as its title.
+     The tray views the launcher fills in everywhere are kept, hidden, since 3.1 had none. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="74dp"
+    android:elevation="150dp">
+
+    <RelativeLayout
+        android:id="@+id/taskbar_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:paddingLeft="6dp"
+        android:paddingRight="6dp">
+
+        <!-- Program Manager, minimized -->
+        <LinearLayout
+            android:id="@+id/start_and_divider"
+            android:layout_width="76dp"
+            android:layout_height="match_parent"
+            android:layout_alignParentLeft="true"
+            android:gravity="center_horizontal|top"
+            android:orientation="vertical"
+            android:paddingTop="4dp">
+
+            <ImageView
+                android:id="@+id/start_button"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="Program Manager"
+                android:scaleType="fitXY"
+                android:src="@drawable/win31_progman"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/win31_progman_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:background="@drawable/win31_icon_title"
+                android:fontFamily="@font/micross_block"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="2"
+                android:paddingLeft="2dp"
+                android:paddingRight="2dp"
+                android:paddingBottom="1dp"
+                android:text="Program Manager"
+                android:textColor="@color/win31_icon_title_text"
+                android:textSize="11sp"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
+
+        <!-- Icons of minimized windows -->
+        <LinearLayout
+            android:id="@+id/taskbar_empty_space"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_toLeftOf="@id/win31_clock_icon"
+            android:layout_toRightOf="@id/start_and_divider"
+            android:background="@android:color/transparent"
+            android:gravity="start|top"
+            android:orientation="horizontal" />
+
+        <!-- Clock, minimized, with the time as its title -->
+        <LinearLayout
+            android:id="@+id/win31_clock_icon"
+            android:layout_width="76dp"
+            android:layout_height="match_parent"
+            android:layout_alignParentRight="true"
+            android:gravity="center_horizontal|top"
+            android:orientation="vertical"
+            android:paddingTop="4dp">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="Clock"
+                android:scaleType="fitXY"
+                android:src="@drawable/win31_clock"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/clock_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:background="@drawable/win31_icon_title"
+                android:fontFamily="@font/micross_block"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:paddingLeft="2dp"
+                android:paddingRight="2dp"
+                android:paddingBottom="1dp"
+                android:text="01:23"
+                android:textColor="@color/win31_icon_title_text"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Kept for the code that fills in the tray on every theme; 3.1 had no tray -->
+        <ImageView
+            android:id="@+id/system_tray_toggle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/system_tray"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/system_tray_toggle_area"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/aqi_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/aqi_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/micross_block"
+                        android:text="?" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/weather_temp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/micross_block"
+                    android:text="?" />
+
+                <LinearLayout
+                    android:id="@+id/volume_icon_wrapper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        android:id="@+id/volume_icon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/sound_98" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/update_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/date_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/date_day"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/micross_block" />
+
+                    <TextView
+                        android:id="@+id/date_ordinal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/micross_block" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

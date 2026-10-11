@@ -194,7 +194,7 @@ abstract class WinSkin(val pal: WinPalette) {
     companion object {
         /** The skin the launcher's current shell wears. */
         fun of(theme: AppTheme): WinSkin = when (theme) {
-            AppTheme.WindowsClassic -> ClassicSkin
+            AppTheme.WindowsClassic, AppTheme.Windows31 -> ClassicSkin
             AppTheme.WindowsXP -> LunaSkin
             AppTheme.WindowsVista -> VistaSkin
             AppTheme.Windows7 -> Aero7Skin

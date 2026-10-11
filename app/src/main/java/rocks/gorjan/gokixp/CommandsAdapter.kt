@@ -41,7 +41,7 @@ class CommandsAdapter(
 
     // Backward compatible property
     private var isWindows98Theme = false
-        get() = currentTheme is AppTheme.WindowsClassic
+        get() = currentTheme.isClassic
 
     companion object {
         private const val TYPE_COMMAND = 0
