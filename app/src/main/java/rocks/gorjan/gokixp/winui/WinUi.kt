@@ -53,10 +53,25 @@ class WinUi(
     val density: Float = context.resources.displayMetrics.density
     private val fonts = FontManager(context)
 
-    val isClassic: Boolean get() = theme is AppTheme.WindowsClassic
+    val isClassic: Boolean get() = theme.isClassic
     val isXp: Boolean get() = theme is AppTheme.WindowsXP
     val isAero: Boolean get() = theme.isAero
     val isWin7: Boolean get() = theme is AppTheme.Windows7
+    val isWin31: Boolean get() = theme is AppTheme.Windows31
+
+    /**
+     * Windows 3.1 set its menus - the bar and the drop-downs alike - in the System font, not
+     * the dialog font. Sized so one of its pixels is one dp.
+     */
+    fun applyMenuFont(view: TextView) {
+        if (isWin31) {
+            view.typeface = ResourcesCompat.getFont(context, R.font.w31_system)
+            view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            view.includeFontPadding = false
+        } else {
+            applyFont(view)
+        }
+    }
 
     // ---------------------------------------------------------------- measures
 
@@ -334,6 +349,11 @@ class WinUi(
     ): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         background = when {
+            // 3.1's menu bar is white, closed off from the window below by a black line
+            isWin31 -> GradientPanelDrawable(
+                pal.window, pal.window, Color.BLACK, density, 0f,
+                sides = GradientPanelDrawable.Sides.BOTTOM
+            )
             isClassic -> BevelDrawable(pal, density, BevelDrawable.Style.FLAT, pal.face)
             else -> GradientPanelDrawable(
                 pal.toolbarTop, pal.toolbarBottom, pal.etch, density, 0f,
@@ -345,7 +365,8 @@ class WinUi(
             addView(
                 label(menu.title).apply {
                     text = accelerated(menu.title)
-                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                    applyMenuFont(this)
+                    setPadding(dp(if (isWin31) 6 else 8), dp(4), dp(if (isWin31) 6 else 8), dp(4))
                     isClickable = true
                     setOnClickListener { view ->
                         onSound?.invoke()

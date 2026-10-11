@@ -415,7 +415,7 @@ class SolitareGame(
                 isAntiAlias = true
                 textAlign = Paint.Align.CENTER
                 color = if (card.isRed()) Color.RED else Color.BLACK
-                textSize = if(currentTheme == AppTheme.WindowsClassic) 90f else 60f
+                textSize = if(currentTheme.isClassic) 90f else 60f
                 typeface = customTypeface
             }
 
@@ -438,7 +438,7 @@ class SolitareGame(
 
             // Calculate positions (with padding from edges)
             val padding = CARD_WIDTH * 0.05f
-            val topYText = y + padding + (if(currentTheme == AppTheme.WindowsClassic) 65f else 55f)
+            val topYText = y + padding + (if(currentTheme.isClassic) 65f else 55f)
 
             // Draw rank in top-left corner
             var rankX = x + CARD_WIDTH * 0.20f
@@ -446,7 +446,7 @@ class SolitareGame(
                 rankX += 7f
             }
 
-            if(currentTheme == AppTheme.WindowsClassic) {rankX+= 5f}
+            if(currentTheme.isClassic) {rankX+= 5f}
 
             canvas.drawText(rankStr, rankX, topYText, textPaint)
 

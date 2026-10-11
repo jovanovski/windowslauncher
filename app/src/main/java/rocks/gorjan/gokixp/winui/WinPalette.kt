@@ -220,8 +220,37 @@ data class WinPalette(
             headerBottom = 0xFFF3F3F3.toInt()
         )
 
+        /**
+         * Windows 3.1, "Windows Default": the same parts as 98 in the plain VGA greys -
+         * a C0C0C0 face, an 808080 shadow, black for the darkest edge and for disabled text's
+         * absence of colour, 808080 for grey text.
+         */
+        val WIN31 = CLASSIC.copy(
+            face = 0xFFC0C0C0.toInt(),
+            light = 0xFFC0C0C0.toInt(),
+            shadow = 0xFF808080.toInt(),
+            dkShadow = 0xFF000000.toInt(),
+            grayText = 0xFF808080.toInt(),
+            fieldBorder = 0xFF000000.toInt(),
+            fieldFocusBorder = 0xFF000000.toInt(),
+            buttonBorder = 0xFF000000.toInt(),
+            buttonTop = 0xFFC0C0C0.toInt(),
+            buttonBottom = 0xFFC0C0C0.toInt(),
+            buttonPressedTop = 0xFFC0C0C0.toInt(),
+            buttonPressedBottom = 0xFFC0C0C0.toInt(),
+            headerTop = 0xFFC0C0C0.toInt(),
+            headerBottom = 0xFFC0C0C0.toInt(),
+            headerLine = 0xFF808080.toInt(),
+            toolbarTop = 0xFFC0C0C0.toInt(),
+            toolbarBottom = 0xFFC0C0C0.toInt(),
+            etch = 0xFF808080.toInt(),
+            paneTop = 0xFFC0C0C0.toInt(),
+            paneBottom = 0xFFC0C0C0.toInt(),
+        )
+
         fun of(theme: AppTheme): WinPalette = when (theme) {
             AppTheme.WindowsClassic -> CLASSIC
+            AppTheme.Windows31 -> WIN31
             AppTheme.WindowsXP -> XP
             AppTheme.WindowsVista -> VISTA
             AppTheme.Windows7 -> WIN7

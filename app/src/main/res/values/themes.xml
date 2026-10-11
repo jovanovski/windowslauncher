@@ -99,6 +99,65 @@
     </style>
 
 
+    <!-- Windows 3.1 Theme: the "Windows Default" colour scheme - grey desktop, white windows -->
+    <style name="Theme.GokiXP.Win31" parent="Theme.GokiXP.Classic">
+        <item name="windowBackgroundColor">#FFFFFF</item>
+        <item name="dialogBackgroundColor">#FFFFFF</item>
+        <item name="winButtonStyle">@style/Win31Button</item>
+    </style>
+
+    <!-- Windows 3.1 Program Manager pieces -->
+    <style name="Win31MenuBarItem">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingLeft">6dp</item>
+        <item name="android:paddingRight">6dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:background">@drawable/win31_menu_bar_item</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:fontFamily">@font/w31_system</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">@color/win31_icon_title_text</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="Win31GroupIcon">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+    <style name="Win31GroupIconImage">
+        <item name="android:layout_width">32dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:scaleType">fitXY</item>
+        <item name="android:src">@drawable/win31_group</item>
+    </style>
+
+    <style name="Win31GroupIconTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">3dp</item>
+        <item name="android:background">@drawable/win31_icon_title_window</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:fontFamily">@font/micross_block</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:paddingLeft">2dp</item>
+        <item name="android:paddingRight">2dp</item>
+        <item name="android:paddingBottom">1dp</item>
+        <item name="android:textColor">@color/win31_icon_title_text</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+
     <!-- Button Widget Styles -->
     <style name="Win98Button" parent="@android:style/Widget.Button">
         <item name="android:textColor">#000000</item>
@@ -109,6 +168,19 @@
         <item name="android:paddingTop">3dp</item>
         <item name="android:paddingBottom">3dp</item>
         <item name="android:background">@drawable/win98_start_menu_border</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="Win31Button" parent="@android:style/Widget.Button">
+        <item name="android:textColor">#000000</item>
+        <item name="android:fontFamily">@font/w31_system</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:background">@drawable/win31_button</item>
         <item name="android:backgroundTint">@null</item>
         <item name="android:gravity">center</item>
     </style>

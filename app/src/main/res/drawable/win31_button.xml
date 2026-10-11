@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Windows 3.1 push button: a black outline with its corners left out, two pixels of
+     white light on the top and left, two of gray shadow on the bottom and right. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@drawable/win31_button_pressed" />
+    <item android:drawable="@drawable/win31_button_normal" />
+</selector>

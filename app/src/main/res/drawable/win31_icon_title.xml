@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The title under an icon on the Windows 3.1 desktop: drawn on the desktop colour, and on
+     the highlight colour while the icon is selected. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@drawable/win31_icon_title_selected" />
+    <item android:state_selected="true" android:drawable="@drawable/win31_icon_title_selected" />
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#C0C0C0" />
+        </shape>
+    </item>
+</selector>

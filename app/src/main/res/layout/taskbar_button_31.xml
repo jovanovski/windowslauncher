@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A minimized window on the Windows 3.1 desktop: its icon, and its title beneath. The window
+     code shows this only while the window is minimized; 3.1 had no buttons for open windows. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/taskbar_button"
+    android:layout_width="76dp"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_horizontal|top"
+    android:orientation="vertical"
+    android:paddingTop="4dp">
+
+    <ImageView
+        android:id="@+id/taskbar_button_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:contentDescription="Window icon"
+        android:duplicateParentState="true"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/taskbar_button_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/win31_icon_title"
+        android:duplicateParentState="true"
+        android:ellipsize="end"
+        android:fontFamily="@font/micross_block"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:paddingBottom="1dp"
+        android:textColor="@color/win31_icon_title_text"
+        android:textSize="11sp" />
+</LinearLayout>

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 3.1 had no Start menu; programs were started from the Program Manager. So under
+     this theme the Start menu is the Program Manager window: its caption, its menu bar, and
+     its white workspace holding the "Applications" group window with every installed app,
+     with the other groups minimized to icons beneath it. The edit line at the bottom stands
+     in for File > Run's "Command Line:" and filters the group as you type.
+     It stops above the bottom row of desktop icons, so the Program Manager icon stays in reach. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/start_menu_content"
+    android:layout_width="match_parent"
+    android:layout_height="560dp"
+    android:layout_alignParentBottom="true"
+    android:layout_marginBottom="36dp"
+    android:background="@drawable/win31_window_frame"
+    android:clickable="true"
+    android:orientation="vertical"
+    android:padding="5dp"
+    tools:ignore="HardcodedText">
+
+    <!-- Caption -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="19dp"
+        android:background="@drawable/win31_caption_active"
+        android:orientation="horizontal"
+        android:paddingBottom="1dp">
+
+        <ImageView
+            android:id="@+id/win31_pm_sysmenu"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Control menu"
+            android:scaleType="fitXY"
+            android:src="@drawable/win31_sysmenu" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="#000000" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:fontFamily="@font/w31_system"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Program Manager"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+
+        <ImageView
+            android:id="@+id/win31_pm_minimize"
+            android:layout_width="19dp"
+            android:layout_height="18dp"
+            android:contentDescription="Minimize"
+            android:scaleType="fitXY"
+            android:src="@drawable/win31_caption_min_states" />
+
+        <ImageView
+            android:id="@+id/win31_pm_maximize"
+            android:layout_width="19dp"
+            android:layout_height="18dp"
+            android:contentDescription="Maximize"
+            android:scaleType="fitXY"
+            android:src="@drawable/win31_caption_max_states" />
+    </LinearLayout>
+
+    <!-- Menu bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:orientation="horizontal"
+        android:paddingStart="2dp">
+
+        <TextView
+            android:id="@+id/win31_pm_menu_file"
+            style="@style/Win31MenuBarItem"
+            android:text="@string/win31_menu_file" />
+
+        <TextView
+            android:id="@+id/win31_pm_menu_options"
+            style="@style/Win31MenuBarItem"
+            android:text="@string/win31_menu_options" />
+
+        <TextView
+            android:id="@+id/win31_pm_menu_window"
+            style="@style/Win31MenuBarItem"
+            android:text="@string/win31_menu_window" />
+
+        <TextView
+            android:id="@+id/win31_pm_menu_help"
+            style="@style/Win31MenuBarItem"
+            android:text="@string/win31_menu_help" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#000000" />
+
+    <!-- Workspace -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#FFFFFF">
+
+        <!-- The program groups, minimized -->
+        <LinearLayout
+            android:id="@+id/win31_pm_group_icons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <LinearLayout
+                android:id="@+id/win31_group_main"
+                style="@style/Win31GroupIcon">
+
+                <ImageView style="@style/Win31GroupIconImage" />
+
+                <TextView
+                    style="@style/Win31GroupIconTitle"
+                    android:text="Main" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/win31_group_accessories"
+                style="@style/Win31GroupIcon">
+
+                <ImageView style="@style/Win31GroupIconImage" />
+
+                <TextView
+                    style="@style/Win31GroupIconTitle"
+                    android:text="Accessories" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/win31_group_games"
+                style="@style/Win31GroupIcon">
+
+                <ImageView style="@style/Win31GroupIconImage" />
+
+                <TextView
+                    style="@style/Win31GroupIconTitle"
+                    android:text="Games" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/win31_group_startup"
+                style="@style/Win31GroupIcon">
+
+                <ImageView style="@style/Win31GroupIconImage" />
+
+                <TextView
+                    style="@style/Win31GroupIconTitle"
+                    android:text="StartUp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- The Applications group window -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@id/win31_pm_group_icons"
+            android:layout_margin="6dp"
+            android:background="@drawable/win31_window_frame"
+            android:orientation="vertical"
+            android:padding="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="19dp"
+                android:background="@drawable/win31_caption_active"
+                android:orientation="horizontal"
+                android:paddingBottom="1dp">
+
+                <ImageView
+                    android:id="@+id/win31_group_sysmenu"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Control menu"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_sysmenu" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <TextView
+                    android:id="@+id/win31_group_title"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/w31_system"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="Applications"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp" />
+
+                <ImageView
+                    android:id="@+id/win31_group_minimize"
+                    android:layout_width="19dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Minimize"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_caption_min_states" />
+
+                <ImageView
+                    android:layout_width="19dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Maximize"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_caption_restore_states" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/apps_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#FFFFFF"
+                android:scrollbars="vertical" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <!-- Command line -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:fontFamily="@font/w31_system"
+            android:includeFontPadding="false"
+            android:text="Command Line:"
+            android:textColor="#000000"
+            android:textSize="16sp" />
+
+        <EditText
+            android:id="@+id/search_box"
+            style="@android:style/Widget.EditText"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:background="@drawable/win31_edit_field"
+            android:fontFamily="@font/w31_system"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
+            android:textColor="#000000"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- The launcher's pinned-commands list is part of every Start menu; 3.1 has no place for it -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/commands_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</LinearLayout>

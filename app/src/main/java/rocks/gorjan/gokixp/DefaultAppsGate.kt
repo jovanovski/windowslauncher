@@ -117,6 +117,7 @@ class DefaultAppsGate(
         content.findViewById<ImageView>(R.id.gate_icon).setImageResource(
             when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
+                AppTheme.Windows31 -> R.drawable.win31_dialog_exclamation
                 AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
                 AppTheme.Windows7 -> R.drawable.dialog_warning_win7
                 else -> R.drawable.dialog_warning_xp

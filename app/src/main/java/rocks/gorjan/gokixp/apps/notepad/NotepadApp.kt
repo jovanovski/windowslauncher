@@ -390,7 +390,7 @@ class NotepadApp(
         return NoteMarkdown.Look(
             // Links, bullets and the bar down a quotation, in the shell's own blue.
             accent = when (theme) {
-                AppTheme.WindowsClassic -> 0xFF000080.toInt()
+                AppTheme.WindowsClassic, AppTheme.Windows31 -> 0xFF000080.toInt()
                 AppTheme.WindowsXP -> 0xFF316AC5.toInt()
                 else -> 0xFF0066CC.toInt()
             },
@@ -398,7 +398,7 @@ class NotepadApp(
             subtle = 0xFF808080.toInt(),
             // The ground behind code: 9x greys it in the silver it greyed everything in,
             // the later shells more lightly.
-            shade = if (theme is AppTheme.WindowsClassic) 0xFFC0C0C0.toInt() else 0xFFE8E8E8.toInt(),
+            shade = if (theme.isClassic) 0xFFC0C0C0.toInt() else 0xFFE8E8E8.toInt(),
             bold = bold,
             density = context.resources.displayMetrics.density
         )
@@ -872,7 +872,7 @@ class NotepadApp(
                 // Use theme's primary font
                 typeface = MainActivity.getInstance()?.getThemePrimaryFont()
                 val currentTheme = ThemeManager(context).getSelectedTheme()
-                textSize = if (currentTheme == AppTheme.WindowsClassic) 12f else 11f
+                textSize = if (currentTheme.isClassic) 12f else 11f
             }
             return NoteViewHolder(textView)
         }

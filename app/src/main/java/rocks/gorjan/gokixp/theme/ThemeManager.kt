@@ -30,6 +30,14 @@ sealed class AppTheme {
      */
     open val isAero: Boolean = false
 
+    /**
+     * Whether this theme draws its controls the Windows Classic way: gray 3D bevels, MS Sans
+     * Serif, the 98 programs. Windows 3.1 is the other one - its programs and controls were the
+     * ancestors of 98's, so it shares everything here and swaps out the shell around them (the
+     * Program Manager, its window frames, its menus and its System font).
+     */
+    open val isClassic: Boolean = false
+
     object WindowsXP : AppTheme() {
         override val customIconsKey = "custom_icons_xp"
         override fun toString() = "Windows XP"
@@ -37,7 +45,14 @@ sealed class AppTheme {
 
     object WindowsClassic : AppTheme() {
         override val customIconsKey = "custom_icons_98"
+        override val isClassic = true
         override fun toString() = "Windows Classic"
+    }
+
+    object Windows31 : AppTheme() {
+        override val customIconsKey = "custom_icons_31"
+        override val isClassic = true
+        override fun toString() = "Windows 3.1"
     }
 
     object WindowsVista : AppTheme() {
@@ -59,6 +74,7 @@ sealed class AppTheme {
          */
         fun fromString(value: String?): AppTheme = when (value) {
             "Windows Classic" -> WindowsClassic
+            "Windows 3.1" -> Windows31
             "Windows Vista" -> WindowsVista
             "Windows 7" -> Windows7
             "Windows XP" -> WindowsXP
@@ -80,7 +96,7 @@ sealed class AppTheme {
         /**
          * The themes a user can pick.
          */
-        fun all(): List<AppTheme> = listOf(WindowsXP, WindowsClassic, WindowsVista, Windows7)
+        fun all(): List<AppTheme> = listOf(Windows31, WindowsClassic, WindowsXP, WindowsVista, Windows7)
     }
 }
 
@@ -166,10 +182,13 @@ class ThemeManager(private val context: Context) {
     fun plus95Path(slug: String, filename: String): String = "plus95/$slug/$filename"
 
     /**
-     * Returns true if the current theme is Windows Classic (98).
-     * Convenience method for boolean checks.
+     * Returns true if the current theme draws Classic controls: Windows Classic (95/98) or
+     * Windows 3.1. See [AppTheme.isClassic]; [isWin31Theme] tells the two apart.
      */
-    fun isClassicTheme(): Boolean = getSelectedTheme() is AppTheme.WindowsClassic
+    fun isClassicTheme(): Boolean = getSelectedTheme().isClassic
+
+    /** Windows 3.1 alone - its Program Manager shell, not the Classic controls it shares. */
+    fun isWin31Theme(): Boolean = getSelectedTheme() is AppTheme.Windows31
 
     /**
      * Returns true if the current theme is Windows XP.
@@ -190,12 +209,15 @@ class ThemeManager(private val context: Context) {
      */
     fun getTaskbarHeightDp(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic, AppTheme.WindowsXP -> 40
+        // The row of minimized icons along the bottom of the desktop: a 32px icon and its title.
+        AppTheme.Windows31 -> 74
         AppTheme.WindowsVista -> 45
         AppTheme.Windows7 -> 52
     }
 
     /** How far below the container's top the visible bar starts, in dp. */
-    fun getTaskbarGlassInsetDp(theme: AppTheme): Int = getTaskbarHeightDp(theme) - 40
+    fun getTaskbarGlassInsetDp(theme: AppTheme): Int =
+        if (theme is AppTheme.Windows31) 0 else getTaskbarHeightDp(theme) - 40
 
     // ========== Resource Mapping Methods ==========
     // These methods centralize all theme-specific resource lookups
@@ -205,6 +227,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getThemeStyleRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.style.Theme_GokiXP_Classic
+        AppTheme.Windows31 -> R.style.Theme_GokiXP_Win31
         AppTheme.WindowsXP -> R.style.Base_Theme_GokiXP
         AppTheme.WindowsVista -> R.style.Theme_GokiXP_Vista
         AppTheme.Windows7 -> R.style.Theme_GokiXP_Win7
@@ -215,6 +238,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getTaskbarLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.taskbar_98
+        AppTheme.Windows31 -> R.layout.taskbar_31
         AppTheme.WindowsXP -> R.layout.taskbar_xp
         AppTheme.WindowsVista -> R.layout.taskbar_vista
         AppTheme.Windows7 -> R.layout.taskbar_win7
@@ -225,6 +249,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getStartMenuLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.start_menu_98
+        AppTheme.Windows31 -> R.layout.start_menu_31
         AppTheme.WindowsXP -> R.layout.start_menu_xp
         AppTheme.WindowsVista -> R.layout.start_menu_vista
         AppTheme.Windows7 -> R.layout.start_menu_win7
@@ -235,6 +260,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getDialogLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.windows_dialog_content_98
+        AppTheme.Windows31 -> R.layout.windows_dialog_content_31
         AppTheme.WindowsXP -> R.layout.windows_dialog_content_xp
         AppTheme.WindowsVista -> R.layout.windows_dialog_content_vista
         AppTheme.Windows7 -> R.layout.windows_dialog_content_win7
@@ -245,6 +271,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getSpinnerItemLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.spinner_item_classic
+        AppTheme.Windows31 -> R.layout.spinner_item_classic
         AppTheme.WindowsXP -> R.layout.spinner_item_xp
         AppTheme.WindowsVista -> R.layout.spinner_item_vista
         AppTheme.Windows7 -> R.layout.spinner_item_vista
@@ -255,6 +282,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getSpinnerDropdownLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.spinner_dropdown_item_classic
+        AppTheme.Windows31 -> R.layout.spinner_dropdown_item_classic
         AppTheme.WindowsXP -> R.layout.spinner_dropdown_item_xp
         AppTheme.WindowsVista -> R.layout.spinner_dropdown_item_vista
         AppTheme.Windows7 -> R.layout.spinner_dropdown_item_vista
@@ -262,6 +290,7 @@ class ThemeManager(private val context: Context) {
 
     fun getIELayout(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.layout.program_internet_explorer
+        AppTheme.Windows31 -> R.layout.program_internet_explorer
         AppTheme.WindowsXP -> R.layout.program_internet_explorer
         AppTheme.WindowsVista -> R.layout.program_internet_explorer_7
         AppTheme.Windows7 -> R.layout.program_internet_explorer_7
@@ -271,6 +300,7 @@ class ThemeManager(private val context: Context) {
 
     fun getIEIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.ie6
+        AppTheme.Windows31 -> R.drawable.ie6
         AppTheme.WindowsXP -> R.drawable.ie6
         AppTheme.WindowsVista -> R.drawable.ie7
         AppTheme.Windows7 -> R.drawable.ie7
@@ -278,6 +308,7 @@ class ThemeManager(private val context: Context) {
 
     fun getWindowsIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.windows_logo
+        AppTheme.Windows31 -> R.drawable.win31_windows_logo
         AppTheme.WindowsXP -> R.drawable.xp_logo
         AppTheme.WindowsVista -> R.drawable.logo_vista
         AppTheme.Windows7 -> R.drawable.start_getting_started_win7
@@ -287,6 +318,7 @@ class ThemeManager(private val context: Context) {
 
     fun getSolitareIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.solitare_icon
+        AppTheme.Windows31 -> R.drawable.win31_solitaire
         AppTheme.WindowsXP -> R.drawable.solitare_icon
         AppTheme.WindowsVista -> R.drawable.solitare_icon_vista
         AppTheme.Windows7 -> R.drawable.solitare_icon_vista
@@ -295,6 +327,7 @@ class ThemeManager(private val context: Context) {
 
     fun getWinampIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.winamp_icon_98
+        AppTheme.Windows31 -> R.drawable.winamp_icon_98
         AppTheme.WindowsXP -> R.drawable.winamp_icon_xp
         AppTheme.WindowsVista -> R.drawable.winamp_icon_xp
         AppTheme.Windows7 -> R.drawable.winamp_icon_xp
@@ -302,6 +335,7 @@ class ThemeManager(private val context: Context) {
 
     fun getWmpIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.wmp_98_icon
+        AppTheme.Windows31 -> R.drawable.win31_media_player
         AppTheme.WindowsXP -> R.drawable.wmp_xp_icon
         AppTheme.WindowsVista -> R.drawable.wmp_vista_icon
         AppTheme.Windows7 -> R.drawable.wmp_win7_icon
@@ -309,6 +343,7 @@ class ThemeManager(private val context: Context) {
 
     fun getPhotosIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.photos_98_icon
+        AppTheme.Windows31 -> R.drawable.photos_98_icon
         AppTheme.WindowsXP -> R.drawable.photos_xp_icon
         AppTheme.WindowsVista -> R.drawable.photos_vista_icon
         AppTheme.Windows7 -> R.drawable.photos_win7_icon
@@ -316,6 +351,7 @@ class ThemeManager(private val context: Context) {
 
     fun getMinesweeperIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.minesweeper_icon_98
+        AppTheme.Windows31 -> R.drawable.win31_minesweeper
         AppTheme.WindowsXP -> R.drawable.minesweeper_icon_xp
         AppTheme.WindowsVista -> R.drawable.minesweeper_icon_vista
         AppTheme.Windows7 -> R.drawable.minesweeper_icon_vista
@@ -328,6 +364,7 @@ class ThemeManager(private val context: Context) {
 
     fun getPaintIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.paint_icon_98
+        AppTheme.Windows31 -> R.drawable.win31_paintbrush
         AppTheme.WindowsXP -> R.drawable.paint_icon_xp
         AppTheme.WindowsVista -> R.drawable.paint_icon_vista
         AppTheme.Windows7 -> R.drawable.paint_icon_vista
@@ -336,6 +373,7 @@ class ThemeManager(private val context: Context) {
 
     fun getNotepadIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.notepad_icon_98
+        AppTheme.Windows31 -> R.drawable.win31_notepad
         AppTheme.WindowsXP -> R.drawable.notepad_icon_xp
         AppTheme.WindowsVista -> R.drawable.notepad_icon_vista
         AppTheme.Windows7 -> R.drawable.notepad_icon_vista
@@ -344,6 +382,7 @@ class ThemeManager(private val context: Context) {
 
     fun getClockIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.icon_clock_98
+        AppTheme.Windows31 -> R.drawable.win31_clock
         AppTheme.WindowsXP -> R.drawable.icon_clock_xp
         AppTheme.WindowsVista -> R.drawable.icon_clock_vista
         AppTheme.Windows7 -> R.drawable.icon_clock_vista
@@ -352,6 +391,7 @@ class ThemeManager(private val context: Context) {
 
     fun getMyComputerIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.my_computer_98_icon
+        AppTheme.Windows31 -> R.drawable.win31_file_manager
         AppTheme.WindowsXP -> R.drawable.my_computer_xp_icon
         AppTheme.WindowsVista -> R.drawable.my_computer_vista_icon
         AppTheme.Windows7 -> R.drawable.my_computer_win7_icon
@@ -363,6 +403,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getBriefcaseIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.briefcase_98_icon
+        AppTheme.Windows31 -> R.drawable.briefcase_98_icon
         AppTheme.WindowsXP -> R.drawable.briefcase_xp_icon
         AppTheme.WindowsVista -> R.drawable.briefcase_vista_icon
         AppTheme.Windows7 -> R.drawable.briefcase_win7_icon
@@ -370,6 +411,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileGenericIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_generic_98
+        AppTheme.Windows31 -> R.drawable.file_generic_98
         AppTheme.WindowsXP -> R.drawable.file_generic_xp
         AppTheme.WindowsVista -> R.drawable.file_generic_vista
         AppTheme.Windows7 -> R.drawable.file_generic_win7
@@ -377,6 +419,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileImageIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_image_98
+        AppTheme.Windows31 -> R.drawable.file_image_98
         AppTheme.WindowsXP -> R.drawable.file_image_xp
         AppTheme.WindowsVista -> R.drawable.file_image_vista
         AppTheme.Windows7 -> R.drawable.file_image_vista
@@ -385,6 +428,7 @@ class ThemeManager(private val context: Context) {
 
     fun getPDFImageIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_pdf_98
+        AppTheme.Windows31 -> R.drawable.file_pdf_98
         AppTheme.WindowsXP -> R.drawable.file_pdf_xp
         AppTheme.WindowsVista -> R.drawable.file_pdf_vista
         AppTheme.Windows7 -> R.drawable.file_pdf_vista
@@ -392,6 +436,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileAudioIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_audio_98
+        AppTheme.Windows31 -> R.drawable.file_audio_98
         AppTheme.WindowsXP -> R.drawable.file_audio_xp
         AppTheme.WindowsVista -> R.drawable.file_audio_vista
         AppTheme.Windows7 -> R.drawable.file_audio_vista
@@ -399,6 +444,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileVideoIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_video_98
+        AppTheme.Windows31 -> R.drawable.file_video_98
         AppTheme.WindowsXP -> R.drawable.file_video_xp
         AppTheme.WindowsVista -> R.drawable.file_video_vista
         AppTheme.Windows7 -> R.drawable.file_video_vista
@@ -406,6 +452,7 @@ class ThemeManager(private val context: Context) {
 
     fun getDriveFloppyIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.drive_floppy_98
+        AppTheme.Windows31 -> R.drawable.win31_floppy
         AppTheme.WindowsXP -> R.drawable.drive_floppy_xp
         AppTheme.WindowsVista -> R.drawable.drive_floppy_vista
         AppTheme.Windows7 -> R.drawable.drive_floppy_win7
@@ -413,6 +460,7 @@ class ThemeManager(private val context: Context) {
 
     fun getDriveLocalIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.drive_local_98
+        AppTheme.Windows31 -> R.drawable.win31_harddrive
         AppTheme.WindowsXP -> R.drawable.drive_local_xp
         AppTheme.WindowsVista -> R.drawable.drive_local_vista
         AppTheme.Windows7 -> R.drawable.drive_local_win7
@@ -420,6 +468,7 @@ class ThemeManager(private val context: Context) {
 
     fun getDriveOpticalIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.drive_optical_98
+        AppTheme.Windows31 -> R.drawable.drive_optical_98
         AppTheme.WindowsXP -> R.drawable.drive_optical_xp
         AppTheme.WindowsVista -> R.drawable.drive_optical_vista
         AppTheme.Windows7 -> R.drawable.drive_optical_win7
@@ -427,6 +476,7 @@ class ThemeManager(private val context: Context) {
 
     fun getWmpLayout(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.layout.program_wmp_98
+        AppTheme.Windows31 -> R.layout.program_wmp_98
         AppTheme.WindowsXP -> R.layout.program_wmp_xp
         AppTheme.WindowsVista -> R.layout.program_wmp_vista
         AppTheme.Windows7 -> R.layout.program_wmp_vista
@@ -434,6 +484,7 @@ class ThemeManager(private val context: Context) {
 
     fun getMaximizeIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.win98_title_bar_maximize
+        AppTheme.Windows31 -> R.drawable.win31_caption_max_states
         AppTheme.WindowsXP -> R.drawable.xp_title_bar_maximize
         AppTheme.WindowsVista -> R.drawable.vista_title_bar_maximize
         AppTheme.Windows7 -> R.drawable.caption_max_win7
@@ -441,6 +492,7 @@ class ThemeManager(private val context: Context) {
 
     fun getRestoreIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.win98_title_bar_restore
+        AppTheme.Windows31 -> R.drawable.win31_caption_restore_states
         AppTheme.WindowsXP -> R.drawable.xp_title_bar_restore
         AppTheme.WindowsVista -> R.drawable.vista_title_bar_restore
         AppTheme.Windows7 -> R.drawable.caption_restore_win7
@@ -451,6 +503,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getTaskbarButtonLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.taskbar_button_98
+        AppTheme.Windows31 -> R.layout.taskbar_button_31
         AppTheme.WindowsXP -> R.layout.taskbar_button_xp
         AppTheme.WindowsVista -> R.layout.taskbar_button_vista
         AppTheme.Windows7 -> R.layout.taskbar_button_win7
@@ -461,6 +514,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getWindowsExplorerLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.windows_explorer_98
+        AppTheme.Windows31 -> R.layout.windows_explorer_98
         AppTheme.WindowsXP -> R.layout.windows_explorer_xp
         AppTheme.WindowsVista -> R.layout.windows_explorer_vista
         AppTheme.Windows7 -> R.layout.windows_explorer_win7
@@ -473,6 +527,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getFolderIconRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.drawable.folder_98
+        AppTheme.Windows31 -> R.drawable.win31_folder
         AppTheme.WindowsXP -> R.drawable.folder_xp
         AppTheme.WindowsVista -> R.drawable.folder_vista
         AppTheme.Windows7 -> R.drawable.folder_win7
@@ -484,6 +539,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getRecycleBinIconRes(theme: AppTheme, isEmpty: Boolean): Int = when (theme) {
         AppTheme.WindowsClassic -> R.drawable.recycle_98
+        AppTheme.Windows31 -> R.drawable.win31_wastebasket
         AppTheme.WindowsXP -> R.drawable.recycle
         AppTheme.WindowsVista -> R.drawable.recycle_vista
         AppTheme.Windows7 -> R.drawable.recycle_win7
@@ -494,6 +550,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getStartButtonRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.drawable.start_98
+        AppTheme.Windows31 -> R.drawable.win31_progman
         AppTheme.WindowsXP -> R.drawable.start
         AppTheme.WindowsVista -> R.drawable.start_vista
         AppTheme.Windows7 -> R.drawable.start_orb_win7
@@ -506,6 +563,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getPrimaryFontRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.font.micross_font_family
+        AppTheme.Windows31 -> R.font.micross_font_family
         AppTheme.WindowsXP -> R.font.tahoma_font_family
         AppTheme.WindowsVista -> R.font.tahoma_font_family  // Use Tahoma for now, can be replaced with Segoe UI
         AppTheme.Windows7 -> R.font.segoeui_font_family
@@ -516,6 +574,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getBoldFontRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.font.micross_block_bold
+        AppTheme.Windows31 -> R.font.w31_system
         AppTheme.WindowsXP -> R.font.tahoma
         AppTheme.WindowsVista -> R.font.tahoma  // Use Tahoma for now
         AppTheme.Windows7 -> R.font.segoeui_bold
@@ -535,6 +594,7 @@ class ThemeManager(private val context: Context) {
         val (trackRes, thumbRes) = when (theme) {
             AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp to R.drawable.scrollbar_thumb_xp
             AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98 to R.drawable.win98_start_menu_border
+            AppTheme.Windows31 -> R.drawable.scrollbar_track_98 to R.drawable.win98_start_menu_border
             AppTheme.WindowsVista -> R.drawable.scrollbar_track_vista to R.drawable.scrollbar_thumb_vista
             AppTheme.Windows7 -> R.drawable.scrollbar_track_vista to R.drawable.scrollbar_thumb_vista
         }

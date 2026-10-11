@@ -52,4 +52,9 @@
         libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
+    <!-- Program Manager's menu bar under the Windows 3.1 theme, mnemonics underlined -->
+    <string name="win31_menu_file"><u>F</u>ile</string>
+    <string name="win31_menu_options"><u>O</u>ptions</string>
+    <string name="win31_menu_window"><u>W</u>indow</string>
+    <string name="win31_menu_help"><u>H</u>elp</string>
 </resources>

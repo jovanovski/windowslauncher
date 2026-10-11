@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A program item in a Windows 3.1 program group: the icon with its title beneath. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingLeft="2dp"
+    android:paddingTop="8dp"
+    android:paddingRight="2dp"
+    android:paddingBottom="6dp">
+
+    <ImageView
+        android:id="@+id/app_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:duplicateParentState="true"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/app_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/win31_icon_title_window"
+        android:duplicateParentState="true"
+        android:ellipsize="end"
+        android:fontFamily="@font/micross_block"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:paddingBottom="1dp"
+        android:textColor="@color/win31_icon_title_text"
+        android:textSize="11sp" />
+</LinearLayout>

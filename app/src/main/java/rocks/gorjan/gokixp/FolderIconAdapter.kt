@@ -54,7 +54,7 @@ class FolderIconAdapter(
 
         // Configure the icon view
         iconView.setDesktopIcon(icon)
-        val isClassic = theme is AppTheme.WindowsClassic
+        val isClassic = theme.isClassic
         iconView.setThemeFont(isClassic)
         iconView.setTextColor(android.graphics.Color.BLACK)
         iconView.removeTextShadow()

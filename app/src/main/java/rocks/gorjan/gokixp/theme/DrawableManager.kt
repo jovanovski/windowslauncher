@@ -33,6 +33,11 @@ class DrawableManager(private val context: Context) {
                 val bottomRightColor = ContextCompat.getColor(context, R.color.border_black)
                 createWindows98Border(bgColor, topLeftColor, bottomRightColor)
             }
+            // White, a black line round it and a shadow, as every Windows 3.1 menu was drawn
+            AppTheme.Windows31 -> {
+                ContextCompat.getDrawable(context, R.drawable.win31_menu_background)
+                    ?: ColorDrawable(Color.WHITE)
+            }
             AppTheme.WindowsXP -> {
                 ContextCompat.getDrawable(context, R.drawable.context_menu_background)
                     ?: ColorDrawable(Color.WHITE)
@@ -148,7 +153,7 @@ class DrawableManager(private val context: Context) {
      * @return The scrollbar track drawable resource ID
      */
     fun getScrollbarTrackRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98
+        AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.scrollbar_track_98
         AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp
         AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_track_vista
     }
@@ -160,7 +165,7 @@ class DrawableManager(private val context: Context) {
      * @return The scrollbar thumb drawable resource ID
      */
     fun getScrollbarThumbRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
+        AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.win98_start_menu_border
         AppTheme.WindowsXP -> R.drawable.scrollbar_thumb_xp
         AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_thumb_vista
     }

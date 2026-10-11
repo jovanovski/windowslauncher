@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Windows 3.1 window: the sizing frame, a caption with the Control-menu box on the left
+     and the minimize and maximize arrows on the right, the title centred in the System font.
+     There is no close button; a window closes from its Control menu, or with a double tap on
+     the box, the way it did then. dialog_close_button is kept, hidden, because the window
+     code binds it in every theme. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dialog_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clickable="true"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <LinearLayout
+        android:id="@+id/window_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:background="@drawable/win31_window_frame"
+        android:padding="5dp"
+        android:elevation="20dp">
+
+        <LinearLayout
+            android:id="@+id/dialog_title_bar"
+            android:layout_width="match_parent"
+            android:layout_height="19dp"
+            android:background="@drawable/win31_caption_active"
+            android:orientation="horizontal"
+            android:paddingBottom="1dp">
+
+            <ImageView
+                android:id="@+id/dialog_sysmenu_button"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Control menu"
+                android:scaleType="fitXY"
+                android:src="@drawable/win31_sysmenu" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="#000000" />
+
+            <TextView
+                android:id="@+id/dialog_title_text"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/w31_system"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp"
+                android:text="Dialog Title"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp" />
+
+            <ImageView
+                android:id="@+id/dialog_minimize_button"
+                android:layout_width="19dp"
+                android:layout_height="18dp"
+                android:contentDescription="Minimize"
+                android:scaleType="fitXY"
+                android:src="@drawable/win31_caption_min_states" />
+
+            <ImageView
+                android:id="@+id/dialog_maximize_button"
+                android:layout_width="19dp"
+                android:layout_height="18dp"
+                android:contentDescription="Maximize"
+                android:scaleType="fitXY"
+                android:src="@drawable/win31_caption_max_states" />
+
+            <ImageView
+                android:id="@+id/dialog_close_button"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/window_border"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/dialog_content_area"
+                android:clickable="true"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:background="#FFFFFF"/>
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

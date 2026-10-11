@@ -143,18 +143,21 @@ class DialogBoxApp(
         return when (type) {
             DialogType.INFORMATION -> when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_info_98
+                AppTheme.Windows31 -> R.drawable.win31_dialog_info
                 AppTheme.WindowsXP -> R.drawable.dialog_info_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_info_vista
                 AppTheme.Windows7 -> R.drawable.dialog_info_win7
             }
             DialogType.WARNING -> when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_warning_98
+                AppTheme.Windows31 -> R.drawable.win31_dialog_exclamation
                 AppTheme.WindowsXP -> R.drawable.dialog_warning_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_warning_vista
                 AppTheme.Windows7 -> R.drawable.dialog_warning_win7
             }
             DialogType.ERROR -> when (theme) {
                 AppTheme.WindowsClassic -> R.drawable.dialog_error_98
+                AppTheme.Windows31 -> R.drawable.win31_dialog_stop
                 AppTheme.WindowsXP -> R.drawable.dialog_error_xp
                 AppTheme.WindowsVista -> R.drawable.dialog_error_vista
                 AppTheme.Windows7 -> R.drawable.dialog_error_win7

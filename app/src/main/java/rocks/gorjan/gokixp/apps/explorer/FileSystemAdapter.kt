@@ -112,7 +112,7 @@ class FileSystemAdapter(
 
         // Configure the icon view
         iconView.setDesktopIcon(desktopIcon)
-        val isClassic = theme is AppTheme.WindowsClassic
+        val isClassic = theme.isClassic
         iconView.setThemeFont(isClassic)
         iconView.setTextColor(Color.BLACK)
         iconView.removeTextShadow()

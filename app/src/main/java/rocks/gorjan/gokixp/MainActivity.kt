@@ -109,6 +109,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import rocks.gorjan.gokixp.theme.*
 import rocks.gorjan.gokixp.winui.WinMenuPopup
+import rocks.gorjan.gokixp.winui.WinMenuTracker
 import rocks.gorjan.gokixp.winui.WinUi
 import rocks.gorjan.gokixp.winui.dialog.WinLayout
 import rocks.gorjan.gokixp.winui.dialog.WinSkin
@@ -144,6 +145,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var originalStartMenuLayoutParams: RelativeLayout.LayoutParams? = null
     // The menu an app-list folder (Accessories) opened, put away with the start menu
     private var startMenuFolderMenu: WinMenuPopup? = null
+    /** The Windows 3.1 Program Manager's menu bar, while that is the start menu. */
+    private var win31MenuTracker: WinMenuTracker? = null
     // Adapters auto-(un)register for theme notifications as they're replaced, so a stale adapter
     // is never left in themeAwareComponents. (The `= null` initializer skips the setter.)
     private var appsAdapter: AppsAdapter? = null
@@ -668,6 +671,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         /** Window key for My Computer opened from the Windows 7 start menu with no desktop icon. */
         private const val WIN7_START_MENU_COMPUTER_ID = "start_menu"
+        /** Icons across a row of the Windows 3.1 Program Manager's group window. */
+        private const val WIN31_GROUP_COLUMNS = 4
 
         /**
          * Where Windows Phone 8.1 went. Shown once to the people who were running it.
@@ -696,10 +701,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_WALLPAPER_VISTA_URI = "wallpaper_vista_uri"
         private const val KEY_WALLPAPER_WIN7_PATH = "wallpaper_win7_path"
         private const val KEY_WALLPAPER_WIN7_URI = "wallpaper_win7_uri"
+        private const val KEY_WALLPAPER_WIN31_PATH = "wallpaper_win31_path"
+        private const val KEY_WALLPAPER_WIN31_URI = "wallpaper_win31_uri"
         private const val KEY_WALLPAPER_XP_FOCUS_X = "wallpaper_xp_focus_x"
         private const val KEY_WALLPAPER_CLASSIC_FOCUS_X = "wallpaper_classic_focus_x"
         private const val KEY_WALLPAPER_VISTA_FOCUS_X = "wallpaper_vista_focus_x"
         private const val KEY_WALLPAPER_WIN7_FOCUS_X = "wallpaper_win7_focus_x"
+        private const val KEY_WALLPAPER_WIN31_FOCUS_X = "wallpaper_win31_focus_x"
         private const val KEY_SLIDE_WALLPAPER_ENABLED = "slide_wallpaper_enabled"
         private const val KEY_SLIDE_WALLPAPER_DURATION = "slide_wallpaper_duration" // whole 0->max->0 cycle, in seconds
         private const val DEFAULT_SLIDE_WALLPAPER_DURATION = 10
@@ -999,6 +1007,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsXP -> Pair(KEY_WALLPAPER_XP_PATH, KEY_WALLPAPER_XP_URI)
             AppTheme.WindowsVista -> Pair(KEY_WALLPAPER_VISTA_PATH, KEY_WALLPAPER_VISTA_URI)
             AppTheme.Windows7 -> Pair(KEY_WALLPAPER_WIN7_PATH, KEY_WALLPAPER_WIN7_URI)
+            AppTheme.Windows31 -> Pair(KEY_WALLPAPER_WIN31_PATH, KEY_WALLPAPER_WIN31_URI)
         }
     }
 
@@ -1011,6 +1020,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsXP -> KEY_WALLPAPER_XP_FOCUS_X
             AppTheme.WindowsVista -> KEY_WALLPAPER_VISTA_FOCUS_X
             AppTheme.Windows7 -> KEY_WALLPAPER_WIN7_FOCUS_X
+            AppTheme.Windows31 -> KEY_WALLPAPER_WIN31_FOCUS_X
         }
     }
 
@@ -1023,6 +1033,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsXP -> "wallpapers/Bliss (m).jpg"
             AppTheme.WindowsVista -> "wallpapers/Windows Vista (m).jpg" // Can be changed to Vista default later
             AppTheme.Windows7 -> "wallpapers/Windows 7 (m).jpg"
+            // Windows 3.1 came up on a plain grey desktop, with no wallpaper set
+            AppTheme.Windows31 -> "wallpapers/Windows 3.1.png"
         }
     }
 
@@ -1035,6 +1047,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsXP -> "custom_icons"
             AppTheme.WindowsVista -> "custom_icons_vista"
             AppTheme.Windows7 -> "custom_icons_7"
+            AppTheme.Windows31 -> "custom_icons_31"
         }
     }
 
@@ -1044,6 +1057,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun getButtonBackgroundForCurrentTheme(): Int {
         return when (themeManager.getSelectedTheme()) {
             AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
+            AppTheme.Windows31 -> R.drawable.win31_button
             AppTheme.WindowsXP -> R.drawable.button_xp_background
             AppTheme.WindowsVista -> R.drawable.button_xp_background // Can be changed to Vista button later
             AppTheme.Windows7 -> R.drawable.button_win7
@@ -1055,7 +1069,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun getDisplayPropertiesIconForCurrentTheme(): Int {
         return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> R.drawable.display_98
+            AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.display_98
             AppTheme.WindowsXP -> R.drawable.display_xp
             AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.display_xp // Can be changed to Vista icon later
         }
@@ -1066,7 +1080,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun getVolumeIconForCurrentTheme(isMuted: Boolean): Int {
         return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic -> if (isMuted) R.drawable.mute_98 else R.drawable.sound_98
+            AppTheme.WindowsClassic, AppTheme.Windows31 -> if (isMuted) R.drawable.mute_98 else R.drawable.sound_98
             AppTheme.WindowsXP -> if (isMuted) R.drawable.mute else R.drawable.sound
             AppTheme.WindowsVista -> if (isMuted) R.drawable.mute_vista else R.drawable.sound_vista
             AppTheme.Windows7 -> if (isMuted) R.drawable.mute_win7 else R.drawable.sound_win7
@@ -1565,6 +1579,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         soundIds[R.raw.ding] = soundPool.load(audioContext, R.raw.ding, 1)
         soundIds[R.raw.ding_vista] = soundPool.load(audioContext, R.raw.ding_vista, 1)
         soundIds[R.raw.ding_win7] = soundPool.load(audioContext, R.raw.ding_win7, 1)
+        soundIds[R.raw.chimes_31] = soundPool.load(audioContext, R.raw.chimes_31, 1)
+        soundIds[R.raw.ding_31] = soundPool.load(audioContext, R.raw.ding_31, 1)
         soundIds[R.raw.bubble] = soundPool.load(audioContext, R.raw.bubble, 1)
         soundIds[R.raw.bubble_win7] = soundPool.load(audioContext, R.raw.bubble_win7, 1)
         soundIds[R.raw.recycle_win7] = soundPool.load(audioContext, R.raw.recycle_win7, 1)
@@ -1673,12 +1689,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     Intent.ACTION_POWER_CONNECTED -> playSound(when (currentTheme) {
                         AppTheme.WindowsVista -> R.raw.charge_on_vista
                         AppTheme.Windows7 -> R.raw.charge_on_win7
-                        AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.charge_on
+                        AppTheme.WindowsXP, AppTheme.WindowsClassic, AppTheme.Windows31 -> R.raw.charge_on
                     })
                     Intent.ACTION_POWER_DISCONNECTED -> playSound(when (currentTheme) {
                         AppTheme.WindowsVista -> R.raw.charge_off_vista
                         AppTheme.Windows7 -> R.raw.charge_off_win7
-                        AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.charge_off
+                        AppTheme.WindowsXP, AppTheme.WindowsClassic, AppTheme.Windows31 -> R.raw.charge_off
                     })
                 }
             }
@@ -2093,7 +2109,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // filtered result still grows upward from the search box like the real Start menu.
             // It replaces the old wrap_content + alignParentBottom trick, which forced a full
             // RecyclerView layout pass inside every onMeasure.
-            appsRecyclerView.layoutManager = AppListLayoutManager(this)
+            appsRecyclerView.layoutManager = if (selectedTheme is AppTheme.Windows31) {
+                // The Program Manager's group lays its programs out as rows of icons
+                GridLayoutManager(this, WIN31_GROUP_COLUMNS).apply {
+                    spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                        override fun getSpanSize(position: Int): Int {
+                            val adapter = appsRecyclerView.adapter as? AppsAdapter
+                            return if (adapter?.isSeparator(position) == true) WIN31_GROUP_COLUMNS else 1
+                        }
+                    }
+                }
+            } else {
+                AppListLayoutManager(this)
+            }
             // The list box is a fixed size now, so adapter updates can never change our
             // bounds - this skips the requestLayout that walked all the way to root_container
             // (re-measuring the whole desktop) on every keystroke.
@@ -2159,9 +2187,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
 
             if (selectedTheme is AppTheme.Windows7) setupWin7StartMenuLinks()
+            if (selectedTheme is AppTheme.Windows31) setupWin31ProgramManager()
 
             // Setup XP/Vista-specific All Programs toggle
-            if (selectedTheme !is AppTheme.WindowsClassic) {
+            if (!selectedTheme.isClassic) {
                 val allProgramsWrapper = findViewById<LinearLayout>(R.id.all_programs)
                 val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
                 val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
@@ -2323,6 +2352,168 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
     
     
+    /**
+     * Under Windows 3.1 the start menu is the Program Manager (see start_menu_31.xml). This
+     * wires what it has beyond the app list: the Control-menu box and minimize arrow on its
+     * caption, the File / Options / Window / Help menu bar, and the minimized program groups,
+     * each of which opens to the programs it held in 3.1 that the launcher has a counterpart for.
+     */
+    private fun setupWin31ProgramManager() {
+        // Drawn by the common controls, which know 3.1's white menus and System font
+        val ui = WinUi(this, AppTheme.Windows31)
+        val tracker = WinMenuTracker(ui).also { win31MenuTracker = it }
+        fun menuBelow(anchor: View, items: List<ContextMenuItem>) {
+            playClickSound()
+            startMenuFolderMenu?.dismiss()
+            startMenuFolderMenu = WinMenuPopup(ui).also { menu ->
+                menu.onPicked = { menu.dismiss() }
+                menu.show(anchor, items) {
+                    if (startMenuFolderMenu === menu) startMenuFolderMenu = null
+                }
+            }
+        }
+        fun barMenu(word: TextView, items: List<ContextMenuItem>) {
+            playClickSound()
+            tracker.toggle(word, items)
+        }
+        fun icon(res: Int) = AppCompatResources.getDrawable(this, res)
+        fun program(title: String, iconRes: Int, action: () -> Unit) =
+            ContextMenuItem(title, icon = icon(iconRes), action = { hideStartMenu(); action() })
+
+        val groups = linkedMapOf(
+            "Main" to listOf(
+                program("File Manager", R.drawable.win31_file_manager) {
+                    openMyComputerWindow(myComputer?.getDesktopIcon()?.id ?: WIN7_START_MENU_COMPUTER_ID)
+                },
+                program("Control Panel", R.drawable.win31_control_panel) { openPhoneSettings() },
+                program("Windows Setup", R.drawable.win31_setup) { checkForUpdates(true) },
+                program("Read Me", R.drawable.win31_write) { showWelcomeToWindows() },
+            ),
+            "Accessories" to listOf(
+                program("Paintbrush", R.drawable.win31_paintbrush) { launchSystemApp("system.paint") },
+                program("Notepad", R.drawable.win31_notepad) { launchSystemApp("system.notepad") },
+                program("Clock", R.drawable.win31_clock) { launchSystemApp("system.clock") },
+                program("Media Player", R.drawable.win31_media_player) { launchSystemApp("system.wmp") },
+            ),
+            "Games" to listOf(
+                program("Solitaire", R.drawable.win31_solitaire) { launchSystemApp("system.solitare") },
+                program("Minesweeper", R.drawable.win31_minesweeper) { launchSystemApp("system.minesweeper") },
+                program("Hearts", R.drawable.win31_hearts) { launchSystemApp("system.hearts") },
+            ),
+            // Empty out of the box, as it was in 3.1
+            "StartUp" to listOf(ContextMenuItem("(Empty)", isEnabled = false)),
+        )
+        val groupViews = mapOf(
+            "Main" to R.id.win31_group_main,
+            "Accessories" to R.id.win31_group_accessories,
+            "Games" to R.id.win31_group_games,
+            "StartUp" to R.id.win31_group_startup,
+        )
+        for ((name, id) in groupViews) {
+            val view = findViewById<View>(id) ?: continue
+            view.setOnClickListener { menuBelow(view, groups.getValue(name)) }
+        }
+
+        // The Control menu: Close puts the Program Manager away, as does a double tap on the box
+        val sysMenu = findViewById<View>(R.id.win31_pm_sysmenu)
+        if (sysMenu != null) {
+            val controlMenu = listOf(
+                ContextMenuItem("&Restore", isEnabled = false),
+                ContextMenuItem("&Move", isEnabled = false),
+                ContextMenuItem("&Size", isEnabled = false),
+                ContextMenuItem("Mi&nimize", action = { hideStartMenu() }),
+                ContextMenuItem("Ma&ximize", isEnabled = false),
+                ContextMenuItem.separator(),
+                ContextMenuItem("&Close", shortcut = "Alt+F4", action = { hideStartMenu() }),
+                ContextMenuItem.separator(),
+                ContextMenuItem("S&witch To...", shortcut = "Ctrl+Esc", isEnabled = false),
+            )
+            val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    menuBelow(sysMenu, controlMenu)
+                    return true
+                }
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    hideStartMenu()
+                    return true
+                }
+            })
+            sysMenu.setOnTouchListener { _, event -> detector.onTouchEvent(event) }
+        }
+        findViewById<View>(R.id.win31_pm_minimize)?.setOnClickListener {
+            playClickSound()
+            hideStartMenu()
+        }
+
+        findViewById<TextView>(R.id.win31_pm_menu_file)?.let { file ->
+            file.setOnClickListener {
+                barMenu(file, listOf(
+                    ContextMenuItem("&New...", isEnabled = false),
+                    ContextMenuItem("&Open", shortcut = "Enter", isEnabled = false),
+                    ContextMenuItem("&Move...", shortcut = "F7", isEnabled = false),
+                    ContextMenuItem("&Copy...", shortcut = "F8", isEnabled = false),
+                    ContextMenuItem("&Delete", shortcut = "Del", isEnabled = false),
+                    ContextMenuItem("Proper&ties...", shortcut = "Alt+Enter", isEnabled = false),
+                    ContextMenuItem.separator(),
+                    ContextMenuItem("&Run...", action = { focusWin31CommandLine() }),
+                    ContextMenuItem.separator(),
+                    ContextMenuItem("E&xit Windows...", action = { handleShutdown() }),
+                ))
+            }
+        }
+        findViewById<TextView>(R.id.win31_pm_menu_options)?.let { options ->
+            options.setOnClickListener {
+                barMenu(options, listOf(
+                    ContextMenuItem("&Auto Arrange", hasCheckbox = true, isChecked = true, isEnabled = false),
+                    ContextMenuItem("&Minimize on Use", hasCheckbox = true, isChecked = true, isEnabled = false),
+                    ContextMenuItem("&Save Settings on Exit", hasCheckbox = true, isChecked = true, isEnabled = false),
+                    ContextMenuItem.separator(),
+                    ContextMenuItem("&Refresh", shortcut = "F5", action = { refreshAppListManually() }),
+                    ContextMenuItem("Show &Hidden Programs", action = { showStartMenuWithHiddenApps() }),
+                ))
+            }
+        }
+        findViewById<TextView>(R.id.win31_pm_menu_window)?.let { window ->
+            window.setOnClickListener {
+                val numbered = groups.keys.mapIndexed { i, name ->
+                    ContextMenuItem("&${i + 1} $name", action = {
+                        findViewById<View>(groupViews.getValue(name))?.let { menuBelow(it, groups.getValue(name)) }
+                    })
+                }
+                barMenu(window, listOf(
+                    ContextMenuItem("&Cascade", shortcut = "Shift+F5", isEnabled = false),
+                    ContextMenuItem("&Tile", shortcut = "Shift+F4", isEnabled = false),
+                    ContextMenuItem("&Arrange Icons", isEnabled = false),
+                    ContextMenuItem.separator(),
+                ) + numbered + ContextMenuItem(
+                    "&${numbered.size + 1} Applications", hasCheckbox = true, isChecked = true, action = {},
+                ))
+            }
+        }
+        findViewById<TextView>(R.id.win31_pm_menu_help)?.let { help ->
+            help.setOnClickListener {
+                barMenu(help, listOf(
+                    ContextMenuItem("&Contents", isEnabled = false),
+                    ContextMenuItem("&Search for Help on...", isEnabled = false),
+                    ContextMenuItem("&How to Use Help", isEnabled = false),
+                    ContextMenuItem.separator(),
+                    ContextMenuItem("&Windows Tutorial", action = { hideStartMenu(); showWelcomeToWindows() }),
+                    ContextMenuItem.separator(),
+                    ContextMenuItem("&About Program Manager...", action = { hideStartMenu(); showWelcomeToWindows() }),
+                ))
+            }
+        }
+    }
+
+    /** File > Run...: the Program Manager's command line takes the keyboard. */
+    private fun focusWin31CommandLine() {
+        if (!::searchBox.isInitialized) return
+        searchBox.requestFocus()
+        val imm = attributionContext("system").getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(searchBox, InputMethodManager.SHOW_IMPLICIT)
+    }
+
     private fun loadAppIcon(packageName: String): Drawable? {
         // Handle special virtual items that don't have real packages
         if (packageName == "recycle.bin") {
@@ -3860,7 +4051,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // The start menu lives outside main_background, so applyPlus95Theme's walk never
             // reaches it — tint (or reset) it here every time it opens. Passing CLASSIC_GRAY when
             // no Plus! theme is active clears any stale tint left over from a previous selection.
-            if (themeManager.isClassicTheme()) {
+            if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
                 val menuColor = themeManager.getActivePlus95()?.menuColor ?: ThemeManager.CLASSIC_GRAY
                 applyPlus95MenuColor(startMenu, menuColor)
             }
@@ -3872,7 +4063,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             commandsAdapter?.setProgramsExpanded(false)
 
             // XP and the Aero themes: reset to show the command list instead of the app list
-            if (themeManager.getSelectedTheme() !is AppTheme.WindowsClassic) {
+            if (!themeManager.isClassicTheme()) {
                 val appListWrapper = findViewById<LinearLayout>(R.id.app_list_wrapper)
                 val commandListWrapper = findViewById<LinearLayout>(R.id.command_list_wrapper)
                 val allProgramsText = findViewById<TextView>(R.id.all_programs_text)
@@ -3932,6 +4123,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 searchBox.setText("")
             }
             startMenuFolderMenu?.dismiss()
+            win31MenuTracker?.close()
 
             // Reset keyboard state flag and restore original layout
             isKeyboardOpen = false
@@ -3980,7 +4172,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      * "Programs" entry puts it in, minus the click.
      */
     private fun showAppList() {
-        if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
+        if (themeManager.isClassicTheme()) {
             val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
             appList98?.visibility = View.VISIBLE
             isProgramsMenuExpanded = true
@@ -4006,7 +4198,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // For Windows Classic theme, make app list visible when opened via swipe up
             // For Vista, keep showing command list until user starts typing
-            if (themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
+            if (themeManager.isClassicTheme()) {
                 val appList98 = findViewById<RelativeLayout>(R.id.start_menu_app_list_98)
                 appList98?.visibility = View.VISIBLE
                 isProgramsMenuExpanded = true
@@ -4048,7 +4240,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun scrollAppListToTop() {
         if (::appsRecyclerView.isInitialized) {
-            (appsRecyclerView.layoutManager as? AppListLayoutManager)?.pinToTop()
+            when (val layoutManager = appsRecyclerView.layoutManager) {
+                is AppListLayoutManager -> layoutManager.pinToTop()
+                // The Windows 3.1 group grid starts at the top on its own
+                is GridLayoutManager -> layoutManager.scrollToPositionWithOffset(0, 0)
+            }
         }
     }
 
@@ -4553,7 +4749,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "QuickGlanceWidget created")
 
         // Set initial theme font based on current theme
-        quickGlanceWidget.setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+        quickGlanceWidget.setThemeFont(themeManager.isClassicTheme())
         Log.d("MainActivity", "QuickGlanceWidget initial theme font set for: ${themeManager.getSelectedTheme()}")
         
         // Create layout params - the widget measures its own width (see QuickGlanceWidget.onMeasure)
@@ -5403,7 +5599,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "Found GridView")
 
         // Get the theme
-        val isWindows98 = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+        val isWindows98 = themeManager.isClassicTheme()
 
         // Get folder ID from the dialog's windowIdentifier (format: "folder:folderId")
         val windowId = parentDialog.windowIdentifier
@@ -5562,7 +5758,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Create and set the content with theme-appropriate layout
         val selectedTheme = themeManager.getSelectedTheme()
         val contentLayoutResId = when (selectedTheme) {
-            AppTheme.WindowsClassic -> R.layout.icon_selection_content
+            AppTheme.WindowsClassic, AppTheme.Windows31 -> R.layout.icon_selection_content
             AppTheme.WindowsVista, AppTheme.Windows7 -> R.layout.icon_selection_content_vista
             AppTheme.WindowsXP -> R.layout.icon_selection_content_xp
         }
@@ -5710,6 +5906,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Which icons to show: a dropdown of the icon sets, each an asset folder, starting on the
         // current theme's own
         val iconSets = listOf(
+            "Windows 3.1" to "custom_icons_31",
             "Windows Classic" to "custom_icons_98",
             "Windows XP" to "custom_icons",
             "Windows Vista" to "custom_icons_vista",
@@ -5767,7 +5964,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
 
         // Create and set the content with theme-appropriate layout
-        val contentLayoutResId = if (selectedTheme == "Windows Classic") {
+        val contentLayoutResId = if (AppTheme.fromString(selectedTheme).isClassic) {
             R.layout.icon_selection_content
         } else {
             R.layout.icon_selection_content_xp
@@ -5988,7 +6185,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         windowsDialog.setWindowSizePercentage(90f, 30f)
         windowsDialog.setMaximizable(true)
-        if (currentTheme is AppTheme.WindowsClassic) {
+        if (currentTheme.isClassic) {
             val folderNameLarge = contentView.findViewById<TextView>(R.id.folder_name_large)
             val folderIconLarge = contentView.findViewById<ImageView>(R.id.folder_icon_large)
             folderNameLarge.text = folderNameDisplay
@@ -6015,7 +6212,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
 
         // Pre-calculate theme-dependent values
-        val isWindows98 = currentTheme is AppTheme.WindowsClassic
+        val isWindows98 = currentTheme.isClassic
 
         // Create and set adapter
         val adapter = FolderIconAdapter(
@@ -7976,7 +8173,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val applyButton = contentView.findViewById<TextView>(R.id.apply_button)
 
         // Set button background based on theme
-        val buttonBackground = if (selectedTheme == "Windows Classic") {
+        val buttonBackground = if (AppTheme.fromString(selectedTheme).isClassic) {
             R.drawable.win98_start_menu_border
         } else {
             R.drawable.button_xp_background
@@ -8632,6 +8829,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun getThemedButtonBackground(): Int {
         return when (themeManager.getSelectedTheme()) {
             AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
+            AppTheme.Windows31 -> R.drawable.win31_button
             AppTheme.WindowsXP -> R.drawable.button_xp_background
             AppTheme.WindowsVista -> R.drawable.button_xp_background
             AppTheme.Windows7 -> R.drawable.button_win7
@@ -9401,6 +9599,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             AppTheme.WindowsVista, AppTheme.Windows7 -> R.layout.program_welcome_vista
             AppTheme.WindowsXP -> R.layout.program_welcome_xp
+            // Windows 3.1 had no Welcome screen; the nearest one in plain grey is Windows 95's
+            AppTheme.Windows31 -> R.layout.program_welcome_95
         }
 
         // Create MediaPlayer for welcome sound - choose based on theme
@@ -9416,6 +9616,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Windows 7 had no welcome music; this is Kalimba, from the Sample Music it shipped.
             AppTheme.Windows7 -> R.raw.welcome_win7
             AppTheme.WindowsXP -> R.raw.welcome
+            AppTheme.Windows31 -> R.raw.welcome_98
         }
         val welcomeMediaPlayer = MediaPlayer.create(this, soundRes)
         welcomeMediaPlayer.isLooping = true
@@ -9460,6 +9661,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsVista -> Pair(R.drawable.welcome_vista_welcome, R.drawable.welcome_vista_change_log)
             AppTheme.Windows7 -> Pair(R.drawable.welcome_win7_welcome, R.drawable.welcome_win7_welcome)
             AppTheme.WindowsXP -> Pair(R.drawable.welcome_xp_welcome, R.drawable.welcome_xp_change_log)
+            AppTheme.Windows31 -> Pair(R.drawable.welcome_95_welcome, R.drawable.welcome_95_change_log)
         }
         // Windows 7 shares Vista's layout, whose picture is Vista's; set the theme's own
         backgroundImageView?.setImageResource(welcomeDrawable)
@@ -10413,6 +10615,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         else if(themeManager.getSelectedTheme() is AppTheme.Windows7) {
             playSound(R.raw.startup_win7)
         }
+        else if(themeManager.getSelectedTheme() is AppTheme.Windows31) {
+            // WIN.INI's SystemStart in Windows for Workgroups 3.11
+            playSound(R.raw.chimes_31)
+        }
         else{
             playSound(R.raw.startup)
         }
@@ -10460,7 +10666,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         playShutdownSound()
         // Delay the screen lock to allow sound to play
         Handler(Looper.getMainLooper()).postDelayed({
-            if(themeManager.isClassicTheme()) {
+            // Windows 3.1 dropped back to DOS rather than to a "safe to turn off" screen
+            if(themeManager.getSelectedTheme() is AppTheme.WindowsClassic) {
                 if(isLogoff){
                     lockScreen()
                 }
@@ -10498,6 +10705,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         else if(themeManager.getSelectedTheme() is AppTheme.Windows7) {
             playSound(R.raw.shutdown_win7)
+        }
+        else if(themeManager.getSelectedTheme() is AppTheme.Windows31) {
+            // SystemExit, the same chimes Windows 3.1 started with
+            playSound(R.raw.chimes_31)
         }
         else{
             playSound(R.raw.shutdown)
@@ -10778,6 +10989,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsVista -> R.raw.ding_vista
             AppTheme.Windows7 -> R.raw.ding_win7
             AppTheme.WindowsXP, AppTheme.WindowsClassic -> R.raw.ding
+            AppTheme.Windows31 -> R.raw.ding_31
         }
         playSound(ding, bypassMute = true)
 
@@ -10830,7 +11042,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     setDesktopIcon(desktopIcon)
                     // Apply current theme for recycle bin
                     Log.d("MainActivity", "OPA: selectedTheme = $selectedTheme")
-                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    val isClassic = themeManager.isClassicTheme()
                     setThemeFont(isClassic)
                     setThemeIcon(isClassic)
                 }
@@ -10838,7 +11050,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "my.computer" -> {
                 rocks.gorjan.gokixp.apps.explorer.MyComputerView(this).apply {
                     setDesktopIcon(desktopIcon)
-                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    val isClassic = themeManager.isClassicTheme()
                     setThemeFont(isClassic)
                     setThemeIcon(isClassic)
                 }
@@ -10846,7 +11058,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "my.briefcase" -> {
                 rocks.gorjan.gokixp.apps.briefcase.BriefcaseView(this).apply {
                     setDesktopIcon(desktopIcon)
-                    val isClassic = themeManager.getSelectedTheme() is AppTheme.WindowsClassic
+                    val isClassic = themeManager.isClassicTheme()
                     setThemeFont(isClassic)
                     setThemeIcon(isClassic)
                 }
@@ -10854,7 +11066,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             else -> {
                 DesktopIconView(this).apply {
                     setDesktopIcon(desktopIcon)
-                    setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                    setThemeFont(themeManager.isClassicTheme())
                 }
             }
         }
@@ -11176,23 +11388,23 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 // Apply current theme for recycle bin
                                 val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
                                 Log.d("MainActivity", "LoadDesktopIcons: selectedTheme = $selectedTheme")
-                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
-                                setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                setThemeFont(themeManager.isClassicTheme())
+                                setThemeIcon(themeManager.isClassicTheme())
                             }
                         }
                         IconType.MY_COMPUTER -> {
                             rocks.gorjan.gokixp.apps.explorer.MyComputerView(this).apply {
                                 setDesktopIcon(desktopIcon)
-                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
-                                setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                setThemeFont(themeManager.isClassicTheme())
+                                setThemeIcon(themeManager.isClassicTheme())
                             }
                         }
                         IconType.BRIEFCASE -> {
                             rocks.gorjan.gokixp.apps.briefcase.BriefcaseView(this).apply {
                                 setDesktopIcon(desktopIcon)
-                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                setThemeFont(themeManager.isClassicTheme())
                                 if (!customIconMappings.containsKey(packageName)) {
-                                    setThemeIcon(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                    setThemeIcon(themeManager.isClassicTheme())
                                 }
                             }
                         }
@@ -11201,7 +11413,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                                 setDesktopIcon(desktopIcon)
                                 // Apply current theme for folder
                                 Log.d("MainActivity", "LoadDesktopIcons: loading folder = $name")
-                                setThemeFont(themeManager.getSelectedTheme() is AppTheme.WindowsClassic)
+                                setThemeFont(themeManager.isClassicTheme())
                                 // Only set theme icon if there's no custom icon mapping
                                 if (!customIconMappings.containsKey(packageName)) {
                                     setThemeIcon(themeManager.getSelectedTheme())
@@ -11225,7 +11437,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     desktopIconViews.add(iconView)
                     // Apply current theme font
                     val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-                    iconView.setThemeFont(selectedTheme == "Windows Classic")
+                    iconView.setThemeFont(AppTheme.fromString(selectedTheme).isClassic)
 
                     // Set position after adding to container
                     // NOTE: Position will be set by positionIconsFromGridIndices() after all icons are loaded
@@ -14400,6 +14612,31 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Dialogs will check this when they're created
     }
 
+    private fun applyWindows31Theme() {
+        Log.d("MainActivity", "Applying Windows 3.1 theme")
+
+        // The row of minimized icons along the bottom of the desktop. It has no tray, so the
+        // tray toggle is not set up.
+        swapTaskbarLayout(R.layout.taskbar_31)
+        findViewById<View>(R.id.win31_progman_label)?.setOnClickListener {
+            playClickSound()
+            toggleStartMenu()
+        }
+
+        // The Program Manager
+        setupStartMenu(AppTheme.Windows31.toString())
+
+        loadCustomIconMappings()
+        updateAllCustomIcons()
+
+        if (::quickGlanceWidget.isInitialized) {
+            quickGlanceWidget.setThemeFont(true)
+            quickGlanceWidget.refreshData()
+        }
+
+        notifyThemeChanged(AppTheme.Windows31)
+    }
+
     private fun applyWindowsXPTheme() {
         Log.d("MainActivity", "Applying Windows XP theme")
 
@@ -14836,7 +15073,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = newBase.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         val selectedTheme = prefs.getString("selected_theme", "Windows XP") ?: "Windows XP"
-        val shouldScaleFont = selectedTheme == "Windows Classic"
+        val shouldScaleFont = selectedTheme == "Windows Classic" || selectedTheme == "Windows 3.1"
         if(shouldScaleFont) {
             val config = Configuration(newBase.resources.configuration)
             config.fontScale = 1.05f // +20%
@@ -14898,6 +15135,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Apply theme layouts directly (bypass tracking for initialization)
         when (theme) {
             AppTheme.WindowsClassic -> applyWindows98Theme()
+            AppTheme.Windows31 -> applyWindows31Theme()
             AppTheme.WindowsXP -> applyWindowsXPTheme()
             AppTheme.WindowsVista -> applyWindowsVistaTheme()
             AppTheme.Windows7 -> applyWindows7Theme()
