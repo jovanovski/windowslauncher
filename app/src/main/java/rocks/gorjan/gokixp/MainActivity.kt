@@ -318,6 +318,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             if (uri != null) putUriInBriefcase(uri)
         }
 
+    // Winamp's "Load skin...". A .wsz has no MIME type of its own, so the picker shows everything.
+    private val winampSkinPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri != null) winampAppInstance?.importSkin(uri)
+        }
+
     // Notepad image pickers
     private var currentNotepadApp: NotepadApp? = null
 
@@ -9206,6 +9212,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         showWinampDialog(fileToPlay = fileToPlay)
     }
 
+    /** Opens Winamp, if it is not open already, and dresses it in the skin at [skinPath]. */
+    fun openWinampSkin(skinPath: String) {
+        val skinFile = java.io.File(skinPath)
+        if (floatingWindowManager.findWindowByIdentifier("system.winamp") != null) {
+            floatingWindowManager.findAndFocusWindow("system.winamp")
+            winampAppInstance?.importSkin(skinFile)
+            return
+        }
+        setCursorBusy()
+        Handler(Looper.getMainLooper()).post {
+            createAndShowWinampDialog()
+            winampAppInstance?.importSkin(skinFile)
+        }
+    }
+
     private fun showWinampDialog(appInfo: AppInfo? = null, fileToPlay: String? = null) {
         // Check if Winamp is already open
         val existingWindow = floatingWindowManager.findWindowByIdentifier("system.winamp")
@@ -9263,7 +9284,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 showConfirmDialog(title, message, onConfirm)
             },
             contextMenuView = contextMenu,
-            fileToPlay = fileToPlay
+            fileToPlay = fileToPlay,
+            onPickSkinFile = {
+                winampSkinPickerLauncher.launch(arrayOf("*/*"))
+            }
         )
 
         // Store reference for permission callback
