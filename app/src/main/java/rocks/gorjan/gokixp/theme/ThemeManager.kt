@@ -411,7 +411,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileGenericIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_generic_98
-        AppTheme.Windows31 -> R.drawable.file_generic_98
+        AppTheme.Windows31 -> R.drawable.win31_file_generic
         AppTheme.WindowsXP -> R.drawable.file_generic_xp
         AppTheme.WindowsVista -> R.drawable.file_generic_vista
         AppTheme.Windows7 -> R.drawable.file_generic_win7
@@ -419,7 +419,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileImageIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_image_98
-        AppTheme.Windows31 -> R.drawable.file_image_98
+        AppTheme.Windows31 -> R.drawable.win31_file_document
         AppTheme.WindowsXP -> R.drawable.file_image_xp
         AppTheme.WindowsVista -> R.drawable.file_image_vista
         AppTheme.Windows7 -> R.drawable.file_image_vista
@@ -428,7 +428,7 @@ class ThemeManager(private val context: Context) {
 
     fun getPDFImageIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_pdf_98
-        AppTheme.Windows31 -> R.drawable.file_pdf_98
+        AppTheme.Windows31 -> R.drawable.win31_file_document
         AppTheme.WindowsXP -> R.drawable.file_pdf_xp
         AppTheme.WindowsVista -> R.drawable.file_pdf_vista
         AppTheme.Windows7 -> R.drawable.file_pdf_vista
@@ -436,7 +436,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileAudioIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_audio_98
-        AppTheme.Windows31 -> R.drawable.file_audio_98
+        AppTheme.Windows31 -> R.drawable.win31_file_document
         AppTheme.WindowsXP -> R.drawable.file_audio_xp
         AppTheme.WindowsVista -> R.drawable.file_audio_vista
         AppTheme.Windows7 -> R.drawable.file_audio_vista
@@ -444,7 +444,7 @@ class ThemeManager(private val context: Context) {
 
     fun getFileVideoIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.file_video_98
-        AppTheme.Windows31 -> R.drawable.file_video_98
+        AppTheme.Windows31 -> R.drawable.win31_file_document
         AppTheme.WindowsXP -> R.drawable.file_video_xp
         AppTheme.WindowsVista -> R.drawable.file_video_vista
         AppTheme.Windows7 -> R.drawable.file_video_vista
@@ -468,7 +468,7 @@ class ThemeManager(private val context: Context) {
 
     fun getDriveOpticalIcon(): Int = when (getSelectedTheme()){
         AppTheme.WindowsClassic -> R.drawable.drive_optical_98
-        AppTheme.Windows31 -> R.drawable.drive_optical_98
+        AppTheme.Windows31 -> R.drawable.win31_drive_cd
         AppTheme.WindowsXP -> R.drawable.drive_optical_xp
         AppTheme.WindowsVista -> R.drawable.drive_optical_vista
         AppTheme.Windows7 -> R.drawable.drive_optical_win7
