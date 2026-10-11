@@ -1069,7 +1069,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun getDisplayPropertiesIconForCurrentTheme(): Int {
         return when (themeManager.getSelectedTheme()) {
-            AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.display_98
+            AppTheme.WindowsClassic -> R.drawable.display_98
+            // Control Panel's Desktop
+            AppTheme.Windows31 -> R.drawable.win31_desktop
             AppTheme.WindowsXP -> R.drawable.display_xp
             AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.display_xp // Can be changed to Vista icon later
         }
@@ -15214,6 +15216,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
         if (themeManager.isAeroTheme()) {
             cursorEffect.setImageResource(R.drawable.cursor_vista)
+        } else if (themeManager.isWin31Theme()) {
+            // The arrow from Windows 3.1's VGA display driver
+            cursorEffect.setImageResource(R.drawable.cursor_31)
         } else {
             cursorEffect.setImageResource(R.drawable.cursor)
         }
@@ -15475,6 +15480,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     interpolator = android.view.animation.LinearInterpolator()
                     start()
                 }
+            } else if (themeManager.isWin31Theme()) {
+                // The VGA driver's hourglass
+                cursorEffect.setImageResource(R.drawable.cursor_busy_31)
             } else {
                 cursorEffect.setImageResource(R.drawable.cursor_busy)
             }
