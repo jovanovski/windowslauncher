@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 3.1 File Manager: its menu bar, a directory window in the white workspace with
+     its own caption (the path) and drive bar, and the two-panel status bar at the bottom.
+     The directory window lists names beside WinFile's own small bitmaps; there is no tree.
+     The ids are the ones every explorer layout carries, so My Computer, desktop folders and
+     My Briefcase all fill this one too. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:orientation="vertical"
+    tools:ignore="HardcodedText">
+
+    <!-- Menu bar -->
+    <LinearLayout
+        android:id="@+id/win31_fm_menu_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFFFF"
+        android:orientation="horizontal"
+        android:paddingStart="2dp">
+
+        <TextView
+            android:id="@+id/win31_fm_menu_file"
+            style="@style/Win31MenuBarItem"
+            android:text="File" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_disk"
+            style="@style/Win31MenuBarItem"
+            android:text="Disk" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_tree"
+            style="@style/Win31MenuBarItem"
+            android:text="Tree" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_view"
+            style="@style/Win31MenuBarItem"
+            android:text="View" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_options"
+            style="@style/Win31MenuBarItem"
+            android:text="Options" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_window"
+            style="@style/Win31MenuBarItem"
+            android:text="Window" />
+
+        <TextView
+            android:id="@+id/win31_fm_menu_help"
+            style="@style/Win31MenuBarItem"
+            android:text="Help" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#000000" />
+
+    <!-- Workspace, holding the directory window -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#FFFFFF"
+        android:padding="3dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/win31_window_frame"
+            android:orientation="vertical"
+            android:padding="5dp">
+
+            <!-- Caption: the directory's path, with *.* -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="19dp"
+                android:background="@drawable/win31_caption_active"
+                android:orientation="horizontal"
+                android:paddingBottom="1dp">
+
+                <ImageView
+                    android:id="@+id/win31_fm_child_sysmenu"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Control menu"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_sysmenu" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="#000000" />
+
+                <TextView
+                    android:id="@+id/folder_name_small"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:ellipsize="start"
+                    android:fontFamily="@font/w31_system"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="C:\\*.*"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp" />
+
+                <ImageView
+                    android:layout_width="19dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Minimize"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_caption_min_states" />
+
+                <ImageView
+                    android:layout_width="19dp"
+                    android:layout_height="18dp"
+                    android:contentDescription="Maximize"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/win31_caption_max_states" />
+            </LinearLayout>
+
+            <!-- Drive bar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:background="#FFFFFF"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp">
+
+                <LinearLayout
+                    android:id="@+id/win31_fm_drive_a"
+                    style="@style/Win31DriveBarDrive">
+
+                    <ImageView
+                        style="@style/Win31DriveBarDriveImage"
+                        android:src="@drawable/win31_fm_drive_floppy" />
+
+                    <TextView
+                        style="@style/Win31DriveBarDriveLetter"
+                        android:text="a" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/win31_fm_drive_c"
+                    style="@style/Win31DriveBarDrive">
+
+                    <ImageView
+                        style="@style/Win31DriveBarDriveImage"
+                        android:src="@drawable/win31_fm_drive_hard" />
+
+                    <TextView
+                        style="@style/Win31DriveBarDriveLetter"
+                        android:text="c" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/win31_fm_drive_d"
+                    style="@style/Win31DriveBarDrive">
+
+                    <ImageView
+                        style="@style/Win31DriveBarDriveImage"
+                        android:src="@drawable/win31_fm_drive_cd" />
+
+                    <TextView
+                        style="@style/Win31DriveBarDriveLetter"
+                        android:text="d" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/win31_fm_volume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/micross_block"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="C: [WIN31]"
+                    android:textColor="#000000"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#000000" />
+
+            <!-- The directory's contents -->
+            <GridView
+                android:id="@+id/folder_icons_grid"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#FFFFFF"
+                android:columnWidth="50dp"
+                android:fadeScrollbars="false"
+                android:horizontalSpacing="0dp"
+                android:numColumns="auto_fit"
+                android:paddingStart="2dp"
+                android:paddingTop="2dp"
+                android:scrollbarAlwaysDrawVerticalTrack="true"
+                android:scrollbarDefaultDelayBeforeFade="0"
+                android:scrollbarFadeDuration="0"
+                android:scrollbarSize="17dp"
+                android:scrollbarStyle="insideOverlay"
+                android:scrollbarThumbVertical="@drawable/win31_scrollbar_thumb"
+                android:scrollbarTrackVertical="@drawable/win31_scrollbar_track"
+                android:scrollbars="vertical"
+                android:stretchMode="none"
+                android:verticalSpacing="0dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- Status bar -->
+    <LinearLayout
+        android:id="@+id/resize_drag_view"
+        android:layout_width="match_parent"
+        android:layout_height="22dp"
+        android:background="#C0C0C0"
+        android:orientation="horizontal"
+        android:paddingStart="3dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="3dp"
+        android:paddingBottom="3dp">
+
+        <TextView
+            android:id="@+id/win31_fm_selected"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/win31_status_panel"
+            android:ellipsize="end"
+            android:fontFamily="@font/micross_block"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:paddingStart="3dp"
+            android:text="Selected 0 file(s) (0 bytes)"
+            android:textColor="#000000"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/explorer_number_of_items"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/win31_status_panel"
+            android:ellipsize="end"
+            android:fontFamily="@font/micross_block"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:paddingStart="3dp"
+            android:text="Total 0 file(s) (0 bytes)"
+            android:textColor="#000000"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Read by the desktop-folder window under every classic theme; 3.1 shows neither -->
+    <TextView
+        android:id="@+id/folder_name_large"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/folder_icon_large"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</LinearLayout>

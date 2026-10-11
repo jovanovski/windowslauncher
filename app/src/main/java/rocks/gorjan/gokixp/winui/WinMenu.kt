@@ -189,11 +189,14 @@ class WinMenuPopup(private val ui: WinUi) {
      * Shows [items] under [anchor] (a menu-bar word) or beside it (a submenu row, or a Start
      * menu folder). Beside means to the right, or to the left when the right has no room for
      * it, top level with the row and moved up as far as it needs to fit on the screen.
+     * [above] puts it over [anchor] instead, its bottom edge on the anchor's top: for an
+     * anchor at the bottom of a window, like the 3.1 Program Manager's minimized groups.
      */
     fun show(
         anchor: View,
         items: List<ContextMenuItem>,
         toTheSide: Boolean = false,
+        above: Boolean = false,
         onDismiss: (() -> Unit)? = null,
     ) {
         dismiss()
@@ -267,6 +270,15 @@ class WinMenuPopup(private val ui: WinUi) {
                         true
                     }.also { anchor.viewTreeObserver.addOnPreDrawListener(it) }
                 }
+            } else if (above) {
+                val screen = activityRoot(anchor)
+                val at = IntArray(2)
+                anchor.getLocationOnScreen(at)
+                val origin = IntArray(2)
+                screen.getLocationOnScreen(origin)
+                val x = (at[0] - origin[0]).coerceAtMost(screen.width - body.measuredWidth).coerceAtLeast(0)
+                val y = (at[1] - origin[1] - body.measuredHeight).coerceAtLeast(0)
+                showAtLocation(screen, Gravity.NO_GRAVITY, x, y)
             } else {
                 showAsDropDown(anchor, 0, 0)
             }
@@ -277,7 +289,7 @@ class WinMenuPopup(private val ui: WinUi) {
                     when {
                         toTheLeft -> MenuAnimator.Direction.LEFT
                         toTheSide -> MenuAnimator.Direction.RIGHT
-                        isAboveAnchor -> MenuAnimator.Direction.UP
+                        above || isAboveAnchor -> MenuAnimator.Direction.UP
                         else -> MenuAnimator.Direction.DOWN
                     },
                 )

@@ -38,7 +38,8 @@ data class FileSystemItem(
     val driveType: DriveType? = null,  // Type of drive if isDrive is true
     val isShortcut: Boolean = false,  // True for system app shortcuts
     val shortcutPackageName: String? = null,  // Package name for system app shortcuts
-    val isVirtualFolder: Boolean = false  // True for virtual folders like WINDOWS
+    val isVirtualFolder: Boolean = false,  // True for virtual folders like WINDOWS
+    val isParentLink: Boolean = false  // The ".." entry a Windows 3.1 directory window starts with
 ) {
     companion object {
         // Known file extensions by type
@@ -98,6 +99,21 @@ data class FileSystemItem(
                 size = 0,
                 lastModified = 0,
                 isVirtualFolder = true
+            )
+        }
+
+        /**
+         * Creates the ".." entry that leads up out of [directory], the way a Windows 3.1
+         * File Manager directory window listed it first
+         */
+        fun createParentLink(directory: File): FileSystemItem {
+            return FileSystemItem(
+                file = directory,
+                name = "..",
+                isDirectory = true,
+                size = 0,
+                lastModified = 0,
+                isParentLink = true
             )
         }
 
