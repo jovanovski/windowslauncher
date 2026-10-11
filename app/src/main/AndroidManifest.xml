@@ -98,6 +98,36 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
 
+            <!--
+                Winamp skins (.wsz) opened from a file manager or a browser's downloads. Most
+                apps hand a .wsz over as a zip or as raw bytes with no name to go by, so those
+                types are taken too; anything that is not a skin is turned away with a toast.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-winamp-skin" />
+                <data android:mimeType="application/vnd.winamp-skin" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.wsz" />
+                <data android:pathPattern=".*\\..*\\.wsz" />
+                <data android:pathPattern=".*\\..*\\..*\\.wsz" />
+                <data android:pathPattern=".*\\.WSZ" />
+            </intent-filter>
+
         </activity>
 
         <!-- Accessibility Service for screen locking -->

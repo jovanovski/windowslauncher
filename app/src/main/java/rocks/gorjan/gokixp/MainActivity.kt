@@ -1272,6 +1272,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Handle a URL shared into the launcher on cold start
         // A shared file goes into the Briefcase; shared text is a web shortcut.
         if (!handleSharedFileIntent(intent)) handleSharedUrlIntent(intent)
+        // A Winamp skin opened from a file manager or a browser's downloads
+        handleWinampSkinIntent(intent)
 
 
         // Tell the person when something turns up from the computer while they are looking
@@ -9247,15 +9249,48 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     /** Opens Winamp, if it is not open already, and dresses it in the skin at [skinPath]. */
     fun openWinampSkin(skinPath: String) {
         val skinFile = java.io.File(skinPath)
+        withWinampOpen { it.importSkin(skinFile) }
+    }
+
+    /** Opens Winamp, if it is not open already, and hands it to [then]. */
+    private fun withWinampOpen(then: (rocks.gorjan.gokixp.apps.winamp.WinampApp) -> Unit) {
         if (floatingWindowManager.findWindowByIdentifier("system.winamp") != null) {
             floatingWindowManager.findAndFocusWindow("system.winamp")
-            winampAppInstance?.importSkin(skinFile)
+            winampAppInstance?.let(then)
             return
         }
         setCursorBusy()
         Handler(Looper.getMainLooper()).post {
             createAndShowWinampDialog()
-            winampAppInstance?.importSkin(skinFile)
+            winampAppInstance?.let(then)
+        }
+    }
+
+    /**
+     * A `.wsz` opened from outside - a file manager, or a browser's download - comes in as
+     * ACTION_VIEW. Winamp opens wearing it. Returns whether the intent carried one.
+     */
+    private fun handleWinampSkinIntent(intent: Intent?): Boolean {
+        if (intent?.action != Intent.ACTION_VIEW) return false
+        val uri = intent.data ?: return false
+        // Cleared so a rotation or a return to the launcher does not load it again
+        intent.data = null
+        intent.action = null
+        // Posted so the desktop is up before the window opens over it on a cold start
+        Handler(Looper.getMainLooper()).postDelayed({
+            withWinampOpen { it.importSkin(uri) }
+        }, 300)
+        return true
+    }
+
+    /** Winamp's "Get skins...": the Winamp Skin Museum, in the phone's own browser. */
+    private fun openWinampSkinMuseum() {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://skins.webamp.org/")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            Log.e("MainActivity", "No browser for the Winamp Skin Museum", e)
         }
     }
 
@@ -9319,7 +9354,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             fileToPlay = fileToPlay,
             onPickSkinFile = {
                 winampSkinPickerLauncher.launch(arrayOf("*/*"))
-            }
+            },
+            onGetSkins = { openWinampSkinMuseum() }
         )
 
         // Store reference for permission callback
@@ -13167,6 +13203,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Handle what was shared into the launcher while it's already running (the common path)
         if (!handleSharedFileIntent(intent)) handleSharedUrlIntent(intent)
+        handleWinampSkinIntent(intent)
 
     }
 

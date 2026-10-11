@@ -47,7 +47,9 @@ class WinampApp(
     private val contextMenuView: rocks.gorjan.gokixp.ContextMenuView,
     private val fileToPlay: String? = null, // Optional file path to play on launch
     /** Opens Android's file picker for a `.wsz`; the pick comes back through [importSkin]. */
-    private val onPickSkinFile: () -> Unit = {}
+    private val onPickSkinFile: () -> Unit = {},
+    /** Opens skins.webamp.org, where skins come from. */
+    private val onGetSkins: () -> Unit = {}
 ) {
     companion object {
         private const val NOTIFICATION_ID = 1001
@@ -870,6 +872,7 @@ class WinampApp(
     private fun showSkinMenu(x: Float, y: Float) {
         val items = mutableListOf<ContextMenuItem>()
         items.add(ContextMenuItem("Load skin...", action = { onPickSkinFile() }))
+        items.add(ContextMenuItem("Get skins...", action = { onGetSkins() }))
         items.add(ContextMenuItem("", isEnabled = false))
         items.add(
             ContextMenuItem(
