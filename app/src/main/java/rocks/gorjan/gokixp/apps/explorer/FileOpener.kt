@@ -10,9 +10,9 @@ import java.io.File
 /**
  * What the shell does with a file when somebody taps it.
  *
- * The rules are the desktop's: a sound belongs to Winamp, a film to Media Player, a bitmap
- * to Paint because bitmaps are Paint's own files, a picture or a PDF to the Photo Viewer, and
- * anything else to whatever Android has for it. Shared by My Computer and My Briefcase so a
+ * The rules are the desktop's: a sound belongs to Winamp, and so does a Winamp skin, a film
+ * to Media Player, a bitmap to Paint because bitmaps are Paint's own files, a picture or a PDF
+ * to the Photo Viewer, and anything else to whatever Android has for it. Shared by My Computer and My Briefcase so a
  * file opens the same way wherever it is looked at.
  */
 object FileOpener {
@@ -28,6 +28,7 @@ object FileOpener {
     fun isVideo(file: File): Boolean = file.extension.lowercase() in VIDEO
     fun isImage(file: File): Boolean = file.extension.lowercase() in IMAGE
     fun isPdf(file: File): Boolean = file.extension.lowercase() == "pdf"
+    fun isWinampSkin(file: File): Boolean = file.extension.lowercase() == "wsz"
 
     /** Bitmaps open in Paint rather than the viewer, the way they always have. */
     fun isBitmap(file: File): Boolean = file.extension.lowercase() in BITMAP
@@ -36,6 +37,7 @@ object FileOpener {
         val mainActivity = context as? MainActivity
         when {
             isAudio(file) -> mainActivity?.openWinamp(file.absolutePath)
+            isWinampSkin(file) -> mainActivity?.openWinampSkin(file.absolutePath)
             isVideo(file) -> mainActivity?.openWmp(file.absolutePath)
             isBitmap(file) -> mainActivity?.openPaint(file.absolutePath)
             isImage(file) || isPdf(file) -> mainActivity?.openPhotoViewer(file.absolutePath)
@@ -85,7 +87,7 @@ object FileOpener {
         "m4a" -> "audio/mp4"
         "aac" -> "audio/aac"
         "wma" -> "audio/x-ms-wma"
-        "zip" -> "application/zip"
+        "zip", "wsz" -> "application/zip"
         "apk" -> "application/vnd.android.package-archive"
         else -> "*/*"
     }

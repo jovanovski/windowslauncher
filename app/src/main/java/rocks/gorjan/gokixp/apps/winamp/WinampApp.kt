@@ -1,33 +1,27 @@
 package rocks.gorjan.gokixp.apps.winamp
 
 import android.content.Context
-import android.content.Intent
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.OpenableColumns
 import android.util.Log
 import android.view.View
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.Toast
 import rocks.gorjan.gokixp.R
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import rocks.gorjan.gokixp.ContextMenuItem
 import rocks.gorjan.gokixp.theme.ThemeManager
 import rocks.gorjan.gokixp.winui.WinUi
 import rocks.gorjan.gokixp.winui.showMenu
+import java.io.File
 import java.util.Locale
-
-/**
- * Data model for a theme
- */
-data class WinampTheme(
-    val themeId: Int,
-    val themeName: String,
-    val themePostfix: String,
-    val themeTextColor: String,
-    val themeBackgroundColor: String
-)
+import kotlin.random.Random
 
 /**
  * Data model for a playlist
@@ -39,6 +33,9 @@ data class Playlist(
 
 /**
  * Winamp music player app logic and UI controller
+ *
+ * The window itself is a [WinampSkinView] wearing a classic Winamp 2 skin - the base skin
+ * Winamp 2.91 shipped with, or any `.wsz` somebody loads from skins.webamp.org.
  */
 class WinampApp(
     private val context: Context,
@@ -48,7 +45,9 @@ class WinampApp(
     private val onShowConfirmDialog: (title: String, message: String, onConfirm: () -> Unit) -> Unit,
     /** Spare since the playlist's menu moved to the kit, and droppable once MainActivity stops passing it. */
     private val contextMenuView: rocks.gorjan.gokixp.ContextMenuView,
-    private val fileToPlay: String? = null // Optional file path to play on launch
+    private val fileToPlay: String? = null, // Optional file path to play on launch
+    /** Opens Android's file picker for a `.wsz`; the pick comes back through [importSkin]. */
+    private val onPickSkinFile: () -> Unit = {}
 ) {
     companion object {
         private const val NOTIFICATION_ID = 1001
@@ -56,31 +55,21 @@ class WinampApp(
         private const val PREFS_NAME = "winamp_prefs"
         private const val KEY_PLAYLISTS = "playlists"
         private const val KEY_CURRENT_PLAYLIST = "current_playlist"
-        private const val KEY_CURRENT_THEME = "current_theme"
+        private const val KEY_SKIN = "current_skin"
+        private const val KEY_VOLUME = "volume"
+        private const val KEY_BALANCE = "balance"
+        private const val KEY_SHUFFLE = "shuffle"
+        private const val KEY_REPEAT = "repeat"
         private const val ALL_LOCAL_FILES = "Local Tracks"
+        private const val IDLE_TITLE = "Winamp 2.91"
 
-        // Available themes
-        private val AVAILABLE_THEMES = listOf(
-            WinampTheme(
-                themeId = 0,
-                themeName = "Default",
-                themePostfix = "",
-                themeTextColor = "#00FF00",
-                themeBackgroundColor = "#000000"
-            ),
-            WinampTheme(
-                themeId = 1,
-                themeName = "Modern",
-                themePostfix = "_modern",
-                themeTextColor = "#FFFFFF",
-                themeBackgroundColor = "#243c79"
-            )
-        )
+        /** A skin is a few hundred kilobytes; anything past this is not one. */
+        private const val MAX_SKIN_BYTES = 20 * 1024 * 1024
     }
 
     /**
      * The shell's own controls. Winamp's window is skin art from edge to edge, so the only
-     * thing that asks the kit for anything is the playlist's menu.
+     * things that ask the kit for anything are its menus.
      */
     private val ui = WinUi(context)
 
@@ -96,147 +85,123 @@ class WinampApp(
     private var currentPlaylistIndex = 0
     private var isShowingPlaylists = true // Start with playlist view
 
-    // Theme state
-    private var currentTheme: WinampTheme = AVAILABLE_THEMES[0] // Default theme
+    // Player settings
+    private var volume = 1f
+    private var balance = 0f
+    private var shuffle = false
+    private var repeat = true // The player always looped its playlist before it had the button
+    private var currentSkinFile = ""
 
     // Media session for notifications
     private var mediaSession: android.media.session.MediaSession? = null
 
     // UI references
-    private var trackNameView: TextView? = null
-    private var trackSecondsView: TextView? = null
-    private var tabView: ImageView? = null
-    private var statusView: ImageView? = null
-    private var playingAnimationView: View? = null
-    private var trackListView: android.widget.TableLayout? = null
-    private var trackListScrollView: android.widget.ScrollView? = null
-    private var playlistNameView: TextView? = null
-    private var backgroundView: ImageView? = null
+    private var skinView: WinampSkinView? = null
+    private var menuAnchor: View? = null
 
     // Update handlers
     private val updateHandler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
-    private val blinkHandler = Handler(Looper.getMainLooper())
-    private var blinkRunnable: Runnable? = null
 
     /**
      * Initialize the app UI
      */
     fun setupApp(contentView: View): View {
-        // Get references to views
-        trackNameView = contentView.findViewById(R.id.track_name)
-        trackListView = contentView.findViewById(R.id.track_list)
-        trackListScrollView = contentView.findViewById(R.id.track_list_scroll)
-        trackSecondsView = contentView.findViewById(R.id.track_seconds)
-        tabView = contentView.findViewById(R.id.winamp_tab)
-        statusView = contentView.findViewById(R.id.winamp_status)
-        playingAnimationView = contentView.findViewById(R.id.winamp_playing_animation)
-        playlistNameView = contentView.findViewById(R.id.playlist_name)
-        backgroundView = contentView.findViewById(R.id.winamp_background)
-        val previousButton = contentView.findViewById<View>(R.id.previous_button)
-        val playButton = contentView.findViewById<View>(R.id.play_button)
-        val pauseButton = contentView.findViewById<View>(R.id.pause_button)
-        val stopButton = contentView.findViewById<View>(R.id.stop_button)
-        val nextButton = contentView.findViewById<View>(R.id.next_button)
-        val playlistAddButton = contentView.findViewById<View>(R.id.playlist_add_button)
-        val playlistRemoveButton = contentView.findViewById<View>(R.id.playlist_remove_button)
-        val playlistNextButton = contentView.findViewById<View>(R.id.playlist_next_button)
-        val playlistPrevButton = contentView.findViewById<View>(R.id.playlist_prev_button)
-        val playlistShowAllButton = contentView.findViewById<View>(R.id.playlist_show_all)
-        val themeButton = contentView.findViewById<View>(R.id.theme_button)
-
-        // Enable marquee scrolling for track name
-        trackNameView?.isSelected = true
+        skinView = contentView.findViewById(R.id.winamp_skin)
+        menuAnchor = contentView.findViewById(R.id.winamp_menu_anchor)
 
         // Initialize media session
         setupMediaSession()
 
-        // Set up button click handlers
-        previousButton.setOnClickListener {
-            if (getCurrentTracks().isNotEmpty()) {
-                // Check current playback position
-                val currentPosition = mediaPlayer?.currentPosition ?: 0
+        loadSettings()
+        skinView?.apply {
+            skin = loadCurrentSkin()
+            volume = this@WinampApp.volume
+            balance = this@WinampApp.balance
+            shuffle = this@WinampApp.shuffle
+            repeat = this@WinampApp.repeat
+            title = IDLE_TITLE
+            listener = skinListener
+        }
 
-                if (currentPosition > 5000) {
-                    // More than 5 seconds played - restart current track
-                    mediaPlayer?.seekTo(0)
-                    trackSecondsView?.text = "00:00"
-                    // Reset tab position to left
-                    (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                        params.setMargins(0, params.topMargin, params.rightMargin, params.bottomMargin)
-                        tabView?.layoutParams = params
-                    }
-                } else {
-                    // Less than 5 seconds played - go to previous track
-                    selectedTrackIndex = if (selectedTrackIndex <= 0) {
-                        getCurrentTracks().size - 1 // Wrap to last track
-                    } else {
-                        selectedTrackIndex - 1
-                    }
-                    val title = getCurrentTracks()[selectedTrackIndex].title.uppercase()
-                    trackNameView?.text = "$title     $title     $title"
-                    playTrack(getCurrentTracks()[selectedTrackIndex])
-                    refreshTrackList?.invoke()
-                }
+        // Load playlists from SharedPreferences
+        loadPlaylists()
+
+        // Check permissions and load music
+        if (hasAudioPermission()) {
+            // Permission already granted, load tracks immediately
+            loadMusicTracks()
+        } else {
+            refreshTrackListUI()
+            // Request storage permissions
+            onRequestPermissions()
+        }
+
+        return contentView
+    }
+
+    private val skinListener = object : WinampSkinView.Listener {
+        override fun onPrevious() = previous()
+        override fun onPlay() = play()
+        override fun onPause() = pause()
+        override fun onStop() = stop()
+        override fun onNext() = next()
+        override fun onEject(x: Float, y: Float) = showSkinMenu(x, y)
+        override fun onSeek(fraction: Float) = seekTo(fraction)
+
+        override fun onVolume(volume: Float) {
+            this@WinampApp.volume = volume
+            applyVolume()
+            saveSettings()
+        }
+
+        override fun onBalance(balance: Float) {
+            this@WinampApp.balance = balance
+            applyVolume()
+            saveSettings()
+        }
+
+        override fun onShuffle() {
+            shuffle = !shuffle
+            skinView?.shuffle = shuffle
+            saveSettings()
+        }
+
+        override fun onRepeat() {
+            repeat = !repeat
+            skinView?.repeat = repeat
+            saveSettings()
+        }
+
+        override fun onOptions(x: Float, y: Float) = showSkinMenu(x, y)
+
+        override fun onRowClick(index: Int) {
+            if (isShowingPlaylists) {
+                // Switch to the selected playlist
+                currentPlaylistIndex = index
+                isShowingPlaylists = false
+                // Update selected track index based on currently playing track
+                updateSelectedTrackIndex()
+                savePlaylists()
+                refreshTrackListUI()
+                skinView?.scrollToRow(selectedTrackIndex)
+            } else {
+                val tracks = getCurrentTracks()
+                if (index !in tracks.indices) return
+                selectedTrackIndex = index
+                playTrack(tracks[index])
+                refreshTrackListUI()
             }
         }
 
-        playButton.setOnClickListener {
-            if (mediaPlayer?.isPlaying == false) {
-                mediaPlayer?.start()
-                startUpdates()
-                updateMediaSessionState(true)
-                statusView?.setImageResource(getThemedDrawable("winamp_playing"))
-                playingAnimationView?.visibility = View.VISIBLE
-                stopTimeBlink()
-            } else if (selectedTrackIndex >= 0 && selectedTrackIndex < getCurrentTracks().size) {
-                playTrack(getCurrentTracks()[selectedTrackIndex])
-            }
+        override fun onRowLongClick(index: Int, x: Float, y: Float) {
+            if (isShowingPlaylists) return
+            val tracks = getCurrentTracks()
+            if (index !in tracks.indices) return
+            showTrackContextMenu(tracks[index], index, x, y)
         }
 
-        pauseButton.setOnClickListener {
-            if (mediaPlayer?.isPlaying == true) {
-                mediaPlayer?.pause()
-                updateRunnable?.let { updateHandler.removeCallbacks(it) }
-                updateMediaSessionState(false)
-                statusView?.setImageResource(getThemedDrawable("winamp_paused"))
-                playingAnimationView?.visibility = View.GONE
-                startTimeBlink()
-            }
-        }
-
-        stopButton.setOnClickListener {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-            updateRunnable?.let { updateHandler.removeCallbacks(it) }
-            trackSecondsView?.text = "00:00"
-            statusView?.setImageResource(getThemedDrawable("winamp_stopped"))
-            playingAnimationView?.visibility = View.GONE
-            stopTimeBlink()
-            // Reset tab position
-            (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                params.setMargins(0, params.topMargin, params.rightMargin, params.bottomMargin)
-                tabView?.layoutParams = params
-            }
-        }
-
-        nextButton.setOnClickListener {
-            if (getCurrentTracks().isNotEmpty()) {
-                selectedTrackIndex = if (selectedTrackIndex >= getCurrentTracks().size - 1) {
-                    0 // Wrap to first track
-                } else {
-                    selectedTrackIndex + 1
-                }
-                val title = getCurrentTracks()[selectedTrackIndex].title.uppercase()
-                trackNameView?.text = "$title     $title     $title"
-                playTrack(getCurrentTracks()[selectedTrackIndex])
-                refreshTrackList?.invoke()
-            }
-        }
-
-        // Set up playlist button handlers
-        playlistAddButton.setOnClickListener {
+        override fun onPlaylistAdd() {
             onShowRenameDialog("Create Playlist", "", "Playlist name") { playlistName ->
                 if (playlistName.isNotBlank() && playlistName.uppercase() != ALL_LOCAL_FILES) {
                     createPlaylist(playlistName)
@@ -244,15 +209,10 @@ class WinampApp(
             }
         }
 
-        playlistRemoveButton.setOnClickListener {
+        override fun onPlaylistRemove() {
             val currentPlaylist = getCurrentPlaylist()
-
             // Don't allow deleting "ALL LOCAL FILES"
-            if (currentPlaylist.name == ALL_LOCAL_FILES) {
-                return@setOnClickListener
-            }
-
-            // Show confirmation dialog
+            if (currentPlaylist.name == ALL_LOCAL_FILES) return
             onShowConfirmDialog(
                 "Delete Playlist",
                 "Are you sure you want to delete the playlist '${currentPlaylist.name}'?"
@@ -261,172 +221,109 @@ class WinampApp(
             }
         }
 
-        playlistNextButton.setOnClickListener {
-            switchToNextPlaylist()
+        override fun onPlaylistSelect() = switchToPreviousPlaylist()
+        override fun onPlaylistMisc() = switchToNextPlaylist()
+        override fun onPlaylistList() = togglePlaylistView()
+    }
+
+    // ========== Transport ==========
+
+    private fun previous() {
+        val tracks = getCurrentTracks()
+        if (tracks.isEmpty()) return
+        // More than 5 seconds in, Previous starts the song again
+        if ((mediaPlayer?.currentPosition ?: 0) > 5000) {
+            mediaPlayer?.seekTo(0)
+            skinView?.elapsedMs = 0
+            return
         }
+        selectedTrackIndex = if (selectedTrackIndex <= 0) tracks.size - 1 else selectedTrackIndex - 1
+        playTrack(tracks[selectedTrackIndex])
+        refreshTrackList?.invoke()
+    }
 
-        playlistPrevButton.setOnClickListener {
-            switchToPreviousPlaylist()
+    private fun next() {
+        val tracks = getCurrentTracks()
+        if (tracks.isEmpty()) return
+        selectedTrackIndex = nextIndex(tracks.size)
+        playTrack(tracks[selectedTrackIndex])
+        refreshTrackList?.invoke()
+    }
+
+    private fun nextIndex(size: Int): Int = when {
+        shuffle && size > 1 -> {
+            var index: Int
+            do { index = Random.nextInt(size) } while (index == selectedTrackIndex)
+            index
         }
+        selectedTrackIndex >= size - 1 -> 0
+        else -> selectedTrackIndex + 1
+    }
 
-        playlistShowAllButton.setOnClickListener {
-            togglePlaylistView()
+    private fun play() {
+        val player = mediaPlayer
+        if (player != null && !player.isPlaying) {
+            player.start()
+            startUpdates()
+            updateMediaSessionState(true)
+            skinView?.status = WinampSkinView.Status.PLAYING
+        } else if (player == null) {
+            val tracks = getCurrentTracks()
+            if (selectedTrackIndex in tracks.indices) {
+                playTrack(tracks[selectedTrackIndex])
+            } else if (!isShowingPlaylists && tracks.isNotEmpty()) {
+                selectedTrackIndex = 0
+                playTrack(tracks[0])
+                refreshTrackListUI()
+            }
         }
+    }
 
-        // Set up theme button handler
-        themeButton.setOnClickListener {
-            cycleTheme()
-        }
-
-        // Set up draggable thumb for seeking
-        setupSeekBar()
-
-        // Load playlists from SharedPreferences
-        loadPlaylists()
-
-        // Load theme from SharedPreferences
-        loadTheme()
-
-        // Apply the loaded theme to UI
-        applyTheme()
-
-        // Check permissions and load music
-        if (hasAudioPermission()) {
-            // Permission already granted, load tracks immediately
-            loadMusicTracks()
+    private fun pause() {
+        val player = mediaPlayer ?: return
+        if (player.isPlaying) {
+            player.pause()
+            updateRunnable?.let { updateHandler.removeCallbacks(it) }
+            updateMediaSessionState(false)
+            skinView?.status = WinampSkinView.Status.PAUSED
         } else {
-            // Request storage permissions
-            onRequestPermissions()
-        }
-
-        return contentView
-    }
-
-    /**
-     * Set up seek bar dragging and clicking
-     */
-    private fun setupSeekBar() {
-        var isDraggingThumb = false
-        var wasPlayingBeforeDrag = false
-
-        tabView?.setOnTouchListener { view, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    // Start dragging - pause playback if playing
-                    isDraggingThumb = true
-                    wasPlayingBeforeDrag = mediaPlayer?.isPlaying == true
-                    if (wasPlayingBeforeDrag) {
-                        mediaPlayer?.pause()
-                        updateRunnable?.let { updateHandler.removeCallbacks(it) }
-                    }
-                    true
-                }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    if (isDraggingThumb && mediaPlayer != null) {
-                        seekToPosition(view, event.rawX)
-                    }
-                    true
-                }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    // Stop dragging - resume playback if it was playing before
-                    isDraggingThumb = false
-                    if (wasPlayingBeforeDrag) {
-                        mediaPlayer?.start()
-                        startUpdates()
-                        wasPlayingBeforeDrag = false
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-
-        // Set up click-to-seek on the scrubber track
-        val scrubberTrack = tabView?.parent as? android.view.ViewGroup
-        scrubberTrack?.setOnTouchListener { view, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    // Check if touch is on the track (not on the thumb)
-                    val thumbBounds = android.graphics.Rect()
-                    tabView?.getHitRect(thumbBounds)
-
-                    // If touch is not on the thumb, handle as a track click
-                    if (!thumbBounds.contains(event.x.toInt(), event.y.toInt())) {
-                        mediaPlayer?.let {
-                            val touchX = event.x - view.paddingLeft
-                            val maxMarginPx = 270.dpToPx()
-                            val newMarginPx = touchX.toInt().coerceIn(0, maxMarginPx)
-
-                            // Update the tab position
-                            (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                                params.setMargins(newMarginPx, params.topMargin, params.rightMargin, params.bottomMargin)
-                                tabView?.layoutParams = params
-                            }
-
-                            // Seek the media player to the corresponding position
-                            try {
-                                val duration = it.duration
-                                val progress = newMarginPx.toFloat() / maxMarginPx.toFloat()
-                                val newPosition = (duration * progress).toInt()
-                                it.seekTo(newPosition)
-
-                                // Update time display
-                                val minutes = (newPosition / 1000 / 60).toInt()
-                                val seconds = (newPosition / 1000 % 60).toInt()
-                                trackSecondsView?.text = String.format("%02d:%02d", minutes, seconds)
-                            } catch (e: Exception) {
-                                Log.e("WinampApp", "Error seeking on track click", e)
-                            }
-                        }
-                        true
-                    } else {
-                        // Touch is on thumb, let thumb's touch listener handle it
-                        false
-                    }
-                }
-                else -> false
-            }
+            // Winamp's Pause button also un-pauses
+            play()
         }
     }
 
-    /**
-     * Seek to a position based on touch X coordinate
-     */
-    private fun seekToPosition(view: View, rawX: Float) {
-        val parent = view.parent as? android.view.ViewGroup
-        parent?.let { parentView ->
-            // Calculate the new left margin based on touch position
-            val maxMarginPx = 270.dpToPx()
-            val parentLeft = IntArray(2)
-            parentView.getLocationOnScreen(parentLeft)
-            // Account for parent's left padding
-            val touchX = rawX - parentLeft[0] - parentView.paddingLeft
+    private fun stop() {
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        updateRunnable?.let { updateHandler.removeCallbacks(it) }
+        skinView?.apply {
+            status = WinampSkinView.Status.STOPPED
+            hasMedia = false
+            elapsedMs = 0
+            stereo = null
+        }
+    }
 
-            // Clamp the margin between 0 and maxMargin (in pixels)
-            val newMarginPx = touchX.toInt().coerceIn(0, maxMarginPx)
+    private fun seekTo(fraction: Float) {
+        val player = mediaPlayer ?: return
+        try {
+            val position = (player.duration * fraction).toInt()
+            player.seekTo(position)
+            skinView?.elapsedMs = position
+        } catch (e: Exception) {
+            Log.e("WinampApp", "Error seeking", e)
+        }
+    }
 
-            // Update the tab position
-            (view.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                params.setMargins(newMarginPx, params.topMargin, params.rightMargin, params.bottomMargin)
-                view.layoutParams = params
-            }
-
-            // Seek the media player to the corresponding position
-            mediaPlayer?.let { player ->
-                try {
-                    val duration = player.duration
-                    val progress = newMarginPx.toFloat() / maxMarginPx.toFloat()
-                    val newPosition = (duration * progress).toInt()
-                    player.seekTo(newPosition)
-
-                    // Update time display
-                    val minutes = (newPosition / 1000 / 60).toInt()
-                    val seconds = (newPosition / 1000 % 60).toInt()
-                    trackSecondsView?.text = String.format("%02d:%02d", minutes, seconds)
-                } catch (e: Exception) {
-                    Log.e("WinampApp", "Error seeking", e)
-                }
-            }
+    /** Volume and balance together: balance turns one side down, never the other up. */
+    private fun applyVolume() {
+        val left = volume * (if (balance > 0f) 1f - balance else 1f)
+        val right = volume * (if (balance < 0f) 1f + balance else 1f)
+        try {
+            mediaPlayer?.setVolume(left, right)
+        } catch (e: IllegalStateException) {
+            Log.w("WinampApp", "Player not ready for volume", e)
         }
     }
 
@@ -443,7 +340,7 @@ class WinampApp(
 
             // Get duration of the raw file
             val mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, android.net.Uri.parse(rawResourceUri))
+                setDataSource(context, Uri.parse(rawResourceUri))
                 prepare()
             }
             val duration = mediaPlayer.duration.toLong()
@@ -495,7 +392,6 @@ class WinampApp(
             Log.e("WinampApp", "Error loading music tracks", e)
         }
 
-
         // Update "ALL LOCAL FILES" playlist with all tracks
         updateAllLocalFilesPlaylist()
 
@@ -509,260 +405,28 @@ class WinampApp(
     }
 
     /**
-     * Refresh the track list UI
+     * Refresh the playlist editor: the list of playlists, or the current playlist's tracks
      */
     private fun refreshTrackListUI() {
-        trackListView?.removeAllViews()
-
+        val view = skinView ?: return
         if (isShowingPlaylists) {
-            // Show playlist list
-            showPlaylistList()
+            view.playlistName = "Playlists"
+            view.rows = playlists.mapIndexed { index, playlist ->
+                WinampSkinView.Row("${index + 1}. ${playlist.name}", "")
+            }
+            view.highlighted = -1
         } else {
-            // Show track list
-            showTrackList()
-            // Scroll to selected track after list is populated
-            scrollToSelectedTrack()
+            view.playlistName = getCurrentPlaylist().name.uppercase(Locale.getDefault())
+            view.rows = getCurrentTracks().mapIndexed { index, track ->
+                WinampSkinView.Row("${index + 1}. ${track.title}", formatTime(track.duration))
+            }
+            view.highlighted = selectedTrackIndex
         }
     }
 
-    /**
-     * Scroll to the selected track in the list
-     */
-    private fun scrollToSelectedTrack() {
-        if (selectedTrackIndex < 0 || isShowingPlaylists) return
-
-        // Post with delay to ensure the view is laid out
-        Handler(Looper.getMainLooper()).postDelayed({
-            trackListView?.let { tableLayout ->
-                if (selectedTrackIndex < tableLayout.childCount) {
-                    val selectedRow = tableLayout.getChildAt(selectedTrackIndex)
-                    selectedRow?.let { row ->
-                        // Calculate the scroll position to center the selected track
-                        val scrollY = row.top - (trackListScrollView?.height ?: 0) / 2 + row.height / 2
-                        trackListScrollView?.smoothScrollTo(0, scrollY.coerceAtLeast(0))
-                    }
-                }
-            }
-        }, 100) // Small delay to ensure layout is complete
-    }
-
-    /**
-     * Show the list of playlists
-     */
-    private fun showPlaylistList() {
-        // Update playlist name display
-        playlistNameView?.text = "PLAYLISTS"
-
-        // Get theme text color
-        val themeTextColor = try {
-            android.graphics.Color.parseColor(currentTheme.themeTextColor)
-        } catch (e: Exception) {
-            0xFF00FF00.toInt() // Fallback to green
-        }
-
-        playlists.forEachIndexed { index, playlist ->
-            val tableRow = android.widget.TableRow(context).apply {
-                layoutParams = android.widget.TableLayout.LayoutParams(
-                    android.widget.TableLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.TableLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            // Playlist name
-            val playlistNameView = TextView(context).apply {
-                text = "${index + 1}. ${playlist.name}"
-                setTextColor(if (index == currentPlaylistIndex && !isShowingPlaylists) android.graphics.Color.WHITE else themeTextColor)
-                textSize = 10f
-                maxLines = 1
-                typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.micross_block)
-                setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
-                layoutParams = android.widget.TableRow.LayoutParams(
-                    0,
-                    android.widget.TableRow.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-
-                if (index == currentPlaylistIndex && !isShowingPlaylists) {
-                    setBackgroundColor(0xFF0000BE.toInt())
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
-            }
-
-            // Touch listener for immediate visual feedback
-            val touchListener = View.OnTouchListener { view, event ->
-                when (event.action) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        // Immediately show selection on touch down
-                        playlistNameView.setBackgroundColor(0xFF0000BE.toInt())
-                        playlistNameView.setTextColor(android.graphics.Color.WHITE)
-                        false // Continue processing the event
-                    }
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                        // Restore original colors if not the current playlist
-                        if (index != currentPlaylistIndex || isShowingPlaylists) {
-                            playlistNameView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            playlistNameView.setTextColor(themeTextColor)
-                        }
-                        false // Continue processing the event
-                    }
-                    else -> false
-                }
-            }
-
-            // Click handler for playlist selection
-            val clickListener = View.OnClickListener {
-                // Switch to the selected playlist
-                currentPlaylistIndex = index
-                isShowingPlaylists = false
-
-                // Update selected track index based on currently playing track
-                updateSelectedTrackIndex()
-
-                savePlaylists()
-                refreshTrackListUI()
-            }
-
-            playlistNameView.setOnTouchListener(touchListener)
-            tableRow.setOnTouchListener(touchListener)
-
-            playlistNameView.setOnClickListener(clickListener)
-            tableRow.setOnClickListener(clickListener)
-
-            tableRow.addView(playlistNameView)
-            trackListView?.addView(tableRow)
-        }
-    }
-
-    /**
-     * Show the list of tracks for the current playlist
-     */
-    private fun showTrackList() {
-        // Update playlist name display
-        playlistNameView?.text = getCurrentPlaylist().name.uppercase(Locale.getDefault())
-
-        // Get theme text color
-        val themeTextColor = try {
-            android.graphics.Color.parseColor(currentTheme.themeTextColor)
-        } catch (e: Exception) {
-            0xFF00FF00.toInt() // Fallback to green
-        }
-
-        val currentTracks = getCurrentTracks()
-        currentTracks.forEachIndexed { index, track ->
-            val tableRow = android.widget.TableRow(context).apply {
-                layoutParams = android.widget.TableLayout.LayoutParams(
-                    android.widget.TableLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.TableLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            // Format duration as MM:SS
-            val minutes = (track.duration / 1000 / 60).toInt()
-            val seconds = (track.duration / 1000 % 60).toInt()
-            val durationStr = String.format("%02d:%02d", minutes, seconds)
-
-            // Track number and name
-            val trackInfoView = TextView(context).apply {
-                text = "${index + 1}. ${track.title}"
-                setTextColor(if (index == selectedTrackIndex) android.graphics.Color.WHITE else themeTextColor)
-                textSize = 10f
-                maxLines = 1
-                typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.micross_block)
-                setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
-                layoutParams = android.widget.TableRow.LayoutParams(
-                    0,
-                    android.widget.TableRow.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-
-                if (index == selectedTrackIndex) {
-                    setBackgroundColor(0xFF0000BE.toInt())
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
-            }
-
-            // Duration
-            val durationView = TextView(context).apply {
-                text = durationStr
-                setTextColor(if (index == selectedTrackIndex) android.graphics.Color.WHITE else themeTextColor)
-                textSize = 10f
-                typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.micross_block)
-                gravity = android.view.Gravity.END
-                setPadding(4.dpToPx(), 2.dpToPx(), 4.dpToPx(), 2.dpToPx())
-                layoutParams = android.widget.TableRow.LayoutParams(
-                    android.widget.TableRow.LayoutParams.WRAP_CONTENT,
-                    android.widget.TableRow.LayoutParams.WRAP_CONTENT
-                )
-
-                if (index == selectedTrackIndex) {
-                    setBackgroundColor(0xFF0000BE.toInt())
-                } else {
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                }
-            }
-
-            // Touch listener for immediate visual feedback and long-press detection
-            val touchListener = View.OnTouchListener { view, event ->
-                when (event.action) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        // Immediately show selection on touch down
-                        trackInfoView.setBackgroundColor(0xFF0000BE.toInt())
-                        trackInfoView.setTextColor(android.graphics.Color.WHITE)
-                        durationView.setBackgroundColor(0xFF0000BE.toInt())
-                        durationView.setTextColor(android.graphics.Color.WHITE)
-                        false // Continue processing the event
-                    }
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                        // Restore original colors if not the selected track
-                        if (index != selectedTrackIndex) {
-                            trackInfoView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            trackInfoView.setTextColor(themeTextColor)
-                            durationView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            durationView.setTextColor(themeTextColor)
-                        }
-                        false // Continue processing the event
-                    }
-                    else -> false
-                }
-            }
-
-            // Click handler for track selection and playback
-            val clickListener = View.OnClickListener {
-                selectedTrackIndex = index
-                // Update track name display (in all caps, no extension)
-                // Duplicate title to ensure scrolling even for short text
-                val title = track.title.uppercase()
-                trackNameView?.text = "$title     $title     $title"
-                // Play the selected track
-                playTrack(track)
-                refreshTrackListUI()
-            }
-
-            // Long-press handler for context menu
-            val longClickListener = View.OnLongClickListener { view ->
-                showTrackContextMenu(track, index, view)
-                true
-            }
-
-            // Apply listeners to all views
-            trackInfoView.setOnTouchListener(touchListener)
-            durationView.setOnTouchListener(touchListener)
-            tableRow.setOnTouchListener(touchListener)
-
-            trackInfoView.setOnClickListener(clickListener)
-            durationView.setOnClickListener(clickListener)
-            tableRow.setOnClickListener(clickListener)
-
-            trackInfoView.setOnLongClickListener(longClickListener)
-            durationView.setOnLongClickListener(longClickListener)
-            tableRow.setOnLongClickListener(longClickListener)
-
-            tableRow.addView(trackInfoView)
-            tableRow.addView(durationView)
-            trackListView?.addView(tableRow)
-        }
+    private fun formatTime(ms: Long): String {
+        val seconds = ms / 1000
+        return String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
     }
 
     /**
@@ -785,7 +449,7 @@ class WinampApp(
             mediaPlayer = MediaPlayer().apply {
                 // Check if this is a resource URI or a file path
                 if (track.path.startsWith("android.resource://")) {
-                    setDataSource(context, android.net.Uri.parse(track.path))
+                    setDataSource(context, Uri.parse(track.path))
                 } else {
                     setDataSource(track.path)
                 }
@@ -795,51 +459,86 @@ class WinampApp(
                 // Set up completion listener to auto-play next track
                 setOnCompletionListener {
                     updateRunnable?.let { updateHandler.removeCallbacks(it) }
-                    trackSecondsView?.text = "00:00"
-                    // Reset tab position to left (0 margin)
-                    (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                        params.setMargins(0, params.topMargin, params.rightMargin, params.bottomMargin)
-                        tabView?.layoutParams = params
-                    }
-
-                    // Auto-play next track
                     val currentTracks = getCurrentTracks()
-                    if (currentTracks.isNotEmpty() && selectedTrackIndex >= 0) {
-                        selectedTrackIndex = if (selectedTrackIndex >= currentTracks.size - 1) {
-                            0 // Wrap to first track
-                        } else {
-                            selectedTrackIndex + 1
-                        }
-                        val title = currentTracks[selectedTrackIndex].title.uppercase()
-                        trackNameView?.text = "$title     $title     $title"
+                    val atEnd = selectedTrackIndex >= currentTracks.size - 1
+                    if (currentTracks.isNotEmpty() && selectedTrackIndex >= 0 && (repeat || shuffle || !atEnd)) {
+                        selectedTrackIndex = nextIndex(currentTracks.size)
                         playTrack(currentTracks[selectedTrackIndex])
                         refreshTrackList?.invoke()
+                    } else {
+                        // Repeat is off and the playlist has run out
+                        stop()
                     }
                 }
             }
+            applyVolume()
 
-            // Reset tab position to left at start of new track
-            (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                params.setMargins(0, params.topMargin, params.rightMargin, params.bottomMargin)
-                tabView?.layoutParams = params
-            }
+            showNowPlaying(track)
 
-            // Start updating the time and tab position
+            // Start updating the time and seek bar
             startUpdates()
 
             // Update media session state
             updateMediaSessionState(true)
-
-            // Update background to playing state
-            statusView?.setImageResource(getThemedDrawable("winamp_playing"))
-            playingAnimationView?.visibility = View.VISIBLE
-
-            // Stop blinking when playing
-            stopTimeBlink()
-
         } catch (e: Exception) {
             Log.e("WinampApp", "Error playing track: ${track.path}", e)
         }
+    }
+
+    /** The song title, bitrate and channels in the main window, as Winamp put them. */
+    private fun showNowPlaying(track: MusicTrack) {
+        val view = skinView ?: return
+        val number = selectedTrackIndex + 1
+        val duration = mediaPlayer?.duration?.toLong()?.takeIf { it > 0 } ?: track.duration
+        view.title = "$number. ${track.title} (${formatTime(duration)})"
+        view.durationMs = duration.toInt()
+        view.elapsedMs = 0
+        view.hasMedia = true
+        view.status = WinampSkinView.Status.PLAYING
+
+        val info = readAudioInfo(track)
+        view.kbps = info.first
+        view.khz = info.second
+        view.stereo = info.third
+    }
+
+    /** Bitrate in kbps, sample rate in kHz, and whether it is stereo; blanks where unknown. */
+    private fun readAudioInfo(track: MusicTrack): Triple<String, String, Boolean?> {
+        var kbps = ""
+        var khz = ""
+        var stereo: Boolean? = null
+        val uri = if (track.path.startsWith("android.resource://")) Uri.parse(track.path) else null
+        val retriever = MediaMetadataRetriever()
+        try {
+            if (uri != null) retriever.setDataSource(context, uri) else retriever.setDataSource(track.path)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()?.let {
+                kbps = (it / 1000).toString()
+            }
+        } catch (e: Exception) {
+            Log.w("WinampApp", "Could not read bitrate of ${track.path}", e)
+        } finally {
+            try { retriever.release() } catch (e: Exception) { }
+        }
+        val extractor = MediaExtractor()
+        try {
+            if (uri != null) extractor.setDataSource(context, uri, null) else extractor.setDataSource(track.path)
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                if (format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") != true) continue
+                if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                    khz = (format.getInteger(MediaFormat.KEY_SAMPLE_RATE) / 1000).toString()
+                }
+                if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                    stereo = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT) > 1
+                }
+                break
+            }
+        } catch (e: Exception) {
+            Log.w("WinampApp", "Could not read the format of ${track.path}", e)
+        } finally {
+            extractor.release()
+        }
+        return Triple(kbps, khz, stereo)
     }
 
     /**
@@ -858,19 +557,16 @@ class WinampApp(
             currentPlaylistIndex = 0
             isShowingPlaylists = false
 
-            // Update track name display
-            val title = track.title.uppercase()
-            trackNameView?.text = "$title     $title     $title"
-
             // Play the track
             playTrack(track)
             refreshTrackListUI()
+            skinView?.scrollToRow(selectedTrackIndex)
 
             Log.d("WinampApp", "Playing file from library: ${track.title}")
         } else {
             // Track not in library - add it temporarily and play
             try {
-                val file = java.io.File(filePath)
+                val file = File(filePath)
                 val displayName = file.nameWithoutExtension
 
                 // Get duration
@@ -892,13 +588,10 @@ class WinampApp(
                 currentPlaylistIndex = 0
                 isShowingPlaylists = false
 
-                // Update track name display
-                val title = track.title.uppercase()
-                trackNameView?.text = "$title     $title     $title"
-
                 // Play the track
                 playTrack(track)
                 refreshTrackListUI()
+                skinView?.scrollToRow(0)
 
                 Log.d("WinampApp", "Playing external file: ${track.title}")
             } catch (e: Exception) {
@@ -911,31 +604,13 @@ class WinampApp(
      * Start periodic updates for playback UI
      */
     private fun startUpdates() {
+        updateRunnable?.let { updateHandler.removeCallbacks(it) }
         updateRunnable = object : Runnable {
             override fun run() {
                 mediaPlayer?.let { player ->
                     if (player.isPlaying) {
                         try {
-                            val currentPosition = player.currentPosition
-                            val duration = player.duration
-
-                            // Update time display (MM:SS)
-                            val minutes = (currentPosition / 1000 / 60).toInt()
-                            val seconds = (currentPosition / 1000 % 60).toInt()
-                            trackSecondsView?.text = String.format("%02d:%02d", minutes, seconds)
-
-                            // Update tab position (0 to 270dp left margin = 0% to 100%)
-                            if (duration > 0) {
-                                val progress = currentPosition.toFloat() / duration.toFloat()
-                                val maxMarginPx = 270.dpToPx()
-                                val newLeftMarginPx = (maxMarginPx * progress).toInt()
-
-                                (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                                    params.setMargins(newLeftMarginPx, params.topMargin, params.rightMargin, params.bottomMargin)
-                                    tabView?.layoutParams = params
-                                }
-                            }
-
+                            skinView?.elapsedMs = player.currentPosition
                             // Schedule next update
                             updateHandler.postDelayed(this, 100) // Update every 100ms
                         } catch (e: Exception) {
@@ -946,43 +621,6 @@ class WinampApp(
             }
         }
         updateRunnable?.let { updateHandler.post(it) }
-    }
-
-    /**
-     * Start blinking the time display (when paused)
-     */
-    private fun startTimeBlink() {
-        // Stop any existing blink
-        stopTimeBlink()
-
-        blinkRunnable = object : Runnable {
-            override fun run() {
-                trackSecondsView?.let { view ->
-                    // Toggle visibility
-                    view.visibility = if (view.visibility == android.view.View.VISIBLE) {
-                        android.view.View.INVISIBLE
-                    } else {
-                        android.view.View.VISIBLE
-                    }
-
-                    // Schedule next toggle
-                    blinkHandler.postDelayed(this, 1000)
-                }
-            }
-        }
-        blinkRunnable?.let { blinkHandler.post(it) }
-    }
-
-    /**
-     * Stop blinking the time display
-     */
-    private fun stopTimeBlink() {
-        // Stop the blink runnable
-        blinkRunnable?.let { blinkHandler.removeCallbacks(it) }
-        blinkRunnable = null
-
-        // Ensure time display is visible
-        trackSecondsView?.visibility = android.view.View.VISIBLE
     }
 
     /**
@@ -1009,71 +647,16 @@ class WinampApp(
         // Set up media session callback for notification controls
         mediaSession?.setCallback(object : android.media.session.MediaSession.Callback() {
             override fun onPlay() {
-                if (mediaPlayer?.isPlaying == false) {
-                    mediaPlayer?.start()
-                    startUpdates()
-                    updateMediaSessionState(true)
-                    statusView?.setImageResource(getThemedDrawable("winamp_playing"))
-                    playingAnimationView?.visibility = View.VISIBLE
-                    stopTimeBlink()
-                }
+                if (mediaPlayer?.isPlaying == false) play()
             }
 
             override fun onPause() {
-                if (mediaPlayer?.isPlaying == true) {
-                    mediaPlayer?.pause()
-                    updateRunnable?.let { updateHandler.removeCallbacks(it) }
-                    updateMediaSessionState(false)
-                    statusView?.setImageResource(getThemedDrawable("winamp_paused"))
-                    playingAnimationView?.visibility = View.GONE
-                    startTimeBlink()
-                }
+                if (mediaPlayer?.isPlaying == true) pause()
             }
 
-            override fun onSkipToNext() {
-                val currentTracks = getCurrentTracks()
-                if (currentTracks.isNotEmpty()) {
-                    selectedTrackIndex = if (selectedTrackIndex >= currentTracks.size - 1) {
-                        0
-                    } else {
-                        selectedTrackIndex + 1
-                    }
-                    val title = currentTracks[selectedTrackIndex].title.uppercase()
-                    trackNameView?.text = "$title     $title     $title"
-                    playTrack(currentTracks[selectedTrackIndex])
-                    refreshTrackList?.invoke()
-                }
-            }
+            override fun onSkipToNext() = next()
 
-            override fun onSkipToPrevious() {
-                val currentTracks = getCurrentTracks()
-                if (currentTracks.isNotEmpty()) {
-                    // Check current playback position
-                    val currentPosition = mediaPlayer?.currentPosition ?: 0
-
-                    if (currentPosition > 5000) {
-                        // More than 5 seconds played - restart current track
-                        mediaPlayer?.seekTo(0)
-                        trackSecondsView?.text = "00:00"
-                        // Reset tab position to left
-                        (tabView?.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-                            params.setMargins(0, params.topMargin, params.rightMargin, params.bottomMargin)
-                            tabView?.layoutParams = params
-                        }
-                    } else {
-                        // Less than 5 seconds played - go to previous track
-                        selectedTrackIndex = if (selectedTrackIndex <= 0) {
-                            currentTracks.size - 1
-                        } else {
-                            selectedTrackIndex - 1
-                        }
-                        val title = currentTracks[selectedTrackIndex].title.uppercase()
-                        trackNameView?.text = "$title     $title     $title"
-                        playTrack(currentTracks[selectedTrackIndex])
-                        refreshTrackList?.invoke()
-                    }
-                }
-            }
+            override fun onSkipToPrevious() = previous()
         })
 
         // Store refresh callback
@@ -1153,25 +736,31 @@ class WinampApp(
         notificationManager.cancel(NOTIFICATION_ID)
     }
 
+    /** Opens a menu at a point on the skin, which has no views of its own to hang one from. */
+    private fun showMenuAt(x: Float, y: Float, items: List<ContextMenuItem>) {
+        val anchor = menuAnchor ?: return
+        anchor.translationX = x
+        anchor.translationY = y
+        ui.showMenu(anchor, items)
+    }
+
     /**
      * Show context menu for a track
      *
      * Winamp skinned its window but never its menus - right-clicking a track in the playlist
      * editor put up an ordinary Windows menu - so this one comes from the control kit and
-     * follows the shell rather than the skin. It hangs off the row itself, which saves the
-     * old dance of reading the row's screen coordinates and asking the desktop to place a
-     * menu there.
+     * follows the shell rather than the skin.
      */
-    private fun showTrackContextMenu(track: MusicTrack, trackIndex: Int, view: View) {
+    private fun showTrackContextMenu(track: MusicTrack, trackIndex: Int, x: Float, y: Float) {
         val currentPlaylist = getCurrentPlaylist()
 
         // Create context menu items
-        val menuItems = mutableListOf<rocks.gorjan.gokixp.ContextMenuItem>()
+        val menuItems = mutableListOf<ContextMenuItem>()
 
         // Add "Delete from playlist" option for custom playlists
         if (currentPlaylist.name != ALL_LOCAL_FILES) {
             menuItems.add(
-                rocks.gorjan.gokixp.ContextMenuItem(
+                ContextMenuItem(
                     title = "Delete from playlist",
                     isEnabled = true,
                     action = {
@@ -1183,7 +772,7 @@ class WinampApp(
 
         // Add divider if we have delete option
         if (menuItems.isNotEmpty()) {
-            menuItems.add(rocks.gorjan.gokixp.ContextMenuItem("", isEnabled = false))
+            menuItems.add(ContextMenuItem("", isEnabled = false))
         }
 
         // Add "Add to X" options for each playlist
@@ -1194,7 +783,7 @@ class WinampApp(
                 val isInPlaylist = playlist.tracks.contains(track.path)
 
                 menuItems.add(
-                    rocks.gorjan.gokixp.ContextMenuItem(
+                    ContextMenuItem(
                         title = "Add to ${playlist.name}",
                         isEnabled = !isInPlaylist,
                         action = {
@@ -1210,7 +799,7 @@ class WinampApp(
             // The desktop's menu buzzed as it opened, and a long press that produces a menu
             // without one feels broken.
             rocks.gorjan.gokixp.Helpers.performHapticFeedback(context)
-            ui.showMenu(view, menuItems)
+            showMenuAt(x, y, menuItems)
         } else {
             Log.d("WinampApp", "No context menu items to show")
         }
@@ -1258,14 +847,8 @@ class WinampApp(
             currentPlayingTrackPath = null // Clear the currently playing track
 
             // Stop playback if it was playing
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-            updateRunnable?.let { updateHandler.removeCallbacks(it) }
-            trackSecondsView?.text = "00:00"
-            statusView?.setImageResource(getThemedDrawable("winamp_stopped"))
-            playingAnimationView?.visibility = View.GONE
-            stopTimeBlink()
+            stop()
+            skinView?.title = IDLE_TITLE
         } else if (trackIndex < selectedTrackIndex) {
             // If we deleted a track before the selected one, adjust the index
             selectedTrackIndex--
@@ -1278,6 +861,147 @@ class WinampApp(
         Log.d("WinampApp", "Deleted track '${track.title}' from playlist '${playlist.name}'")
     }
 
+    // ========== Skins ==========
+
+    /**
+     * The skin menu, off the title bar's options button, the logo, or Eject: load a `.wsz`,
+     * or put on one loaded before.
+     */
+    private fun showSkinMenu(x: Float, y: Float) {
+        val items = mutableListOf<ContextMenuItem>()
+        items.add(ContextMenuItem("Load skin...", action = { onPickSkinFile() }))
+        items.add(ContextMenuItem("", isEnabled = false))
+        items.add(
+            ContextMenuItem(
+                WinampSkins.BASE_NAME,
+                hasCheckbox = true,
+                isChecked = currentSkinFile.isEmpty(),
+                action = { applySkin("") }
+            )
+        )
+        WinampSkins.installed(context).forEach { file ->
+            items.add(
+                ContextMenuItem(
+                    file.nameWithoutExtension,
+                    hasCheckbox = true,
+                    isChecked = file.name == currentSkinFile,
+                    action = { applySkin(file.name) }
+                )
+            )
+        }
+        if (currentSkinFile.isNotEmpty()) {
+            items.add(ContextMenuItem("", isEnabled = false))
+            items.add(ContextMenuItem("Delete current skin", action = { deleteCurrentSkin() }))
+        }
+        showMenuAt(x, y, items)
+    }
+
+    private fun loadCurrentSkin(): WinampSkin {
+        if (currentSkinFile.isNotEmpty()) {
+            WinampSkins.load(context, currentSkinFile)?.let { return it }
+            currentSkinFile = ""
+            saveSettings()
+        }
+        return WinampSkins.base(context)
+    }
+
+    private fun applySkin(fileName: String) {
+        currentSkinFile = fileName
+        saveSettings()
+        skinView?.skin = loadCurrentSkin()
+    }
+
+    private fun deleteCurrentSkin() {
+        val fileName = currentSkinFile
+        if (fileName.isEmpty()) return
+        onShowConfirmDialog(
+            "Delete Skin",
+            "Are you sure you want to delete the skin '${File(fileName).nameWithoutExtension}'?"
+        ) {
+            WinampSkins.delete(context, fileName)
+            applySkin("")
+        }
+    }
+
+    /** A skin chosen in Android's file picker. */
+    fun importSkin(uri: Uri) {
+        val resolver = context.contentResolver
+        val name = try {
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        } ?: uri.lastPathSegment ?: "Skin"
+        importSkin(name) {
+            resolver.openInputStream(uri)?.use { readSkinBytes(it) }
+        }
+    }
+
+    /** A `.wsz` opened from My Computer or My Briefcase. */
+    fun importSkin(file: File) {
+        importSkin(file.name) {
+            if (file.length() > MAX_SKIN_BYTES) null else file.readBytes()
+        }
+    }
+
+    private fun readSkinBytes(input: java.io.InputStream): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            out.write(buffer, 0, read)
+            if (out.size() > MAX_SKIN_BYTES) return null
+        }
+        return out.toByteArray()
+    }
+
+    /** Reads and checks the skin off the main thread, then puts it on. */
+    private fun importSkin(name: String, read: () -> ByteArray?) {
+        val main = Handler(Looper.getMainLooper())
+        Thread {
+            val result = try {
+                val bytes = read() ?: throw IllegalArgumentException("Could not read $name")
+                WinampSkins.install(context, name, bytes)
+            } catch (e: Exception) {
+                Log.e("WinampApp", "Could not load skin $name", e)
+                null
+            }
+            main.post {
+                if (result == null) {
+                    Toast.makeText(context, "That isn't a classic Winamp skin (.wsz)", Toast.LENGTH_LONG).show()
+                    return@post
+                }
+                currentSkinFile = result.first
+                saveSettings()
+                skinView?.skin = result.second
+            }
+        }.start()
+    }
+
+    // ========== Settings ==========
+
+    private fun loadSettings() {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        currentSkinFile = prefs.getString(KEY_SKIN, "") ?: ""
+        volume = prefs.getFloat(KEY_VOLUME, 1f)
+        balance = prefs.getFloat(KEY_BALANCE, 0f)
+        shuffle = prefs.getBoolean(KEY_SHUFFLE, false)
+        repeat = prefs.getBoolean(KEY_REPEAT, true)
+    }
+
+    private fun saveSettings() {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().apply {
+            putString(KEY_SKIN, currentSkinFile)
+            putFloat(KEY_VOLUME, volume)
+            putFloat(KEY_BALANCE, balance)
+            putBoolean(KEY_SHUFFLE, shuffle)
+            putBoolean(KEY_REPEAT, repeat)
+            apply()
+        }
+    }
+
     /**
      * Cleanup when app is closed
      */
@@ -1285,9 +1009,6 @@ class WinampApp(
         // Stop updates
         updateRunnable?.let { updateHandler.removeCallbacks(it) }
         updateRunnable = null
-
-        // Stop blinking
-        stopTimeBlink()
 
         // Stop and release media player
         mediaPlayer?.stop()
@@ -1303,11 +1024,9 @@ class WinampApp(
         mediaSession = null
 
         // Clear view references
-        trackListView = null
-        trackNameView = null
-        trackSecondsView = null
-        tabView = null
-        statusView = null
+        skinView?.listener = null
+        skinView = null
+        menuAnchor = null
 
         // Clear track data
         allTracks.clear()
@@ -1523,122 +1242,4 @@ class WinampApp(
         Log.d("WinampApp", "Toggled playlist view: ${if (isShowingPlaylists) "showing playlists" else "showing tracks"}")
     }
 
-    // ========== Theme Management Functions ==========
-
-    /**
-     * Cycle to the next theme
-     */
-    private fun cycleTheme() {
-        val currentIndex = AVAILABLE_THEMES.indexOfFirst { it.themeId == currentTheme.themeId }
-        val nextIndex = (currentIndex + 1) % AVAILABLE_THEMES.size
-        currentTheme = AVAILABLE_THEMES[nextIndex]
-
-        saveTheme()
-        applyTheme()
-
-        Log.d("WinampApp", "Switched to theme: ${currentTheme.themeName}")
-    }
-
-    /**
-     * Apply the current theme to all UI elements
-     */
-    private fun applyTheme() {
-        // Helper function to get drawable resource ID with postfix
-        fun getDrawableResource(baseName: String): Int {
-            val resourceName = baseName + currentTheme.themePostfix
-            val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
-            return if (resourceId != 0) resourceId else {
-                // Fallback to base resource if postfixed version doesn't exist
-                context.resources.getIdentifier(baseName, "drawable", context.packageName)
-            }
-        }
-
-        // Parse text color
-        val textColor = try {
-            android.graphics.Color.parseColor(currentTheme.themeTextColor)
-        } catch (e: Exception) {
-            0xFF00FF00.toInt() // Fallback to green
-        }
-
-        // Parse background color
-        val backgroundColor = try {
-            android.graphics.Color.parseColor(currentTheme.themeBackgroundColor)
-        } catch (e: Exception) {
-            0xFF000000.toInt() // Fallback to black
-        }
-
-        // Update background image
-        backgroundView?.setImageResource(getDrawableResource("winamp_screen"))
-
-        // Update tab/thumb image
-        tabView?.setImageResource(getDrawableResource("winamp_thumb"))
-
-        // Update status image based on current playback state
-        val isPlaying = mediaPlayer?.isPlaying == true
-        val statusDrawableName = when {
-            isPlaying -> "winamp_playing"
-            mediaPlayer != null -> "winamp_paused"
-            else -> "winamp_stopped"
-        }
-        statusView?.setImageResource(getDrawableResource(statusDrawableName))
-
-        // Update playing animation (GifImageView)
-        (playingAnimationView as? pl.droidsonroids.gif.GifImageView)?.setImageResource(getDrawableResource("winamp_playing_animation"))
-
-        // Update text colors
-        trackNameView?.setTextColor(textColor)
-        trackSecondsView?.setTextColor(textColor)
-        playlistNameView?.setTextColor(textColor)
-
-        // Update track list background and text colors
-        trackListView?.setBackgroundColor(backgroundColor)
-
-        // Refresh track list to apply text colors to all items
-        refreshTrackListUI()
-    }
-
-    /**
-     * Load theme from SharedPreferences
-     */
-    private fun loadTheme() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val themeId = prefs.getInt(KEY_CURRENT_THEME, 0)
-
-        // Find theme by ID, default to first theme if not found
-        currentTheme = AVAILABLE_THEMES.find { it.themeId == themeId } ?: AVAILABLE_THEMES[0]
-
-        Log.d("WinampApp", "Loaded theme: ${currentTheme.themeName}")
-    }
-
-    /**
-     * Save theme to SharedPreferences
-     */
-    private fun saveTheme() {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putInt(KEY_CURRENT_THEME, currentTheme.themeId)
-            apply()
-        }
-
-        Log.d("WinampApp", "Saved theme: ${currentTheme.themeName}")
-    }
-
-    /**
-     * Get a themed drawable resource ID by applying the current theme postfix
-     */
-    private fun getThemedDrawable(baseName: String): Int {
-        val resourceName = baseName + currentTheme.themePostfix
-        val resourceId = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
-        return if (resourceId != 0) resourceId else {
-            // Fallback to base resource if postfixed version doesn't exist
-            context.resources.getIdentifier(baseName, "drawable", context.packageName)
-        }
-    }
-
-    /**
-     * Extension function to convert dp to pixels
-     */
-    private fun Int.dpToPx(): Int {
-        return (this * context.resources.displayMetrics.density).toInt()
-    }
 }
