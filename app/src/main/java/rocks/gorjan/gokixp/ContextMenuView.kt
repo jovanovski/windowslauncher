@@ -64,11 +64,6 @@ class ContextMenuView @JvmOverloads constructor(
         // Clear existing items
         removeAllViews()
 
-        // 3.1's menus are as wide as their longest command, set in the wide System font
-        if (isWin31()) {
-            layoutParams?.let { it.width = LayoutParams.WRAP_CONTENT; layoutParams = it }
-            minimumWidth = 180.dpToPx()
-        }
         
         // Add new items
         items.forEach { item ->
