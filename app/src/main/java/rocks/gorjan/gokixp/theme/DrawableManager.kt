@@ -153,7 +153,8 @@ class DrawableManager(private val context: Context) {
      * @return The scrollbar track drawable resource ID
      */
     fun getScrollbarTrackRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.scrollbar_track_98
+        AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98
+        AppTheme.Windows31 -> R.drawable.win31_scrollbar_track
         AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp
         AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_track_vista
     }
@@ -165,7 +166,8 @@ class DrawableManager(private val context: Context) {
      * @return The scrollbar thumb drawable resource ID
      */
     fun getScrollbarThumbRes(theme: AppTheme): Int = when (theme) {
-        AppTheme.WindowsClassic, AppTheme.Windows31 -> R.drawable.win98_start_menu_border
+        AppTheme.WindowsClassic -> R.drawable.win98_start_menu_border
+        AppTheme.Windows31 -> R.drawable.win31_scrollbar_thumb
         AppTheme.WindowsXP -> R.drawable.scrollbar_thumb_xp
         AppTheme.WindowsVista, AppTheme.Windows7 -> R.drawable.scrollbar_thumb_vista
     }

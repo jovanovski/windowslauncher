@@ -62,6 +62,7 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.core.graphics.scale
 import androidx.core.view.isNotEmpty
 import kotlin.math.abs
+import rocks.gorjan.gokixp.winui.dressTrackBar
 import kotlin.math.roundToInt
 import androidx.activity.result.contract.ActivityResultContracts
 import android.graphics.Bitmap
@@ -6986,6 +6987,34 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         return uri
     }
 
+    /**
+     * The parts of Display Properties still built from Android widgets, in 3.1's clothes:
+     * USER's own check box glyph, the black-lined drop-down with its combo button, the
+     * scroll-bar slider, single black rules, and 3.1 scroll bars on the lists.
+     */
+    private fun dressWin31Controls(root: View) {
+        val ui = rocks.gorjan.gokixp.winui.WinUi(this, AppTheme.Windows31)
+        val divider = AppCompatResources.getDrawable(this, R.drawable.settings_section_divider)?.constantState
+        fun walk(view: View) {
+            when (view) {
+                is android.widget.CheckBox -> view.setButtonDrawable(R.drawable.win31_check)
+                is android.widget.Spinner -> view.setBackgroundResource(R.drawable.win31_combo)
+                is android.widget.SeekBar -> ui.dressTrackBar(view)
+                is EditText -> if (view !is rocks.gorjan.gokixp.winui.dialog.WinEditText) {
+                    view.background = ui.fieldBackground()
+                }
+                is RecyclerView, is android.widget.ScrollView -> themeManager.applyThemedScrollbars(view, AppTheme.Windows31)
+            }
+            // The etched section rules
+            if (view !is ViewGroup && divider != null && view.background?.constantState == divider) {
+                view.setBackgroundColor(Color.BLACK)
+                view.layoutParams = view.layoutParams.apply { height = (resources.displayMetrics.density).roundToInt().coerceAtLeast(1) }
+            }
+            if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))
+        }
+        walk(root)
+    }
+
     private fun createAndShowWallpaperDialog(initScreen: String? = null) {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
@@ -7008,6 +7037,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val contentView = themedInflater.inflate(R.layout.wallpaper_selection_content, null)
         // The dialog's geometry is Windows 98's whatever the shell; only the paint changes.
         (contentView as? WinLayout)?.applySkin(WinSkin.of(currentTheme))
+        if (currentTheme is AppTheme.Windows31) dressWin31Controls(contentView)
         windowsDialog.setContentView(contentView)
 
         // Inflate the theme-appropriate RecyclerView into the container

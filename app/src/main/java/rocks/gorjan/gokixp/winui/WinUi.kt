@@ -105,7 +105,8 @@ class WinUi(
     /** The dialog face: what a window's background is, in every one of these shells. */
     fun facePanel(): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setBackgroundColor(pal.face)
+        // 3.1's dialogs and windows were white; only the buttons were grey
+        setBackgroundColor(if (isWin31) pal.window else pal.face)
     }
 
     /**
@@ -119,6 +120,14 @@ class WinUi(
     fun buttonBackground(): Drawable {
         if (isWin7) {
             ContextCompat.getDrawable(context, R.drawable.button_win7_states)?.let { return it }
+        }
+        if (isWin31) {
+            return StateListDrawable().apply {
+                val down = Win31Drawable(density, Win31Drawable.Kind.BUTTON_PRESSED)
+                addState(intArrayOf(android.R.attr.state_pressed), down)
+                addState(intArrayOf(android.R.attr.state_selected), down)
+                addState(intArrayOf(), Win31Drawable(density, Win31Drawable.Kind.BUTTON))
+            }
         }
         if (isClassic) {
             return StateListDrawable().apply {
@@ -190,7 +199,8 @@ class WinUi(
 
     /** The edge an edit field or a list box is sunk behind. */
     fun fieldBackground(fill: Int = pal.window, focused: Boolean = false): Drawable =
-        if (isClassic) BevelDrawable(pal, density, BevelDrawable.Style.SUNKEN, fill)
+        if (isWin31) Win31Drawable(density, Win31Drawable.Kind.FIELD, fill)
+        else if (isClassic) BevelDrawable(pal, density, BevelDrawable.Style.SUNKEN, fill)
         else GradientPanelDrawable(
             fill, fill,
             if (focused) pal.fieldFocusBorder else pal.fieldBorder,
@@ -218,7 +228,7 @@ class WinUi(
     /** The white body a list, a tree or a message pane sits in. */
     fun listBody(): FrameLayout = FrameLayout(context).apply {
         background = fieldBackground()
-        val edge = if (isClassic) dp(2) else dp(1)
+        val edge = if (isClassic && !isWin31) dp(2) else dp(1)
         setPadding(edge, edge, edge, edge)
     }
 
@@ -322,10 +332,12 @@ class WinUi(
     fun separator(): View = View(context).apply {
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            if (isClassic) dp(2) else dp(1)
+            if (isClassic && !isWin31) dp(2) else dp(1)
         )
         background =
-            if (isClassic) BevelDrawable(pal, density, BevelDrawable.Style.ETCHED, Color.TRANSPARENT)
+            // 3.1 had no etched lines; a rule was one black line
+            if (isWin31) GradientPanelDrawable(Color.BLACK, Color.BLACK, Color.TRANSPARENT, density, 0f)
+            else if (isClassic) BevelDrawable(pal, density, BevelDrawable.Style.ETCHED, Color.TRANSPARENT)
             else GradientPanelDrawable(pal.etch, pal.etch, Color.TRANSPARENT, density, 0f)
     }
 
@@ -560,6 +572,10 @@ class WinUi(
     fun banner(text: String): TextView = label(text, bold = true, size = titleSp).apply {
         setPadding(dp(10), dp(7), dp(10), dp(7))
         background = when {
+            // No gradients before 95: the active caption's flat navy
+            isWin31 -> GradientPanelDrawable(
+                0xFF000080.toInt(), 0xFF000080.toInt(), Color.TRANSPARENT, density, 0f
+            )
             isClassic -> GradientPanelDrawable(
                 0xFF000080.toInt(), 0xFF1084D0.toInt(), Color.TRANSPARENT, density, 0f
             )
