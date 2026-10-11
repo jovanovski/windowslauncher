@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Windows 3.1 vertical scroll bar: the arrow boxes at either end, the gray shaft between. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#C0C0C0" />
+            <stroke android:width="1dp" android:color="#000000" />
+        </shape>
+    </item>
+    <item android:gravity="top" android:height="17dp" android:drawable="@drawable/win31_scroll_up" />
+    <item android:gravity="bottom" android:height="17dp" android:drawable="@drawable/win31_scroll_down" />
+</layer-list>

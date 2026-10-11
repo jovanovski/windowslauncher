@@ -514,7 +514,7 @@ class ThemeManager(private val context: Context) {
      */
     fun getWindowsExplorerLayoutRes(theme: AppTheme): Int = when (theme) {
         AppTheme.WindowsClassic -> R.layout.windows_explorer_98
-        AppTheme.Windows31 -> R.layout.windows_explorer_98
+        AppTheme.Windows31 -> R.layout.windows_explorer_31
         AppTheme.WindowsXP -> R.layout.windows_explorer_xp
         AppTheme.WindowsVista -> R.layout.windows_explorer_vista
         AppTheme.Windows7 -> R.layout.windows_explorer_win7

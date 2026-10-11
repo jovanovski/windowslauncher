@@ -2370,16 +2370,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Drawn by the common controls, which know 3.1's white menus and System font
         val ui = WinUi(this, AppTheme.Windows31)
         val tracker = WinMenuTracker(ui).also { win31MenuTracker = it }
-        fun menuBelow(anchor: View, items: List<ContextMenuItem>) {
+        fun menuBelow(anchor: View, items: List<ContextMenuItem>, above: Boolean = false) {
             playClickSound()
             startMenuFolderMenu?.dismiss()
             startMenuFolderMenu = WinMenuPopup(ui).also { menu ->
                 menu.onPicked = { menu.dismiss() }
-                menu.show(anchor, items) {
+                menu.show(anchor, items, above = above, onDismiss = {
                     if (startMenuFolderMenu === menu) startMenuFolderMenu = null
-                }
+                })
             }
         }
+        // The groups sit at the bottom of the Program Manager, so their menus open upward
+        fun groupMenu(anchor: View, items: List<ContextMenuItem>) = menuBelow(anchor, items, above = true)
         fun barMenu(word: TextView, items: List<ContextMenuItem>) {
             playClickSound()
             tracker.toggle(word, items)
@@ -2419,7 +2421,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         )
         for ((name, id) in groupViews) {
             val view = findViewById<View>(id) ?: continue
-            view.setOnClickListener { menuBelow(view, groups.getValue(name)) }
+            view.setOnClickListener { groupMenu(view, groups.getValue(name)) }
         }
 
         // The Control menu: Close puts the Program Manager away, as does a double tap on the box
@@ -2486,7 +2488,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             window.setOnClickListener {
                 val numbered = groups.keys.mapIndexed { i, name ->
                     ContextMenuItem("&${i + 1} $name", action = {
-                        findViewById<View>(groupViews.getValue(name))?.let { menuBelow(it, groups.getValue(name)) }
+                        findViewById<View>(groupViews.getValue(name))?.let { groupMenu(it, groups.getValue(name)) }
                     })
                 }
                 barMenu(window, listOf(

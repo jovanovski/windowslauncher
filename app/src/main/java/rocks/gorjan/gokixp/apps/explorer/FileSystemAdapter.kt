@@ -3,8 +3,12 @@ package rocks.gorjan.gokixp.apps.explorer
 import android.content.Context
 import android.graphics.Color
 import android.view.View
+import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.BaseAdapter
+import android.widget.ImageView
+import android.widget.TextView
 import rocks.gorjan.gokixp.DesktopIconView
 import rocks.gorjan.gokixp.FolderView
 import rocks.gorjan.gokixp.R
@@ -58,6 +62,7 @@ class FileSystemAdapter(
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val item = items[position]
+        if (theme is AppTheme.Windows31) return getWin31View(position, item, convertView, parent)
 
         // Create DesktopIconView for both files and folders
         // Don't use FolderView here as it has desktop-specific context menu
@@ -158,5 +163,79 @@ class FileSystemAdapter(
         iconView.alpha = if (isCut || isFileDimmed?.invoke(item) == true) 0.6f else 1.0f
 
         return iconView
+    }
+
+    /**
+     * A Windows 3.1 File Manager entry: WinFile's small bitmap and the name, lower case the
+     * way 3.1 listed DOS names. Directories, programs, documents (files something opens)
+     * and other files each have their own bitmap, and ".." the up arrow.
+     */
+    private fun getWin31View(position: Int, item: FileSystemItem, convertView: View?, parent: ViewGroup?): View {
+        val row = convertView?.takeIf { it.getTag(R.id.fm_name) == WIN31_ROW }
+            ?: LayoutInflater.from(context).inflate(R.layout.file_list_item_31, parent, false).also {
+                it.setTag(R.id.fm_name, WIN31_ROW)
+            }
+        val iconRes = when {
+            item.isParentLink -> R.drawable.win31_fm_dirup
+            item.isDrive -> when (item.driveType) {
+                DriveType.FLOPPY -> R.drawable.win31_fm_drive_floppy
+                DriveType.OPTICAL -> R.drawable.win31_fm_drive_cd
+                else -> R.drawable.win31_fm_drive_hard
+            }
+            item.isShortcut -> R.drawable.win31_fm_app
+            item.isDirectory || item.isVirtualFolder -> R.drawable.win31_fm_folder
+            else -> {
+                val extension = item.file.extension.lowercase()
+                when {
+                    extension in WIN31_PROGRAM_EXTENSIONS -> R.drawable.win31_fm_app
+                    extension in WIN31_DOCUMENT_EXTENSIONS -> R.drawable.win31_fm_doc
+                    FileSystemItem.getFileType(item) != FileType.GENERIC -> R.drawable.win31_fm_doc
+                    else -> R.drawable.win31_fm_file
+                }
+            }
+        }
+        row.findViewById<ImageView>(R.id.fm_icon).setImageResource(iconRes)
+        row.findViewById<TextView>(R.id.fm_name).text = if (item.isParentLink) "" else item.name.lowercase()
+
+        row.setOnClickListener { onItemClick(item, row) }
+        var touchX = 0f
+        var touchY = 0f
+        row.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                touchX = event.rawX
+                touchY = event.rawY
+            }
+            false
+        }
+        val canLongClick = !item.isDrive && !item.isShortcut && !item.isVirtualFolder &&
+            !item.isParentLink && onItemLongClick != null
+        if (canLongClick) {
+            row.setOnLongClickListener {
+                selectedPosition = position
+                row.isSelected = true
+                onItemLongClick?.invoke(item, touchX, touchY)
+                true
+            }
+        } else {
+            row.setOnLongClickListener(null)
+            row.isLongClickable = false
+        }
+
+        row.isSelected = (position == selectedPosition)
+        val isCut = !item.isDrive && !item.isParentLink && isFileCut != null && isFileCut.invoke(item.file)
+        row.alpha = if (isCut || isFileDimmed?.invoke(item) == true) 0.6f else 1.0f
+        return row
+    }
+
+    private companion object {
+        /** Marks a recycled view as a 3.1 row rather than a DesktopIconView. */
+        val WIN31_ROW = Any()
+
+        val WIN31_PROGRAM_EXTENSIONS = setOf("exe", "com", "bat", "pif", "apk")
+
+        /** Files 3.1 would have had an association for, beyond pictures, sound and video */
+        val WIN31_DOCUMENT_EXTENSIONS = setOf(
+            "txt", "ini", "log", "wri", "doc", "hlp", "rtf", "csv", "htm", "html", "md", "crd", "cal",
+        )
     }
 }

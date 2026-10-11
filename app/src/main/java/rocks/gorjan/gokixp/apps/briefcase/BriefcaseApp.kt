@@ -81,6 +81,11 @@ class BriefcaseApp(
         folderIconLarge = contentView.findViewById(R.id.folder_icon_large)
         statusText = contentView.findViewById(R.id.explorer_number_of_items)
 
+        // Windows 3.1 lists files by name, a column of them wide rather than an icon
+        if (theme is AppTheme.Windows31) {
+            folderIconsGrid?.columnWidth = (130 * context.resources.displayMetrics.density).toInt()
+        }
+
         // The Briefcase is flat - there is nowhere to go back, forward or up to.
         listOf(R.id.back_button, R.id.forward_button, R.id.up_button).forEach { id ->
             contentView.findViewById<View>(id)?.setOnClickListener { onSoundPlay() }

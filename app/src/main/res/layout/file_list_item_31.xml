@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One entry in a Windows 3.1 File Manager directory window: the small WinFile bitmap and
+     the name, which turns to the highlight while the entry is selected. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="18dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="2dp"
+    android:paddingEnd="2dp">
+
+    <ImageView
+        android:id="@+id/fm_icon"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:duplicateParentState="true"
+        android:scaleType="fitXY" />
+
+    <TextView
+        android:id="@+id/fm_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="3dp"
+        android:background="@drawable/win31_icon_title_window"
+        android:duplicateParentState="true"
+        android:ellipsize="end"
+        android:fontFamily="@font/micross_block"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp"
+        android:textColor="@color/win31_icon_title_text"
+        android:textSize="11sp" />
+</LinearLayout>

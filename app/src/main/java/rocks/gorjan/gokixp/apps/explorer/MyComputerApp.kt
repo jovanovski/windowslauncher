@@ -39,10 +39,15 @@ class MyComputerApp(
         private const val TAG = "MyComputerApp"
         private const val MY_COMPUTER_ROOT = "MY_COMPUTER_ROOT"  // Virtual root path
         private const val WINDOWS_FOLDER_NAME = "WINDOWS"  // Virtual Windows folder
+        private const val WIN31_TITLE = "File Manager"
     }
 
     // Track if we're in the virtual WINDOWS folder
     private var isInWindowsFolder = false
+
+    // Windows 3.1 is File Manager: no My Computer above the drives, a ".." entry to go up,
+    // the path in the directory window's caption and a drive bar to change drives with.
+    private val isWin31 = theme is AppTheme.Windows31
 
     // Cache system apps list and icons to avoid repeated expensive calls
     private var cachedSystemApps: List<Pair<String?, String>>? = null
@@ -179,8 +184,10 @@ class MyComputerApp(
             }
         }
 
-        // Load initial view (My Computer root with drives)
-        navigateToDirectory(null, addToHistory = true)
+        if (isWin31) setupWin31FileManager(contentView)
+
+        // Load initial view (My Computer root with drives; File Manager opens on C:)
+        navigateToDirectory(if (isWin31) Environment.getExternalStorageDirectory() else null, addToHistory = true)
         onSoundPlay("click")
         return contentView
     }
@@ -277,6 +284,9 @@ class MyComputerApp(
             return
         }
 
+        // File Manager has nothing above a drive's root
+        if (isWin31 && currentPath == rootDirectory) return
+
         // If at internal storage root, go to My Computer root
         if (currentPath == rootDirectory) {
             Log.d(TAG, "Navigating up to My Computer root")
@@ -289,7 +299,7 @@ class MyComputerApp(
             // Don't allow going above internal storage root
             if (parent.absolutePath.length < rootDirectory.absolutePath.length) {
                 Log.d(TAG, "Cannot navigate above internal storage root, going to My Computer root")
-                navigateToDirectory(null, addToHistory = true)
+                navigateToDirectory(if (isWin31) rootDirectory else null, addToHistory = true)
                 return
             }
             navigateToDirectory(parent, addToHistory = true)
@@ -314,6 +324,14 @@ class MyComputerApp(
             currentPath == null -> computerName
             isInWindowsFolder -> "C:\\$WINDOWS_FOLDER_NAME"
             else -> getWindowsStylePath(currentPath!!)
+        }
+
+        if (isWin31) {
+            // The directory window's caption is its path and the files it shows; the window
+            // around it is File Manager
+            folderNameSmall?.text = pathDisplayName.removeSuffix("\\") + "\\*.*"
+            onUpdateWindowTitle(WIN31_TITLE)
+            return
         }
 
         // Update small folder name with full path (in address bar)
@@ -399,13 +417,19 @@ class MyComputerApp(
                     }
                 }
 
+                // A File Manager directory window starts with ".." everywhere but a drive's root
+                val rootDirectory = Environment.getExternalStorageDirectory()
+                val listed = if (isWin31 && currentPath != null && (isInWindowsFolder || currentPath != rootDirectory)) {
+                    listOf(FileSystemItem.createParentLink(currentPath!!)) + items
+                } else items
+
                 // Update UI on main thread
                 (context as? android.app.Activity)?.runOnUiThread {
                     try {
                         // Create adapter and set to GridView
                         val adapter = FileSystemAdapter(
                             context = context,
-                            items = items,
+                            items = listed,
                             theme = theme,
                             themeManager = themeManager,
                             onItemClick = { item, view ->
@@ -427,7 +451,9 @@ class MyComputerApp(
                         folderIconsGrid?.adapter = adapter
 
                         // Update item count
-                        explorerNumberOfItems?.text = "${items.size} items"
+                        explorerNumberOfItems?.text = if (isWin31) {
+                            String.format("Total %,d file(s) (%,d bytes)", items.size, items.sumOf { it.size })
+                        } else "${items.size} items"
 
                         // Restore cursor to normal after UI updates
                         onSetCursorNormal()
@@ -464,7 +490,9 @@ class MyComputerApp(
         // Clear selection on any click
         currentAdapter?.clearSelection()
 
-        if (item.isDrive) {
+        if (item.isParentLink) {
+            navigateUp()
+        } else if (item.isDrive) {
             // Handle drive clicks
             when (item.driveType) {
                 DriveType.LOCAL_DISK -> {
@@ -1072,6 +1100,92 @@ class MyComputerApp(
             .map { (exeName, packageName) ->
                 FileSystemItem.createShortcut("$exeName", packageName, dummyFile)
             }
+    }
+
+    /**
+     * The parts of the Windows 3.1 File Manager around the directory list: the drive bar,
+     * and the menu bar with the few commands that do something here.
+     */
+    private fun setupWin31FileManager(contentView: View) {
+        folderIconsGrid?.columnWidth = (130 * context.resources.displayMetrics.density).toInt()
+
+        val driveC = contentView.findViewById<View>(R.id.win31_fm_drive_c)
+        driveC?.isSelected = true
+        contentView.findViewById<View>(R.id.win31_fm_drive_a)?.setOnClickListener {
+            onSoundPlay("click")
+            playDriveSound(R.raw.floppy_read, rocks.gorjan.gokixp.apps.dialogbox.DialogType.ERROR, "A:/ is not accessible", timeout = 3000)
+        }
+        driveC?.setOnClickListener {
+            onSoundPlay("click")
+            isInWindowsFolder = false
+            navigateToDirectory(Environment.getExternalStorageDirectory(), addToHistory = true)
+        }
+        contentView.findViewById<View>(R.id.win31_fm_drive_d)?.setOnClickListener {
+            onSoundPlay("click")
+            playDriveSound(R.raw.cd_spin, rocks.gorjan.gokixp.apps.dialogbox.DialogType.WARNING, "Please insert a disk into drive D:", timeout = 3000)
+        }
+
+        val tracker = rocks.gorjan.gokixp.winui.WinMenuTracker(rocks.gorjan.gokixp.winui.WinUi(context, theme))
+        fun off(title: String, shortcut: String? = null, checked: Boolean? = null) = rocks.gorjan.gokixp.ContextMenuItem(
+            title, isEnabled = false, shortcut = shortcut, hasCheckbox = checked != null, isChecked = checked == true,
+        )
+        val separator = rocks.gorjan.gokixp.ContextMenuItem.separator()
+        fun bar(id: Int, items: () -> List<rocks.gorjan.gokixp.ContextMenuItem>) {
+            val word = contentView.findViewById<TextView>(id) ?: return
+            word.setOnClickListener {
+                onSoundPlay("click")
+                tracker.toggle(word, items())
+            }
+        }
+        bar(R.id.win31_fm_menu_file) {
+            val canCreate = currentPath != null && !isInWindowsFolder
+            listOf(
+                off("&Open", "Enter"), off("&Move...", "F7"), off("&Copy...", "F8"), off("&Delete...", "Del"),
+                off("Re&name..."), off("Proper&ties...", "Alt+Enter"), separator,
+                off("&Run..."), off("&Print..."), off("&Associate..."), separator,
+                rocks.gorjan.gokixp.ContextMenuItem("Cr&eate Directory...", isEnabled = canCreate, action = { showNewFolderDialog() }),
+                off("Searc&h..."), off("&Select Files..."), separator,
+                rocks.gorjan.gokixp.ContextMenuItem("E&xit", action = { closeWin31Window(contentView) }),
+            )
+        }
+        bar(R.id.win31_fm_menu_disk) {
+            listOf(off("&Copy Disk..."), off("&Label Disk..."), off("&Format Disk..."), off("Make S&ystem Disk..."),
+                separator, off("Select &Drive..."))
+        }
+        bar(R.id.win31_fm_menu_tree) {
+            listOf(off("E&xpand One Level", "+"), off("Expand &Branch", "*"), off("Expand &All", "Ctrl+*"),
+                off("&Collapse Branch", "-"), separator, off("&Indicate Expandable Branches", checked = false))
+        }
+        bar(R.id.win31_fm_menu_view) {
+            listOf(off("T&ree and Directory", checked = false), off("Tr&ee Only", checked = false),
+                off("Directory &Only", checked = true), separator, off("Sp&lit"), separator,
+                off("&Name", checked = true), off("&All File Details", checked = false),
+                off("&Partial Details...", checked = false), separator,
+                off("&Sort by Name", checked = true), off("Sort &by Type", checked = false),
+                off("Sort by Si&ze", checked = false), off("Sort by &Date", checked = false), separator,
+                off("By File &Type..."))
+        }
+        bar(R.id.win31_fm_menu_options) {
+            listOf(off("&Confirmation..."), off("&Font..."), separator, off("&Status Bar", checked = true),
+                off("&Minimize on Use", checked = false), off("Save Settings on &Exit", checked = true))
+        }
+        bar(R.id.win31_fm_menu_window) {
+            listOf(off("&New Window"), off("&Cascade", "Shift+F5"), off("&Tile", "Shift+F4"), off("&Arrange Icons"),
+                rocks.gorjan.gokixp.ContextMenuItem("&Refresh", shortcut = "F5", action = { loadDirectoryContents() }),
+                separator,
+                rocks.gorjan.gokixp.ContextMenuItem("&1 " + (folderNameSmall?.text ?: ""), hasCheckbox = true, isChecked = true, action = {}))
+        }
+        bar(R.id.win31_fm_menu_help) {
+            listOf(off("&Contents"), off("&Search for Help on..."), off("&How to Use Help"), separator,
+                off("&About File Manager..."))
+        }
+    }
+
+    /** File > Exit: closes the window File Manager is in. */
+    private fun closeWin31Window(contentView: View) {
+        var parent = contentView.parent
+        while (parent != null && parent !is rocks.gorjan.gokixp.WindowsDialog) parent = parent.parent
+        (parent as? rocks.gorjan.gokixp.WindowsDialog)?.closeWindow()
     }
 
     /**

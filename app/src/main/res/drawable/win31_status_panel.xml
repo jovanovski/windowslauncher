@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A File Manager status bar panel: sunk into the gray bar, shadow above and left. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle"><solid android:color="#FFFFFF" /></shape>
+    </item>
+    <item android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle"><solid android:color="#808080" /></shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle"><solid android:color="#C0C0C0" /></shape>
+    </item>
+</layer-list>
