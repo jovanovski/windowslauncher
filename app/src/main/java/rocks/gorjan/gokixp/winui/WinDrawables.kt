@@ -230,3 +230,42 @@ class FocusRectDrawable(private val density: Float) : Drawable() {
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 }
+
+/**
+ * A Windows 3.1 surface - a push button, or the one black line round a field - drawn by the
+ * same [rocks.gorjan.gokixp.winui.dialog.Win31Skin] the Display Properties sheet is, at one
+ * Windows pixel to the dp.
+ */
+class Win31Drawable(
+    private val density: Float,
+    private val kind: Kind,
+    private val fill: Int = WinPalette.WIN31.window,
+) : Drawable() {
+
+    enum class Kind { BUTTON, BUTTON_PRESSED, FIELD }
+
+    override fun draw(canvas: Canvas) {
+        val b = bounds
+        val w = b.width().toFloat()
+        val h = b.height().toFloat()
+        if (w <= 0f || h <= 0f) return
+        val skin = rocks.gorjan.gokixp.winui.dialog.Win31Skin
+        canvas.save()
+        canvas.translate(b.left.toFloat(), b.top.toFloat())
+        val e = rocks.gorjan.gokixp.winui.dialog.WinEdges(canvas, density)
+        when (kind) {
+            Kind.BUTTON -> skin.button(e, w, h, rocks.gorjan.gokixp.winui.dialog.WinState.NORMAL)
+            Kind.BUTTON_PRESSED -> skin.button(e, w, h, rocks.gorjan.gokixp.winui.dialog.WinState.PRESSED)
+            Kind.FIELD -> {
+                e.fill(0f, 0f, w, h, fill)
+                e.outline(0f, 0f, w, h, WinPalette.WIN31.dkShadow)
+            }
+        }
+        canvas.restore()
+    }
+
+    override fun setAlpha(alpha: Int) = Unit
+    override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+    @Deprecated("Deprecated in Drawable")
+    override fun getOpacity() = PixelFormat.TRANSLUCENT
+}

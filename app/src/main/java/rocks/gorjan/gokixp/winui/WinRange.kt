@@ -29,6 +29,20 @@ private class GrooveDrawable(private val ui: WinUi) : Drawable() {
     override fun draw(canvas: Canvas) {
         val b = bounds
         val h = hair(ui.density)
+        if (ui.isWin31) {
+            // 3.1 had no trackbar; its Control Panel set a number with a scroll bar, so the
+            // groove is a scroll bar's grey shaft in a black line
+            val top = b.exactCenterY() - ui.dp(17) / 2f
+            val bottom = top + ui.dp(17)
+            paint.color = ui.pal.face
+            canvas.drawRect(b.left.toFloat(), top, b.right.toFloat(), bottom, paint)
+            paint.color = ui.pal.dkShadow
+            canvas.drawRect(b.left.toFloat(), top, b.right.toFloat(), top + h, paint)
+            canvas.drawRect(b.left.toFloat(), bottom - h, b.right.toFloat(), bottom, paint)
+            canvas.drawRect(b.left.toFloat(), top, b.left + h, bottom, paint)
+            canvas.drawRect(b.right - h, top, b.right.toFloat(), bottom, paint)
+            return
+        }
         val thickness = ui.dp(4)
         val top = b.exactCenterY() - thickness / 2f
         val bottom = top + thickness
@@ -70,6 +84,11 @@ private class ThumbDrawable(private val ui: WinUi) : Drawable() {
     override fun draw(canvas: Canvas) {
         val b = bounds
         val h = hair(ui.density)
+        if (ui.isWin31) {
+            // The scroll box: a raised square in a black line
+            Win31Drawable(ui.density, Win31Drawable.Kind.BUTTON).apply { bounds = b }.draw(canvas)
+            return
+        }
         if (ui.isClassic) {
             paint.color = ui.pal.face
             canvas.drawRect(b, paint)
@@ -102,8 +121,8 @@ private class ThumbDrawable(private val ui: WinUi) : Drawable() {
     override fun setColorFilter(colorFilter: ColorFilter?) = Unit
     @Deprecated("Deprecated in Drawable")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
-    override fun getIntrinsicWidth() = ui.dp(11)
-    override fun getIntrinsicHeight() = ui.dp(21)
+    override fun getIntrinsicWidth() = ui.dp(if (ui.isWin31) 17 else 11)
+    override fun getIntrinsicHeight() = ui.dp(if (ui.isWin31) 17 else 21)
 }
 
 /**
@@ -155,6 +174,17 @@ private class WinProgressDrawable(private val ui: WinUi) : Drawable() {
         val b = bounds
         val h = hair(ui.density)
         val fraction = level / 10000f
+
+        if (ui.isWin31) {
+            // 3.1 Setup's gauge: a white box in a black line, filling solid with the highlight
+            Win31Drawable(ui.density, Win31Drawable.Kind.FIELD).apply { bounds = b }.draw(canvas)
+            if (fraction > 0f) {
+                paint.style = Paint.Style.FILL
+                paint.color = ui.pal.select
+                canvas.drawRect(b.left + h, b.top + h, b.left + h + (b.width() - 2 * h) * fraction, b.bottom - h, paint)
+            }
+            return
+        }
 
         // The trough.
         paint.style = Paint.Style.FILL
@@ -226,3 +256,11 @@ fun WinUi.progressBar(max: Int = 100, progress: Int = 0): ProgressBar =
         progressDrawable = WinProgressDrawable(this@progressBar)
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(18))
     }
+
+/** Gives a [SeekBar] that already exists in a layout file this shell's groove and thumb. */
+fun WinUi.dressTrackBar(bar: SeekBar) {
+    bar.progressDrawable = GrooveDrawable(this)
+    bar.thumb = ThumbDrawable(this)
+    bar.splitTrack = false
+    bar.thumbOffset = 0
+}

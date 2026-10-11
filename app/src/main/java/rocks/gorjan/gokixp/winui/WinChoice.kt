@@ -129,22 +129,32 @@ private class WinTickDrawable(
     override fun getIntrinsicHeight() = ui.dp(13)
 }
 
-private fun WinUi.tickStates(radio: Boolean): StateListDrawable = StateListDrawable().apply {
+private fun WinUi.tickStates(radio: Boolean): Drawable {
+    // 3.1's glyphs are USER's own bitmaps: a box with an X, a ring with a dot
+    if (isWin31) {
+        androidx.core.content.ContextCompat.getDrawable(
+            context, if (radio) rocks.gorjan.gokixp.R.drawable.win31_radio else rocks.gorjan.gokixp.R.drawable.win31_check,
+        )?.let { return it }
+    }
+    return tickStateList(radio)
+}
+
+private fun WinUi.tickStateList(radio: Boolean): StateListDrawable = StateListDrawable().apply {
     addState(
         intArrayOf(-android.R.attr.state_enabled, android.R.attr.state_checked),
-        WinTickDrawable(this@tickStates, radio, checked = true, enabled = false),
+        WinTickDrawable(this@tickStateList, radio, checked = true, enabled = false),
     )
     addState(
         intArrayOf(-android.R.attr.state_enabled),
-        WinTickDrawable(this@tickStates, radio, checked = false, enabled = false),
+        WinTickDrawable(this@tickStateList, radio, checked = false, enabled = false),
     )
     addState(
         intArrayOf(android.R.attr.state_checked),
-        WinTickDrawable(this@tickStates, radio, checked = true, enabled = true),
+        WinTickDrawable(this@tickStateList, radio, checked = true, enabled = true),
     )
     addState(
         intArrayOf(),
-        WinTickDrawable(this@tickStates, radio, checked = false, enabled = true),
+        WinTickDrawable(this@tickStateList, radio, checked = false, enabled = true),
     )
 }
 

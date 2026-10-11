@@ -38,7 +38,7 @@ class WinWindow(
     /** Where the window's contents go. */
     val body = LinearLayout(context).apply {
         orientation = VERTICAL
-        setBackgroundColor(ui.pal.face)
+        setBackgroundColor(if (ui.isWin31) ui.pal.window else ui.pal.face)
     }
 
     private val caption = TextView(context)
@@ -46,7 +46,7 @@ class WinWindow(
     init {
         orientation = VERTICAL
         background = frameBackground()
-        val edge = ui.dp(if (ui.isClassic) 3 else 1)
+        val edge = ui.dp(if (ui.isWin31) 5 else if (ui.isClassic) 3 else 1)
         setPadding(edge, edge, edge, edge)
 
         addView(titleBar(title, iconRes, onClose), LayoutParams(MATCH, WRAP))
@@ -66,6 +66,9 @@ class WinWindow(
      * window manager and there is none of that here.
      */
     private fun frameBackground() = when {
+        // 3.1's sizing frame: black, grey, black, with the corner ticks
+        ui.isWin31 -> androidx.core.content.ContextCompat.getDrawable(context, rocks.gorjan.gokixp.R.drawable.win31_window_frame)
+            ?: BevelDrawable(ui.pal, ui.density, BevelDrawable.Style.RAISED)
         ui.isClassic -> BevelDrawable(ui.pal, ui.density, BevelDrawable.Style.RAISED)
         ui.isXp -> GradientPanelDrawable(
             XP_FRAME, XP_FRAME, XP_FRAME, ui.density, 0f
@@ -97,7 +100,11 @@ class WinWindow(
                 typeface = ui.font(bold = true)
                 isSingleLine = true
                 ellipsize = android.text.TextUtils.TruncateAt.END
-                if (!ui.isAero) setShadowLayer(1f, 1f, 1f, 0x66000000)
+                if (ui.isWin31) {
+                    // Centred, in the System font, with no shadow
+                    ui.applyMenuFont(this)
+                    gravity = Gravity.CENTER
+                } else if (!ui.isAero) setShadowLayer(1f, 1f, 1f, 0x66000000)
             }
             addView(caption, LayoutParams(0, WRAP, 1f))
 
@@ -107,6 +114,8 @@ class WinWindow(
         }
 
     private fun captionBackground() = when {
+        ui.isWin31 -> androidx.core.content.ContextCompat.getDrawable(context, rocks.gorjan.gokixp.R.drawable.win31_caption_active)
+            ?: GradientPanelDrawable(0xFF000080.toInt(), 0xFF000080.toInt(), Color.TRANSPARENT, ui.density, 0f)
         ui.isClassic -> GradientPanelDrawable(
             0xFF000080.toInt(), 0xFF1084D0.toInt(), Color.TRANSPARENT, ui.density, 0f
         )
@@ -134,6 +143,7 @@ class WinWindow(
         setTextSize(TypedValue.COMPLEX_UNIT_SP, ui.smallSp)
         typeface = ui.font(bold = true)
         background = when {
+            ui.isWin31 -> ui.buttonBackground()
             ui.isClassic -> BevelDrawable(ui.pal, ui.density, BevelDrawable.Style.RAISED)
             else -> GradientPanelDrawable(
                 0xFFE04343.toInt(), 0xFFB81C1C.toInt(), 0xFF8E1616.toInt(),

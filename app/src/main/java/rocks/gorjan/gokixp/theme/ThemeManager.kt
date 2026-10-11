@@ -594,7 +594,7 @@ class ThemeManager(private val context: Context) {
         val (trackRes, thumbRes) = when (theme) {
             AppTheme.WindowsXP -> R.drawable.scrollbar_track_xp to R.drawable.scrollbar_thumb_xp
             AppTheme.WindowsClassic -> R.drawable.scrollbar_track_98 to R.drawable.win98_start_menu_border
-            AppTheme.Windows31 -> R.drawable.scrollbar_track_98 to R.drawable.win98_start_menu_border
+            AppTheme.Windows31 -> R.drawable.win31_scrollbar_track to R.drawable.win31_scrollbar_thumb
             AppTheme.WindowsVista -> R.drawable.scrollbar_track_vista to R.drawable.scrollbar_thumb_vista
             AppTheme.Windows7 -> R.drawable.scrollbar_track_vista to R.drawable.scrollbar_thumb_vista
         }
