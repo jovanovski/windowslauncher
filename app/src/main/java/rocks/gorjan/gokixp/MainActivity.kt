@@ -12906,19 +12906,26 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
-     * An icon in Move mode was dragged to ([rawX] on screen). Held near the left or right edge
-     * it carries over to the desktop that way, one desktop at a time, past the last one into a
-     * new one as long as it isn't leaving an empty one behind.
+     * An icon in Move mode was dragged to ([rawX] on screen). Held at the left or right edge
+     * it carries over to the desktop that way, one desktop at a time and back again as often
+     * as wanted, past the last one into a new one as long as it isn't leaving an empty one
+     * behind.
+     *
+     * "At the edge" is the finger near it, or the icon itself pushed part way off the screen:
+     * the finger is usually in the middle of an icon that is wider than any edge zone, so on
+     * its own it would have to go further than the icon visibly can.
      */
     fun onDesktopIconDragged(iconView: DesktopIconView, rawX: Float) {
         val width = desktopContainer.width
         if (width == 0) return
         val location = IntArray(2)
         desktopContainer.getLocationOnScreen(location)
-        val edge = 32 * resources.displayMetrics.density
+        val edge = 40 * resources.displayMetrics.density
+        // A first or last column icon already pokes a little past the edge; a quarter is a push
+        val overhang = iconView.width * 0.25f
         val direction = when {
-            rawX < location[0] + edge -> -1
-            rawX > location[0] + width - edge -> 1
+            rawX < location[0] + edge || iconView.x < -overhang -> -1
+            rawX > location[0] + width - edge || iconView.x + iconView.width > width + overhang -> 1
             else -> 0
         }
         if (direction == edgeFlipDirection) return
