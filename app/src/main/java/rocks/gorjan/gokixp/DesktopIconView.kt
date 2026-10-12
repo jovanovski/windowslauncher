@@ -70,6 +70,25 @@ open class DesktopIconView : LinearLayout, ThemeAware {
         shortcutIcon = findViewById(R.id.shortcut_icon)
     }
 
+    /**
+     * How far this icon is drawn from where it sits on its own desktop page: 0 on the page
+     * being shown, a screen width per page away otherwise, and in between while pages slide.
+     *
+     * [getX]/[setX] stay in page coordinates, so the grid, dragging and saving never see it.
+     */
+    var pageShift = 0f
+        set(value) {
+            val pageX = x
+            field = value
+            x = pageX
+        }
+
+    override fun getX(): Float = super.getX() - pageShift
+
+    override fun setX(x: Float) {
+        super.setX(x + pageShift)
+    }
+
     init {
         
         // Set click listener for launching apps
@@ -431,6 +450,9 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                     x = initialX + deltaX
                     y = initialY + deltaY
 
+                    // Held at a screen edge, the icon carries over to the next desktop
+                    if (isOnDesktop) (context as? MainActivity)?.onDesktopIconDragged(this, event.rawX)
+
                     // Update the desktop icon position
                     desktopIcon?.let { icon ->
                         icon.x = x
@@ -491,6 +513,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                     isDragging = false
 
                     val mainActivity = context as? MainActivity
+                    mainActivity?.onDesktopIconDragEnded()
 
                     // Check if dropped on folder first (only for regular icons, not folders or recycle bin)
                     if (this !is RecycleBinView && this !is FolderView && canGoInFolder()) {
@@ -544,6 +567,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                     val isSwipeDown = deltaY > 0 && Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 80
                     val isSwipeUp = deltaY < 0 && Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 80
                     val isSwipeRight = deltaX > 0 && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 80
+                    val isSwipeLeft = deltaX < 0 && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 80
                     
                     when {
                         isSwipeDown -> {
@@ -559,8 +583,14 @@ open class DesktopIconView : LinearLayout, ThemeAware {
                             mainActivity?.showStartMenuWithSearch()
                         }
                         isSwipeRight -> {
-                            // Swipe right - launch swipe right app (configured in settings)
-                            mainActivity?.launchSwipeRightApp()
+                            // Swipe right - the desktop before this one, or from the first
+                            // the swipe right app (configured in settings)
+                            if (isOnDesktop) mainActivity?.onDesktopSwipe(rightward = true)
+                            else mainActivity?.launchSwipeRightApp()
+                        }
+                        isSwipeLeft -> {
+                            // Swipe left - the next desktop
+                            if (isOnDesktop) mainActivity?.onDesktopSwipe(rightward = false)
                         }
                     }
                     
@@ -583,6 +613,7 @@ open class DesktopIconView : LinearLayout, ThemeAware {
 
             MotionEvent.ACTION_CANCEL -> {
                 // System cancelled the touch (e.g., gesture navigation took over)
+                if (isDragging) (context as? MainActivity)?.onDesktopIconDragEnded()
                 // Cancel any pending long press
                 longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
                 isLongPressed = false

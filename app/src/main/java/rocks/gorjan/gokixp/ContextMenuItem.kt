@@ -50,7 +50,9 @@ object ContextMenuItems {
         onChangeWallpaper: () -> Unit,
         onOpenInternetExplorer: () -> Unit,
         onNewFolder: () -> Unit,
-        onAddWidget: () -> Unit
+        onAddWidget: () -> Unit,
+        onNewDesktop: () -> Unit,
+        onRemoveDesktop: (() -> Unit)?  // null when there is only the one desktop
     ): List<ContextMenuItem> {
         return listOf(
             ContextMenuItem("Arrange Icons By", isEnabled = false, hasSubmenu = true),
@@ -61,6 +63,9 @@ object ContextMenuItems {
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("New Folder", isEnabled = true, action = onNewFolder),
             ContextMenuItem("Add Widget...", isEnabled = true, action = onAddWidget),
+            ContextMenuItem("", isEnabled = false), // Divider
+            ContextMenuItem("New Desktop", isEnabled = true, action = onNewDesktop),
+            ContextMenuItem("Remove Desktop", isEnabled = onRemoveDesktop != null, action = onRemoveDesktop),
             ContextMenuItem("", isEnabled = false), // Divider
             ContextMenuItem("Properties", isEnabled = true, action = onChangeWallpaper)
         )
