@@ -28,6 +28,8 @@ data class SavedDesktopWidget(
     val y: Float,
     val width: Int,
     val height: Int,
+    /** Which desktop it is on. Missing from widgets saved before there were several: 0. */
+    val page: Int = 0,
 )
 
 /**
@@ -47,6 +49,9 @@ class DesktopWidgetManager(
 ) {
     /** A widget was long-pressed; screen coordinates, for the context menu. */
     var onWidgetLongPress: ((DesktopWidgetView, Float, Float) -> Unit)? = null
+
+    /** The desktop being shown, which is where a new widget goes. */
+    var currentPage: () -> Int = { 0 }
 
     private val appWidgetManager = AppWidgetManager.getInstance(activity)
     private val host = AppWidgetHost(activity.applicationContext, HOST_ID)
@@ -128,7 +133,7 @@ class DesktopWidgetManager(
                 host.deleteAppWidgetId(entry.appWidgetId)
                 continue
             }
-            addWidgetView(entry.appWidgetId, info, entry.x, entry.y, entry.width, entry.height)
+            addWidgetView(entry.appWidgetId, info, entry.x, entry.y, entry.width, entry.height, entry.page)
             kept.add(entry)
         }
         if (kept.size != saved.size) save(kept)
@@ -271,7 +276,7 @@ class DesktopWidgetManager(
         val x = (add.centerX - width / 2f).coerceIn(0f, (maxW - width).toFloat().coerceAtLeast(0f))
         val y = (add.centerY - height / 2f).coerceIn(0f, (maxH - height).toFloat().coerceAtLeast(0f))
 
-        val view = addWidgetView(add.appWidgetId, info, x, y, width, height)
+        val view = addWidgetView(add.appWidgetId, info, x, y, width, height, currentPage())
         saveAll()
         // Straight into Move / Resize: it was dropped where the menu was opened, which is
         // rarely exactly where it should live
@@ -293,6 +298,7 @@ class DesktopWidgetManager(
         y: Float,
         width: Int,
         height: Int,
+        page: Int,
     ): DesktopWidgetView {
         // Created with the activity, not the application, so the widget inflates with a real theme
         val hostView = host.createView(widgetContext, appWidgetId, info)
@@ -300,6 +306,7 @@ class DesktopWidgetManager(
             onLongPress = { v, sx, sy -> onWidgetLongPress?.invoke(v, sx, sy) }
             onGeometryChanged = { saveAll() }
             contentScale = widgetScale
+            this.page = page
         }
         // Above the icons, level with Quick Glance, below windows and menus
         view.elevation = 5f * density
@@ -323,6 +330,19 @@ class DesktopWidgetManager(
     }
 
     fun isEditing(): Boolean = widgetViews.any { it.isEditMode }
+
+    // ---- Desktops ----------------------------------------------------------------------
+
+    fun hasWidgetsOn(page: Int): Boolean = widgetViews.any { it.page == page }
+
+    /** The furthest desktop any widget is on, or -1 with none. */
+    fun lastUsedPage(): Int = widgetViews.maxOfOrNull { it.page } ?: -1
+
+    /** [page] was taken away: everything after it moves one desktop back. */
+    fun desktopRemoved(page: Int) {
+        widgetViews.forEach { if (it.page > page) it.page-- }
+        saveAll()
+    }
 
     fun removeWidget(view: DesktopWidgetView) {
         container.removeView(view)
@@ -380,7 +400,7 @@ class DesktopWidgetManager(
 
     private fun saveAll() {
         save(widgetViews.map {
-            SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight)
+            SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight, it.page)
         })
     }
 

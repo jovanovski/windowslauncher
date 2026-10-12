@@ -22,5 +22,9 @@ data class DesktopIcon(
     var parentFolderId: String? = null,  // ID of parent folder, null if on desktop
     var portraitGridIndex: Int? = null,   // Grid index for portrait orientation (0, 1, 2, 3...)
     var landscapeGridIndex: Int? = null,   // Grid index for landscape orientation (0, 1, 2, 3...)
-    var targetUrl: String? = null   // For URL_SHORTCUT icons: the web address to open on tap
+    var targetUrl: String? = null,   // For URL_SHORTCUT icons: the web address to open on tap
+    // Which desktop (home screen) it sits on, per orientation like the grid index: they only
+    // differ when a desktop that is full in one orientation has no room for it in the other
+    var portraitPage: Int = 0,
+    var landscapePage: Int = 0
 )

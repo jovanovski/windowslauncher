@@ -46,6 +46,26 @@ class DesktopWidgetView(
     var isEditMode = false
         private set
 
+    /** Which desktop (home screen) the widget sits on. */
+    var page = 0
+
+    /**
+     * How far the widget is drawn from where it sits on its own desktop page; see
+     * DesktopIconView.pageShift. [getX]/[setX] stay in page coordinates.
+     */
+    var pageShift = 0f
+        set(value) {
+            val pageX = x
+            field = value
+            x = pageX
+        }
+
+    override fun getX(): Float = super.getX() - pageShift
+
+    override fun setX(x: Float) {
+        super.setX(x + pageShift)
+    }
+
     /**
      * Where the user put the widget and how big they made it - what gets saved. What's on
      * screen can be smaller or shifted to fit a desktop that shrank (a rotation), and goes

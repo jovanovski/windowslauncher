@@ -168,6 +168,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var contextMenu: ContextMenuView
     private lateinit var gestureDetector: GestureDetectorCompat
     private lateinit var desktopContainer: RelativeLayout
+
+    // Desktops (home screens) side by side; see setupDesktopPages
+    private var desktopPageCount = 1
+    private var currentDesktopPage = 0
+    /** The page the desktop is scrolled to; fractional while pages slide. */
+    private var desktopPagePosition = 0f
+    private var desktopPageAnimator: android.animation.ValueAnimator? = null
+    private var desktopPageIndicator: LinearLayout? = null
+    /** The icon being carried to another desktop by holding it at a screen edge. */
+    private var iconCarriedAcrossPages: DesktopIconView? = null
+    private var edgeFlipRunnable: Runnable? = null
+    private var edgeFlipDirection = 0
     private lateinit var recycleBin: RecycleBinView
     private var myComputer: rocks.gorjan.gokixp.apps.explorer.MyComputerView? = null
     private var briefcaseIcon: rocks.gorjan.gokixp.apps.briefcase.BriefcaseView? = null
@@ -634,6 +646,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     companion object {
         const val PREFS_NAME = "taskbar_widget_prefs"  // Public constant for shared preferences name
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
+        private const val KEY_DESKTOP_PAGE_COUNT = "desktop_page_count"
+        private const val KEY_DESKTOP_CURRENT_PAGE = "desktop_current_page"
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_HIDDEN_APPS = "hidden_apps"
 
@@ -1181,6 +1195,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Set up desktop container (separate container for icons with margin)
         desktopContainer = findViewById(R.id.desktop_icons_container)
+        setupDesktopPages()
 
         // Set up cursor effect
         setupCursorEffect()
@@ -3621,7 +3636,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 var occupied = false
                 for (i in 0 until desktopContainer.childCount) {
                     val child = desktopContainer.getChildAt(i)
-                    if (child is DesktopIconView) {
+                    if (child is DesktopIconView && (child.getDesktopIcon()?.page ?: 0) == currentDesktopPage) {
                         val childX = child.x.toInt()
                         val childY = child.y.toInt()
                         
@@ -4415,6 +4430,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     val isSwipeDown = deltaY > 0 && abs(deltaY) > abs(deltaX)
                     val isSwipeUp = deltaY < 0 && abs(deltaY) > abs(deltaX)
                     val isSwipeRight = deltaX > 0 && abs(deltaX) > abs(deltaY)
+                    val isSwipeLeft = deltaX < 0 && abs(deltaX) > abs(deltaY)
                     val isMinimumDistanceY = abs(deltaY) > 80 // At least 80px movement for vertical
                     val isMinimumDistanceX = abs(deltaX) > 80 // At least 80px movement for horizontal
                     val isMinimumVelocityY = abs(velocityY) > 300 // Minimum velocity for vertical
@@ -4439,8 +4455,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         showStartMenuWithSearch()
                         return true
                     } else if (isSwipeRight && isMinimumDistanceX && isMinimumVelocityX) {
-                        Log.d("MainActivity", "✅ Swipe right detected, launching swipe right app")
-                        launchSwipeRightApp()
+                        Log.d("MainActivity", "✅ Swipe right detected")
+                        onDesktopSwipe(rightward = true)
+                        return true
+                    } else if (isSwipeLeft && isMinimumDistanceX && isMinimumVelocityX) {
+                        Log.d("MainActivity", "✅ Swipe left detected")
+                        onDesktopSwipe(rightward = false)
                         return true
                     }
                 }
@@ -4677,6 +4697,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setupDesktopWidgets() {
         desktopWidgetManager = DesktopWidgetManager(this, desktopContainer)
+        desktopWidgetManager.currentPage = { currentDesktopPage }
         desktopWidgetManager.onWidgetLongPress = { view, screenX, screenY ->
             showDesktopWidgetContextMenu(view, screenX, screenY)
         }
@@ -4918,7 +4939,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 onChangeWallpaper = { createAndShowWallpaperDialog() },
                 onOpenInternetExplorer = { showInternetExplorerDialog() },
                 onNewFolder = { createNewFolder(x, y) },
-                onAddWidget = { showAddWidgetDialog(x, y) }
+                onAddWidget = { showAddWidgetDialog(x, y) },
+                onNewDesktop = { addDesktopPage() },
+                onRemoveDesktop = if (visibleDesktopPageCount() > 1) {
+                    { removeDesktopPage(currentDesktopPage) }
+                } else null
             )
             
             // Show the menu
@@ -5401,6 +5426,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     onMove = {
                         // Remove from current folder and put on desktop at first available grid position
                         icon.parentFolderId = null
+                        // Onto the desktop being shown, in its first free cell
+                        placeOnDesktopPage(icon, currentDesktopPage)
 
                         // Find first available grid slot and set position
                         val firstAvailablePosition = findFirstAvailableGridSlot()
@@ -5459,6 +5486,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                     onMoveToDesktop = {
                         // Remove from folder and place at first available grid position
                         icon.parentFolderId = null
+                        // Onto the desktop being shown, in its first free cell
+                        placeOnDesktopPage(icon, currentDesktopPage)
 
                         // Find first available grid slot and set position
                         val firstAvailablePosition = findFirstAvailableGridSlot()
@@ -6806,8 +6835,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         // Get all currently occupied positions
         val occupiedPositions = mutableSetOf<Pair<Int, Int>>()
         
-        // Add positions for all existing desktop icons (including recycle bin)
+        // Add positions for all existing desktop icons (including recycle bin) on this desktop
         desktopIconViews.forEach { iconView ->
+            if ((iconView.getDesktopIcon()?.page ?: 0) != currentDesktopPage) return@forEach
             val centerX = iconView.x + iconView.width / 2
             val centerY = iconView.y + iconView.height / 2
             val (cellWidth, cellHeight) = getGridDimensions()
@@ -6856,6 +6886,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Skip icons in folders
             if (icon.parentFolderId != null) return@forEach
 
+            // Only this desktop's icons take up its cells
+            if (icon.page != currentDesktopPage) return@forEach
+
             val view = desktopIconViews.find { it.getDesktopIcon() == icon }
             if (view != null && view.parent != null && view.isVisible) {
                 val gridIndex = when (currentOrientation) {
@@ -6896,7 +6929,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             id = folderId,
             type = IconType.FOLDER,
             portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
-            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null
+            landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null,
+            portraitPage = currentDesktopPage,
+            landscapePage = currentDesktopPage
         )
 
         desktopIcons.add(desktopIcon)
@@ -11119,7 +11154,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             type = iconType,
             portraitGridIndex = if (currentOrientation == ScreenOrientation.PORTRAIT) gridIndex else null,
             landscapeGridIndex = if (currentOrientation == ScreenOrientation.LANDSCAPE) gridIndex else null,
-            targetUrl = targetUrl
+            targetUrl = targetUrl,
+            portraitPage = currentDesktopPage,
+            landscapePage = currentDesktopPage
         )
 
         desktopIcons.add(desktopIcon)
@@ -11335,7 +11372,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "parentFolderId" to icon.parentFolderId,
                 "portraitGridIndex" to icon.portraitGridIndex,
                 "landscapeGridIndex" to icon.landscapeGridIndex,
-                "targetUrl" to icon.targetUrl
+                "targetUrl" to icon.targetUrl,
+                "portraitPage" to icon.portraitPage,
+                "landscapePage" to icon.landscapePage
             )
         }
 
@@ -11380,6 +11419,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 // Read grid indices (may be null for old data)
                 var portraitGridIndex = (iconData["portraitGridIndex"] as? Double)?.toInt()
                 var landscapeGridIndex = (iconData["landscapeGridIndex"] as? Double)?.toInt()
+                // Saved before there were several desktops: the first one
+                val portraitPage = ((iconData["portraitPage"] as? Double)?.toInt() ?: 0).coerceAtLeast(0)
+                val landscapePage = ((iconData["landscapePage"] as? Double)?.toInt() ?: 0).coerceAtLeast(0)
 
 
                 val iconType = if (typeStr != null) {
@@ -11466,7 +11508,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                         fallbackIconFor(iconType)
                     }
 
-                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex, targetUrl)
+                    val desktopIcon = DesktopIcon(name, packageName, icon, x, y, id, iconType, parentFolderId, portraitGridIndex, landscapeGridIndex, targetUrl, portraitPage, landscapePage)
                     desktopIcons.add(desktopIcon)
 
                     // Skip icons that are inside folders - they shouldn't be shown on desktop
@@ -11578,6 +11620,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
             // Reflow any icons without position in current orientation
             reflowIconsWithoutPosition()
+
+            // Enough desktops for everything on them, each drawn on its own
+            reconcileDesktopPages()
 
             // Save after migration and reflow
             saveDesktopIcons()
@@ -12112,6 +12157,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         if (!isRecycleBinVisible() || !::recycleBin.isInitialized || recycleBin.parent == null) {
             return false
         }
+        // Only reachable from the desktop it is on
+        if ((recycleBin.getDesktopIcon()?.page ?: 0) != currentDesktopPage) return false
 
         // Get recycle bin bounds
         val recycleBinX = recycleBin.x
@@ -12136,7 +12183,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     fun isOverFolder(x: Float, y: Float): FolderView? {
         // Check all desktop icon views to see if any folders are under the coordinates
         desktopIconViews.forEach { iconView ->
-            if (iconView is FolderView && iconView.parent != null && iconView.isVisible) {
+            if (iconView is FolderView && iconView.parent != null && iconView.isVisible &&
+                (iconView.getDesktopIcon()?.page ?: 0) == currentDesktopPage) {
                 val folderX = iconView.x
                 val folderY = iconView.y
                 val folderWidth = iconView.width
@@ -12536,20 +12584,28 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     /**
-     * Auto-assign grid indices to icons that don't have position in current orientation
+     * Auto-assign grid indices to icons that don't have position in current orientation, or
+     * whose cell is past the end of this orientation's grid - a desktop filled in portrait has
+     * more cells than the same desktop sideways. Each goes in the first free cell of its own
+     * desktop or, when that one is full in this orientation, of the first desktop after it
+     * with room. Only this orientation's page changes, so turning back finds the other as left.
      */
     private fun reflowIconsWithoutPosition() {
         val currentOrientation = getCurrentOrientation()
+        val capacity = calculateGridColumns(currentOrientation) * calculateGridRows(currentOrientation)
+        // Straight after a rotation the container can still have its old shape, and a grid
+        // measured on that would send icons to other desktops for good: only then is the end
+        // of the grid taken on trust.
+        val gridIsCurrent = desktopContainer.width > 0 && desktopContainer.height > 0 &&
+            (desktopContainer.width > desktopContainer.height) ==
+            (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
 
-        // Get icons that need reflow (no grid index for current orientation)
-        val iconsToReflow = desktopIcons.filter { icon ->
-            // Skip icons in folders
-            if (icon.parentFolderId != null) return@filter false
+        val onDesktop = desktopIcons.filter { it.parentFolderId == null }
 
-            when (currentOrientation) {
-                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex == null
-                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex == null
-            }
+        // Get icons that need reflow (no grid index for current orientation, or off its grid)
+        val iconsToReflow = onDesktop.filter { icon ->
+            val gridIndex = gridIndexOf(icon)
+            gridIndex == null || (gridIsCurrent && gridIndex >= capacity)
         }
 
         if (iconsToReflow.isEmpty()) {
@@ -12557,35 +12613,36 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             return
         }
 
-        // Build set of occupied grid indices
-        val occupiedIndices = desktopIcons.mapNotNull { icon ->
-            if (icon.parentFolderId != null) return@mapNotNull null
+        // Build set of occupied grid indices, per desktop
+        val occupiedIndices = mutableMapOf<Int, MutableSet<Int>>()
+        onDesktop.forEach { icon ->
+            if (iconsToReflow.any { it === icon }) return@forEach
+            val gridIndex = gridIndexOf(icon) ?: return@forEach
+            occupiedIndices.getOrPut(icon.page) { mutableSetOf() }.add(gridIndex)
+        }
 
-            when (currentOrientation) {
-                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
-                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
-            }
-        }.toMutableSet()
-
-        // Assign sequential available indices
-        var nextIndex = 0
         iconsToReflow.forEach { icon ->
-            // Find next available index
-            while (occupiedIndices.contains(nextIndex)) {
-                nextIndex++
+            // Find the first free index, on this icon's desktop or the next one with room
+            var page = icon.page
+            var nextIndex = 0
+            while (true) {
+                val taken = occupiedIndices.getOrPut(page) { mutableSetOf() }
+                nextIndex = 0
+                while (taken.contains(nextIndex)) nextIndex++
+                if (!gridIsCurrent || nextIndex < capacity) break
+                page++
+            }
+            if (page != icon.page) {
+                Log.d("MainActivity", "Desktop ${icon.page + 1} is full in $currentOrientation, moving ${icon.name} to desktop ${page + 1}")
+                icon.page = page
             }
 
             // Assign this index
             when (currentOrientation) {
-                ScreenOrientation.PORTRAIT -> {
-                    icon.portraitGridIndex = nextIndex
-                    Log.d("MainActivity", "Auto-assigned portrait grid index $nextIndex to ${icon.name}")
-                }
-                ScreenOrientation.LANDSCAPE -> {
-                    icon.landscapeGridIndex = nextIndex
-                    Log.d("MainActivity", "Auto-assigned landscape grid index $nextIndex to ${icon.name}")
-                }
+                ScreenOrientation.PORTRAIT -> icon.portraitGridIndex = nextIndex
+                ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex = nextIndex
             }
+            Log.d("MainActivity", "Auto-assigned $currentOrientation grid index $nextIndex on desktop ${page + 1} to ${icon.name}")
 
             // Convert to screen position
             val (row, col) = convertIndexToPosition(nextIndex, currentOrientation)
@@ -12595,7 +12652,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             icon.y = y
 
             // Update view position if it exists (find by matching icon, not by index)
-            val iconView = desktopIconViews.find { it.getDesktopIcon() == icon }
+            val iconView = desktopIconViews.find { it.getDesktopIcon() === icon }
             if (iconView != null) {
                 iconView.x = x
                 iconView.y = y
@@ -12603,12 +12660,353 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 Log.w("MainActivity", "No view found for reflowed icon ${icon.name}")
             }
 
-            occupiedIndices.add(nextIndex)
-            nextIndex++
+            occupiedIndices.getValue(page).add(nextIndex)
         }
 
         Log.d("MainActivity", "Reflowed ${iconsToReflow.size} icons for $currentOrientation orientation")
+
+        // A desktop may have been needed past the last one
+        applyDesktopPageShifts()
+        updateDesktopPageIndicator()
     }
+
+    /** The icon's grid cell in the current orientation, if it has one. */
+    private fun gridIndexOf(icon: DesktopIcon): Int? = when (getCurrentOrientation()) {
+        ScreenOrientation.PORTRAIT -> icon.portraitGridIndex
+        ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex
+    }
+
+    // ========== DESKTOPS (HOME SCREENS) ==========
+    //
+    // Several desktops side by side, swiped between like any other launcher's home screens.
+    // They all live in the one desktop container: each icon and widget knows its page, and
+    // is drawn a screen width per page away from the one being shown (pageShift on the view),
+    // so everything else - the grid, dragging, saving - keeps working in page coordinates.
+    // Clippy and Quick Glance aren't on a page and stay put.
+
+    /** The desktop an icon is on in the current orientation. */
+    private var DesktopIcon.page: Int
+        get() = when (getCurrentOrientation()) {
+            ScreenOrientation.PORTRAIT -> portraitPage
+            ScreenOrientation.LANDSCAPE -> landscapePage
+        }
+        set(value) {
+            when (getCurrentOrientation()) {
+                ScreenOrientation.PORTRAIT -> portraitPage = value
+                ScreenOrientation.LANDSCAPE -> landscapePage = value
+            }
+        }
+
+    private fun setupDesktopPages() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        desktopPageCount = prefs.getInt(KEY_DESKTOP_PAGE_COUNT, 1).coerceAtLeast(1)
+        currentDesktopPage = prefs.getInt(KEY_DESKTOP_CURRENT_PAGE, 0).coerceIn(0, desktopPageCount - 1)
+        desktopPagePosition = currentDesktopPage.toFloat()
+
+        // Every icon and widget is drawn on its own page the moment it is put on the desktop,
+        // whichever of the many places that do it
+        desktopContainer.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
+            override fun onChildViewAdded(parent: View?, child: View?) {
+                child?.let { applyPageShift(it, desktopPagePosition) }
+            }
+
+            override fun onChildViewRemoved(parent: View?, child: View?) {
+                when (child) {
+                    is DesktopIconView -> child.pageShift = 0f
+                    is DesktopWidgetView -> child.pageShift = 0f
+                }
+            }
+        })
+        // A page is a screen width, which a rotation changes
+        desktopContainer.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (right - left != oldRight - oldLeft) applyDesktopPageShifts()
+        }
+
+        setupDesktopPageIndicator()
+    }
+
+    /** How many desktops there are to swipe through in this orientation. */
+    private fun visibleDesktopPageCount(): Int {
+        val lastIconPage = desktopIcons.filter { it.parentFolderId == null }.maxOfOrNull { it.page } ?: 0
+        val lastWidgetPage = if (::desktopWidgetManager.isInitialized) desktopWidgetManager.lastUsedPage() else -1
+        return maxOf(desktopPageCount, lastIconPage + 1, lastWidgetPage + 1)
+    }
+
+    private fun desktopPageOf(view: View): Int? = when (view) {
+        is DesktopIconView -> view.getDesktopIcon()?.page ?: 0
+        is DesktopWidgetView -> view.page
+        else -> null
+    }
+
+    private fun applyPageShift(view: View, position: Float) {
+        val page = desktopPageOf(view) ?: return
+        val shift = (page - position) * desktopContainer.width
+        when (view) {
+            is DesktopIconView -> view.pageShift = shift
+            is DesktopWidgetView -> view.pageShift = shift
+        }
+    }
+
+    /** Draws everything on the desktop at its own page, the desktop scrolled to [position]. */
+    private fun applyDesktopPageShifts(position: Float = desktopPagePosition) {
+        for (i in 0 until desktopContainer.childCount) {
+            val child = desktopContainer.getChildAt(i)
+            // Stays under the finger while the desktops slide past it
+            if (child === iconCarriedAcrossPages) continue
+            applyPageShift(child, position)
+        }
+    }
+
+    /** After loading: a desktop for everything that is on one, and the one shown still there. */
+    private fun reconcileDesktopPages() {
+        val count = visibleDesktopPageCount()
+        if (currentDesktopPage >= count) {
+            currentDesktopPage = count - 1
+            desktopPagePosition = currentDesktopPage.toFloat()
+            saveDesktopPageState()
+        }
+        applyDesktopPageShifts()
+        updateDesktopPageIndicator()
+    }
+
+    private fun saveDesktopPageState() {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
+            putInt(KEY_DESKTOP_PAGE_COUNT, desktopPageCount)
+            putInt(KEY_DESKTOP_CURRENT_PAGE, currentDesktopPage)
+        }
+    }
+
+    /** Slides to desktop [target] (clamped to the ones there are). */
+    fun goToDesktopPage(target: Int, animate: Boolean = true) {
+        val page = target.coerceIn(0, visibleDesktopPageCount() - 1)
+        desktopPageAnimator?.cancel()
+        desktopPageAnimator = null
+        if (page != currentDesktopPage) {
+            hideContextMenu()
+            if (::desktopWidgetManager.isInitialized) desktopWidgetManager.exitEditMode()
+        }
+        currentDesktopPage = page
+        saveDesktopPageState()
+        updateDesktopPageIndicator()
+
+        if (!animate || desktopContainer.width == 0 || desktopPagePosition == page.toFloat()) {
+            desktopPagePosition = page.toFloat()
+            applyDesktopPageShifts()
+            return
+        }
+        desktopPageAnimator = android.animation.ValueAnimator.ofFloat(desktopPagePosition, page.toFloat()).apply {
+            duration = 250L
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener {
+                desktopPagePosition = it.animatedValue as Float
+                applyDesktopPageShifts()
+            }
+            start()
+        }
+    }
+
+    /**
+     * A horizontal swipe on the desktop. Left goes to the next desktop; right to the one
+     * before, and from the first one opens the swipe right app as it always has.
+     */
+    fun onDesktopSwipe(rightward: Boolean) {
+        if (rightward) {
+            if (currentDesktopPage > 0) goToDesktopPage(currentDesktopPage - 1) else launchSwipeRightApp()
+        } else if (currentDesktopPage < visibleDesktopPageCount() - 1) {
+            goToDesktopPage(currentDesktopPage + 1)
+        }
+    }
+
+    /** True when nothing but [except] (if given) is on desktop [page]. */
+    private fun isDesktopPageEmpty(page: Int, except: DesktopIcon? = null): Boolean {
+        val hasIcons = desktopIcons.any { it.parentFolderId == null && it !== except && it.page == page }
+        val hasWidgets = ::desktopWidgetManager.isInitialized && desktopWidgetManager.hasWidgetsOn(page)
+        return !hasIcons && !hasWidgets
+    }
+
+    /** Desktop menu > New Desktop: one more after the last, and straight to it. */
+    private fun addDesktopPage() {
+        hideContextMenu()
+        desktopPageCount = visibleDesktopPageCount() + 1
+        saveDesktopPageState()
+        goToDesktopPage(desktopPageCount - 1)
+    }
+
+    /** Desktop menu > Remove Desktop. Only an empty one, so nothing is lost with it. */
+    private fun removeDesktopPage(page: Int) {
+        hideContextMenu()
+        val count = visibleDesktopPageCount()
+        if (count <= 1) return
+        if (!isDesktopPageEmpty(page)) {
+            showNotification("Remove Desktop", "Move or delete what's on this desktop first")
+            return
+        }
+
+        // Everything after it moves one desktop back, in both orientations. Whatever the other
+        // orientation still had on this one stays on the desktop that takes its place, and
+        // finds a free cell there when the phone is turned.
+        val otherIsLandscape = getCurrentOrientation() == ScreenOrientation.PORTRAIT
+        desktopIcons.forEach { icon ->
+            if (icon.portraitPage > page) icon.portraitPage--
+            else if (icon.portraitPage == page && !otherIsLandscape) icon.portraitGridIndex = null
+            if (icon.landscapePage > page) icon.landscapePage--
+            else if (icon.landscapePage == page && otherIsLandscape) icon.landscapeGridIndex = null
+        }
+        if (::desktopWidgetManager.isInitialized) desktopWidgetManager.desktopRemoved(page)
+        desktopPageCount = (count - 1).coerceAtLeast(1)
+        saveDesktopIcons()
+
+        // The pages after it have just been renumbered under the one being shown
+        desktopPagePosition = page.toFloat()
+        applyDesktopPageShifts()
+        goToDesktopPage(if (page >= desktopPageCount) desktopPageCount - 1 else page)
+    }
+
+    /**
+     * Puts [icon] on desktop [page] in both orientations, in the first free cell for this one;
+     * the other orientation finds it a cell when the phone is turned.
+     */
+    private fun placeOnDesktopPage(icon: DesktopIcon, page: Int) {
+        icon.portraitPage = page
+        icon.landscapePage = page
+        icon.portraitGridIndex = null
+        icon.landscapeGridIndex = null
+        val taken = desktopIcons
+            .filter { it !== icon && it.parentFolderId == null && it.page == page }
+            .mapNotNull { gridIndexOf(it) }
+            .toSet()
+        var index = 0
+        while (index in taken) index++
+        when (getCurrentOrientation()) {
+            ScreenOrientation.PORTRAIT -> icon.portraitGridIndex = index
+            ScreenOrientation.LANDSCAPE -> icon.landscapeGridIndex = index
+        }
+    }
+
+    /**
+     * An icon in Move mode was dragged to ([rawX] on screen). Held near the left or right edge
+     * it carries over to the desktop that way, one desktop at a time, past the last one into a
+     * new one as long as it isn't leaving an empty one behind.
+     */
+    fun onDesktopIconDragged(iconView: DesktopIconView, rawX: Float) {
+        val width = desktopContainer.width
+        if (width == 0) return
+        val location = IntArray(2)
+        desktopContainer.getLocationOnScreen(location)
+        val edge = 32 * resources.displayMetrics.density
+        val direction = when {
+            rawX < location[0] + edge -> -1
+            rawX > location[0] + width - edge -> 1
+            else -> 0
+        }
+        if (direction == edgeFlipDirection) return
+        cancelEdgeFlip()
+        if (direction == 0) return
+        edgeFlipDirection = direction
+        scheduleEdgeFlip(iconView, direction, 600L)
+    }
+
+    private fun scheduleEdgeFlip(iconView: DesktopIconView, direction: Int, delayMs: Long) {
+        val flip = Runnable {
+            edgeFlipRunnable = null
+            if (carryIconToPage(iconView, currentDesktopPage + direction)) {
+                // Still held there: on to the next one
+                scheduleEdgeFlip(iconView, direction, 900L)
+            }
+        }
+        edgeFlipRunnable = flip
+        desktopContainer.postDelayed(flip, delayMs)
+    }
+
+    private fun carryIconToPage(iconView: DesktopIconView, target: Int): Boolean {
+        val icon = iconView.getDesktopIcon() ?: return false
+        if (target < 0) return false
+        if (target >= visibleDesktopPageCount()) {
+            if (isDesktopPageEmpty(currentDesktopPage, except = icon)) return false
+            desktopPageCount = target + 1
+        }
+        Helpers.performHapticFeedback(this)
+        icon.portraitPage = target
+        icon.landscapePage = target
+        // Its cells were on the desktop it left; the drop picks one here, and the other
+        // orientation finds one when the phone is turned
+        icon.portraitGridIndex = null
+        icon.landscapeGridIndex = null
+        iconCarriedAcrossPages = iconView
+        goToDesktopPage(target)
+        return true
+    }
+
+    private fun cancelEdgeFlip() {
+        edgeFlipRunnable?.let { desktopContainer.removeCallbacks(it) }
+        edgeFlipRunnable = null
+        edgeFlipDirection = 0
+    }
+
+    /** The icon being dragged was let go (or the drag was cancelled). */
+    fun onDesktopIconDragEnded() {
+        cancelEdgeFlip()
+        if (iconCarriedAcrossPages != null) {
+            // Land the slide now, so the icon isn't moved under the finger as it finishes
+            desktopPageAnimator?.end()
+            iconCarriedAcrossPages = null
+            applyDesktopPageShifts()
+        }
+    }
+
+    /** Little squares above the taskbar, one per desktop, shown when there is more than one. */
+    private fun setupDesktopPageIndicator() {
+        val density = resources.displayMetrics.density
+        val indicator = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            isClickable = false
+            isFocusable = false
+            visibility = View.GONE
+            elevation = 1f * density
+        }
+        val params = RelativeLayout.LayoutParams(
+            RelativeLayout.LayoutParams.WRAP_CONTENT,
+            RelativeLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+            addRule(RelativeLayout.CENTER_HORIZONTAL)
+            // Clear of the taskbar (40dp, 30dp up from the bottom)
+            bottomMargin = (76 * density).toInt()
+        }
+        findViewById<RelativeLayout>(R.id.main_background).addView(indicator, params)
+        desktopPageIndicator = indicator
+    }
+
+    private fun updateDesktopPageIndicator() {
+        val indicator = desktopPageIndicator ?: return
+        val count = visibleDesktopPageCount()
+        if (count <= 1) {
+            indicator.visibility = View.GONE
+            return
+        }
+        indicator.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        val size = (7 * density).toInt()
+        val gap = (4 * density).toInt()
+        while (indicator.childCount < count) {
+            indicator.addView(View(this), LinearLayout.LayoutParams(size, size).apply {
+                marginStart = gap
+                marginEnd = gap
+            })
+        }
+        while (indicator.childCount > count) indicator.removeViewAt(indicator.childCount - 1)
+        for (i in 0 until count) {
+            val selected = i == currentDesktopPage
+            indicator.getChildAt(i).background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(if (selected) Color.WHITE else Color.argb(110, 255, 255, 255))
+                setStroke(maxOf(1, density.toInt()), Color.argb(160, 0, 0, 0))
+            }
+        }
+    }
+
+    // ========== END DESKTOPS ==========
 
     /**
      * Get screen coordinates from grid row/col
@@ -12697,9 +13095,12 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val occupiedIndices = mutableSetOf<Int>()
 
         // Get all current occupied grid indices (excluding the icon being snapped)
+        val page = iconView.getDesktopIcon()?.page ?: currentDesktopPage
         desktopIcons.forEach { icon ->
             // Skip icons in folders
             if (icon.parentFolderId != null) return@forEach
+            // and those on other desktops
+            if (icon.page != page) return@forEach
 
             // Find the view by matching the icon
             val view = desktopIconViews.find { it.getDesktopIcon() == icon }
@@ -13195,6 +13596,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // We're already the home screen, just ensure we're in the right state
             if (isStartMenuVisible) {
                 hideStartMenu()
+            } else if (hasWindowFocus() && currentDesktopPage != 0) {
+                // Home while already home: back to the first desktop, as other launchers do
+                goToDesktopPage(0)
             }
         }
         
