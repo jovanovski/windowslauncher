@@ -667,7 +667,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             "system.pinball", "system.solitare", "system.destroyer"
         )
         private val ACCESSORIES_OWN =
-            listOf("system.clock", "system.internet_explorer", "system.notepad", "system.paint")
+            listOf("system.clock", "system.internet_explorer", "system.notepad", "system.paint", "system.explorer")
         private val ACCESSORIES_PROGRAMS =
             (ACCESSORIES_ENTERTAINMENT + ACCESSORIES_GAMES + ACCESSORIES_OWN).toSet()
 
@@ -1823,6 +1823,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             createAndShowClockDialog()
         }
 
+        // Register Windows Explorer - it opens on My Computer, the same window the desktop icon opens
+        systemAppActions["system.explorer"] = { _ ->
+            openMyComputerWindow(myComputer?.getDesktopIcon()?.id ?: WIN7_START_MENU_COMPUTER_ID)
+        }
+
 
         Log.d("MainActivity", "System apps initialized: ${systemAppActions.size} apps")
     }
@@ -1958,6 +1963,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 exeName = "clock.exe",
                 packageName = "system.clock",
                 icon = createSquareDrawable(clockDrawable)
+            ))
+        }
+
+        // Windows Explorer - wears My Computer's icon, since that is where it opens
+        AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())?.let {
+            systemApps.add(AppInfo(
+                name = "Windows Explorer",
+                exeName = "explorer.exe",
+                packageName = "system.explorer",
+                icon = createSquareDrawable(it)
             ))
         }
 
@@ -2566,6 +2581,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 "system.notepad" ->AppCompatResources.getDrawable(this, themeManager.getNotepadIcon())
                 "system.paint" ->AppCompatResources.getDrawable(this, themeManager.getPaintIcon())
                 "system.clock" ->AppCompatResources.getDrawable(this, themeManager.getClockIcon())
+                "system.explorer" ->AppCompatResources.getDrawable(this, themeManager.getMyComputerIcon())
                 "system.solitare" ->AppCompatResources.getDrawable(this, themeManager.getSolitareIcon())
                 "system.minesweeper" ->AppCompatResources.getDrawable(this, themeManager.getMinesweeperIcon())
                 "system.pinball" ->AppCompatResources.getDrawable(this, R.drawable.pinball)
@@ -3920,7 +3936,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 )
                 is AppInfo -> ContextMenuItem(
                     child.name.replace("&", "&&"), icon = child.icon,
-                    action = { appsAdapter?.launchApp(child) }
+                    action = { appsAdapter?.launchApp(child) },
+                    onLongPress = { x, y -> showStartMenuFolderAppContextMenu(child, x, y) }
                 )
                 else -> null
             }
@@ -3935,6 +3952,27 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 if (startMenuFolderMenu === menu) startMenuFolderMenu = null
             }
         }
+    }
+
+    /** A program in a Start menu folder: pinning it to Start, or a shortcut to it on the desktop. */
+    private fun showStartMenuFolderAppContextMenu(appInfo: AppInfo, x: Float, y: Float) {
+        if (!::contextMenu.isInitialized) return
+        val pinText = if (isAppPinned(appInfo.packageName)) "Unpin from Start" else "Pin to Start"
+        val menuItems = listOf(
+            ContextMenuItem(pinText, action = {
+                togglePinnedApp(appInfo.packageName)
+                // As from the list itself: the start menu stays open, the list catches up once
+                // the context menu has closed
+                refreshCommandsList()
+                Handler(Looper.getMainLooper()).postDelayed({ loadInstalledApps() }, 50)
+            }),
+            ContextMenuItem("Send to Desktop", action = {
+                createDesktopShortcut(appInfo)
+                hideStartMenu()
+            }),
+        )
+        contextMenu.showMenu(menuItems, x, y)
+        isContextMenuVisible = true
     }
 
     private fun refreshAppListManually() {

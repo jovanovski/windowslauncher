@@ -498,9 +498,16 @@ class WinMenuPopup(private val ui: WinUi) {
             val cold = textColor
             val words = listOf(row.getChildAt(1) as TextView) +
                 listOfNotNull(row.getChildAt(2) as? TextView)
+            // Where the finger went down, for a long press to open its menu at
+            var pressedX = 0f
+            var pressedY = 0f
             row.setOnTouchListener { v, event ->
                 when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> words.forEach { it.setTextColor(hot) }
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        pressedX = event.rawX
+                        pressedY = event.rawY
+                        words.forEach { it.setTextColor(hot) }
+                    }
                     android.view.MotionEvent.ACTION_UP,
                     android.view.MotionEvent.ACTION_CANCEL -> words.forEach { it.setTextColor(cold) }
                 }
@@ -528,6 +535,18 @@ class WinMenuPopup(private val ui: WinUi) {
                 dismiss()
                 onPicked?.invoke()
                 item.action?.invoke()
+            }
+            item.onLongPress?.let { longPress ->
+                // The menu it opens gives the buzz; the row's own would be a second one
+                row.isHapticFeedbackEnabled = false
+                row.setOnLongClickListener {
+                    // The menus close first: they are windows of their own, and would sit
+                    // over whatever menu the long press opens.
+                    dismiss()
+                    onPicked?.invoke()
+                    longPress(pressedX, pressedY)
+                    true
+                }
             }
         }
         return row

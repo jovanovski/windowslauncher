@@ -21,6 +21,12 @@ data class ContextMenuItem(
     /** What opens to the side. Setting this implies [hasSubmenu]. */
     val submenu: List<ContextMenuItem>? = null,
     /**
+     * What a long press on the row does, given where on the screen it was pressed - the Start
+     * menu's folders open a program's own context menu with it, as a right-click did.
+     * Not last, so a trailing lambda can't bind to it.
+     */
+    val onLongPress: ((x: Float, y: Float) -> Unit)? = null,
+    /**
      * The picture beside the words, for a menu of programs - the Start menu's folders. A menu
      * where any item has one is laid out like the Start menu's, roomier and with icons.
      */
