@@ -170,7 +170,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private lateinit var desktopContainer: RelativeLayout
 
     // Desktops (home screens) side by side; see setupDesktopPages
-    private var desktopPageCount = 1
     private var currentDesktopPage = 0
     /** The page the desktop is scrolled to; fractional while pages slide. */
     private var desktopPagePosition = 0f
@@ -180,6 +179,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private var iconCarriedAcrossPages: DesktopIconView? = null
     private var edgeFlipRunnable: Runnable? = null
     private var edgeFlipDirection = 0
+    private var desktopPageCompactionPosted = false
     private lateinit var recycleBin: RecycleBinView
     private var myComputer: rocks.gorjan.gokixp.apps.explorer.MyComputerView? = null
     private var briefcaseIcon: rocks.gorjan.gokixp.apps.briefcase.BriefcaseView? = null
@@ -646,7 +646,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     companion object {
         const val PREFS_NAME = "taskbar_widget_prefs"  // Public constant for shared preferences name
         private const val KEY_DESKTOP_ICONS = "desktop_icons"
-        private const val KEY_DESKTOP_PAGE_COUNT = "desktop_page_count"
         private const val KEY_DESKTOP_CURRENT_PAGE = "desktop_current_page"
         private const val KEY_PINNED_APPS = "pinned_apps"
         private const val KEY_HIDDEN_APPS = "hidden_apps"
@@ -4698,6 +4697,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun setupDesktopWidgets() {
         desktopWidgetManager = DesktopWidgetManager(this, desktopContainer)
         desktopWidgetManager.currentPage = { currentDesktopPage }
+        desktopWidgetManager.onWidgetsChanged = { scheduleDesktopPageCompaction() }
         desktopWidgetManager.onWidgetLongPress = { view, screenX, screenY ->
             showDesktopWidgetContextMenu(view, screenX, screenY)
         }
@@ -4939,11 +4939,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 onChangeWallpaper = { createAndShowWallpaperDialog() },
                 onOpenInternetExplorer = { showInternetExplorerDialog() },
                 onNewFolder = { createNewFolder(x, y) },
-                onAddWidget = { showAddWidgetDialog(x, y) },
-                onNewDesktop = { addDesktopPage() },
-                onRemoveDesktop = if (visibleDesktopPageCount() > 1) {
-                    { removeDesktopPage(currentDesktopPage) }
-                } else null
+                onAddWidget = { showAddWidgetDialog(x, y) }
             )
             
             // Show the menu
@@ -11380,6 +11376,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         val json = gson.toJson(serializedIcons)
         prefs.edit { putString(KEY_DESKTOP_ICONS, json) }
+        // A desktop this change left empty goes
+        scheduleDesktopPageCompaction()
         Log.d("MainActivity", "Saved ${desktopIcons.size} desktop icons with grid indices")
     }
     
@@ -12699,8 +12697,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun setupDesktopPages() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        desktopPageCount = prefs.getInt(KEY_DESKTOP_PAGE_COUNT, 1).coerceAtLeast(1)
-        currentDesktopPage = prefs.getInt(KEY_DESKTOP_CURRENT_PAGE, 0).coerceIn(0, desktopPageCount - 1)
+        // Clamped to the desktops there are once the icons are loaded
+        currentDesktopPage = prefs.getInt(KEY_DESKTOP_CURRENT_PAGE, 0).coerceAtLeast(0)
         desktopPagePosition = currentDesktopPage.toFloat()
 
         // Every icon and widget is drawn on its own page the moment it is put on the desktop,
@@ -12725,11 +12723,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         setupDesktopPageIndicator()
     }
 
-    /** How many desktops there are to swipe through in this orientation. */
+    /**
+     * How many desktops there are to swipe through in this orientation: as many as reach the
+     * last one with something on it. There is no adding or removing them by hand - one is made
+     * by carrying an icon past the last, and goes when nothing is left on it (see
+     * compactDesktopPages).
+     */
     private fun visibleDesktopPageCount(): Int {
         val lastIconPage = desktopIcons.filter { it.parentFolderId == null }.maxOfOrNull { it.page } ?: 0
         val lastWidgetPage = if (::desktopWidgetManager.isInitialized) desktopWidgetManager.lastUsedPage() else -1
-        return maxOf(desktopPageCount, lastIconPage + 1, lastWidgetPage + 1)
+        return maxOf(1, lastIconPage + 1, lastWidgetPage + 1)
     }
 
     private fun desktopPageOf(view: View): Int? = when (view) {
@@ -12771,9 +12774,66 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
     private fun saveDesktopPageState() {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit {
-            putInt(KEY_DESKTOP_PAGE_COUNT, desktopPageCount)
             putInt(KEY_DESKTOP_CURRENT_PAGE, currentDesktopPage)
         }
+    }
+
+    /**
+     * Drops desktops nothing is on any more, after whatever change is in hand has settled
+     * (a delete, a drop into a folder or the Recycle Bin, a widget removed).
+     */
+    private fun scheduleDesktopPageCompaction() {
+        if (!::desktopContainer.isInitialized || desktopPageCompactionPosted) return
+        desktopPageCompactionPosted = true
+        desktopContainer.post {
+            desktopPageCompactionPosted = false
+            compactDesktopPages()
+        }
+    }
+
+    /**
+     * A desktop lasts as long as an icon or widget is on it, in either orientation. Empty ones
+     * are closed up: everything after moves back, and the one shown stays shown, or if it was
+     * the one that went, the desktop taking its place.
+     */
+    private fun compactDesktopPages() {
+        // Mid-carry the desktop just left can be empty for a moment; the drop settles it
+        if (iconCarriedAcrossPages != null) return
+
+        val onDesktop = desktopIcons.filter { it.parentFolderId == null }
+        val used = sortedSetOf<Int>()
+        onDesktop.forEach {
+            used.add(it.portraitPage)
+            used.add(it.landscapePage)
+        }
+        if (::desktopWidgetManager.isInitialized) used.addAll(desktopWidgetManager.usedPages())
+
+        // A page's new number is how many used pages come before it
+        val renumber = { page: Int -> used.headSet(page).size }
+        val closedUp = used.withIndex().any { (index, page) -> index != page }
+        if (closedUp) {
+            Log.d("MainActivity", "Closing up empty desktops; in use: $used")
+            onDesktop.forEach {
+                it.portraitPage = renumber(it.portraitPage)
+                it.landscapePage = renumber(it.landscapePage)
+            }
+            if (::desktopWidgetManager.isInitialized) desktopWidgetManager.renumberPages(renumber)
+            currentDesktopPage = renumber(currentDesktopPage)
+            saveDesktopIcons()
+        }
+
+        val count = visibleDesktopPageCount()
+        val shown = currentDesktopPage.coerceIn(0, count - 1)
+        // Not when nothing moved: a slide in progress is left to finish
+        if (closedUp || shown != currentDesktopPage) {
+            desktopPageAnimator?.cancel()
+            desktopPageAnimator = null
+            currentDesktopPage = shown
+            desktopPagePosition = shown.toFloat()
+        }
+        saveDesktopPageState()
+        applyDesktopPageShifts()
+        updateDesktopPageIndicator()
     }
 
     /** Slides to desktop [target] (clamped to the ones there are). */
@@ -12822,44 +12882,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val hasIcons = desktopIcons.any { it.parentFolderId == null && it !== except && it.page == page }
         val hasWidgets = ::desktopWidgetManager.isInitialized && desktopWidgetManager.hasWidgetsOn(page)
         return !hasIcons && !hasWidgets
-    }
-
-    /** Desktop menu > New Desktop: one more after the last, and straight to it. */
-    private fun addDesktopPage() {
-        hideContextMenu()
-        desktopPageCount = visibleDesktopPageCount() + 1
-        saveDesktopPageState()
-        goToDesktopPage(desktopPageCount - 1)
-    }
-
-    /** Desktop menu > Remove Desktop. Only an empty one, so nothing is lost with it. */
-    private fun removeDesktopPage(page: Int) {
-        hideContextMenu()
-        val count = visibleDesktopPageCount()
-        if (count <= 1) return
-        if (!isDesktopPageEmpty(page)) {
-            showNotification("Remove Desktop", "Move or delete what's on this desktop first")
-            return
-        }
-
-        // Everything after it moves one desktop back, in both orientations. Whatever the other
-        // orientation still had on this one stays on the desktop that takes its place, and
-        // finds a free cell there when the phone is turned.
-        val otherIsLandscape = getCurrentOrientation() == ScreenOrientation.PORTRAIT
-        desktopIcons.forEach { icon ->
-            if (icon.portraitPage > page) icon.portraitPage--
-            else if (icon.portraitPage == page && !otherIsLandscape) icon.portraitGridIndex = null
-            if (icon.landscapePage > page) icon.landscapePage--
-            else if (icon.landscapePage == page && otherIsLandscape) icon.landscapeGridIndex = null
-        }
-        if (::desktopWidgetManager.isInitialized) desktopWidgetManager.desktopRemoved(page)
-        desktopPageCount = (count - 1).coerceAtLeast(1)
-        saveDesktopIcons()
-
-        // The pages after it have just been renumbered under the one being shown
-        desktopPagePosition = page.toFloat()
-        applyDesktopPageShifts()
-        goToDesktopPage(if (page >= desktopPageCount) desktopPageCount - 1 else page)
     }
 
     /**
@@ -12921,10 +12943,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private fun carryIconToPage(iconView: DesktopIconView, target: Int): Boolean {
         val icon = iconView.getDesktopIcon() ?: return false
         if (target < 0) return false
-        if (target >= visibleDesktopPageCount()) {
-            if (isDesktopPageEmpty(currentDesktopPage, except = icon)) return false
-            desktopPageCount = target + 1
-        }
+        // Past the last desktop makes a new one, unless that leaves an empty one behind
+        if (target >= visibleDesktopPageCount() && isDesktopPageEmpty(currentDesktopPage, except = icon)) return false
         Helpers.performHapticFeedback(this)
         icon.portraitPage = target
         icon.landscapePage = target

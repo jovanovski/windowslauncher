@@ -53,6 +53,9 @@ class DesktopWidgetManager(
     /** The desktop being shown, which is where a new widget goes. */
     var currentPage: () -> Int = { 0 }
 
+    /** A widget was added, moved or removed (and saved). */
+    var onWidgetsChanged: (() -> Unit)? = null
+
     private val appWidgetManager = AppWidgetManager.getInstance(activity)
     private val host = AppWidgetHost(activity.applicationContext, HOST_ID)
     private val prefs = activity.getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
@@ -338,10 +341,19 @@ class DesktopWidgetManager(
     /** The furthest desktop any widget is on, or -1 with none. */
     fun lastUsedPage(): Int = widgetViews.maxOfOrNull { it.page } ?: -1
 
-    /** [page] was taken away: everything after it moves one desktop back. */
-    fun desktopRemoved(page: Int) {
-        widgetViews.forEach { if (it.page > page) it.page-- }
-        saveAll()
+    fun usedPages(): Set<Int> = widgetViews.map { it.page }.toSet()
+
+    /** Empty desktops were closed up: each widget's desktop is now [renumber] of the old one. */
+    fun renumberPages(renumber: (Int) -> Int) {
+        var changed = false
+        widgetViews.forEach {
+            val page = renumber(it.page)
+            if (page != it.page) {
+                it.page = page
+                changed = true
+            }
+        }
+        if (changed) save(currentWidgets())
     }
 
     fun removeWidget(view: DesktopWidgetView) {
@@ -399,9 +411,12 @@ class DesktopWidgetManager(
     }
 
     private fun saveAll() {
-        save(widgetViews.map {
-            SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight, it.page)
-        })
+        save(currentWidgets())
+        onWidgetsChanged?.invoke()
+    }
+
+    private fun currentWidgets(): List<SavedDesktopWidget> = widgetViews.map {
+        SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight, it.page)
     }
 
     private fun save(widgets: List<SavedDesktopWidget>) {
