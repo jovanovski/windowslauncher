@@ -120,7 +120,7 @@ class WindowsDialog @JvmOverloads constructor(
     private var isDragging = false
 
     // Resizing from bottom-right corner
-    private var resizeDragView: ImageView? = null
+    private var resizeDragView: View? = null
     private var isResizing = false
     private var initialWidth = 0
     private var initialHeight = 0

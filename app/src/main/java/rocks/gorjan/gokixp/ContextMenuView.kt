@@ -105,6 +105,13 @@ class ContextMenuView @JvmOverloads constructor(
         return super.dispatchTouchEvent(ev)
     }
 
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        // A touch no row took (a divider, the padding, the border) stops at the menu
+        // instead of falling through to whatever is underneath.
+        return isOpen || super.onTouchEvent(event)
+    }
+
     private fun selectedTheme(): AppTheme =
         (context as? MainActivity)?.themeManager?.getSelectedTheme() ?: currentTheme
 

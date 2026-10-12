@@ -1384,6 +1384,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         
         // Time display opens clock
         clockTime.setOnClickListener { openClockApp() }
+        // On 3.1 the clock is a minimized icon, so tapping its picture should open it too
+        findViewById<View>(R.id.win31_clock_icon)?.setOnClickListener { openClockApp() }
         
         // Shutdown button will be set up after theme layout is loaded in setupStartMenu()
 
@@ -10650,6 +10652,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         dateContainer.setOnClickListener { openCalendarApp() }
 
         clockTime.setOnClickListener { openClockApp() }
+        // On 3.1 the clock is a minimized icon, so tapping its picture should open it too
+        findViewById<View>(R.id.win31_clock_icon)?.setOnClickListener { openClockApp() }
 
         // Long press to toggle clock format (24-hour <-> 12-hour)
         clockTime.setOnLongClickListener {
