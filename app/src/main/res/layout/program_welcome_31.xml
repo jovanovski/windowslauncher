@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows 3.1 had no Welcome screen, so this is its About box: the logo, the product lines
+     and OK, who it is licensed to, then under a rule the notice, which is where the welcome
+     text and the change log scroll. Set in
+     the System font at 16sp, so one of its pixels is one dp. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    android:orientation="horizontal"
+    android:paddingTop="10dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="8dp">
+
+    <ImageView
+        android:id="@+id/background"
+        android:layout_width="59dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="13dp"
+        android:layout_marginEnd="8dp"
+        android:src="@drawable/win31_about_logo" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/Win31AboutText"
+                    android:text="Microsoft Windows" />
+
+                <TextView
+                    android:id="@+id/version"
+                    style="@style/Win31AboutText"
+                    android:text="Version 3.1" />
+
+                <TextView
+                    style="@style/Win31AboutText"
+                    android:text="Copyright © 1985-1992 Microsoft Corp." />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/close_button"
+                    style="@style/Win31AboutButton"
+                    android:text="OK" />
+
+                <TextView
+                    android:id="@+id/change_log_button"
+                    style="@style/Win31AboutButton"
+                    android:layout_marginTop="4dp"
+                    android:text="Log" />
+
+                <!-- Bound in every theme; here the Log button toggles back itself -->
+                <View
+                    android:id="@+id/welcome_button"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/Win31AboutText"
+            android:layout_marginTop="6dp"
+            android:text="This product is licensed to:" />
+
+        <TextView
+            android:id="@+id/licensed_device"
+            style="@style/Win31AboutText"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/licensed_android"
+            style="@style/Win31AboutText" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:background="#000000" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:scrollbarSize="12dp"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbarThumbVertical="@drawable/win31_scrollbar_thumb"
+            android:scrollbarTrackVertical="@drawable/win31_scrollbar_track"
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/welcome_text"
+                style="@style/Win31AboutText"
+                android:layout_width="match_parent"
+                android:paddingEnd="14dp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>

@@ -84,6 +84,12 @@ class ScreensaverManager(
                 addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+                // Draw under the camera cutout too. Left at the default, a fullscreen window is
+                // kept out of it, and the desktop shows through a strip at the top (Note 10+).
+                attributes = attributes.apply {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
 
                 // Clear any flags that might prevent fullscreen or keep screen on
                 clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
@@ -166,10 +172,12 @@ class ScreensaverManager(
                 return@setOnPreparedListener
             }
 
-            // Get actual screen dimensions from display metrics
+            // The window's own size, cutout included. displayMetrics can leave the cutout and
+            // the navigation bar out, which would crop the video short of the edges
+            val container = videoView.parent as View
             val displayMetrics = context.resources.displayMetrics
-            val screenWidth = displayMetrics.widthPixels
-            val screenHeight = displayMetrics.heightPixels
+            val screenWidth = container.width.takeIf { it > 0 } ?: displayMetrics.widthPixels
+            val screenHeight = container.height.takeIf { it > 0 } ?: displayMetrics.heightPixels
 
             // Calculate scale to fill screen (using max instead of min for crop behavior)
             val scaleX = screenWidth.toFloat() / videoWidth

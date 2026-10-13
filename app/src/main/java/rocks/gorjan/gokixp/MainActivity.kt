@@ -2431,7 +2431,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 },
                 program("Control Panel", R.drawable.win31_control_panel) { openPhoneSettings() },
                 program("Windows Setup", R.drawable.win31_setup) { checkForUpdates(true) },
-                program("Read Me", R.drawable.win31_write) { showWelcomeToWindows() },
+                program("About Windows", R.drawable.win31_write) { showWelcomeToWindows() },
             ),
             "Accessories" to listOf(
                 program("Paintbrush", R.drawable.win31_paintbrush) { launchSystemApp("system.paint") },
@@ -9745,6 +9745,14 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         )?.contains("WP81KeyboardService") == true
     }.getOrDefault(false)
 
+    /** The About box is licensed to the phone it runs on. */
+    private fun fillWin31AboutBox(contentView: View) {
+        val manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
+        contentView.findViewById<TextView>(R.id.licensed_device)?.text =
+            if (Build.MODEL.startsWith(manufacturer, ignoreCase = true)) Build.MODEL else "$manufacturer ${Build.MODEL}"
+        contentView.findViewById<TextView>(R.id.licensed_android)?.text = "Android ${Build.VERSION.RELEASE}"
+    }
+
     private fun showWelcomeToWindows(showChangeLog: Boolean = false) {
         // Get theme preferences
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -9764,8 +9772,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             }
             AppTheme.WindowsVista, AppTheme.Windows7 -> R.layout.program_welcome_vista
             AppTheme.WindowsXP -> R.layout.program_welcome_xp
-            // Windows 3.1 had no Welcome screen; the nearest one in plain grey is Windows 95's
-            AppTheme.Windows31 -> R.layout.program_welcome_95
+            // Windows 3.1 had no Welcome screen; it gets its About box
+            AppTheme.Windows31 -> R.layout.program_welcome_31
         }
 
         // Create MediaPlayer for welcome sound - choose based on theme
@@ -9781,7 +9789,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Windows 7 had no welcome music; this is Kalimba, from the Sample Music it shipped.
             AppTheme.Windows7 -> R.raw.welcome_win7
             AppTheme.WindowsXP -> R.raw.welcome
-            AppTheme.Windows31 -> R.raw.welcome_98
+            AppTheme.Windows31 -> R.raw.welcome_win31
         }
         val welcomeMediaPlayer = MediaPlayer.create(this, soundRes)
         welcomeMediaPlayer.isLooping = true
@@ -9789,7 +9797,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Create Windows-style dialog with correct theme from start
         val windowsDialog = createThemedWindowsDialog()
-        windowsDialog.setTitle(if (theme is AppTheme.Windows7) "Getting Started" else "Welcome to Windows")
+        windowsDialog.setTitle(when (theme) {
+            AppTheme.Windows7 -> "Getting Started"
+            AppTheme.Windows31 -> "About Windows"
+            else -> "Welcome to Windows"
+        })
         windowsDialog.setTaskbarIcon(themeManager.getWindowsIcon())
 
         // Inflate the welcome content
@@ -9800,6 +9812,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val (width, height) = when (layoutRes) {
             R.layout.program_welcome_xp -> Pair(354, 286)
             R.layout.program_welcome_vista -> Pair(354, 286)
+            R.layout.program_welcome_31 -> Pair(395, 440)
             else -> Pair(354, 258)
         }
         windowsDialog.setWindowSize(width, height)
@@ -9826,7 +9839,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             AppTheme.WindowsVista -> Pair(R.drawable.welcome_vista_welcome, R.drawable.welcome_vista_change_log)
             AppTheme.Windows7 -> Pair(R.drawable.welcome_win7_welcome, R.drawable.welcome_win7_welcome)
             AppTheme.WindowsXP -> Pair(R.drawable.welcome_xp_welcome, R.drawable.welcome_xp_change_log)
-            AppTheme.Windows31 -> Pair(R.drawable.welcome_95_welcome, R.drawable.welcome_95_change_log)
+            AppTheme.Windows31 -> Pair(R.drawable.win31_about_logo, R.drawable.win31_about_logo)
         }
         // Windows 7 shares Vista's layout, whose picture is Vista's; set the theme's own
         backgroundImageView?.setImageResource(welcomeDrawable)
@@ -9900,7 +9913,8 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val versionTextView = contentView.findViewById<TextView>(R.id.version)
 
         // Set version text (using the versionName we already retrieved)
-        versionTextView?.text = "Version: $versionName"
+        versionTextView?.text = if (theme is AppTheme.Windows31) "Version $versionName" else "Version: $versionName"
+        if (theme is AppTheme.Windows31) fillWin31AboutBox(contentView)
         // Vista's header is dark; Windows 7's Getting Started banner is pale
         if (theme is AppTheme.Windows7) versionTextView?.setTextColor(Color.parseColor("#1E395B"))
 
@@ -9983,7 +9997,21 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             welcomeTextView.setLinkTextColor(Color.parseColor("#0000FF")) // Windows blue
         }
 
+        // Windows 3.1's box has one button for both; it flips between them
+        var showingChangeLog = false
+
         changeLogButton?.setOnClickListener {
+            if (theme is AppTheme.Windows31 && showingChangeLog) {
+                showingChangeLog = false
+                (changeLogButton as? TextView)?.text = "Log"
+                backgroundImageView.setImageResource(welcomeDrawable)
+                welcomeTextView.text = spannableString
+                welcomeTextView.movementMethod = LinkMovementMethod.getInstance()
+                return@setOnClickListener
+            }
+            showingChangeLog = true
+            (changeLogButton as? TextView)?.takeIf { theme is AppTheme.Windows31 }?.text = "Read Me"
+
             // Switch to changelog image
             backgroundImageView.setImageResource(changeLogDrawable)
 
