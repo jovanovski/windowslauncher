@@ -4,8 +4,8 @@ import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 
 /**
- * An MS Agent character extracted frame-by-frame: every animation is an animated WebP in
- * assets/agents/<agent id>/, named after the original MS Agent animation.
+ * An MS Agent character extracted frame-by-frame into assets/agents/<agent id>/ (see [SpriteSheet]),
+ * its animations named after the original MS Agent ones.
  */
 data class SpriteAnimations(
     // Looped for as long as the agent is speaking
