@@ -1,10 +1,6 @@
 package rocks.gorjan.gokixp.agent
 
 import android.content.Context
-import android.graphics.ImageDecoder
-import android.graphics.drawable.Animatable2
-import android.graphics.drawable.AnimatedImageDrawable
-import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -17,7 +13,6 @@ import rocks.gorjan.gokixp.MainActivity
 import rocks.gorjan.gokixp.R
 import rocks.gorjan.gokixp.agent.TTSService
 import rocks.gorjan.gokixp.agent.Agent
-import java.io.IOException
 import kotlin.math.abs
 import kotlin.random.Random
 import rocks.gorjan.gokixp.getSafeFloat
@@ -37,7 +32,11 @@ class AgentView @JvmOverloads constructor(
     private var isGifLoaded = false
 
     // Sprite animation state
-    private var spriteDrawable: AnimatedImageDrawable? = null
+    private var spriteSheet: SpriteSheet? = null
+    private var frameDrawable: SpriteFrameDrawable? = null
+    // The step showing the playing animation's next frame; held while hidden so playback resumes where it was
+    private var frameStep: Runnable? = null
+    private var isShownOnScreen = true
     private var nextIdleRunnable: Runnable? = null
     private var lastIdleAnimation: String? = null
     private val idlePools = mutableMapOf<String, List<String>>()
@@ -208,41 +207,67 @@ class AgentView @JvmOverloads constructor(
 
     private fun idlePool(agent: Agent, sprites: SpriteAnimations): List<String> = idlePools.getOrPut(agent.id) {
         val excluded = sprites.notIdle + sprites.rest + sprites.talking
-        (context.assets.list("agents/${agent.id}") ?: emptyArray())
-            .filter { it.endsWith(".webp") }
-            .map { it.removeSuffix(".webp") }
-            .filter { it !in excluded }
+        currentSpriteSheet()?.animationNames.orEmpty().filter { it !in excluded }
+    }
+
+    private fun currentSpriteSheet(): SpriteSheet? {
+        spriteSheet?.let { if (it.agentId == currentAgent.id) return it }
+        val sheet = SpriteSheet.load(context.assets, currentAgent.id)
+        spriteSheet = sheet
+        frameDrawable = sheet?.let { SpriteFrameDrawable(it.frameWidth, it.frameHeight) }
+        return sheet
     }
 
     /**
-     * Shows one of the agent's animations. The drawable only advances while it is drawn, so the idle
-     * loop pauses by itself when the agent is hidden or the launcher is in the background.
+     * Shows one of the agent's animations. Frames only advance while the agent is on screen, so the idle
+     * loop pauses when the agent is hidden or the launcher is in the background.
      */
     private fun playSprite(name: String, loop: Boolean, onEnd: (() -> Unit)? = null) {
         stopSprite()
-        val drawable = try {
-            ImageDecoder.decodeDrawable(ImageDecoder.createSource(context.assets, "agents/${currentAgent.id}/$name.webp"))
-        } catch (e: IOException) {
-            Log.e("AgentView", "Failed to load animation $name for ${currentAgent.name}", e)
-            null
-        }
-        setImageDrawable(drawable)
-        if (drawable !is AnimatedImageDrawable) {
-            // A still frame (or a missing file) has nothing to wait for
+        val sheet = currentSpriteSheet()
+        val drawable = frameDrawable
+        val animation = sheet?.animation(name)
+        if (sheet == null || drawable == null || animation == null || animation.frames.isEmpty()) {
+            Log.e("AgentView", "Missing animation $name for ${currentAgent.name}")
+            setImageDrawable(null)
             onEnd?.let { handler.post(it) }
             return
         }
-        drawable.repeatCount = if (loop) AnimatedImageDrawable.REPEAT_INFINITE else 0
-        if (onEnd != null) {
-            drawable.registerAnimationCallback(object : Animatable2.AnimationCallback() {
-                override fun onAnimationEnd(ended: Drawable) {
-                    // Posted so the next animation doesn't swap drawables inside this drawable's callback
-                    handler.post { if (ended === spriteDrawable) onEnd() }
-                }
-            })
+        if (getDrawable() !== drawable) setImageDrawable(drawable)
+        if (animation.frames.size == 1) {
+            // A still frame has nothing to wait for
+            drawable.showFrame(sheet, animation.frames[0])
+            onEnd?.let { handler.post(it) }
+            return
         }
-        spriteDrawable = drawable
-        drawable.start()
+        var next = 0
+        val step = object : Runnable {
+            override fun run() {
+                if (frameStep !== this) return
+                if (next == animation.frames.size) {
+                    if (!loop) {
+                        frameStep = null
+                        onEnd?.invoke()
+                        return
+                    }
+                    next = 0
+                }
+                drawable.showFrame(sheet, animation.frames[next])
+                val duration = animation.durationsMs[next].toLong().coerceAtLeast(MIN_FRAME_MS)
+                next++
+                if (isShownOnScreen) handler.postDelayed(this, duration)
+            }
+        }
+        frameStep = step
+        step.run()
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        isShownOnScreen = isVisible
+        val step = frameStep ?: return
+        handler.removeCallbacks(step)
+        if (isVisible) handler.post(step)
     }
 
     // A pending Glide load would otherwise land on top of the sprite
@@ -259,10 +284,8 @@ class AgentView @JvmOverloads constructor(
     private fun stopSprite() {
         nextIdleRunnable?.let { handler.removeCallbacks(it) }
         nextIdleRunnable = null
-        // Callbacks stay registered: clearing them while the drawable has an end callback posted
-        // crashes (it iterates the cleared list), and the identity check in playSprite ignores stale ends
-        spriteDrawable?.stop()
-        spriteDrawable = null
+        frameStep?.let { handler.removeCallbacks(it) }
+        frameStep = null
     }
 
     fun getCurrentAgent(): Agent {
@@ -372,5 +395,6 @@ class AgentView @JvmOverloads constructor(
     companion object {
         private const val IDLE_REST_MIN_MS = 1000L
         private const val IDLE_REST_MAX_MS = 3000L
+        private const val MIN_FRAME_MS = 10L
     }
 }
