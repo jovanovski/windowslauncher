@@ -11,6 +11,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -42,13 +43,22 @@ class ScreensaverManager(
 
     private val screensaverRunnable: Runnable = Runnable {
         if (selectedScreensaver == SaverCatalog.NONE) return@Runnable
-        if (keyboardVisible) {
-            // Look again in a while instead of covering the keyboard
+        if (keyboardVisible || !launcherHasFocus()) {
+            // Look again in a while instead of covering the keyboard, or whatever window is
+            // in front of the launcher - see launcherHasFocus
             handler.postDelayed(screensaverRunnable, inactivityTimeout)
             return@Runnable
         }
         showScreensaver()
     }
+
+    /**
+     * Whether the launcher's own window is the one being used. The timer only hears about
+     * touches on that window, so while something else has focus - a menu, the notification
+     * shade, another app beside the launcher in split screen or a pop-up view, which leave it
+     * resumed - it would count someone busy there as idle.
+     */
+    private fun launcherHasFocus(): Boolean = (context as? Activity)?.hasWindowFocus() != false
 
     init {
         // Start the inactivity timer
@@ -62,6 +72,7 @@ class ScreensaverManager(
      * dialog can be closed from its title bar or the back button without OK or Cancel running,
      * and a preview that had swapped the choice in would leave it on after it was turned off.
      */
+    @SuppressLint("ClickableViewAccessibility")
     fun showScreensaver(saverId: String = selectedScreensaver, videoUri: Uri? = customVideoUri) {
         if (screensaverDialog?.isShowing == true) return
 
@@ -120,10 +131,19 @@ class ScreensaverManager(
                 startVideoSaver(videoView, saver, videoUri)
             }
 
-            // Tap to dismiss - the catcher sits over the video and the WebView both
-            screensaverView.findViewById<View>(R.id.screensaver_tap_catcher).setOnClickListener {
+            // Touch to dismiss - the catcher sits over the video and the WebView both. It wakes
+            // on the first contact, as a mouse nudge did, rather than waiting for a whole click:
+            // a click is lost whenever the system cancels the gesture under it, and users reported
+            // needing several taps. The click listener stays for TalkBack, whose double tap
+            // arrives as a click.
+            val tapCatcher = screensaverView.findViewById<View>(R.id.screensaver_tap_catcher)
+            tapCatcher.setOnClickListener {
                 hideScreensaver()
                 resetInactivityTimer()
+            }
+            tapCatcher.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) tapCatcher.performClick()
+                true
             }
 
             // A key press wakes it as a tap does. The screensaver is its own window, so keys

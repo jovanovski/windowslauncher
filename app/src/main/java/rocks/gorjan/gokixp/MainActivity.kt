@@ -772,6 +772,9 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // The screensavers themselves are listed in SaverCatalog.kt
         private const val DEFAULT_SCREENSAVER_TIMEOUT = 30 // Default 30 seconds
+        // Up to what the three-digit Wait field holds. It used to stop at a minute, which left
+        // no way to make the saver wait long enough for reading.
+        private val SCREENSAVER_TIMEOUT_RANGE = 10..999
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 
@@ -1153,6 +1156,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Load screensaver timeout from SharedPreferences (default to 30 seconds)
         val screensaverTimeout = prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
+            .coerceIn(SCREENSAVER_TIMEOUT_RANGE)
         screensaverManager.setInactivityTimeout(screensaverTimeout)
 
         // Initialize Google Drive helper
@@ -7880,20 +7884,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                // Out of range is held to the nearest end rather than dropped. Dropped, typing
+                // 300 quietly kept whatever was there before, and the saver kept coming back.
                 val value = s.toString().toIntOrNull()
-                if (value != null && value in 10..60) {
-                    pendingScreensaverTimeout = value
-                } else if (s.toString().isEmpty()) {
-                    pendingScreensaverTimeout = DEFAULT_SCREENSAVER_TIMEOUT
-                }
+                pendingScreensaverTimeout = value?.coerceIn(SCREENSAVER_TIMEOUT_RANGE) ?: DEFAULT_SCREENSAVER_TIMEOUT
             }
         })
 
-        // The spin box beside the field, held to the same 10..60 a typed value is.
+        // The spin box beside the field, held to the same range a typed value is.
         val screensaverTimeoutSpin = contentView.findViewById<WinSpinButtons>(R.id.screensaver_timeout_spin)
         fun nudgeScreensaverTimeout(by: Int) {
             val current = screensaverTimeoutInput.text.toString().toIntOrNull() ?: pendingScreensaverTimeout
-            screensaverTimeoutInput.setText((current + by).coerceIn(10, 60).toString())
+            screensaverTimeoutInput.setText((current + by).coerceIn(SCREENSAVER_TIMEOUT_RANGE).toString())
             screensaverTimeoutInput.setSelection(screensaverTimeoutInput.text?.length ?: 0)
         }
         screensaverTimeoutSpin.onUp = { nudgeScreensaverTimeout(1) }
@@ -15904,6 +15906,11 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 }
             }
 
+            // Reset screensaver timer on any touch event, edge touches held back below included
+            if (::screensaverManager.isInitialized) {
+                screensaverManager.resetInactivityTimer()
+            }
+
             // Block edge touches that could be back gestures
             if (isEdgeTouch && potentialBackGestureStartTime > 0L) {
                 val timeSinceEdgeTouch = System.currentTimeMillis() - potentialBackGestureStartTime
@@ -15920,11 +15927,6 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             // Also block if back gesture is confirmed (even if not at edge anymore)
             if (isBackGestureInProgress) {
                 return true // Consume the event without processing
-            }
-
-            // Reset screensaver timer on any touch event
-            if (::screensaverManager.isInitialized) {
-                screensaverManager.resetInactivityTimer()
             }
 
             // The agent holds a reply up until it is tapped away, from anywhere on the screen. The

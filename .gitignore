@@ -118,3 +118,4 @@ target/
 secrets.properties
 keystore.properties
 firebase-adminsdk-*.json
+.kotlin
