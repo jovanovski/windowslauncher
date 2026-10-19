@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId = "rocks.gorjan.gokixp"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 36git
         versionCode = 29
         versionName = "2.1.6"
 
