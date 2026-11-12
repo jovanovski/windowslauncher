@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -20,10 +21,19 @@ import android.widget.VideoView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 
 class ScreensaverManager(
     private val context: Context,
-    private val rootView: ViewGroup
+    private val rootView: ViewGroup,
+    /**
+     * The saved saver id and Wait time in seconds, read again each time the timer runs out.
+     * What this manager was last told can be stale - another launcher instance, or a restored
+     * backup, may have changed the setting since. Trusting only that copy is how (None) could
+     * keep showing whichever saver was picked before.
+     */
+    private val savedSettings: (() -> Pair<String, Int>)? = null
 ) {
     private var screensaverDialog: Dialog? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -41,8 +51,26 @@ class ScreensaverManager(
      */
     private var keyboardVisible = false
 
+    /** When the launcher was last used, on the uptime clock the handler also runs on. */
+    private var lastInteractionAt = SystemClock.uptimeMillis()
+
     private val screensaverRunnable: Runnable = Runnable {
+        val activity = context as? Activity
+        // A launcher that is gone or going has no business putting a saver up. Its timer can
+        // still be armed by a stray callback after onPause or onDestroy stopped it.
+        if (activity != null && (activity.isFinishing || activity.isDestroyed)) return@Runnable
+        refreshFromSavedSettings()
         if (selectedScreensaver == SaverCatalog.NONE) return@Runnable
+        // Only the launcher in front shows one; onResume starts the timer again. Without this
+        // a second launcher instance stacked its own saver over the first, which is why a
+        // saver could take several taps to get rid of.
+        if (!isResumed()) return@Runnable
+        // The Wait time may have grown since this was posted
+        val idleFor = SystemClock.uptimeMillis() - lastInteractionAt
+        if (idleFor < inactivityTimeout) {
+            handler.postDelayed(screensaverRunnable, inactivityTimeout - idleFor)
+            return@Runnable
+        }
         if (keyboardVisible || !launcherHasFocus()) {
             // Look again in a while instead of covering the keyboard, or whatever window is
             // in front of the launcher - see launcherHasFocus
@@ -51,6 +79,15 @@ class ScreensaverManager(
         }
         showScreensaver()
     }
+
+    private fun refreshFromSavedSettings() {
+        val (saverId, timeoutSeconds) = savedSettings?.invoke() ?: return
+        selectedScreensaver = saverId
+        inactivityTimeout = timeoutSeconds * 1000L
+    }
+
+    private fun isResumed(): Boolean =
+        (context as? LifecycleOwner)?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) != false
 
     /**
      * Whether the launcher's own window is the one being used. The timer only hears about
@@ -232,6 +269,7 @@ class ScreensaverManager(
     }
 
     fun resetInactivityTimer() {
+        lastInteractionAt = SystemClock.uptimeMillis()
         handler.removeCallbacks(screensaverRunnable)
         hideScreensaver()
         if (selectedScreensaver != SaverCatalog.NONE) {

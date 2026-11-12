@@ -1151,7 +1151,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
         // Initialize screensaver manager
-        screensaverManager = ScreensaverManager(this, binding.root)
+        screensaverManager = ScreensaverManager(this, binding.root) {
+            savedScreensaverId() to prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
+                .coerceIn(SCREENSAVER_TIMEOUT_RANGE)
+        }
 
         // Load screensaver selection from SharedPreferences (default to 3D Pipes for backward compatibility)
         screensaverManager.setCustomVideoUri(savedScreensaverVideoUri())
@@ -13624,8 +13627,16 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         tidyDesktopIcons()
         startPeriodicAppChecking()
 
-        // Reset screensaver timer when app regains focus
+        // Pick up the saved screensaver again, in case it was changed while we were away (by
+        // another launcher instance, or a restored backup), then restart the timer with it
         if (::screensaverManager.isInitialized) {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            screensaverManager.setCustomVideoUri(savedScreensaverVideoUri())
+            screensaverManager.setSelectedScreensaver(savedScreensaverId())
+            screensaverManager.setInactivityTimeout(
+                prefs.safeGetInt(KEY_SCREENSAVER_TIMEOUT, DEFAULT_SCREENSAVER_TIMEOUT)
+                    .coerceIn(SCREENSAVER_TIMEOUT_RANGE)
+            )
             screensaverManager.resetInactivityTimer()
         }
 
