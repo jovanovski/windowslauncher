@@ -44,6 +44,15 @@
             android:elevation="20dp"/>
     </RelativeLayout>
 
+    <!-- Midtown Madness 2 cars driving on the taskbar -->
+    <FrameLayout
+        android:id="@+id/mm2_cars_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/gesture_bar_background"
         android:layout_width="match_parent"

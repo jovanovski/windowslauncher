@@ -97,6 +97,7 @@ import rocks.gorjan.gokixp.apps.destroyer.DesktopDestroyerApp
 import rocks.gorjan.gokixp.apps.iexplore.InternetExplorerApp
 import rocks.gorjan.gokixp.apps.lights.ChristmasLightsManager
 import rocks.gorjan.gokixp.apps.lights.SnowfallManager
+import rocks.gorjan.gokixp.apps.mm2cars.TaskbarCarsManager
 import rocks.gorjan.gokixp.apps.minesweeper.MinesweeperGame
 import rocks.gorjan.gokixp.apps.notepad.NotepadApp
 import rocks.gorjan.gokixp.apps.solitare.SolitareGame
@@ -196,6 +197,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     private val cursorHandler = Handler(Looper.getMainLooper())
     private var christmasLightsManager: ChristmasLightsManager? = null
     private var snowfallManager: SnowfallManager? = null
+    private var taskbarCarsManager: TaskbarCarsManager? = null
     private var desktopDestroyer: DesktopDestroyerApp? = null
     private var jingleBellsMediaPlayer: MediaPlayer? = null
     private var cursorRunnable: Runnable? = null
@@ -753,6 +755,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         private const val KEY_GESTURE_BAR_VISIBLE = "gesture_bar_visible"
         private const val KEY_CHRISTMAS_LIGHTS_VISIBLE = "christmas_lights_visible"
         private const val KEY_CHRISTMAS_LIGHTS_MARGIN = "christmas_lights_margin"
+        private const val KEY_MM2_CARS_VISIBLE = "mm2_cars_visible"
         private const val KEY_TASKBAR_HEIGHT_OFFSET = "taskbar_height_offset"
         private const val KEY_SHOWN_WELCOME_FOR_VERSION = "shown_welcome_for_version"
         private const val KEY_SYSTEM_TRAY_VISIBLE = "system_tray_visible"
@@ -1315,6 +1318,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             val christmasLightsEnabled = prefs.getBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, false)
             if (christmasLightsEnabled) {
                 initializeChristmasLights()
+            }
+
+            if (prefs.getBoolean(KEY_MM2_CARS_VISIBLE, false)) {
+                initializeTaskbarCars()
             }
 
         }, 1000) // Delay to ensure UI is fully loaded
@@ -2919,6 +2926,25 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         Log.d("MainActivity", "Christmas lights and snowfall cleaned up")
     }
 
+    private fun initializeTaskbarCars() {
+        if (taskbarCarsManager != null) return
+        taskbarCarsManager = TaskbarCarsManager(
+            activity = this,
+            container = findViewById(R.id.mm2_cars_container),
+            prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE),
+            onShowSettings = { createAndShowWallpaperDialog("settings") },
+            onExit = {
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit { putBoolean(KEY_MM2_CARS_VISIBLE, false) }
+                cleanupTaskbarCars()
+            }
+        ).also { it.initialize() }
+    }
+
+    private fun cleanupTaskbarCars() {
+        taskbarCarsManager?.cleanup()
+        taskbarCarsManager = null
+    }
+
     private fun toggleJingleBellsMusic() {
         if (jingleBellsMediaPlayer?.isPlaying == true) {
             stopJingleBellsMusic()
@@ -4026,17 +4052,19 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         val query = searchBox.text.toString().trim()
         if (query.isEmpty()) return
 
+        // "marti" always opens its page, even when an app matches the query
+        if (query == "marti") {
+            showInternetExplorerDialog("https://gorjan.rocks/clients/marti/")
+            hideStartMenu()
+            return
+        }
+
         if (appsAdapter?.launchFirstResult() == true) {
             Log.d("MainActivity", "Enter launched first search result for '$query'")
             return
         }
 
-        if (query == "marti") {
-            val url = "https://gorjan.rocks/clients/marti/"
-            showInternetExplorerDialog(url)
-        } else {
-            openSearchWithQuery(query)
-        }
+        openSearchWithQuery(query)
         hideStartMenu()
     }
 
@@ -7663,6 +7691,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
+
+        val showMm2CarsCheckbox = contentView.findViewById<android.widget.CheckBox>(R.id.show_mm2_cars_checkbox)
+        showMm2CarsCheckbox.isChecked = prefs.getBoolean(KEY_MM2_CARS_VISIBLE, false)
+        showMm2CarsCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_MM2_CARS_VISIBLE, isChecked) }
+            if (isChecked) initializeTaskbarCars() else cleanupTaskbarCars()
+        }
 
         showChristmasLightsCheckbox.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_CHRISTMAS_LIGHTS_VISIBLE, isChecked) }
@@ -13554,6 +13589,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Pause snowfall and save state
         snowfallManager?.pause()
+        taskbarCarsManager?.pause()
 
         // Desktop Destroyer stops its timer and its sounds while we're away
         desktopDestroyer?.pause()
@@ -13595,6 +13631,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Resume snowfall animation
         snowfallManager?.resume()
+        taskbarCarsManager?.resume()
 
         // Resume the wallpaper slide from where it stopped. Covered here (not just onStart) so it
         // also restarts when the activity stays visible (e.g. tapping Home while already on the
@@ -13775,6 +13812,7 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
 
         // Clean up Christmas lights
         cleanupChristmasLights()
+        cleanupTaskbarCars()
 
         // Clean up SoundPool
         if (::soundPool.isInitialized) {
@@ -15935,6 +15973,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
                 speechBubbleView.dismissResponse()
             }
 
+            // The taskbar cars' street can be dragged up and down the desktop, and a tap on
+            // one of the cars kicks it into the air - unless an icon, a window or a menu is
+            // over them there. Either way the touch goes no further.
+            if (taskbarCarsManager?.handleTouch(event) { isTouchOnBareDesktop(event) } == true) {
+                return true
+            }
+
             // Check if touch is on an editable EditText
             val isTouchingEditableEditText = isTouchOnEditableEditText(event)
 
@@ -15985,6 +16030,17 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
         }
 
         return false
+    }
+
+    /** Whether nothing but the desktop's own empty containers is under the touch. */
+    private fun isTouchOnBareDesktop(event: MotionEvent): Boolean {
+        val viewGroup = window.decorView.rootView as? ViewGroup ?: return false
+        val touchedView = findViewAtPosition(viewGroup, event.rawX, event.rawY) ?: return true
+        return touchedView.id == R.id.desktop_icons_container ||
+            touchedView.id == R.id.floating_windows_container ||
+            touchedView.id == R.id.main_background ||
+            touchedView.id == R.id.mm2_cars_container ||
+            (touchedView.parent as? View)?.id == R.id.mm2_cars_container
     }
 
     private fun isTouchOnEditableEditText(event: MotionEvent): Boolean {

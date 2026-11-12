@@ -538,6 +538,19 @@
 
         </LinearLayout>
 
+        <CheckBox
+            android:id="@+id/show_mm2_cars_checkbox"
+            style="@style/Win95.CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="Show 'Midtown Madness' cars"
+            android:textColor="#000000"
+            android:fontFamily="@font/micross_block"
+            android:textSize="11dp"
+            android:checked="false"
+            android:paddingLeft="4dp"
+            android:layout_marginBottom="4dp" />
+
         <!-- ==================== Desktop Agent ==================== -->
         <TextView
             style="@style/Win95.SectionHeader"

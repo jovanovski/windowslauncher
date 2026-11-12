@@ -1,0 +1,103 @@
+<!doctype html>
+<!-- Side view of sim.js: one MM2 car at one ramp. Modules need http, so from this folder:
+     python3 -m http.server 8123   then open http://localhost:8123/ -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>MM2 Ramp Sim</title>
+<style>
+  :root { --bg: #f4f1ea; --ink: #222; --road: #6b6b6b; --ramp: #c48a4c; --car: #2f6fb3; }
+  body { margin: 0; font: 13px system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; }
+  label { display: flex; gap: 4px; align-items: center; }
+  input[type=number] { width: 60px; }
+  canvas { display: block; width: 100%; background: #fff; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+  pre { padding: 0 16px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <label>Car <select id="car"></select></label>
+  <label>Trailer scale <input id="scale" type="number" step="0.01" value="0.38"></label>
+  <label>Stunt <select id="stunt">
+    <option>none</option><option>backflip</option><option>frontflip</option><option>roll</option><option>helicopter</option>
+  </select></label>
+  <label>turn × <input id="factor" type="number" step="0.05" value="1"></label>
+  <label>speed × <input id="slow" type="number" step="0.25" value="0.5"></label>
+  <button id="run">Run</button>
+</header>
+<canvas id="view" height="360"></canvas>
+<pre id="out"></pre>
+<script type="module">
+import { CARS, TRAILER_PROFILE } from './cars.js';
+import { rampRun } from './sim.js';
+
+const SPEEDS = { bullet: 18, beetle: 18.8, cab: 19.6, panoz: 20.4, cop: 21.2 };
+const CRUISE = { bullet: 12, beetle: 10, cab: 9, panoz: 13.5, cop: 12.5 };
+const $ = (id) => document.getElementById(id);
+for (const id of Object.keys(CARS)) $('car').append(new Option(id, id));
+
+const canvas = $('view'), ctx = canvas.getContext('2d');
+let run = null, start = 0;
+
+function go() {
+  const id = $('car').value;
+  run = rampRun(CARS[id], {
+    scale: +$('scale').value, profile: TRAILER_PROFILE,
+    cruise: CRUISE[id], jumpSpeed: SPEEDS[id], seconds: 4,
+    stunt: { kind: $('stunt').value, factor: +$('factor').value },
+  });
+  $('out').textContent = JSON.stringify(run.verdict, null, 1) + '\n' +
+    run.world.events.filter(e => e.kind !== 'scrape').map(e => JSON.stringify(e)).join('\n');
+  start = performance.now();
+}
+
+function draw(now) {
+  requestAnimationFrame(draw);
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = 360 * devicePixelRatio;
+  const W = canvas.width, H = canvas.height, s = W / 50, gy = H - 40 * devicePixelRatio;
+  const X = (x) => (x + 18) * s, Y = (y) => gy - y * s;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#6b6b6b'; ctx.fillRect(0, gy, W, H - gy);
+  ctx.fillStyle = '#999'; ctx.font = `${11 * devicePixelRatio}px system-ui`;
+  for (let x = -18; x < 32; x += 2) { ctx.fillRect(X(x), gy, 1, 6); ctx.fillText(x, X(x) + 2, gy + 16 * devicePixelRatio); }
+  if (!run) return;
+  const r = run.world.ramps[0];
+  ctx.fillStyle = '#7a6a58'; ctx.beginPath(); ctx.moveTo(X(r.start - 0.8), Y(0));
+  for (let a = -0.8; a <= r.length; a += 0.05) ctx.lineTo(X(r.start + a), Y(r.heightAt(a)));
+  ctx.lineTo(X(r.end), Y(0)); ctx.fill();
+
+  const t = (now - start) / 1000 * +$('slow').value;
+  const frames = run.frames;
+  const i = Math.min(frames.length - 1, Math.floor(t * 60));
+  // trail
+  ctx.strokeStyle = '#2f6fb355'; ctx.beginPath();
+  frames.slice(0, i + 1).forEach((f, k) => k ? ctx.lineTo(X(f.x), Y(f.y)) : ctx.moveTo(X(f.x), Y(f.y)));
+  ctx.stroke();
+  const f = frames[i], car = run.car, m = f.m, b = car.bounds, c = car.com;
+  const place = (lx, ly, lz) => [X(f.x + m[0] * lx + m[1] * ly + m[2] * lz), Y(f.y + m[3] * lx + m[4] * ly + m[5] * lz)];
+  // body as its side outline: sill and roof corners, nose to tail
+  const sill = b[1] + 0.28 - c[1], roof = b[4] - c[1], nose = b[2] - c[2], tail = b[5] - c[2];
+  const outline = [[nose, sill], [nose, (sill + roof) / 2], [nose * 0.45, roof], [tail * 0.45, roof], [tail, (sill + roof) / 2], [tail, sill]];
+  ctx.fillStyle = '#2f6fb3'; ctx.beginPath();
+  outline.forEach(([z, y], k) => { const [px, py] = place(0, y, z); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+  ctx.closePath(); ctx.fill();
+  // nose marker
+  const [nx, ny] = place(0, (sill + roof) / 2, nose); ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(nx, ny, 3 * devicePixelRatio, 0, 7); ctx.fill();
+  for (const [k, wh] of car.wheels.entries()) {
+    const [px, py] = place(wh.pivot[0] - c[0], wh.pivot[1] - c[1], wh.pivot[2] - c[2]);
+    ctx.fillStyle = f.contact[k] ? '#111' : '#555';
+    ctx.beginPath(); ctx.arc(px, py, wh.radius * s, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = '#222';
+  ctx.fillText(`t ${f.t.toFixed(2)}  vx ${f.vx.toFixed(1)}  vy ${f.vy.toFixed(1)}  pitch ${f.pitch.toFixed(0)}°  up ${f.up.toFixed(2)}`, 10, 20 * devicePixelRatio);
+}
+
+$('run').onclick = go;
+for (const el of document.querySelectorAll('select, input')) el.onchange = go;
+go();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
