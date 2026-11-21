@@ -30,6 +30,8 @@ data class SavedDesktopWidget(
     val height: Int,
     /** Which desktop it is on. Missing from widgets saved before there were several: 0. */
     val page: Int = 0,
+    /** How opaque the widget is drawn, 0..1. Missing from widgets saved before it existed: null, fully opaque. */
+    val opacity: Float? = null,
 )
 
 /**
@@ -137,6 +139,7 @@ class DesktopWidgetManager(
                 continue
             }
             addWidgetView(entry.appWidgetId, info, entry.x, entry.y, entry.width, entry.height, entry.page)
+                .opacity = (entry.opacity ?: 1f).coerceIn(MIN_OPACITY, 1f)
             kept.add(entry)
         }
         if (kept.size != saved.size) save(kept)
@@ -363,6 +366,16 @@ class DesktopWidgetManager(
         saveAll()
     }
 
+    /** Makes the widget [delta] more opaque (negative: more transparent), within limits, and saves it. */
+    fun changeOpacity(view: DesktopWidgetView, delta: Float) {
+        // Rounded to the step so repeated presses land on even percentages
+        val stepped = Math.round((view.opacity + delta) / OPACITY_STEP) * OPACITY_STEP
+        val opacity = stepped.coerceIn(MIN_OPACITY, 1f)
+        if (opacity == view.opacity) return
+        view.opacity = opacity
+        save(currentWidgets())
+    }
+
     fun canReconfigure(view: DesktopWidgetView): Boolean {
         val info = view.providerInfo
         return info.configure != null &&
@@ -416,7 +429,7 @@ class DesktopWidgetManager(
     }
 
     private fun currentWidgets(): List<SavedDesktopWidget> = widgetViews.map {
-        SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight, it.page)
+        SavedDesktopWidget(it.appWidgetId, it.savedX, it.savedY, it.savedWidth, it.savedHeight, it.page, it.opacity)
     }
 
     private fun save(widgets: List<SavedDesktopWidget>) {
@@ -434,6 +447,10 @@ class DesktopWidgetManager(
 
         const val MIN_SCALE = 0.5f
         const val MAX_SCALE = 1.5f
+
+        /** A widget can be made see-through, but never so far it can't be found again. */
+        const val MIN_OPACITY = 0.1f
+        const val OPACITY_STEP = 0.1f
 
         private fun readScale(prefs: android.content.SharedPreferences): Float = try {
             prefs.getFloat(KEY_WIDGET_SCALE, 1f).coerceIn(MIN_SCALE, MAX_SCALE)

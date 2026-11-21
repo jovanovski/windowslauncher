@@ -331,6 +331,8 @@ class ContextMenuView @JvmOverloads constructor(
                     subActionIconView.visibility = GONE
                 }
 
+                item.stepper?.let { addStepper(itemView, textView, it) }
+
                 // Set click listener
                 if (item.isEnabled && item.action != null) {
                     itemView.setOnClickListener {
@@ -354,6 +356,38 @@ class ContextMenuView @JvmOverloads constructor(
         }
     }
     
+    /**
+     * The − / + buttons, after the title. Unlike every other row they act
+     * without putting the menu away, so the value can be nudged several times while watching it.
+     */
+    private fun addStepper(row: LinearLayout, title: TextView, stepper: MenuStepper) {
+        // The title's 0dp width would be squeezed by the views added after it: let it take
+        // the width of its own words (and any spare width), on one line
+        title.isSingleLine = true
+        title.layoutParams = (title.layoutParams as LayoutParams).apply { width = LayoutParams.WRAP_CONTENT }
+        fun button(label: String, onPress: () -> Unit) = TextView(context).apply {
+            text = label
+            textSize = 14f
+            typeface = title.typeface
+            setTextColor(title.textColors)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LayoutParams(28.dpToPx(), LayoutParams.MATCH_PARENT)
+            setBackgroundResource(
+                if (isWin31()) R.drawable.win31_menu_item else R.drawable.context_menu_item_enabled
+            )
+            isClickable = true
+            setOnClickListener {
+                (context as? MainActivity)?.playClickSound()
+                onPress()
+            }
+        }
+
+        row.addView(button("−", stepper.onDecrease).apply {
+            (layoutParams as LayoutParams).marginStart = 12.dpToPx()
+        })
+        row.addView(button("+", stepper.onIncrease))
+    }
+
     private fun positionMenu(x: Float, y: Float) {
         // Force measure to get actual dimensions
         measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),

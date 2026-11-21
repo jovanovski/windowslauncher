@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.content.pm.LauncherApps
 import android.net.Uri
 import android.graphics.Canvas
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
@@ -3961,6 +3962,13 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
      */
     private fun showStartMenuFolder(folder: StartMenuFolder, row: View) {
         startMenuFolderMenu?.dismiss()
+        // The folder's menu takes over from the search box: the keyboard goes, and without
+        // the focus it does not come back when the menu closes or one of its programs starts.
+        if (::searchBox.isInitialized) {
+            val imm = attributionContext("system").getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(searchBox.windowToken, 0)
+            searchBox.clearFocus()
+        }
         val folderIcon = AppCompatResources.getDrawable(this, themeManager.getFolderIconRes(themeManager.getSelectedTheme()))
         fun itemsOf(children: List<Any>): List<ContextMenuItem> = children.mapNotNull { child ->
             when (child) {
@@ -4022,11 +4030,18 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
     }
 
     private fun setupSearchBox() {
+        // A slanted face is for the hint alone: what is typed over it stands upright.
+        val hintTypeface = searchBox.typeface
+        val typedTypeface = if (hintTypeface?.isItalic == true) Typeface.create(hintTypeface, Typeface.NORMAL) else null
         searchBox.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val query = s?.toString() ?: ""
+                if (typedTypeface != null) {
+                    val face = if (query.isEmpty()) hintTypeface else typedTypeface
+                    if (searchBox.typeface !== face) searchBox.typeface = face
+                }
                 // filter() reports whether the visible set actually changed, so we only pay
                 // for a scroll when the results moved.
                 if (appsAdapter?.filter(query) == true && ::appsRecyclerView.isInitialized) {
@@ -4789,6 +4804,10 @@ class MainActivity : AppCompatActivity(), AppChangeListener {
             onConfigure = if (desktopWidgetManager.canReconfigure(view)) {
                 { hideContextMenu(); desktopWidgetManager.reconfigure(view) }
             } else null,
+            transparency = MenuStepper(
+                onDecrease = { desktopWidgetManager.changeOpacity(view, DesktopWidgetManager.OPACITY_STEP) },
+                onIncrease = { desktopWidgetManager.changeOpacity(view, -DesktopWidgetManager.OPACITY_STEP) },
+            ),
             onRemove = {
                 hideContextMenu()
                 playRecycleSound()

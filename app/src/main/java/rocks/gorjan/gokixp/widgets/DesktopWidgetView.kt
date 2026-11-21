@@ -104,6 +104,16 @@ class DesktopWidgetView(
      * size; the widget is laid out at frame / scale and then scaled to fill it, so at 0.8 the
      * app sees (and lays out for) a widget 25% bigger than the frame, with smaller text.
      */
+    /**
+     * How opaque the widget's content is drawn. Set on the app's view rather than the frame so
+     * the edit-mode outline and grips stay solid however faint the widget is.
+     */
+    var opacity = 1f
+        set(value) {
+            field = value
+            hostView.alpha = value
+        }
+
     var contentScale = 1f
         set(value) {
             if (field == value) return

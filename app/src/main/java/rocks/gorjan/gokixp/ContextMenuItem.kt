@@ -31,6 +31,8 @@ data class ContextMenuItem(
      * where any item has one is laid out like the Start menu's, roomier and with icons.
      */
     val icon: Drawable? = null,
+    /** − and + buttons at the end of the row; pressing them leaves the menu open. */
+    val stepper: MenuStepper? = null,
 ) {
     /** A menu separator is an item with nothing in it. */
     val isSeparator: Boolean get() = title.isEmpty()
@@ -42,6 +44,12 @@ data class ContextMenuItem(
         fun separator() = ContextMenuItem("", isEnabled = false)
     }
 }
+
+/** A value nudged down or up from inside the menu, without closing it. */
+data class MenuStepper(
+    val onDecrease: () -> Unit,
+    val onIncrease: () -> Unit,
+)
 
 /** "Pin to Taskbar" / "Unpin from Taskbar", offered only by the Windows 7 superbar. */
 data class TaskbarPinItem(val isPinned: Boolean, val onToggle: () -> Unit) {
@@ -76,6 +84,7 @@ object ContextMenuItems {
     fun getDesktopWidgetMenuItems(
         onMoveResize: () -> Unit,
         onConfigure: (() -> Unit)?,
+        transparency: MenuStepper,
         onRemove: () -> Unit
     ): List<ContextMenuItem> {
         val items = mutableListOf(
@@ -84,6 +93,7 @@ object ContextMenuItems {
         if (onConfigure != null) {
             items.add(ContextMenuItem("Configure...", isEnabled = true, action = onConfigure))
         }
+        items.add(ContextMenuItem("Transparency", isEnabled = true, stepper = transparency))
         items.add(ContextMenuItem.separator())
         items.add(ContextMenuItem("Remove Widget", isEnabled = true, action = onRemove))
         return items
